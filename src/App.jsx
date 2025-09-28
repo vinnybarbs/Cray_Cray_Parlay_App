@@ -174,15 +174,11 @@ const App = () => {
 
   const Dropdown = ({ label, value, onChange, options, description }) => (
     <div className="flex flex-col space-y-2">
-      {/* Label and description now uses a more distinct color */}
-      <label className="text-gray-300 text-sm font-semibold tracking-wide flex items-center">
-        {label}
-      </label>
+      <label className="text-gray-200 text-sm font-semibold">{label}</label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        // Redesigned select: Darker background, bright green focus/border
-        className="bg-gray-700 text-white p-3 rounded-lg border border-gray-600 focus:ring-green-500 focus:border-green-500 transition duration-200 shadow-md appearance-none cursor-pointer hover:border-green-500/50"
+        className="bg-gray-700 text-white p-3 rounded-xl border border-yellow-500 focus:ring-yellow-400 focus:border-yellow-400 transition duration-150 shadow-lg appearance-none cursor-pointer"
       >
         {options.map((opt) => (
           <option key={opt} value={opt} className="text-sm">
@@ -191,156 +187,137 @@ const App = () => {
         ))}
       </select>
       {description && (
-        <p className="text-xs text-gray-500 mt-1 italic leading-tight">{description}</p>
+        <p className="text-xs text-gray-400 mt-1 italic">{description}</p>
       )}
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans p-4 sm:p-8">
+    <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
       <style>{`
-        /* Custom Scrollbar for better UX (Matching the green/gold theme) */
+        /* Custom Scrollbar for better UX */
         .results-box::-webkit-scrollbar {
           width: 8px;
         }
         .results-box::-webkit-scrollbar-thumb {
-          background-color: #10b981; /* Emerald Green */
+          background-color: #f59e0b;
           border-radius: 4px;
-        }
-        .results-box::-webkit-scrollbar-track {
-           background-color: #1f2937;
         }
         .results-box {
           scrollbar-width: thin;
-          scrollbar-color: #10b981 #1f2937;
-        }
-
-        /* Basic Markdown Styling inside the results box */
-        .results-box h3 {
-            font-size: 1.5rem; /* text-xl */
-            font-weight: 700; /* font-bold */
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-            color: #f59e0b; /* Amber */
-        }
-        .results-box strong {
-            color: #10bb81; /* Emerald Green */
+          scrollbar-color: #f59e0b #1f2937;
         }
       `}</style>
+      <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl">
+        {/* LOGO REMOVED - Clean, title-only header now */}
+        <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">
+          Cray Cray
+        </h1>
+        <p className="text-xl font-medium text-gray-300">for Parlays</p>
+      </header>
 
-      {/* Main App Content Wrapper: Centered and responsive */}
-      <div className="max-w-4xl mx-auto space-y-8">
-        <header className="flex flex-col items-center justify-center py-8 bg-gray-800 rounded-xl shadow-xl border-b border-green-500/50">
-          <h1 className="text-6xl font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-yellow-400 drop-shadow-lg">
-            Cray Cray
-          </h1>
-          <p className="text-2xl font-light text-gray-400 tracking-wide mt-1">for Parlays</p>
-        </header>
-
-        {/* Input/Form Card */}
-        <div className="bg-gray-800 p-6 sm:p-8 rounded-xl shadow-2xl border border-gray-700 space-y-6">
-          <h2 className="text-2xl font-bold text-gray-100 border-b border-gray-700 pb-3 mb-4">
-              Parlay Generation Settings
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Dropdown
-              label="1. Sport"
-              value={sport}
-              onChange={setSport}
-              options={['NFL', 'NBA', 'MLB', 'NHL', 'Soccer', 'NCAAF', 'PGA/Golf', 'Tennis/ATP/WTA']}
-            />
-            <Dropdown
-              label="2. Risk Level"
-              value={riskLevel}
-              onChange={setRiskLevel}
-              options={Object.keys(RISK_LEVEL_DEFINITIONS)}
-              description={RISK_LEVEL_DEFINITIONS[riskLevel]}
-            />
-            <Dropdown
-              label="3. Number of Legs"
-              value={numLegs}
-              onChange={val => setNumLegs(parseInt(val))}
-              options={[2, 3, 4, 5, 6]}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
-            <Dropdown
-              label="4. Bet Type Focus"
-              value={betType}
-              onChange={setBetType}
-              options={['Moneyline/Spread', 'Player Props', 'Totals (Over/Under)', 'Team Props', 'Combo, Surprise Me']}
-            />
-            <Dropdown
-              label="5. Preferred Odds Platform"
-              value={oddsPlatform}
-              onChange={setOddsPlatform}
-              options={['DraftKings', 'FanDuel', 'MGM', 'Caesars', 'Bet365']}
-            />
-          </div>
-
-          <button
-            onClick={fetchParlaySuggestion}
-            disabled={loading}
-            className={`w-full py-4 mt-6 font-extrabold text-xl rounded-xl transition duration-300 transform active:scale-[0.98] border-b-4 ${loading
-                ? 'bg-gray-600 text-gray-400 cursor-not-allowed border-gray-700 shadow-inner'
-                : 'bg-gradient-to-r from-green-500 to-lime-600 text-gray-900 hover:from-green-400 hover:to-lime-500 shadow-green-500/50 shadow-xl border-green-700'
-              }`}
-          >
-            {loading ? (
-              <div className="flex items-center justify-center space-x-3">
-                <svg className="animate-spin h-5 w-5 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeLinecap="round"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                <span className="text-gray-900">Analyzing Current Odds...</span>
-              </div>
-            ) : (
-              `🔥 Generate ${numLegs}-Leg Parlay Suggestions`
-            )}
-          </button>
+      <div className="space-y-6 max-w-lg mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Dropdown
+            label="1. Sport"
+            value={sport}
+            onChange={setSport}
+            options={['NFL', 'NBA', 'MLB', 'NHL', 'Soccer', 'NCAAF', 'PGA/Golf', 'Tennis/ATP/WTA']}
+          />
+          <Dropdown
+            label="2. Risk Level"
+            value={riskLevel}
+            onChange={setRiskLevel}
+            options={Object.keys(RISK_LEVEL_DEFINITIONS)}
+            description={RISK_LEVEL_DEFINITIONS[riskLevel]}
+          />
         </div>
 
-        {/* User ID Display */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Dropdown
+            label="3. Number of Legs"
+            value={numLegs}
+            onChange={val => setNumLegs(parseInt(val))}
+            options={[2, 3, 4, 5, 6]}
+          />
+          <Dropdown
+            label="4. Bet Type Focus"
+            value={betType}
+            onChange={setBetType}
+            options={['Moneyline/Spread', 'Player Props', 'Totals (Over/Under)', 'Team Props', 'Combo, Surprise Me']}
+          />
+        </div>
+
+        <Dropdown
+          label="5. Preferred Odds Platform"
+          value={oddsPlatform}
+          onChange={setOddsPlatform}
+          options={['DraftKings', 'FanDuel', 'MGM', 'Caesars', 'Bet365']}
+        />
+
+        <button
+          onClick={fetchParlaySuggestion}
+          disabled={loading}
+          className={`w-full py-4 mt-8 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95
+            ${loading
+              ? 'bg-gray-500 cursor-not-allowed'
+              : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
+            }`}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center">
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Analyzing Current Odds...
+            </div>
+          ) : (
+            `Generate ${numLegs}-Leg Parlay Suggestions`
+          )}
+        </button>
+
         {userId && (
-          <p className="text-xs text-center text-gray-600 pt-2">
-            User ID: {userId} (Used for session identification)
-          </p>
+            <p className="text-xs text-center text-gray-500 pt-2">
+                User ID: {userId}
+            </p>
+        )}
+      </div>
+
+      {/* Results Display Area */}
+      <div className="mt-8 pt-4 border-t border-gray-700 max-w-lg mx-auto">
+        <h2 className="text-2xl font-bold mb-4 text-yellow-400">Parlay Analyst Report</h2>
+
+        {error && (
+          <div className="p-4 bg-red-800 rounded-xl text-red-100 shadow-md">
+            <p className="font-bold">Error:</p>
+            <p>{error}</p>
+          </div>
         )}
 
-        {/* Results Display Area */}
-        <div className="pt-4">
-          <h2 className="text-3xl font-bold mb-4 text-yellow-400 text-center">Analyst Report</h2>
-
-          {error && (
-            <div className="p-4 bg-red-900 border border-red-700 rounded-xl text-red-100 shadow-md">
-              <p className="font-bold">Error Encountered:</p>
-              <p>{error}</p>
-            </div>
-          )}
-
-          {results && (
-            // Custom CSS ensures markdown elements within this box are styled beautifully
-            <div className="results-box p-6 bg-gray-800 rounded-xl shadow-2xl border border-gray-700 overflow-y-auto max-h-[80vh]">
+        {results && (
+          <div className="results-box p-4 bg-gray-800 rounded-xl shadow-lg overflow-y-auto max-h-[70vh]">
+            {/* The dangerouslySetInnerHTML is used to render the Markdown output from Gemini correctly. */}
+            <article className="prose prose-invert prose-p:text-gray-300 prose-li:text-gray-300 prose-strong:text-yellow-400 max-w-none">
               <div dangerouslySetInnerHTML={{ __html: results.replace(/\n/g, '<br/>') }} />
-            </div>
-          )}
+            </article>
+          </div>
+        )}
 
-          {!loading && !error && !results && (
-              <div className="p-10 text-center text-gray-500 border-2 border-dashed border-gray-700 rounded-xl">
-                  <p className="text-xl font-medium">Ready for the Data Drop?</p>
-                  <p className="mt-2">Select your criteria above and click **Generate** to receive a highly detailed, data-backed parlay analysis tailored to your risk profile.</p>
-              </div>
-          )}
-        </div>
-      
-        {/* Footer Text */}
-        <div className="mt-12 mb-4 text-center">
-          <p className="uppercase font-medium text-xs text-gray-700 tracking-[0.2em] pb-8">
-            A BISQUE BOYS APPLICATION
-          </p>
-        </div>
+        {!loading && !error && !results && (
+            <div className="p-6 text-center text-gray-500 border border-dashed border-gray-700 rounded-xl">
+                <p>Select your criteria above and click "Generate" to receive a highly detailed, data-backed parlay analysis.</p>
+            </div>
+        )}
       </div>
+      
+      {/* Footer Text: A BISQUE BOYS APPLICATION */}
+      <div className="max-w-lg mx-auto mt-12 mb-4 text-center">
+        <p className="uppercase font-bold text-xs text-gray-700 tracking-widest">
+          A BISQUE BOYS APPLICATION
+        </p>
+      </div>
+
     </div>
   );
 };

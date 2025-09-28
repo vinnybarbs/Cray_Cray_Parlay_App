@@ -1,0 +1,17 @@
+brotli
+c-ares
+ca-certificates
+icu4c@77
+libnghttp2
+libnghttp3
+libngtcp2
+libuv
+lz4
+node
+openssl@3
+readline
+simdjson
+sqlite
+uvwasi
+xz
+zstd
