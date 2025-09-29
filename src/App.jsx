@@ -97,6 +97,13 @@ const App = () => {
   console.log('VITE_OPENAI_API_KEY present:', !!import.meta.env.VITE_OPENAI_API_KEY);
   console.log('VITE_GEMINI_API_KEY present:', !!import.meta.env.VITE_GEMINI_API_KEY);
   console.log('VITE_ODDS_API_KEY present:', !!import.meta.env.VITE_ODDS_API_KEY);
+  // Debug: list Vite-provided env keys (safe: keys only, no values)
+  try {
+    const viteKeys = Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'));
+    console.log('Vite env keys present:', viteKeys);
+  } catch (e) {
+    console.warn('Could not list import.meta.env keys', e);
+  }
   // --- State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
