@@ -33,19 +33,22 @@ const RISK_LEVEL_DEFINITIONS = {
   High: "Value underdogs and high-variance outcomes, +600+ odds",
 };
 
+const AI_MODELS = ['OpenAI', 'Gemini'];
+
 const App = () => {
-  // --- State ---
+  // --- UI State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
+  const [aiModel, setAiModel] = useState('OpenAI');
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState('');
   const [error, setError] = useState(null);
 
-  // --- Handlers ---
+  // --- Toggle Handlers ---
   const toggleSport = (sport) => {
     setSelectedSports(prev =>
       prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]
@@ -68,11 +71,9 @@ const App = () => {
       for (const sport of selectedSports) {
         const slug = SPORT_SLUGS[sport];
         const markets = selectedBetTypes.flatMap(bt => MARKET_MAPPING[bt]).join(',');
-
         const url = `${import.meta.env.VITE_API}/sports/${slug}/odds/?regions=us&markets=${markets}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${apiKey}`;
         const res = await fetch(url);
         if (!res.ok) continue;
-
         const data = await res.json();
         oddsResults.push(...data);
       }
@@ -84,14 +85,13 @@ const App = () => {
     }
   };
 
-  // --- Generate OpenAI Prompt ---
-  const generateOpenAIPrompt = useCallback((oddsData) => {
+  // --- Generate OpenAI/Gemini Prompt ---
+  const generatePrompt = useCallback((oddsData) => {
     const sportsStr = selectedSports.join(', ');
     const betTypesStr = selectedBetTypes.join(', ');
     const riskDesc = RISK_LEVEL_DEFINITIONS[riskLevel];
-
     const oddsContext = oddsData.length
-      ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}`
+      ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0,10), null,2)}`
       : '';
 
     return `
@@ -136,17 +136,26 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
 
     try {
       const oddsData = await fetchOddsData();
-      const prompt = generateOpenAIPrompt(oddsData);
-      const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      const prompt = generatePrompt(oddsData);
 
-      const response = await fetch(`${import.meta.env.VITE_API}/openai/chat/completions`, {
+      let apiUrl, apiKey;
+      if (aiModel === 'OpenAI') {
+        apiUrl = 'https://api.openai.com/v1/chat/completions';
+        apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+      } else {
+        // Placeholder Gemini endpoint
+        apiUrl = `${import.meta.env.VITE_API}/gemini/completions`;
+        apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      }
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiKey}`
+          'Authorization': `Bearer ${apiKey}`
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: aiModel === 'OpenAI' ? 'gpt-4o-mini' : 'gemini-prototype',
           messages: [
             { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
             { role: 'user', content: prompt }
@@ -158,13 +167,12 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        throw new Error(`AI API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-
-      if (!content) throw new Error('No content returned from OpenAI');
+      const content = data.choices?.[0]?.message?.content || data.output; // Gemini fallback
+      if (!content) throw new Error('No content returned from AI');
 
       setResults(content);
     } catch (e) {
@@ -173,7 +181,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
     } finally {
       setLoading(false);
     }
-  }, [generateOpenAIPrompt, loading, selectedSports, selectedBetTypes, oddsPlatform]);
+  }, [generatePrompt, loading, selectedSports, selectedBetTypes, oddsPlatform, aiModel]);
 
   // --- UI Components ---
   const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -273,10 +281,18 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
           />
         </div>
 
+        {/* AI Model Selection */}
+        <Dropdown
+          label="AI Model"
+          value={aiModel}
+          onChange={setAiModel}
+          options={AI_MODELS}
+        />
+
         <button
           onClick={fetchParlaySuggestion}
           disabled={loading || selectedSports.length === 0 || selectedBetTypes.length === 0}
-          className={`w-full py-4 mt-8 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95
+          className={`w-full py-4 mt-4 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95
             ${loading || selectedSports.length === 0 || selectedBetTypes.length === 0
               ? 'bg-gray-500 cursor-not-allowed'
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
