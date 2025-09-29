@@ -33,6 +33,24 @@ const RISK_LEVEL_DEFINITIONS = {
   High: "Value underdogs and high-variance outcomes, +600+ odds",
 };
 
+// --- Odds Widget ---
+const OddsWidget = ({ sport, bookmaker }) => {
+  if (!sport || !bookmaker) return null;
+  const slug = SPORT_SLUGS[sport];
+  const bookKey = BOOKMAKER_MAPPING[bookmaker];
+  const widgetSrc = `https://widget.the-odds-api.com/v1/sports/${slug}/events/?accessKey=${process.env.REACT_APP_ODDS_API_KEY}&bookmakerKeys=${bookKey}&oddsFormat=american&markets=h2h,spreads,totals`;
+
+  return (
+    <div className="mt-8 flex justify-center">
+      <iframe
+        title="Sports Odds Widget"
+        style={{ width: '20rem', height: '25rem', border: '1px solid black' }}
+        src={widgetSrc}
+      />
+    </div>
+  );
+};
+
 const App = () => {
   // --- UI State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
@@ -40,7 +58,6 @@ const App = () => {
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
-  const [selectedModel, setSelectedModel] = useState('OpenAI'); // OpenAI or Gemini
 
   // --- API State ---
   const [loading, setLoading] = useState(false);
@@ -139,52 +156,33 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
       const oddsData = await fetchOddsData();
       const prompt = generatePrompt(oddsData);
 
-      if (selectedModel === 'OpenAI') {
-        const response = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-          })
-        });
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays with degenerate humor.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        })
+      });
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        setResults(content || '');
-      } else {
-        // Gemini
-        const geminiPayload = {
-          contents: [{ parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }],
-          systemInstruction: { parts: [{ text: 'You are a concise sports betting analyst producing actionable parlays with degenerate humor.' }] }
-        };
-
-        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${process.env.REACT_APP_GEMINI_API_KEY}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(geminiPayload)
-        });
-
-        const geminiData = await geminiResponse.json();
-        const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
-        setResults(content || '');
-      }
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      setResults(content || '');
     } catch (e) {
       console.error(e);
       setError(`Failed to generate parlays: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [selectedModel, generatePrompt, loading, selectedSports, selectedBetTypes, oddsPlatform]);
+  }, [generatePrompt, loading, selectedSports, selectedBetTypes, oddsPlatform]);
 
   // --- UI Components ---
   const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -245,99 +243,5 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
             selectedOptions={selectedBetTypes}
             onToggle={toggleBetType}
           />
-        </div>
 
-        <div>
-          <label className="text-gray-200 text-sm font-semibold block mb-3">
-            3. Number of Legs: <span className="text-yellow-400 text-lg font-bold">{numLegs}</span>
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={numLegs}
-            onChange={(e) => setNumLegs(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>1</span>
-            <span>10</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Dropdown
-            label="4. Risk Level"
-            value={riskLevel}
-            onChange={setRiskLevel}
-            options={Object.keys(RISK_LEVEL_DEFINITIONS)}
-            description={RISK_LEVEL_DEFINITIONS[riskLevel]}
-          />
-          <Dropdown
-            label="5. Odds Platform"
-            value={oddsPlatform}
-            onChange={setOddsPlatform}
-            options={['DraftKings', 'FanDuel', 'MGM', 'Caesars', 'Bet365']}
-          />
-          <Dropdown
-            label="6. Model"
-            value={selectedModel}
-            onChange={setSelectedModel}
-            options={['OpenAI', 'Gemini']}
-            description="Select which AI model to generate your parlays"
-          />
-        </div>
-
-        <button
-          onClick={fetchParlaySuggestion}
-          disabled={loading || selectedSports.length === 0 || selectedBetTypes.length === 0}
-          className={`w-full py-4 mt-8 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95
-            ${loading || selectedSports.length === 0 || selectedBetTypes.length === 0
-              ? 'bg-gray-500 cursor-not-allowed'
-              : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
-            }`}
-        >
-          {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
-        </button>
-
-        {selectedSports.length === 0 && (
-          <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>
-        )}
-        {selectedBetTypes.length === 0 && (
-          <p className="text-xs text-center text-red-400">⚠️ Select at least one bet type</p>
-        )}
-      </div>
-
-      <div className="mt-8 pt-4 border-t border-gray-700 max-w-2xl mx-auto">
-        <h2 className="text-2xl font-bold mb-4 text-yellow-400">AI-Powered Parlay Analysis</h2>
-
-        {error && (
-          <div className="p-4 bg-red-800 rounded-xl text-red-100 shadow-md">
-            <p className="font-bold">Error:</p>
-            <p>{error}</p>
-          </div>
-        )}
-
-        {results && (
-          <div className="p-6 bg-gray-800 rounded-xl shadow-lg overflow-y-auto max-h-[70vh]">
-            <pre className="whitespace-pre-wrap text-gray-300">{results}</pre>
-          </div>
-        )}
-
-        {!loading && !error && !results && (
-          <div className="p-6 text-center text-gray-500 border border-dashed border-gray-700 rounded-xl">
-            <p>Configure your parlay preferences above and hit Generate to receive AI-powered picks with a bonus high-probability parlay!</p>
-          </div>
-        )}
-      </div>
-
-      <div className="max-w-2xl mx-auto mt-12 mb-4 text-center">
-        <p className="uppercase font-bold text-xs text-gray-700 tracking-widest">
-          A BISQUE BOYS APPLICATION
-        </p>
-      </div>
-    </div>
-  );
-};
-
-export default App;
+   
