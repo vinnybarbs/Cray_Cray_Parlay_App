@@ -186,8 +186,12 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
 
   // --- Fetch Parlay Suggestions ---
   const fetchParlaySuggestion = useCallback(async () => {
-    if (loading || selectedSports.length === 0 || selectedBetTypes.length === 0) return;
+    // --- THIS IS OUR FINAL TEST ---
+    console.log('--- TEST VARIABLE CHECK ---');
+    console.log('Value:', process.env.REACT_APP_TEST_VARIABLE);
 
+    if (loading || selectedSports.length === 0 || selectedBetTypes.length === 0) return;
+    // ... rest of the function
     setLoading(true);
     setResults('');
     setError(null);
