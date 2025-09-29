@@ -2,12 +2,12 @@ import React, { useState, useCallback } from 'react';
 
 // API Keys
 const GEMINI_API_KEY = "AIzaSyDTj7cJ5lNh2_MXyFW6bTyHkU1CcThZr18";
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "sk-svc-PA5-jqIe676Pk0ASdAz44jJOwi49upNLIjM5N_Rh9IixumjJZYeFmvr_dOR2f2wXv5OyTTE7aaT3BlbkFJBK69xObGWfsbDbgiruwSqk_mL0pF8j1v62EYITFhIN4EPDZtS_6n2-GWdYPTPRHYasEIwi8cMA";
 const ODDS_API_KEY = "cbe6d816b76d4f89efd44f1bb4c86cec";
 
 // Risk Level Definitions
 const RISK_LEVEL_DEFINITIONS = {
-  'Low': "High probability to hit, heavy favorites, +200 to +400 odds, no low risk pick shoule be less than 8/10 confidence",
+  'Low': "High probability to hit, heavy favorites, +200 to +400 odds, no low risk pick should be less than 8/10 confidence",
   'Medium': "Balanced value favorites with moderate props, +400 to +600 odds",
   'High': "Value underdogs and high-variance outcomes, +600+ odds",
 };
@@ -81,6 +81,7 @@ const App = () => {
 7. Search Google for TODAY'S games in ${sportsStr} - if NFL, search "Monday Night Football today September 29 2025"
 8. Search NFL.com, FantasyPros.com, CBSSports.com, ESPN.com for injuries and props
 9. NO disclaimers about data - find real games and odds
+10. NO historic game data or bets including players that are injured or aren't playing
 
 **BET TYPE DEFINITIONS (USE ONLY THESE):**
 ${selectedBetTypes.includes('Player Props') ? '- Player Props: Player-specific bets (passing yards, touchdowns, receptions, points, assists, etc.)\n' : ''}${selectedBetTypes.includes('Team Props') ? '- Team Props: Team-specific bets (total team points, first to score, team totals, etc.)\n' : ''}${selectedBetTypes.includes('Totals (O/U)') ? '- Totals (O/U): Over/Under bets on combined game scores\n' : ''}${selectedBetTypes.includes('Moneyline/Spread') ? '- Moneyline/Spread: Win/loss or point spread bets\n' : ''}
