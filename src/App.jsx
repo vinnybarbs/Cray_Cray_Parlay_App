@@ -25,56 +25,6 @@ const App = () => {
   const [results, setResults] = useState('');
   const [error, setError] = useState(null);
 
-  // --- Firebase State ---
-  const [db, setDb] = useState(null);
-  const [auth, setAuth] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-
-  // --- Firebase Initialization ---
-  useEffect(() => {
-    try {
-      if (Object.keys(firebaseConfig).length === 0) {
-        console.error("Firebase config is missing.");
-        setIsAuthReady(true);
-        setUserId(crypto.randomUUID());
-        return;
-      }
-      setLogLevel('debug');
-      const app = initializeApp(firebaseConfig);
-      const firestoreDb = getFirestore(app);
-      const firebaseAuth = getAuth(app);
-
-      setDb(firestoreDb);
-      setAuth(firebaseAuth);
-
-      const unsubscribe = onAuthStateChanged(firebaseAuth, async (user) => {
-        if (user) {
-          setUserId(user.uid);
-        } else {
-          try {
-            if (initialAuthToken) {
-              const userCredential = await signInWithCustomToken(firebaseAuth, initialAuthToken);
-              setUserId(userCredential.user.uid);
-            } else {
-              const userCredential = await signInAnonymously(firebaseAuth);
-              setUserId(crypto.randomUUID());
-            }
-          } catch (e) {
-            console.error("Firebase Auth Error:", e);
-            setUserId(crypto.randomUUID());
-          }
-        }
-        setIsAuthReady(true);
-      });
-      return () => unsubscribe();
-    } catch (e) {
-      console.error("Firebase Init Error:", e);
-      setIsAuthReady(true);
-      setUserId(crypto.randomUUID());
-    }
-  }, []);
-
   // --- Toggle Handlers ---
   const toggleSport = (sport) => {
     setSelectedSports(prev =>
