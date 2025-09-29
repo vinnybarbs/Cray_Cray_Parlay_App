@@ -123,17 +123,32 @@ const App = () => {
     try {
       const oddsResults = [];
       const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
-      const apiKey = process.env.REACT_APP_ODDS_API_KEY;
+      // Vite exposes env vars via import.meta.env and they must be prefixed with VITE_
+      const apiKey = import.meta.env.VITE_ODDS_API_KEY;
+
+      if (!apiKey) {
+        console.error('Missing VITE_ODDS_API_KEY in environment. Create a .env with VITE_ODDS_API_KEY=your_key');
+        return [];
+      }
 
       for (const sport of selectedSports) {
         const slug = SPORT_SLUGS[sport];
-        const markets = selectedBetTypes.flatMap(bt => MARKET_MAPPING[bt]).join(',');
+        // Guard against missing mapping values
+        const markets = selectedBetTypes.flatMap(bt => MARKET_MAPPING[bt] || []).join(',');
+        if (!markets) {
+          console.warn(`No markets mapped for selected bet types: ${selectedBetTypes.join(', ')}; skipping ${sport}`);
+          continue;
+        }
+
         const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${markets}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${apiKey}`;
         const res = await fetch(url);
-        if (!res.ok) continue;
+        if (!res.ok) {
+          console.warn(`Odds API returned ${res.status} for ${slug}`);
+          continue;
+        }
 
         const data = await res.json();
-        oddsResults.push(...data);
+        if (Array.isArray(data)) oddsResults.push(...data);
       }
 
       return oddsResults;
@@ -187,8 +202,8 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
   // --- Fetch Parlay Suggestions ---
   const fetchParlaySuggestion = useCallback(async () => {
     // --- THIS IS OUR FINAL TEST ---
-    console.log('--- TEST VARIABLE CHECK ---');
-    console.log('Value:', process.env.REACT_APP_TEST_VARIABLE);
+      console.log('--- TEST VARIABLE CHECK ---');
+      console.log('Value:', import.meta.env.VITE_TEST_VARIABLE);
 
     if (loading || selectedSports.length === 0 || selectedBetTypes.length === 0) return;
     // ... rest of the function
@@ -202,7 +217,11 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
       let content = '';
 
       if (aiModel === 'openai') {
-        const openaiKey = process.env.REACT_APP_OPENAI_API_KEY;
+        // Vite env var
+        const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
+        if (!openaiKey) {
+          throw new Error('Missing VITE_OPENAI_API_KEY. For security, do not commit API keys to source. Consider using a server-side proxy.');
+        }
         const response = await fetch(`https://api.openai.com/v1/chat/completions`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
@@ -225,7 +244,10 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         content = data.choices?.[0]?.message?.content;
 
       } else if (aiModel === 'gemini') {
-        const geminiKey = process.env.REACT_APP_GEMINI_API_KEY;
+        const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
+        if (!geminiKey) {
+          throw new Error('Missing VITE_GEMINI_API_KEY. For security, do not commit API keys to source. Consider using a server-side proxy.');
+        }
         // CORRECTED URL: Changed v1beta to v1
         const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
         const response = await fetch(url, {
