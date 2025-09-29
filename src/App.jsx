@@ -33,6 +33,66 @@ const RISK_LEVEL_DEFINITIONS = {
   High: "Value underdogs and high-variance outcomes, +600+ odds",
 };
 
+// --- Helper UI Components (Moved outside for better practice) ---
+
+const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
+  <div className="flex flex-col space-y-3">
+    <label className="text-gray-200 text-sm font-semibold">{label}</label>
+    <div className="grid grid-cols-2 gap-2">
+      {options.map((opt) => (
+        <label key={opt} className="flex items-center space-x-2 cursor-pointer group">
+          <input
+            type="checkbox"
+            checked={selectedOptions.includes(opt)}
+            onChange={() => onToggle(opt)}
+            className="w-4 h-4 text-yellow-500 bg-gray-700 border-gray-600 rounded focus:ring-yellow-400 focus:ring-2 cursor-pointer"
+          />
+          <span className="text-sm text-gray-300 group-hover:text-yellow-400 transition">{opt}</span>
+        </label>
+      ))}
+    </div>
+  </div>
+);
+
+const Dropdown = ({ label, value, onChange, options, description }) => (
+  <div className="flex flex-col space-y-2">
+    <label className="text-gray-200 text-sm font-semibold">{label}</label>
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="bg-gray-700 text-white p-3 rounded-xl border border-yellow-500 focus:ring-yellow-400 focus:border-yellow-400 transition shadow-lg appearance-none cursor-pointer"
+    >
+      {options.map((opt) => (
+        <option key={opt} value={opt}>{opt}</option>
+      ))}
+    </select>
+    {description && <p className="text-xs text-gray-400 mt-1 italic">{description}</p>}
+  </div>
+);
+
+const AiModelToggle = ({ aiModel, setAiModel }) => (
+  <div className="flex justify-center items-center mt-4 p-1 rounded-xl bg-gray-700">
+      <button
+          onClick={() => setAiModel('openai')}
+          className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
+              aiModel === 'openai' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
+          }`}
+      >
+          OpenAI
+      </button>
+      <button
+          onClick={() => setAiModel('gemini')}
+          className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
+              aiModel === 'gemini' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
+          }`}
+      >
+          Gemini
+      </button>
+  </div>
+);
+
+
+// --- Main App Component ---
 
 const App = () => {
   // --- State ---
@@ -124,7 +184,7 @@ ${oddsContext}
 
 Tone: Serious picks, full personality, concise degenerate-style humor.
 `.trim();
-  }, [selectedSports, selectedBetTypes, numLegs, riskLevel]);
+  }, [selectedSports, selectedBetTypes, numLegs]);
 
   // --- Fetch Parlay Suggestions ---
   const fetchParlaySuggestion = useCallback(async () => {
@@ -143,10 +203,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         const openaiKey = process.env.REACT_APP_OPENAI_API_KEY;
         const response = await fetch(`https://api.openai.com/v1/chat/completions`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${openaiKey}`
-          },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
           body: JSON.stringify({
             model: 'gpt-4o-mini',
             messages: [
@@ -170,15 +227,10 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
         const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 2000,
-            }
+            generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
           })
         });
 
@@ -190,9 +242,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         content = data.candidates?.[0]?.content?.parts?.[0]?.text;
       }
 
-      if (!content) {
-        throw new Error(`No content returned from ${aiModel.toUpperCase()}`);
-      }
+      if (!content) throw new Error(`No content returned from ${aiModel.toUpperCase()}`);
 
       setResults(content);
     } catch (e) {
@@ -203,63 +253,6 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
     }
   }, [generateAIPrompt, loading, selectedSports, selectedBetTypes, oddsPlatform, aiModel]);
 
-
-  // --- UI Components ---
-  const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
-    <div className="flex flex-col space-y-3">
-      <label className="text-gray-200 text-sm font-semibold">{label}</label>
-      <div className="grid grid-cols-2 gap-2">
-        {options.map((opt) => (
-          <label key={opt} className="flex items-center space-x-2 cursor-pointer group">
-            <input
-              type="checkbox"
-              checked={selectedOptions.includes(opt)}
-              onChange={() => onToggle(opt)}
-              className="w-4 h-4 text-yellow-500 bg-gray-700 border-gray-600 rounded focus:ring-yellow-400 focus:ring-2 cursor-pointer"
-            />
-            <span className="text-sm text-gray-300 group-hover:text-yellow-400 transition">{opt}</span>
-          </label>
-        ))}
-      </div>
-    </div>
-  );
-
-  const Dropdown = ({ label, value, onChange, options, description }) => (
-    <div className="flex flex-col space-y-2">
-      <label className="text-gray-200 text-sm font-semibold">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="bg-gray-700 text-white p-3 rounded-xl border border-yellow-500 focus:ring-yellow-400 focus:border-yellow-400 transition shadow-lg appearance-none cursor-pointer"
-      >
-        {options.map((opt) => (
-          <option key={opt} value={opt}>{opt}</option>
-        ))}
-      </select>
-      {description && <p className="text-xs text-gray-400 mt-1 italic">{description}</p>}
-    </div>
-  );
-
-  const AiModelToggle = () => (
-    <div className="flex justify-center items-center mt-4 p-1 rounded-xl bg-gray-700">
-        <button
-            onClick={() => setAiModel('openai')}
-            className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
-                aiModel === 'openai' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
-            }`}
-        >
-            OpenAI
-        </button>
-        <button
-            onClick={() => setAiModel('gemini')}
-            className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
-                aiModel === 'gemini' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
-            }`}
-        >
-            Gemini
-        </button>
-    </div>
-);
 
   // --- Render ---
   return (
@@ -333,7 +326,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
           {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
         </button>
         
-        <AiModelToggle />
+        <AiModelToggle aiModel={aiModel} setAiModel={setAiModel} />
 
         {selectedSports.length === 0 && (
           <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>
