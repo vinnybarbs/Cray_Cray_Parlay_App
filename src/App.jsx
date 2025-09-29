@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 
 // API Keys
 const GEMINI_API_KEY = "AIzaSyDTj7cJ5lNh2_MXyFW6bTyHkU1CcThZr18";
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "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";
 const ODDS_API_KEY = "cbe6d816b76d4f89efd44f1bb4c86cec";
 
 // Risk Level Definitions
