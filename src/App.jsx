@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 
-// --- Mapping for Odds API ---
+// --- Mappings ---
 const SPORT_SLUGS = {
   NFL: 'americanfootball_nfl',
   NBA: 'basketball_nba',
@@ -15,8 +15,8 @@ const SPORT_SLUGS = {
 const MARKET_MAPPING = {
   'Moneyline/Spread': ['h2h', 'spreads'],
   'Totals (O/U)': ['totals'],
-  'Player Props': ['player_points'], // adjust based on API availability
-  'Team Props': ['team_points'],     // adjust based on API availability
+  'Player Props': ['player_points'],
+  'Team Props': ['team_points'],
 };
 
 const BOOKMAKER_MAPPING = {
@@ -24,30 +24,30 @@ const BOOKMAKER_MAPPING = {
   FanDuel: 'fanduel',
   MGM: 'mgm',
   Caesars: 'caesars',
-  Bet365: 'bet365'
+  Bet365: 'bet365',
 };
 
-// --- Risk Level Definitions ---
 const RISK_LEVEL_DEFINITIONS = {
   Low: "High probability to hit, heavy favorites, +200 to +400 odds, confidence 8/10+",
   Medium: "Balanced value favorites with moderate props, +400 to +600 odds",
   High: "Value underdogs and high-variance outcomes, +600+ odds",
 };
 
+
 const App = () => {
-  // --- UI State ---
+  // --- State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
+  const [aiModel, setAiModel] = useState('openai');
 
-  // --- API State ---
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState('');
   const [error, setError] = useState(null);
 
-  // --- Toggle Handlers ---
+  // --- Handlers ---
   const toggleSport = (sport) => {
     setSelectedSports(prev =>
       prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]
@@ -61,16 +61,16 @@ const App = () => {
   };
 
   // --- Fetch Odds Data ---
-  const fetchOddsData = useCallback(async () => {
+  const fetchOddsData = async () => {
     try {
       const oddsResults = [];
       const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
+      const apiKey = process.env.REACT_APP_ODDS_API_KEY;
 
       for (const sport of selectedSports) {
         const slug = SPORT_SLUGS[sport];
         const markets = selectedBetTypes.flatMap(bt => MARKET_MAPPING[bt]).join(',');
-
-        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${markets}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${process.env.REACT_APP_ODDS_API_KEY}`;
+        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${markets}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${apiKey}`;
         const res = await fetch(url);
         if (!res.ok) continue;
 
@@ -83,15 +83,14 @@ const App = () => {
       console.error('Error fetching odds:', e);
       return [];
     }
-  }, [selectedSports, selectedBetTypes, oddsPlatform]); // ✅ FIXED: Memoized with dependencies
+  };
 
-  // --- Generate OpenAI Prompt ---
-  const generateOpenAIPrompt = useCallback((oddsData) => {
+  // --- Generate AI Prompt ---
+  const generateAIPrompt = useCallback((oddsData) => {
     const sportsStr = selectedSports.join(', ');
     const betTypesStr = selectedBetTypes.join(', ');
-    const riskDesc = RISK_LEVEL_DEFINITIONS[riskLevel];
 
-    const oddsContext = oddsData.length
+    const oddsContext = oddsData && oddsData.length > 0
       ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}`
       : '';
 
@@ -121,7 +120,7 @@ Format:
 **Combined Odds**: [Total]
 **Reasoning**: [Concise explanation]
 
-Supplemental context for odds: ${oddsContext}
+${oddsContext}
 
 Tone: Serious picks, full personality, concise degenerate-style humor.
 `.trim();
@@ -137,35 +136,63 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
 
     try {
       const oddsData = await fetchOddsData();
-      const prompt = generateOpenAIPrompt(oddsData);
-      const openaiKey = process.env.REACT_APP_OPENAI_API_KEY;
+      const prompt = generateAIPrompt(oddsData);
+      let content = '';
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${openaiKey}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
-            { role: 'user', content: prompt }
-          ],
-          temperature: 0.7,
-          max_tokens: 2000
-        })
-      });
+      if (aiModel === 'openai') {
+        const openaiKey = process.env.REACT_APP_OPENAI_API_KEY;
+        const response = await fetch(`https://api.openai.com/v1/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${openaiKey}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000
+          })
+        });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        }
+        const data = await response.json();
+        content = data.choices?.[0]?.message?.content;
+
+      } else if (aiModel === 'gemini') {
+        const geminiKey = process.env.REACT_APP_GEMINI_API_KEY;
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 2000,
+            }
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
+        }
+        const data = await response.json();
+        content = data.candidates?.[0]?.content?.parts?.[0]?.text;
       }
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-
-      if (!content) throw new Error('No content returned from OpenAI');
+      if (!content) {
+        throw new Error(`No content returned from ${aiModel.toUpperCase()}`);
+      }
 
       setResults(content);
     } catch (e) {
@@ -174,7 +201,8 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
     } finally {
       setLoading(false);
     }
-  }, [generateOpenAIPrompt, loading, selectedSports, selectedBetTypes, fetchOddsData]); // ✅ FIXED: Added fetchOddsData to dependency array
+  }, [generateAIPrompt, loading, selectedSports, selectedBetTypes, oddsPlatform, aiModel]);
+
 
   // --- UI Components ---
   const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -212,6 +240,28 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
     </div>
   );
 
+  const AiModelToggle = () => (
+    <div className="flex justify-center items-center mt-4 p-1 rounded-xl bg-gray-700">
+        <button
+            onClick={() => setAiModel('openai')}
+            className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
+                aiModel === 'openai' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
+            }`}
+        >
+            OpenAI
+        </button>
+        <button
+            onClick={() => setAiModel('gemini')}
+            className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
+                aiModel === 'gemini' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
+            }`}
+        >
+            Gemini
+        </button>
+    </div>
+);
+
+  // --- Render ---
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
       <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl">
@@ -229,7 +279,6 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
             selectedOptions={selectedSports}
             onToggle={toggleSport}
           />
-          
           <CheckboxGroup
             label="2. Bet-Type/Focus (Select Multiple)"
             options={['Moneyline/Spread', 'Player Props', 'Totals (O/U)', 'Team Props']}
@@ -264,7 +313,6 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
             options={Object.keys(RISK_LEVEL_DEFINITIONS)}
             description={RISK_LEVEL_DEFINITIONS[riskLevel]}
           />
-          
           <Dropdown
             label="5. Odds Platform"
             value={oddsPlatform}
@@ -276,7 +324,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         <button
           onClick={fetchParlaySuggestion}
           disabled={loading || selectedSports.length === 0 || selectedBetTypes.length === 0}
-          className={`w-full py-4 mt-8 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95
+          className={`w-full py-4 mt-4 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95
             ${loading || selectedSports.length === 0 || selectedBetTypes.length === 0
               ? 'bg-gray-500 cursor-not-allowed'
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
@@ -284,6 +332,8 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         >
           {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
         </button>
+        
+        <AiModelToggle />
 
         {selectedSports.length === 0 && (
           <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>
@@ -293,7 +343,6 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         )}
       </div>
 
-      {/* Results Display */}
       <div className="mt-8 pt-4 border-t border-gray-700 max-w-2xl mx-auto">
         <h2 className="text-2xl font-bold mb-4 text-yellow-400">AI-Powered Parlay Analysis</h2>
 
@@ -304,9 +353,15 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
           </div>
         )}
 
-        {results && (
+        {loading && (
+             <div className="p-6 text-center text-gray-500 border border-dashed border-gray-700 rounded-xl">
+                <p>Contacting the AI degen... please wait.</p>
+             </div>
+        )}
+
+        {results && !loading && (
           <div className="p-6 bg-gray-800 rounded-xl shadow-lg overflow-y-auto max-h-[70vh]">
-            <pre className="whitespace-pre-wrap text-gray-300">{results}</pre>
+            <pre className="whitespace-pre-wrap text-gray-300 font-sans">{results}</pre>
           </div>
         )}
 
