@@ -57,50 +57,67 @@ const App = () => {
     const betTypesStr = selectedBetTypes.join(', ');
     const riskDesc = RISK_LEVEL_DEFINITIONS[riskLevel];
     
-    const oddsContext = oddsData ? `\n\nCurrent Odds Data Available:\n${JSON.stringify(oddsData.slice(0, 20), null, 2)}` : '';
+    const oddsContext = oddsData && oddsData.length > 0 
+      ? `\n\n**SUPPLEMENTAL ODDS DATA** (Use as backup reference if needed):\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}` 
+      : '';
 
-    return `You are a professional sports betting analyst. Generate parlay suggestions based on TODAY'S games using real-time data.
+    return `You are a professional sports betting analyst with access to Google Search. Use your search capabilities to find TODAY'S games, current odds, injuries, and team news for ${sportsStr}.
 
-PARAMETERS:
+**CRITICAL INSTRUCTIONS:**
+- Use Google Search to find current ${sportsStr} games happening TODAY or in the next 24-48 hours
+- Search for current odds from ${oddsPlatform}, DraftKings, FanDuel, or any major sportsbook
+- Search NFL.com, FantasyPros.com, CBSSports.com, and ESPN.com for injury reports and analysis
+- DO NOT give disclaimers about data availability - use your search tool to find real games and odds
+- DO NOT say "no games available" - search until you find upcoming games
+
+**PARLAY PARAMETERS:**
 - Sports: ${sportsStr}
 - Bet Types/Focus: ${betTypesStr}
 - Number of Legs: ${numLegs}
 - Risk Level: ${riskLevel} (${riskDesc})
-- Odds Platform: ${oddsPlatform}
-
-RESEARCH SOURCES (Use these for injury updates and analysis):
-- NFL.com for injury reports
-- FantasyPros.com for player status
-- CBSSports.com for team news
-- ESPN.com for game previews
-- General sports news search
+- Preferred Odds Platform: ${oddsPlatform} (but use any available odds source)
 ${oddsContext}
 
-OUTPUT REQUIREMENTS:
-Provide exactly ${numLegs} parlay picks for today's games, formatted as:
+**OUTPUT FORMAT:**
+Create ONE ${numLegs}-leg parlay with real games and odds:
 
-**PARLAY 1** (Target: ${riskLevel === 'Low' ? '+200 to +400' : riskLevel === 'Medium' ? '+400 to +600' : '+600+'})
-1. [Game/Match] - [Bet Type] - [Selection] - Odds: [+XXX] - Confidence: [X/10]
-   Analysis: [2-3 sentence reasoning with key stats/injuries/trends]
-2. [Continue for ${numLegs} legs]
-   
-Combined Odds: [Total American Odds]
-Why This Works: [2-3 sentences on correlation and value]
+**${numLegs}-LEG ${riskLevel.toUpperCase()} RISK PARLAY** (Target: ${riskLevel === 'Low' ? '+200 to +400' : riskLevel === 'Medium' ? '+400 to +600' : '+600+'})
+
+1. **[Team A] vs [Team B]** - [${betTypesStr}]
+   Pick: [Your Selection] - Odds: [Actual Odds from Search]
+   Confidence: [X/10]
+   Analysis: [2-3 sentences with key stats, injuries, trends from your search]
+
+2. **[Team C] vs [Team D]** - [${betTypesStr}]
+   Pick: [Your Selection] - Odds: [Actual Odds from Search]
+   Confidence: [X/10]
+   Analysis: [2-3 sentences with reasoning]
+
+[Continue for all ${numLegs} legs]
+
+**Combined Odds:** [Calculate total American odds]
+**Payout on $100:** [Show potential payout]
+**Why This Parlay Works:** [2-3 sentences explaining correlation and edge]
 
 ---
 
-**BONUS 3-LEG HIGH PROBABILITY PARLAY** 🔥
-1. [Heavy Favorite Bet] - Odds: [-XXX] - Confidence: 9/10
-   Analysis: [Why this is a lock]
-2. [Heavy Favorite Bet] - Odds: [-XXX] - Confidence: 9/10
-   Analysis: [Why this is a lock]
-3. [Heavy Favorite Bet] - Odds: [-XXX] - Confidence: 9/10
-   Analysis: [Why this is a lock]
+**🔥 BONUS: 3-LEG LOCK PARLAY**
 
-Combined Odds: [Total]
-The Winner: [Brief explanation of why this bonus parlay has the highest probability]
+1. **[Game 1]** - [Heavy Favorite Pick] - Odds: [-XXX] - Confidence: 9/10
+   Lock Reason: [Why this is nearly guaranteed]
 
-Keep responses concise, data-driven, and formatted exactly as shown. No disclaimers about hypotheticals or data limitations.`.trim();
+2. **[Game 2]** - [Heavy Favorite Pick] - Odds: [-XXX] - Confidence: 9/10
+   Lock Reason: [Why this is nearly guaranteed]
+
+3. **[Game 3]** - [Heavy Favorite Pick] - Odds: [-XXX] - Confidence: 9/10
+   Lock Reason: [Why this is nearly guaranteed]
+
+**Combined Odds:** [Total]
+**The Winner:** [Brief explanation of why this bonus parlay has the highest win probability]
+
+---
+
+**Remember:** Search for real games and odds. No disclaimers. Give actionable picks.`.trim();
   }, [selectedSports, selectedBetTypes, numLegs, riskLevel, oddsPlatform]);
 
   // --- API Call with OpenAI as Final Output ---
@@ -147,7 +164,7 @@ Keep responses concise, data-driven, and formatted exactly as shown. No disclaim
       // Step 3: Send Gemini output to OpenAI for refinement
       const openaiUrl = 'https://api.openai.com/v1/chat/completions';
       const openaiPayload = {
-        model: 'gpt-5-mini',
+        model: 'gpt-4o',
         messages: [
           {
             role: 'system',
@@ -159,7 +176,7 @@ Keep responses concise, data-driven, and formatted exactly as shown. No disclaim
           }
         ],
         temperature: 0.7,
-        max_tokens: 5000
+        max_tokens: 2000
       };
 
       const openaiResponse = await fetch(openaiUrl, {
