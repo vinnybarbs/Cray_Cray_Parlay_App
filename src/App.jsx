@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 
 // API Keys
 const GEMINI_API_KEY = "AIzaSyDTj7cJ5lNh2_MXyFW6bTyHkU1CcThZr18";
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "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";
 const ODDS_API_KEY = "cbe6d816b76d4f89efd44f1bb4c86cec";
 
 // Risk Level Definitions
@@ -147,7 +147,7 @@ Keep responses concise, data-driven, and formatted exactly as shown. No disclaim
       // Step 3: Send Gemini output to OpenAI for refinement
       const openaiUrl = 'https://api.openai.com/v1/chat/completions';
       const openaiPayload = {
-        model: 'gpt-4o',
+        model: 'gpt-5-mini',
         messages: [
           {
             role: 'system',
@@ -159,7 +159,7 @@ Keep responses concise, data-driven, and formatted exactly as shown. No disclaim
           }
         ],
         temperature: 0.7,
-        max_tokens: 2000
+        max_tokens: 5000
       };
 
       const openaiResponse = await fetch(openaiUrl, {
@@ -172,17 +172,24 @@ Keep responses concise, data-driven, and formatted exactly as shown. No disclaim
       });
 
       if (!openaiResponse.ok) {
-        throw new Error(`OpenAI API error: ${openaiResponse.status}`);
+        const errorData = await openaiResponse.text();
+        console.error("OpenAI Error Details:", errorData);
+        // If OpenAI fails, fall back to Gemini results
+        console.log("OpenAI failed, using Gemini results directly");
+        setResults(geminiText);
+        setLoading(false);
+        return;
       }
 
       const openaiResult = await openaiResponse.json();
       const finalText = openaiResult.choices?.[0]?.message?.content;
 
       if (!finalText) {
-        throw new Error('Invalid OpenAI response');
+        console.log("No OpenAI response, using Gemini results");
+        setResults(geminiText);
+      } else {
+        setResults(finalText);
       }
-
-      setResults(finalText);
     } catch (e) {
       console.error("API Error:", e);
       setError(`Failed to generate parlays: ${e.message}`);
