@@ -7,7 +7,7 @@ const ODDS_API_KEY = "cbe6d816b76d4f89efd44f1bb4c86cec";
 
 // Risk Level Definitions
 const RISK_LEVEL_DEFINITIONS = {
-  'Low': "High probability to hit, heavy favorites, +200 to +400 odds",
+  'Low': "High probability to hit, heavy favorites, +200 to +400 odds, no low risk pick shoule be less than 8/10 confidence",
   'Medium': "Balanced value favorites with moderate props, +400 to +600 odds",
   'High': "Value underdogs and high-variance outcomes, +600+ odds",
 };
