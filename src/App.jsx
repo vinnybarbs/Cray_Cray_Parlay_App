@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 
 // API Keys
 const GEMINI_API_KEY = "AIzaSyDTj7cJ5lNh2_MXyFW6bTyHkU1CcThZr18";
-const OPENAI_API_KEY = "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";
+const OPENAI_API_KEY = "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";
 const ODDS_API_KEY = "cbe6d816b76d4f89efd44f1bb4c86cec";
 
 // Risk Level Definitions
@@ -177,7 +177,7 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
       // Step 3: Send Gemini output to OpenAI for refinement
       const openaiUrl = 'https://api.openai.com/v1/chat/completions';
       const openaiPayload = {
-        model: 'gpt-4o',
+        model: 'gpt-5-mini',
         messages: [
           {
             role: 'system',
@@ -185,7 +185,7 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
           },
           {
             role: 'user',
-            content: `Refine this parlay analysis into a clean, easy-to-read format:\n\n${geminiText}`
+            content: `Give feedback, make any glaring changes you disagree with and refine this parlay analysis into a clean, easy-to-read format:\n\n${geminiText}`
           }
         ],
         temperature: 0.7,
