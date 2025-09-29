@@ -1,15 +1,36 @@
 import React, { useState, useCallback } from 'react';
 
-// API Keys
-const GEMINI_API_KEY = "AIzaSyDTj7cJ5lNh2_MXyFW6bTyHkU1CcThZr18";
-const OPENAI_API_KEY = "sk-svc-PA5-jqIe676Pk0ASdAz44jJOwi49upNLIjM5N_Rh9IixumjJZYeFmvr_dOR2f2wXv5OyTTE7aaT3BlbkFJBK69xObGWfsbDbgiruwSqk_mL0pF8j1v62EYITFhIN4EPDZtS_6n2-GWdYPTPRHYasEIwi8cMA";
-const ODDS_API_KEY = "cbe6d816b76d4f89efd44f1bb4c86cec";
+// --- Mappings ---
+const SPORT_SLUGS = {
+  NFL: 'americanfootball_nfl',
+  NBA: 'basketball_nba',
+  MLB: 'baseball_mlb',
+  NHL: 'icehockey_nhl',
+  Soccer: 'soccer_epl',
+  NCAAF: 'americanfootball_ncaaf',
+  'PGA/Golf': 'golf_pga',
+  Tennis: 'tennis_atp',
+};
 
-// Risk Level Definitions
+const MARKET_MAPPING = {
+  'Moneyline/Spread': ['h2h', 'spreads'],
+  'Totals (O/U)': ['totals'],
+  'Player Props': ['player_points'],
+  'Team Props': ['team_points'],
+};
+
+const BOOKMAKER_MAPPING = {
+  DraftKings: 'draftkings',
+  FanDuel: 'fanduel',
+  MGM: 'mgm',
+  Caesars: 'caesars',
+  Bet365: 'bet365'
+};
+
 const RISK_LEVEL_DEFINITIONS = {
-  'Low': "High probability to hit, heavy favorites, +200 to +400 odds, no low risk pick should be less than 8/10 confidence",
-  'Medium': "Balanced value favorites with moderate props, +400 to +600 odds",
-  'High': "Value underdogs and high-variance outcomes, +600+ odds",
+  Low: "High probability to hit, heavy favorites, +200 to +400 odds, confidence 8/10+",
+  Medium: "Balanced value favorites with moderate props, +400 to +600 odds",
+  High: "Value underdogs and high-variance outcomes, +600+ odds",
 };
 
 const App = () => {
@@ -19,6 +40,7 @@ const App = () => {
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
+  const [selectedModel, setSelectedModel] = useState('OpenAI'); // OpenAI or Gemini
 
   // --- API State ---
   const [loading, setLoading] = useState(false);
@@ -38,103 +60,74 @@ const App = () => {
     );
   };
 
-  // --- Fetch Current Odds Data ---
+  // --- Fetch Odds Data ---
   const fetchOddsData = async () => {
     try {
-      const response = await fetch(`https://api.the-odds-api.com/v4/sports/upcoming/odds/?regions=us&markets=h2h&apiKey=${ODDS_API_KEY}`);
-      if (!response.ok) return null;
-      const data = await response.json();
-      return data;
+      const oddsResults = [];
+      const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
+
+      for (const sport of selectedSports) {
+        const slug = SPORT_SLUGS[sport];
+        const markets = selectedBetTypes.flatMap(bt => MARKET_MAPPING[bt]).join(',');
+
+        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${markets}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${process.env.REACT_APP_ODDS_API_KEY}`;
+        const res = await fetch(url);
+        if (!res.ok) continue;
+
+        const data = await res.json();
+        oddsResults.push(...data);
+      }
+
+      return oddsResults;
     } catch (e) {
-      console.error("Error fetching odds:", e);
-      return null;
+      console.error('Error fetching odds:', e);
+      return [];
     }
   };
 
-  // --- Prompt Generation ---
-  const generateGeminiPrompt = useCallback((oddsData) => {
+  // --- Generate Prompt ---
+  const generatePrompt = useCallback((oddsData) => {
     const sportsStr = selectedSports.join(', ');
     const betTypesStr = selectedBetTypes.join(', ');
     const riskDesc = RISK_LEVEL_DEFINITIONS[riskLevel];
-    
-    const oddsContext = oddsData && oddsData.length > 0 
-      ? `\n\n**SUPPLEMENTAL ODDS DATA** (Use as backup reference if needed):\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}` 
+
+    const oddsContext = oddsData.length
+      ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}`
       : '';
 
-    return `You are a professional sports betting analyst with access to Google Search.
+    return `
+You are a professional sports betting analyst.
+Generate exactly ${numLegs}-leg parlays for today. Include a bonus lock parlay.
 
-**🚨 ABSOLUTE USER REQUIREMENTS - CANNOT BE VIOLATED 🚨**
+Rules:
+1. Only include sports: ${sportsStr}
+2. Only include bet types: ${betTypesStr}
+3. Include real matchups with current odds if possible
+4. Provide confidence 1-10 for each leg
+5. Include concise degenerate humor in the parlay title or intro
+6. Output structured format exactly as below
 
-**ALLOWED SPORTS (NOTHING ELSE):** ${sportsStr}
-**ALLOWED BET TYPES (NOTHING ELSE):** ${betTypesStr}
-**NUMBER OF LEGS (EXACT):** ${numLegs}
-**RISK LEVEL (MUST MATCH):** ${riskLevel}
-**ODDS PLATFORM PREFERENCE:** ${oddsPlatform}
+Format:
+**Parlay Title**: [Funny/degenerate title]
+**Legs**:
+1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Stats/Trends]
+...
+**Combined Odds**: [Total]
+**Payout on $100**: [XXX]
 
-**MANDATORY RULES:**
-1. EVERY SINGLE PICK must come from ONLY: ${sportsStr}
-2. EVERY SINGLE BET must use ONLY: ${betTypesStr}
-3. You must provide EXACTLY ${numLegs} legs in the main parlay
-4. If you include ANY sport not in [${sportsStr}], you have FAILED
-5. If you include ANY bet type not in [${betTypesStr}], you have FAILED
-6. DO NOT include soccer, cricket, tennis, golf, or ANY sport unless it's in: ${sportsStr}
-7. Search Google for TODAY'S games in ${sportsStr} - if NFL, search "Monday Night Football today September 29 2025"
-8. Search NFL.com, FantasyPros.com, CBSSports.com, ESPN.com for injuries and props
-9. NO disclaimers about data - find real games and odds
-10. NO historic game data or bets including players that are injured or aren't playing
+**Bonus Lock Parlay**:
+1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Why safe]
+...
+**Combined Odds**: [Total]
+**Reasoning**: [Concise explanation]
 
-**BET TYPE DEFINITIONS (USE ONLY THESE):**
-${selectedBetTypes.includes('Player Props') ? '- Player Props: Player-specific bets (passing yards, touchdowns, receptions, points, assists, etc.)\n' : ''}${selectedBetTypes.includes('Team Props') ? '- Team Props: Team-specific bets (total team points, first to score, team totals, etc.)\n' : ''}${selectedBetTypes.includes('Totals (O/U)') ? '- Totals (O/U): Over/Under bets on combined game scores\n' : ''}${selectedBetTypes.includes('Moneyline/Spread') ? '- Moneyline/Spread: Win/loss or point spread bets\n' : ''}
-**Risk Level Target:** ${riskLevel} (${riskDesc})
-${oddsContext}
+Supplemental context for odds: ${oddsContext}
 
-**OUTPUT FORMAT - STRICT COMPLIANCE REQUIRED:**
+Tone: Serious picks, full personality, concise degenerate-style humor.
+`.trim();
+  }, [selectedSports, selectedBetTypes, numLegs, riskLevel]);
 
-**${numLegs}-LEG ${riskLevel.toUpperCase()} RISK PARLAY**
-*Sport Restriction: ONLY ${sportsStr}*
-*Bet Type Restriction: ONLY ${betTypesStr}*
-*Target Odds: ${riskLevel === 'Low' ? '+200 to +400' : riskLevel === 'Medium' ? '+400 to +600' : '+600+'}*
-
-${Array.from({length: numLegs}, (_, i) => `${i + 1}. **[${sportsStr} GAME ONLY]** - [${betTypesStr} BET ONLY]
-   Pick: [Selection] - Odds: [Real Odds]
-   Confidence: [X/10]
-   Analysis: [Stats, injuries, trends]`).join('\n\n')}
-
-**Combined Odds:** [Total]
-**Payout on $100:** [$XXX]
-**Correlation Analysis:** [Why these picks work together]
-
----
-
-**🔥 BONUS: 3-LEG LOCK PARLAY**
-*Must use ONLY ${sportsStr} and ONLY ${betTypesStr}*
-
-1. **[${sportsStr} GAME]** - [${betTypesStr} BET] - Odds: [XXX] - Confidence: 9/10
-   Lock Reason: [Why this is safe]
-
-2. **[${sportsStr} GAME]** - [${betTypesStr} BET] - Odds: [XXX] - Confidence: 9/10
-   Lock Reason: [Why this is safe]
-
-3. **[${sportsStr} GAME]** - [${betTypesStr} BET] - Odds: [XXX] - Confidence: 9/10
-   Lock Reason: [Why this is safe]
-
-**Combined Odds:** [Total]
-**The Winner Explanation:** [Why this is the safest parlay]
-
----
-
-**VALIDATION CHECKLIST (MUST BE TRUE):**
-✓ All ${numLegs} legs use ONLY sports from: ${sportsStr}
-✓ All bets use ONLY bet types from: ${betTypesStr}
-✓ Bonus parlay uses ONLY sports from: ${sportsStr}
-✓ Bonus parlay uses ONLY bet types from: ${betTypesStr}
-✓ All games are from TODAY or next 24-48 hours
-✓ All odds are real and current
-
-If ANY checkbox is false, START OVER and fix it.`.trim();
-  }, [selectedSports, selectedBetTypes, numLegs, riskLevel, oddsPlatform]);
-
-  // --- API Call with OpenAI as Final Output ---
+  // --- Fetch Parlay Suggestion ---
   const fetchParlaySuggestion = useCallback(async () => {
     if (loading || selectedSports.length === 0 || selectedBetTypes.length === 0) return;
 
@@ -143,91 +136,55 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
     setError(null);
 
     try {
-      // Step 1: Fetch current odds data
       const oddsData = await fetchOddsData();
+      const prompt = generatePrompt(oddsData);
 
-      // Step 2: Generate Gemini response
-      const geminiPrompt = generateGeminiPrompt(oddsData);
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${GEMINI_API_KEY}`;
-      
-      const geminiPayload = {
-        contents: [{ parts: [{ text: geminiPrompt }] }],
-        tools: [{ "google_search": {} }],
-        systemInstruction: {
-          parts: [{ text: "You are a concise, data-driven sports betting analyst. Provide actionable parlay suggestions with zero disclaimers. Give the parlay a funny name and add some humor into the reasoning and why you selected a few bets and feel free to call the user a degenerate gambler or hopefully this isn't too risky it's not from your kids college fund types of jokes." }]
-        },
-      };
-
-      const geminiResponse = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(geminiPayload)
-      });
-
-      if (!geminiResponse.ok) {
-        throw new Error(`Gemini API error: ${geminiResponse.status}`);
-      }
-
-      const geminiResult = await geminiResponse.json();
-      const geminiText = geminiResult.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (!geminiText) {
-        throw new Error('Invalid Gemini response');
-      }
-
-      // Step 3: Send Gemini output to OpenAI for refinement
-      const openaiUrl = 'https://api.openai.com/v1/chat/completions';
-      const openaiPayload = {
-        model: 'gpt-5-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a sports betting expert. Take the provided parlay analysis and refine it into a clear, actionable format. Keep all the picks and reasoning but make it more readable and engaging. Maintain the bonus parlay section.'
+      if (selectedModel === 'OpenAI') {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
           },
-          {
-            role: 'user',
-            content: `Give feedback, make any glaring changes you disagree with and refine this parlay analysis into a clean, easy-to-read format:\n\n${geminiText}`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 2000
-      };
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 2000
+          })
+        });
 
-      const openaiResponse = await fetch(openaiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
-        },
-        body: JSON.stringify(openaiPayload)
-      });
-
-      if (!openaiResponse.ok) {
-        const errorData = await openaiResponse.text();
-        console.error("OpenAI Error Details:", errorData);
-        // If OpenAI fails, fall back to Gemini results
-        console.log("OpenAI failed, using Gemini results directly");
-        setResults(geminiText);
-        setLoading(false);
-        return;
-      }
-
-      const openaiResult = await openaiResponse.json();
-      const finalText = openaiResult.choices?.[0]?.message?.content;
-
-      if (!finalText) {
-        console.log("No OpenAI response, using Gemini results");
-        setResults(geminiText);
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content;
+        setResults(content || '');
       } else {
-        setResults(finalText);
+        // Gemini
+        const geminiPayload = {
+          contents: [{ parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
+          systemInstruction: { parts: [{ text: 'You are a concise sports betting analyst producing actionable parlays with degenerate humor.' }] }
+        };
+
+        const geminiResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${process.env.REACT_APP_GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(geminiPayload)
+        });
+
+        const geminiData = await geminiResponse.json();
+        const content = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+        setResults(content || '');
       }
     } catch (e) {
-      console.error("API Error:", e);
+      console.error(e);
       setError(`Failed to generate parlays: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [generateGeminiPrompt, loading, selectedSports, selectedBetTypes]);
+  }, [selectedModel, generatePrompt, loading, selectedSports, selectedBetTypes, oddsPlatform]);
 
   // --- UI Components ---
   const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -267,12 +224,6 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
-      <style>{`
-        .results-box::-webkit-scrollbar { width: 8px; }
-        .results-box::-webkit-scrollbar-thumb { background-color: #f59e0b; border-radius: 4px; }
-        .results-box { scrollbar-width: thin; scrollbar-color: #f59e0b #1f2937; }
-      `}</style>
-      
       <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl">
         <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">
           Cray Cray
@@ -288,7 +239,6 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
             selectedOptions={selectedSports}
             onToggle={toggleSport}
           />
-          
           <CheckboxGroup
             label="2. Bet-Type/Focus (Select Multiple)"
             options={['Moneyline/Spread', 'Player Props', 'Totals (O/U)', 'Team Props']}
@@ -315,7 +265,7 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Dropdown
             label="4. Risk Level"
             value={riskLevel}
@@ -323,12 +273,18 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
             options={Object.keys(RISK_LEVEL_DEFINITIONS)}
             description={RISK_LEVEL_DEFINITIONS[riskLevel]}
           />
-          
           <Dropdown
             label="5. Odds Platform"
             value={oddsPlatform}
             onChange={setOddsPlatform}
             options={['DraftKings', 'FanDuel', 'MGM', 'Caesars', 'Bet365']}
+          />
+          <Dropdown
+            label="6. Model"
+            value={selectedModel}
+            onChange={setSelectedModel}
+            options={['OpenAI', 'Gemini']}
+            description="Select which AI model to generate your parlays"
           />
         </div>
 
@@ -341,17 +297,7 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
             }`}
         >
-          {loading ? (
-            <div className="flex items-center justify-center">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Analyzing Current Odds & Generating Picks...
-            </div>
-          ) : (
-            `Generate ${numLegs}-Leg Parlay + Bonus Winner`
-          )}
+          {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
         </button>
 
         {selectedSports.length === 0 && (
@@ -362,7 +308,6 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
         )}
       </div>
 
-      {/* Results Display */}
       <div className="mt-8 pt-4 border-t border-gray-700 max-w-2xl mx-auto">
         <h2 className="text-2xl font-bold mb-4 text-yellow-400">AI-Powered Parlay Analysis</h2>
 
@@ -374,10 +319,8 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
         )}
 
         {results && (
-          <div className="results-box p-6 bg-gray-800 rounded-xl shadow-lg overflow-y-auto max-h-[70vh]">
-            <div className="prose prose-invert prose-headings:text-yellow-400 prose-strong:text-yellow-400 prose-p:text-gray-300 max-w-none whitespace-pre-wrap">
-              {results}
-            </div>
+          <div className="p-6 bg-gray-800 rounded-xl shadow-lg overflow-y-auto max-h-[70vh]">
+            <pre className="whitespace-pre-wrap text-gray-300">{results}</pre>
           </div>
         )}
 
