@@ -26,6 +26,7 @@ dist-ssr
 # Ignore environment variables
 .env
 .env.*
+!/.env.example
 
 # Node dependencies
 node_modules
