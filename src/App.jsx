@@ -93,6 +93,10 @@ const AiModelToggle = ({ aiModel, setAiModel }) => (
 
 // --- Main App Component ---
 const App = () => {
+  // Debug: presence of Vite env vars (do not print secret values)
+  console.log('VITE_OPENAI_API_KEY present:', !!import.meta.env.VITE_OPENAI_API_KEY);
+  console.log('VITE_GEMINI_API_KEY present:', !!import.meta.env.VITE_GEMINI_API_KEY);
+  console.log('VITE_ODDS_API_KEY present:', !!import.meta.env.VITE_ODDS_API_KEY);
   // --- State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
