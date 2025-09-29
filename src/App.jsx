@@ -13,7 +13,8 @@ const App = () => {
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
-  const [aiProvider, setAiProvider] = useState('OpenAI'); // "OpenAI" or "Gemini"
+  const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
+  const [aiProvider, setAiProvider] = useState('OpenAI'); // OpenAI or Gemini
 
   // --- API State ---
   const [loading, setLoading] = useState(false);
@@ -50,8 +51,9 @@ Rules:
 1. Only include sports: ${selectedSports.join(', ')}
 2. Only include bet types: ${selectedBetTypes.join(', ')}
 3. Include confidence 1-10 for each leg
-4. Provide concise degenerate humor in the parlay title or intro
-5. Output structured format with combined odds and bonus lock parlay
+4. Include the selected odds platform: ${oddsPlatform}
+5. Provide concise degenerate humor in the parlay title or intro
+6. Output structured format with combined odds and bonus lock parlay
 Tone: Serious picks with full personality and degenerate-style humor
 `;
 
@@ -104,7 +106,7 @@ Tone: Serious picks with full personality and degenerate-style humor
     } finally {
       setLoading(false);
     }
-  }, [loading, selectedSports, selectedBetTypes, numLegs, aiProvider]);
+  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiProvider]);
 
   // --- UI Components ---
   const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -175,7 +177,7 @@ Tone: Serious picks with full personality and degenerate-style humor
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Dropdown
             label="4. Risk Level"
             value={riskLevel}
@@ -183,7 +185,13 @@ Tone: Serious picks with full personality and degenerate-style humor
             options={Object.keys(RISK_LEVEL_DEFINITIONS)}
           />
           <Dropdown
-            label="5. AI Provider"
+            label="5. Odds Platform"
+            value={oddsPlatform}
+            onChange={setOddsPlatform}
+            options={['DraftKings', 'FanDuel', 'MGM', 'Caesars', 'Bet365']}
+          />
+          <Dropdown
+            label="6. AI Provider"
             value={aiProvider}
             onChange={setAiProvider}
             options={['OpenAI', 'Gemini']}
