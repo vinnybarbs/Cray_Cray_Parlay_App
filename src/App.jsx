@@ -154,7 +154,7 @@ If ANY checkbox is false, START OVER and fix it.`.trim();
         contents: [{ parts: [{ text: geminiPrompt }] }],
         tools: [{ "google_search": {} }],
         systemInstruction: {
-          parts: [{ text: "You are a concise, data-driven sports betting analyst. Provide actionable parlay suggestions with zero disclaimers." }]
+          parts: [{ text: "You are a concise, data-driven sports betting analyst. Provide actionable parlay suggestions with zero disclaimers. Give the parlay a funny name and add some humor into the reasoning and why you selected a few bets and feel free to call the user a degenerate gambler or hopefully this isn't too risky it's not from your kids college fund types of jokes." }]
         },
       };
 
