@@ -33,8 +33,7 @@ const RISK_LEVEL_DEFINITIONS = {
   High: "Value underdogs and high-variance outcomes, +600+ odds",
 };
 
-// --- Helper UI Components (Moved outside for better practice) ---
-
+// --- Helper UI Components ---
 const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
   <div className="flex flex-col space-y-3">
     <label className="text-gray-200 text-sm font-semibold">{label}</label>
@@ -93,7 +92,6 @@ const AiModelToggle = ({ aiModel, setAiModel }) => (
 
 
 // --- Main App Component ---
-
 const App = () => {
   // --- State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
@@ -224,7 +222,8 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
 
       } else if (aiModel === 'gemini') {
         const geminiKey = process.env.REACT_APP_GEMINI_API_KEY;
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
+        // CORRECTED URL: Changed v1beta to v1
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
         const response = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
