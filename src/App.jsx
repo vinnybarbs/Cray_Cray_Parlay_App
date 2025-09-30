@@ -300,6 +300,15 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         <p className="text-xl font-medium text-gray-300">for Parlays</p>
       </header>
 
+      {/* Debug panel: show which VITE_ env keys are present (no values exposed) */}
+      <div className="max-w-2xl mx-auto mb-4 p-3 bg-gray-800 rounded-xl text-sm text-gray-300">
+        <div className="font-semibold text-yellow-400 mb-2">Env debug</div>
+        <div>VITE_OPENAI_API_KEY present: {String(!!import.meta.env.VITE_OPENAI_API_KEY)}</div>
+        <div>VITE_GEMINI_API_KEY present: {String(!!import.meta.env.VITE_GEMINI_API_KEY)}</div>
+        <div>VITE_ODDS_API_KEY present: {String(!!import.meta.env.VITE_ODDS_API_KEY)}</div>
+        <div className="mt-2">Vite env keys: {JSON.stringify(Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')))}</div>
+      </div>
+
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
