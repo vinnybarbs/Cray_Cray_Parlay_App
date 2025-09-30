@@ -211,7 +211,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ content });
   } catch (err) {
     console.error('generate-parlay error:', err);
-    // TEMP DEBUG: return stack to caller to diagnose deployment failures. Remove this after debugging.
-    return res.status(500).json({ error: err.message || 'Server error', stack: err.stack });
+    return res.status(500).json({ error: err.message || 'Server error' });
   }
 }
