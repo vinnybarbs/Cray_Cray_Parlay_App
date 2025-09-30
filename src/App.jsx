@@ -93,17 +93,7 @@ const AiModelToggle = ({ aiModel, setAiModel }) => (
 
 // --- Main App Component ---
 const App = () => {
-  // Debug: presence of Vite env vars (do not print secret values)
-  console.log('VITE_OPENAI_API_KEY present:', !!import.meta.env.VITE_OPENAI_API_KEY);
-  console.log('VITE_GEMINI_API_KEY present:', !!import.meta.env.VITE_GEMINI_API_KEY);
-  console.log('VITE_ODDS_API_KEY present:', !!import.meta.env.VITE_ODDS_API_KEY);
-  // Debug: list Vite-provided env keys (safe: keys only, no values)
-  try {
-    const viteKeys = Object.keys(import.meta.env).filter(k => k.startsWith('VITE_'));
-    console.log('Vite env keys present:', viteKeys);
-  } catch (e) {
-    console.warn('Could not list import.meta.env keys', e);
-  }
+  // production: no env debug logging here
   // --- State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
@@ -213,8 +203,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
   // --- Fetch Parlay Suggestions ---
   const fetchParlaySuggestion = useCallback(async () => {
     // --- THIS IS OUR FINAL TEST ---
-      console.log('--- TEST VARIABLE CHECK ---');
-      console.log('Value:', import.meta.env.VITE_TEST_VARIABLE);
+    // no client-side env debugging
 
     if (loading || selectedSports.length === 0 || selectedBetTypes.length === 0) return;
     // ... rest of the function
@@ -264,14 +253,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         <p className="text-xl font-medium text-gray-300">for Parlays</p>
       </header>
 
-      {/* Debug panel: show which VITE_ env keys are present (no values exposed) */}
-      <div className="max-w-2xl mx-auto mb-4 p-3 bg-gray-800 rounded-xl text-sm text-gray-300">
-        <div className="font-semibold text-yellow-400 mb-2">Env debug</div>
-        <div>VITE_OPENAI_API_KEY present: {String(!!import.meta.env.VITE_OPENAI_API_KEY)}</div>
-        <div>VITE_GEMINI_API_KEY present: {String(!!import.meta.env.VITE_GEMINI_API_KEY)}</div>
-        <div>VITE_ODDS_API_KEY present: {String(!!import.meta.env.VITE_ODDS_API_KEY)}</div>
-        <div className="mt-2">Vite env keys: {JSON.stringify(Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')))}</div>
-      </div>
+      {/* env debug panel removed */}
 
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
