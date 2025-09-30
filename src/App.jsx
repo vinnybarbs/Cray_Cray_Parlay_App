@@ -190,7 +190,6 @@ const App = () => {
             onChange={(e) => setNumLegs(parseInt(e.target.value))}
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
           />
-           {/* THIS DIV WAS MISSING ITS CLOSING TAG IN THE PREVIOUS VERSION */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -270,17 +269,56 @@ const App = () => {
         )}
       </div>
 
+      {/* === UPDATED WIDGET AS REQUESTED === */}
       <div className="max-w-2xl mx-auto mt-12 mb-4">
         <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-6 border border-gray-700 shadow-2xl">
-          <div className="mb-4 bg-gray-900 border-2 border-gray-700 rounded-lg p-3 text-center">
-            <p className="text-xl font-bold text-yellow-300">{riskLevel} Risk</p>
-            <p className="text-xs text-gray-400 mt-1">{RISK_LEVEL_DEFINITIONS[riskLevel]}</p>
+          {/* 1. "A BISQUE BOYS APPLICATION" header re-added */}
+          <div className="flex items-center justify-center space-x-3 mb-4">
+            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+            <p className="uppercase font-bold text-sm text-gray-400 tracking-widest">
+              A BISQUE BOYS APPLICATION
+            </p>
+            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
           </div>
+          
+          {/* 2. Funny risk-level box inserted here */}
+          {riskLevel === 'Low' && (
+            <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
+              <p className="text-xs text-blue-400 mt-1">Playing it safe, huh? Boring but smart.</p>
+            </div>
+          )}
+          {riskLevel === 'Medium' && (
+            <div className="mb-4 bg-yellow-900 border-2 border-yellow-500 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-yellow-300">🤪 YOU'RE LOCO AND I LIKEY 🤪</p>
+              <p className="text-xs text-yellow-400 mt-1">Balanced chaos - my favorite!</p>
+            </div>
+          )}
+          {riskLevel === 'High' && (
+            <div className="mb-4 bg-red-900 border-2 border-red-500 rounded-lg p-3 text-center animate-pulse">
+              <p className="text-xl font-bold text-red-300">🔥 DEGENERATE IN THE FLESH 🔥</p>
+              <p className="text-xs text-red-400 mt-1">Full degen mode activated! Let's gooo!</p>
+            </div>
+          )}
+          
+          {/* 3. Original grid of selections restored below */}
           <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Sports</p><p className="text-sm font-bold text-yellow-400">{selectedSports.join(', ')}</p></div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Bet Types</p><p className="text-sm font-bold text-green-400">{selectedBetTypes.join(', ')}</p></div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Parlay Size</p><p className="text-sm font-bold text-blue-400">{numLegs} Legs</p></div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Date Range</p><p className="text-sm font-bold text-purple-400">{dateRange} Day{dateRange > 1 ? 's' : ''}</p></div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Sports</p>
+              <p className="text-sm font-bold text-yellow-400">{selectedSports.join(', ')}</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Bet Types</p>
+              <p className="text-sm font-bold text-green-400">{selectedBetTypes.join(', ')}</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Parlay Size</p>
+              <p className="text-sm font-bold text-blue-400">{numLegs} Legs</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Risk Level</p>
+              <p className="text-sm font-bold text-purple-400">{riskLevel}</p>
+            </div>
           </div>
         </div>
       </div>
