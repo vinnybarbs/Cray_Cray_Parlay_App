@@ -1,6 +1,7 @@
 // Serverless endpoint for generating parlays.
 // Runs on Vercel (or any Node server) and keeps API keys server-side.
-import fetch from 'node-fetch';
+// Prefer the runtime/global fetch when available. We'll dynamically import node-fetch
+// inside the handler only if needed to avoid top-level import failures on some hosts.
 
 const SPORT_SLUGS = {
   NFL: 'americanfootball_nfl',
@@ -75,6 +76,17 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
 }
 
 export default async function handler(req, res) {
+  // Resolve a fetch implementation: prefer globalThis.fetch, otherwise dynamic-import node-fetch
+  let fetcher = globalThis.fetch;
+  if (!fetcher) {
+    try {
+      const nf = await import('node-fetch');
+      fetcher = nf.default || nf;
+    } catch (err) {
+      console.error('Could not load fetch implementation:', err);
+      return res.status(500).json({ error: 'Server missing fetch implementation' });
+    }
+  }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { selectedSports = [], selectedBetTypes = [], numLegs = 3, oddsPlatform = 'DraftKings', aiModel = 'openai' } = req.body || {};
@@ -100,7 +112,7 @@ export default async function handler(req, res) {
       const markets = (selectedBetTypes || []).flatMap(bt => MARKET_MAPPING[bt] || []).join(',');
       if (!markets) continue;
       const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(markets)}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
-      const r = await fetch(url);
+  const r = await fetcher(url);
       if (!r.ok) continue;
       const data = await r.json();
       if (Array.isArray(data)) oddsResults.push(...data);
@@ -115,7 +127,7 @@ export default async function handler(req, res) {
     // Call AI provider with model fallback logic
     let content = '';
     const tryOpenAIModel = async (model) => {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetcher('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
         body: JSON.stringify({
@@ -133,7 +145,7 @@ export default async function handler(req, res) {
 
     const tryGeminiModel = async (model) => {
       const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${GEMINI_KEY}`;
-      const response = await fetch(url, {
+  const response = await fetcher(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
