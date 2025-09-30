@@ -98,7 +98,7 @@ export default async function handler(req, res) {
 
   // Allow configurable model fallback lists via env, comma-separated.
   const OPENAI_MODELS = (process.env.OPENAI_MODELS || 'gpt-4o-mini,gpt-4o,gpt-4,gpt-3.5-turbo').split(',').map(s => s.trim()).filter(Boolean);
-  const GEMINI_MODELS = (process.env.GEMINI_MODELS || 'gemini-1.5-flash-latest,gemini-1.5,gemini-1.0,chat-bison-001,text-bison-001').split(',').map(s => s.trim()).filter(Boolean);
+  const GEMINI_MODELS = (process.env.GEMINI_MODELS || 'gemini-2.5-flash,gemini-2.5-pro').split(',').map(s => s.trim()).filter(Boolean);
 
   if (!ODDS_KEY) return res.status(500).json({ error: 'Server missing ODDS_API_KEY' });
 
