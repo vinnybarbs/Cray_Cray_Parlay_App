@@ -227,56 +227,20 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
       const prompt = generateAIPrompt(oddsData);
       let content = '';
 
-      if (aiModel === 'openai') {
-        // Vite env var
-        const openaiKey = import.meta.env.VITE_OPENAI_API_KEY;
-        if (!openaiKey) {
-          throw new Error('Missing VITE_OPENAI_API_KEY. For security, do not commit API keys to source. Consider using a server-side proxy.');
-        }
-        const response = await fetch(`https://api.openai.com/v1/chat/completions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 2000
-          })
-        });
+      // Call serverless proxy on our domain so keys stay server-side
+      const response = await fetch('/api/generate-parlay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel })
+      });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-        }
-        const data = await response.json();
-        content = data.choices?.[0]?.message?.content;
-
-      } else if (aiModel === 'gemini') {
-        const geminiKey = import.meta.env.VITE_GEMINI_API_KEY;
-        if (!geminiKey) {
-          throw new Error('Missing VITE_GEMINI_API_KEY. For security, do not commit API keys to source. Consider using a server-side proxy.');
-        }
-        // CORRECTED URL: Changed v1beta to v1
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${geminiKey}`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
-          })
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
-        }
-        const data = await response.json();
-        content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Server API error: ${response.status} - ${errText}`);
       }
+
+      const data = await response.json();
+      content = data.content;
 
       if (!content) throw new Error(`No content returned from ${aiModel.toUpperCase()}`);
 

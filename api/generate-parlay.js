@@ -1,0 +1,158 @@
+// Serverless endpoint for generating parlays.
+// Runs on Vercel (or any Node server) and keeps API keys server-side.
+import fetch from 'node-fetch';
+
+const SPORT_SLUGS = {
+  NFL: 'americanfootball_nfl',
+  NBA: 'basketball_nba',
+  MLB: 'baseball_mlb',
+  NHL: 'icehockey_nhl',
+  Soccer: 'soccer_epl',
+  NCAAF: 'americanfootball_ncaaf',
+  'PGA/Golf': 'golf_pga',
+  Tennis: 'tennis_atp',
+};
+
+const MARKET_MAPPING = {
+  'Moneyline/Spread': ['h2h', 'spreads'],
+  'Totals (O/U)': ['totals'],
+  'Player Props': ['player_points'],
+  'Team Props': ['team_points'],
+};
+
+const BOOKMAKER_MAPPING = {
+  DraftKings: 'draftkings',
+  FanDuel: 'fanduel',
+  MGM: 'mgm',
+  Caesars: 'caesars',
+  Bet365: 'bet365',
+};
+
+const RISK_LEVEL_DEFINITIONS = {
+  Low: "High probability to hit, heavy favorites, +200 to +400 odds, confidence 8/10+",
+  Medium: "Balanced value favorites with moderate props, +400 to +600 odds",
+  High: "Value underdogs and high-variance outcomes, +600+ odds",
+};
+
+function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData }) {
+  const sportsStr = (selectedSports || []).join(', ');
+  const betTypesStr = (selectedBetTypes || []).join(', ');
+
+  const oddsContext = oddsData && oddsData.length > 0
+    ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}`
+    : '';
+
+  return `
+You are a professional sports betting analyst.
+Generate exactly ${numLegs}-leg parlays for today. Include a bonus lock parlay.
+
+Rules:
+1. Only include sports: ${sportsStr}
+2. Only include bet types: ${betTypesStr}
+3. Include real matchups with current odds if possible
+4. Provide confidence 1-10 for each leg
+5. Include concise degenerate humor in the parlay title or intro
+6. Output structured format exactly as below
+
+Format:
+**Parlay Title**: [Funny/degenerate title]
+**Legs**:
+1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Stats/Trends]
+...
+**Combined Odds**: [Total]
+**Payout on $100**: [XXX]
+
+**Bonus Lock Parlay**:
+1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Why safe]
+...
+**Combined Odds**: [Total]
+**Reasoning**: [Concise explanation]
+
+${oddsContext}
+
+Tone: Serious picks, full personality, concise degenerate-style humor.
+`.trim();
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { selectedSports = [], selectedBetTypes = [], numLegs = 3, oddsPlatform = 'DraftKings', aiModel = 'openai' } = req.body || {};
+
+  // Server-side keys (must be set in Vercel as OPENAI_API_KEY / GEMINI_API_KEY / ODDS_API_KEY)
+  const OPENAI_KEY = process.env.OPENAI_API_KEY;
+  const GEMINI_KEY = process.env.GEMINI_API_KEY;
+  const ODDS_KEY = process.env.ODDS_API_KEY;
+
+  if (!ODDS_KEY) return res.status(500).json({ error: 'Server missing ODDS_API_KEY' });
+
+  try {
+    // Fetch odds server-side
+    const oddsResults = [];
+    const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
+
+    for (const sport of selectedSports) {
+      const slug = SPORT_SLUGS[sport];
+      const markets = (selectedBetTypes || []).flatMap(bt => MARKET_MAPPING[bt] || []).join(',');
+      if (!markets) continue;
+      const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(markets)}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
+      const r = await fetch(url);
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (Array.isArray(data)) oddsResults.push(...data);
+    }
+
+    const prompt = generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData: oddsResults });
+
+    // Call AI provider
+    let content = '';
+    if (aiModel === 'openai') {
+      if (!OPENAI_KEY) return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
+
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `OpenAI error: ${errText}` });
+      }
+      const data = await response.json();
+      content = data.choices?.[0]?.message?.content || JSON.stringify(data);
+
+    } else if (aiModel === 'gemini') {
+      if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
+      const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_KEY}`;
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
+        })
+      });
+
+      if (!response.ok) {
+        const errText = await response.text();
+        return res.status(response.status).json({ error: `Gemini error: ${errText}` });
+      }
+      const data = await response.json();
+      content = data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
+    }
+
+    return res.status(200).json({ content });
+  } catch (err) {
+    console.error('generate-parlay error:', err);
+    return res.status(500).json({ error: err.message || 'Server error' });
+  }
+}
