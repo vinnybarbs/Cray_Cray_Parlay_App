@@ -318,25 +318,43 @@ const App = () => {
             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
           </div>
           
-          <div className="grid grid-cols-3 gap-4 text-center">
+          {/* Risk Level Banner */}
+          {riskLevel === 'Low' && (
+            <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
+              <p className="text-xs text-blue-400 mt-1">Playing it safe, huh? Boring but smart.</p>
+            </div>
+          )}
+          {riskLevel === 'Medium' && (
+            <div className="mb-4 bg-yellow-900 border-2 border-yellow-500 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-yellow-300">🤪 YOU'RE LOCO AND I LIKEY 🤪</p>
+              <p className="text-xs text-yellow-400 mt-1">Balanced chaos - my favorite!</p>
+            </div>
+          )}
+          {riskLevel === 'High' && (
+            <div className="mb-4 bg-red-900 border-2 border-red-500 rounded-lg p-3 text-center animate-pulse">
+              <p className="text-xl font-bold text-red-300">🔥 YOU'RE LOCO AND I LIKEY 🔥</p>
+              <p className="text-xs text-red-400 mt-1">Full degen mode activated! Let's gooo!</p>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-2 gap-3 text-center">
             <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Risk Level</p>
-              <p className="text-lg font-bold text-yellow-400">{riskLevel}</p>
+              <p className="text-xs text-gray-500 uppercase mb-1">Sports</p>
+              <p className="text-sm font-bold text-yellow-400">{selectedSports.join(', ')}</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Bet Types</p>
+              <p className="text-sm font-bold text-green-400">{selectedBetTypes.join(', ')}</p>
             </div>
             <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
               <p className="text-xs text-gray-500 uppercase mb-1">Parlay Size</p>
-              <p className="text-lg font-bold text-green-400">{numLegs} Legs</p>
+              <p className="text-sm font-bold text-blue-400">{numLegs} Legs</p>
             </div>
             <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Odds Platform</p>
-              <p className="text-lg font-bold text-blue-400">{oddsPlatform}</p>
+              <p className="text-xs text-gray-500 uppercase mb-1">Platform</p>
+              <p className="text-sm font-bold text-purple-400">{oddsPlatform}</p>
             </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-gray-700">
-            <p className="text-xs text-center text-gray-500 italic">
-              ⚠️ Gamble responsibly. Never bet more than you can afford to lose.
-            </p>
           </div>
         </div>
       </div>
