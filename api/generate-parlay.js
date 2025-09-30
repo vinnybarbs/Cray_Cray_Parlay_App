@@ -42,13 +42,27 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData 
   // Build a concise human-friendly summary of up to 10 events with UTC date/time
   // Only include essential fields: teams + odds for the markets that match selectedBetTypes
   let oddsContext = '';
+  const formatDateShort = (iso) => {
+    if (!iso) return 'TBD';
+    try {
+      const d = new Date(iso);
+      // Format as MM/DD/YY TZ (e.g. 09/29/25 PDT)
+      const datePart = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
+      // timeZoneName: 'short' gives a short timezone indicator
+      const tzPart = d.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+      return `${datePart} ${tzPart}`;
+    } catch (e) {
+      return 'TBD';
+    }
+  };
+
   if (oddsData && oddsData.length > 0) {
     const marketKeys = (selectedBetTypes || []).flatMap(bt => MARKET_MAPPING[bt] || []);
     const items = oddsData
       .filter(ev => !selectedSports || selectedSports.length === 0 || selectedSports.includes(ev.sport_title) || selectedSports.includes(ev.sport_key))
       .slice(0, 10)
       .map(ev => {
-        const timeStr = ev.commence_time ? new Date(ev.commence_time).toUTCString() : 'TBD';
+  const timeStr = formatDateShort(ev.commence_time);
         const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
         const bm = (ev.bookmakers && ev.bookmakers[0]) || null;
         let marketsSummary = 'no-odds';
