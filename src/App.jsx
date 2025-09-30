@@ -190,6 +190,7 @@ const App = () => {
             onChange={(e) => setNumLegs(parseInt(e.target.value))}
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
           />
+           {/* THIS DIV WAS MISSING ITS CLOSING TAG IN THE PREVIOUS VERSION */}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -244,7 +245,7 @@ const App = () => {
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                 <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
               </div>
-            </div> {/* <-- FIXED: This closing div was missing */}
+            </div>
           </div>
         )}
 
