@@ -40,13 +40,41 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData 
   const betTypesStr = (selectedBetTypes || []).join(', ');
 
   // Build a concise human-friendly summary of up to 10 events with UTC date/time
+  // Only include essential fields: teams + odds for the markets that match selectedBetTypes
   let oddsContext = '';
   if (oddsData && oddsData.length > 0) {
-    const items = oddsData.slice(0, 10).map(ev => {
-      const timeStr = ev.commence_time ? new Date(ev.commence_time).toUTCString() : 'TBD';
-      const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
-      return `- ${timeStr} - ${teams} - sport: ${ev.sport_title || ev.sport_key || 'unknown'}`;
-    });
+    const marketKeys = (selectedBetTypes || []).flatMap(bt => MARKET_MAPPING[bt] || []);
+    const items = oddsData
+      .filter(ev => !selectedSports || selectedSports.length === 0 || selectedSports.includes(ev.sport_title) || selectedSports.includes(ev.sport_key))
+      .slice(0, 10)
+      .map(ev => {
+        const timeStr = ev.commence_time ? new Date(ev.commence_time).toUTCString() : 'TBD';
+        const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
+        const bm = (ev.bookmakers && ev.bookmakers[0]) || null;
+        let marketsSummary = 'no-odds';
+        if (bm && Array.isArray(bm.markets)) {
+          const parts = [];
+          for (const m of bm.markets) {
+            if (!marketKeys.includes(m.key)) continue;
+            if (!Array.isArray(m.outcomes)) continue;
+            if (m.key === 'h2h') {
+              const h2h = m.outcomes.map(o => `${o.name}: ${o.price}`).join(' / ');
+              parts.push(`Moneyline: ${h2h}`);
+            } else if (m.key === 'spreads') {
+              const spread = m.outcomes.map(o => `${o.name}: ${o.price} (${o.point != null ? o.point : 'N/A'})`).join(' / ');
+              parts.push(`Spread: ${spread}`);
+            } else if (m.key === 'totals') {
+              const totals = m.outcomes.map(o => `${o.name}: ${o.price} (${o.point != null ? o.point : ''})`).join(' / ');
+              parts.push(`Totals: ${totals}`);
+            } else {
+              const generic = m.outcomes.map(o => `${o.name}: ${o.price}`).join(' / ');
+              parts.push(`${m.key}: ${generic}`);
+            }
+          }
+          if (parts.length > 0) marketsSummary = parts.join(' | ');
+        }
+        return `- ${timeStr} - ${teams} - ${marketsSummary}`;
+      });
     oddsContext = `\n\n**Supplemental Odds Data (use if available)**:\n${items.join('\n')}`;
   }
 
