@@ -1,38 +1,5 @@
 import React, { useState, useCallback } from 'react';
 
-// --- Mappings ---
-const SPORT_SLUGS = {
-  NFL: 'americanfootball_nfl',
-  NBA: 'basketball_nba',
-  MLB: 'baseball_mlb',
-  NHL: 'icehockey_nhl',
-  Soccer: 'soccer_epl',
-  NCAAF: 'americanfootball_ncaaf',
-  'PGA/Golf': 'golf_pga',
-  Tennis: 'tennis_atp',
-};
-
-const MARKET_MAPPING = {
-  'Moneyline/Spread': ['h2h', 'spreads'],
-  'Totals (O/U)': ['totals'],
-  'Player Props': ['player_points'],
-  'Team Props': ['team_points'],
-};
-
-const BOOKMAKER_MAPPING = {
-  DraftKings: 'draftkings',
-  FanDuel: 'fanduel',
-  MGM: 'mgm',
-  Caesars: 'caesars',
-  Bet365: 'bet365',
-};
-
-const RISK_LEVEL_DEFINITIONS = {
-  Low: "High probability to hit, heavy favorites, +200 to +400 odds, confidence 8/10+",
-  Medium: "Balanced value favorites with moderate props, +400 to +600 odds",
-  High: "Value underdogs and high-variance outcomes, +600+ odds",
-};
-
 // --- Helper UI Components ---
 const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
   <div className="flex flex-col space-y-3">
@@ -90,6 +57,12 @@ const AiModelToggle = ({ aiModel, setAiModel }) => (
   </div>
 );
 
+const RISK_LEVEL_DEFINITIONS = {
+  Low: "High probability to hit, heavy favorites, +200 to +400 odds, confidence 8/10+",
+  Medium: "Balanced value favorites with moderate props, +400 to +600 odds",
+  High: "Value underdogs and high-variance outcomes, +600+ odds",
+};
+
 // --- Main App Component ---
 const App = () => {
   const [selectedSports, setSelectedSports] = useState(['NFL']);
@@ -104,7 +77,6 @@ const App = () => {
   const [error, setError] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState('');
 
-  // Funny loading messages
   const loadingMessages = [
     "Consulting with Vegas insiders...",
     "Bribing the refs for insider info...",
@@ -116,16 +88,6 @@ const App = () => {
     "Channeling my inner degenerate...",
     "Calculating odds while ignoring reality...",
     "Pretending I know what I'm doing...",
-    "Consulting the Oracle of Parlay...",
-    "Ignoring responsible gambling guidelines...",
-    "Turning your money into my money...",
-    "Finding the most irresponsible bets...",
-    "Calling my therapist's therapist...",
-    "Maxing out the credit card vibes...",
-    "Telling myself 'this time is different'...",
-    "Getting banned from another casino...",
-    "Crying into my empty wallet...",
-    "One more bet and I'll quit, I swear...",
   ];
 
   const getRandomLoadingMessage = () => {
@@ -153,26 +115,31 @@ const App = () => {
     setLoadingMessage(getRandomLoadingMessage());
 
     try {
-      // Call backend API that fetches odds and generates parlays
+      console.log('Calling API with:', { selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel });
+      
       const response = await fetch('/api/generate-parlay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          selectedSports, 
-          selectedBetTypes, 
-          numLegs, 
-          oddsPlatform, 
+          selectedSports,
+          selectedBetTypes,
+          numLegs,
+          oddsPlatform,
           aiModel,
           riskLevel
         })
       });
 
+      console.log('Response status:', response.status);
+
       if (!response.ok) {
         const errText = await response.text();
+        console.error('Server error response:', errText);
         throw new Error(`Server error: ${response.status} - ${errText}`);
       }
 
       const data = await response.json();
+      console.log('Response data:', data);
       
       if (!data.content) {
         throw new Error('No content returned from AI');
@@ -185,7 +152,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, getRandomLoadingMessage]);
+  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
@@ -318,7 +285,6 @@ const App = () => {
             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
           </div>
           
-          {/* Risk Level Banner */}
           {riskLevel === 'Low' && (
             <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3 text-center">
               <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
@@ -352,8 +318,8 @@ const App = () => {
               <p className="text-sm font-bold text-blue-400">{numLegs} Legs</p>
             </div>
             <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Platform</p>
-              <p className="text-sm font-bold text-purple-400">{oddsPlatform}</p>
+              <p className="text-xs text-gray-500 uppercase mb-1">Risk Level</p>
+              <p className="text-sm font-bold text-purple-400">{riskLevel}</p>
             </div>
           </div>
         </div>
