@@ -39,9 +39,16 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData 
   const sportsStr = (selectedSports || []).join(', ');
   const betTypesStr = (selectedBetTypes || []).join(', ');
 
-  const oddsContext = oddsData && oddsData.length > 0
-    ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}`
-    : '';
+  // Build a concise human-friendly summary of up to 10 events with UTC date/time
+  let oddsContext = '';
+  if (oddsData && oddsData.length > 0) {
+    const items = oddsData.slice(0, 10).map(ev => {
+      const timeStr = ev.commence_time ? new Date(ev.commence_time).toUTCString() : 'TBD';
+      const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
+      return `- ${timeStr} - ${teams} - sport: ${ev.sport_title || ev.sport_key || 'unknown'}`;
+    });
+    oddsContext = `\n\n**Supplemental Odds Data (use if available)**:\n${items.join('\n')}`;
+  }
 
   return `
 You are a professional sports betting analyst.
@@ -150,7 +157,7 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
+            generationConfig: { temperature: 0.7, maxOutputTokens: 6000 }
         })
       });
       return response;
