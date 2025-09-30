@@ -90,11 +90,8 @@ const AiModelToggle = ({ aiModel, setAiModel }) => (
   </div>
 );
 
-
 // --- Main App Component ---
 const App = () => {
-  // production: no env debug logging here
-  // --- State ---
   const [selectedSports, setSelectedSports] = useState(['NFL']);
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
   const [riskLevel, setRiskLevel] = useState('Low');
@@ -105,8 +102,36 @@ const App = () => {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState('');
   const [error, setError] = useState(null);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
-  // --- Handlers ---
+  // Funny loading messages
+  const loadingMessages = [
+    "Consulting with Vegas insiders...",
+    "Bribing the refs for insider info...",
+    "Sacrificing a prop bet to the degen gods...",
+    "Checking if my bookie is watching...",
+    "Doing complex math (counting on fingers)...",
+    "Reading tea leaves and injury reports...",
+    "Asking my Magic 8-Ball for advice...",
+    "Channeling my inner degenerate...",
+    "Calculating odds while ignoring reality...",
+    "Pretending I know what I'm doing...",
+    "Consulting the Oracle of Parlay...",
+    "Ignoring responsible gambling guidelines...",
+    "Turning your money into my money...",
+    "Finding the most irresponsible bets...",
+    "Calling my therapist's therapist...",
+    "Maxing out the credit card vibes...",
+    "Telling myself 'this time is different'...",
+    "Getting banned from another casino...",
+    "Crying into my empty wallet...",
+    "One more bet and I'll quit, I swear...",
+  ];
+
+  const getRandomLoadingMessage = () => {
+    return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+  };
+
   const toggleSport = (sport) => {
     setSelectedSports(prev =>
       prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]
@@ -119,131 +144,49 @@ const App = () => {
     );
   };
 
-  // --- Fetch Odds Data ---
-  const fetchOddsData = async () => {
-    try {
-      const oddsResults = [];
-      const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
-      // Vite exposes env vars via import.meta.env and they must be prefixed with VITE_
-      const apiKey = import.meta.env.VITE_ODDS_API_KEY;
-
-      if (!apiKey) {
-        console.error('Missing VITE_ODDS_API_KEY in environment. Create a .env with VITE_ODDS_API_KEY=your_key');
-        return [];
-      }
-
-      for (const sport of selectedSports) {
-        const slug = SPORT_SLUGS[sport];
-        // Guard against missing mapping values
-        const markets = selectedBetTypes.flatMap(bt => MARKET_MAPPING[bt] || []).join(',');
-        if (!markets) {
-          console.warn(`No markets mapped for selected bet types: ${selectedBetTypes.join(', ')}; skipping ${sport}`);
-          continue;
-        }
-
-        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${markets}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${apiKey}`;
-        const res = await fetch(url);
-        if (!res.ok) {
-          console.warn(`Odds API returned ${res.status} for ${slug}`);
-          continue;
-        }
-
-        const data = await res.json();
-        if (Array.isArray(data)) oddsResults.push(...data);
-      }
-
-      return oddsResults;
-    } catch (e) {
-      console.error('Error fetching odds:', e);
-      return [];
-    }
-  };
-
-  // --- Generate AI Prompt ---
-  const generateAIPrompt = useCallback((oddsData) => {
-    const sportsStr = selectedSports.join(', ');
-    const betTypesStr = selectedBetTypes.join(', ');
-
-    const oddsContext = oddsData && oddsData.length > 0
-      ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}`
-      : '';
-
-    return `
-You are a professional sports betting analyst.
-Generate exactly ${numLegs}-leg parlays for today. Include a bonus lock parlay.
-
-Rules:
-1. Only include sports: ${sportsStr}
-2. Only include bet types: ${betTypesStr}
-3. Include real matchups with current odds if possible
-4. Provide confidence 1-10 for each leg
-5. Include concise degenerate humor in the parlay title or intro
-6. Output structured format exactly as below
-
-Format:
-**Parlay Title**: [Funny/degenerate title]
-**Legs**:
-1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Stats/Trends]
-...
-**Combined Odds**: [Total]
-**Payout on $100**: [XXX]
-
-**Bonus Lock Parlay**:
-1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Why safe]
-...
-**Combined Odds**: [Total]
-**Reasoning**: [Concise explanation]
-
-${oddsContext}
-
-Tone: Serious picks, full personality, concise degenerate-style humor.
-`.trim();
-  }, [selectedSports, selectedBetTypes, numLegs]);
-
-  // --- Fetch Parlay Suggestions ---
   const fetchParlaySuggestion = useCallback(async () => {
-    // --- THIS IS OUR FINAL TEST ---
-    // no client-side env debugging
-
     if (loading || selectedSports.length === 0 || selectedBetTypes.length === 0) return;
-    // ... rest of the function
+
     setLoading(true);
     setResults('');
     setError(null);
+    setLoadingMessage(getRandomLoadingMessage());
 
     try {
-      const oddsData = await fetchOddsData();
-      const prompt = generateAIPrompt(oddsData);
-      let content = '';
-
-      // Call serverless proxy on our domain so keys stay server-side
+      // Call backend API that fetches odds and generates parlays
       const response = await fetch('/api/generate-parlay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel })
+        body: JSON.stringify({ 
+          selectedSports, 
+          selectedBetTypes, 
+          numLegs, 
+          oddsPlatform, 
+          aiModel,
+          riskLevel
+        })
       });
 
       if (!response.ok) {
         const errText = await response.text();
-        throw new Error(`Server API error: ${response.status} - ${errText}`);
+        throw new Error(`Server error: ${response.status} - ${errText}`);
       }
 
       const data = await response.json();
-      content = data.content;
+      
+      if (!data.content) {
+        throw new Error('No content returned from AI');
+      }
 
-      if (!content) throw new Error(`No content returned from ${aiModel.toUpperCase()}`);
-
-      setResults(content);
+      setResults(data.content);
     } catch (e) {
       console.error('API Error:', e);
       setError(`Failed to generate parlays: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [generateAIPrompt, loading, selectedSports, selectedBetTypes, oddsPlatform, aiModel]);
+  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, getRandomLoadingMessage]);
 
-
-  // --- Render ---
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
       <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl">
@@ -252,8 +195,6 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         </h1>
         <p className="text-xl font-medium text-gray-300">for Parlays</p>
       </header>
-
-      {/* env debug panel removed */}
 
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -338,9 +279,20 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         )}
 
         {loading && (
-             <div className="p-6 text-center text-gray-500 border border-dashed border-gray-700 rounded-xl">
-                <p>Contacting the AI degen... please wait.</p>
-             </div>
+          <div className="p-8 text-center border-2 border-yellow-500 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-2 border-4 border-red-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.6s' }}></div>
+              </div>
+              <p className="text-xl font-bold text-yellow-400 animate-pulse">{loadingMessage}</p>
+              <div className="flex space-x-1 mt-2">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
+          </div>
         )}
 
         {results && !loading && (
@@ -356,10 +308,37 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
         )}
       </div>
 
-      <div className="max-w-2xl mx-auto mt-12 mb-4 text-center">
-        <p className="uppercase font-bold text-xs text-gray-700 tracking-widest">
-          A BISQUE BOYS APPLICATION
-        </p>
+      <div className="max-w-2xl mx-auto mt-12 mb-4">
+        <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-6 border border-gray-700 shadow-2xl">
+          <div className="flex items-center justify-center space-x-3 mb-4">
+            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+            <p className="uppercase font-bold text-sm text-gray-400 tracking-widest">
+              A BISQUE BOYS APPLICATION
+            </p>
+            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Risk Level</p>
+              <p className="text-lg font-bold text-yellow-400">{riskLevel}</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Parlay Size</p>
+              <p className="text-lg font-bold text-green-400">{numLegs} Legs</p>
+            </div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
+              <p className="text-xs text-gray-500 uppercase mb-1">Odds Platform</p>
+              <p className="text-lg font-bold text-blue-400">{oddsPlatform}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-gray-700">
+            <p className="text-xs text-center text-gray-500 italic">
+              ⚠️ Gamble responsibly. Never bet more than you can afford to lose.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
