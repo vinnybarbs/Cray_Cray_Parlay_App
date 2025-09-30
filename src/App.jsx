@@ -71,8 +71,8 @@ const App = () => {
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
   const [aiModel, setAiModel] = useState('openai');
-  const [dateRange, setDateRange] = useState(1); // ADDED: State for date range
-  const [copied, setCopied] = useState(false); // ADDED: State for copy button feedback
+  const [dateRange, setDateRange] = useState(1);
+  const [copied, setCopied] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState('');
@@ -90,12 +90,11 @@ const App = () => {
   const toggleSport = (sport) => setSelectedSports(prev => prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]);
   const toggleBetType = (betType) => setSelectedBetTypes(prev => prev.includes(betType) ? prev.filter(b => b !== betType) : [...prev, betType]);
 
-  // ADDED: Function to handle copying results to clipboard
   const handleCopy = () => {
     if (results) {
       navigator.clipboard.writeText(results).then(() => {
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+        setTimeout(() => setCopied(false), 2000);
       });
     }
   };
@@ -119,7 +118,7 @@ const App = () => {
           oddsPlatform,
           aiModel,
           riskLevel,
-          dateRange // ADDED: Pass dateRange to the API
+          dateRange
         })
       });
 
@@ -149,7 +148,6 @@ const App = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
             label="1. Sports (Select Multiple)"
-            // UPDATED: Added 'NCAAF' (College Football) to the options
             options={['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis']}
             selectedOptions={selectedSports}
             onToggle={toggleSport}
@@ -162,7 +160,6 @@ const App = () => {
           />
         </div>
 
-        {/* ADDED: Date Range Slider */}
         <div>
           <label className="text-gray-200 text-sm font-semibold block mb-3">
             3. Game Date Range: <span className="text-yellow-400 text-lg font-bold">{dateRange} Day{dateRange > 1 ? 's' : ''}</span>
@@ -233,6 +230,7 @@ const App = () => {
         <h2 className="text-2xl font-bold mb-4 text-yellow-400">AI-Powered Parlay Analysis</h2>
 
         {error && <div className="p-4 bg-red-800 rounded-xl text-red-100 shadow-md"><p className="font-bold">Error:</p><p>{error}</p></div>}
+        
         {loading && (
           <div className="p-8 text-center border-2 border-yellow-500 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl">
             <div className="flex flex-col items-center space-y-4">
@@ -241,11 +239,15 @@ const App = () => {
                 <div className="absolute inset-2 border-4 border-red-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.6s' }}></div>
               </div>
               <p className="text-xl font-bold text-yellow-400 animate-pulse">{loadingMessage}</p>
-            </div>
+              <div className="flex space-x-1 mt-2">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div> {/* <-- FIXED: This closing div was missing */}
           </div>
         )}
 
-        {/* UPDATED: Added Share button and container for better styling */}
         {results && !loading && (
           <div className="relative p-6 bg-gray-800 rounded-xl shadow-lg">
             <button
@@ -267,7 +269,6 @@ const App = () => {
         )}
       </div>
 
-      {/* UPDATED: Revamped bottom widget */}
       <div className="max-w-2xl mx-auto mt-12 mb-4">
         <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-6 border border-gray-700 shadow-2xl">
           <div className="mb-4 bg-gray-900 border-2 border-gray-700 rounded-lg p-3 text-center">
