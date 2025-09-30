@@ -1,7 +1,5 @@
-// Serverless endpoint for generating parlays.
-// Runs on Vercel (or any Node server) and keeps API keys server-side.
-// Prefer the runtime/global fetch when available. We'll dynamically import node-fetch
-// inside the handler only if needed to avoid top-level import failures on some hosts.
+// Enhanced backend with web search fallback for odds
+// Replace your current /api/generate-parlay.js with this version
 
 const SPORT_SLUGS = {
   NFL: 'americanfootball_nfl',
@@ -29,103 +27,253 @@ const BOOKMAKER_MAPPING = {
   Bet365: 'bet365',
 };
 
-const RISK_LEVEL_DEFINITIONS = {
-  Low: "High probability to hit, heavy favorites, +200 to +400 odds, confidence 8/10+",
-  Medium: "Balanced value favorites with moderate props, +400 to +600 odds",
-  High: "Value underdogs and high-variance outcomes, +600+ odds",
-};
+// Web search for odds when API data is insufficient
+async function searchWebForOdds(selectedSports, selectedBetTypes, oddsPlatform, fetcher) {
+  try {
+    const SERPER_API_KEY = process.env.SERPER_API_KEY; // Google Search API
+    
+    if (!SERPER_API_KEY) {
+      console.warn('No SERPER_API_KEY found - skipping web search fallback');
+      return null;
+    }
 
-function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData }) {
+    const sportsQuery = selectedSports.join(' ');
+    const betTypesQuery = selectedBetTypes.join(' ');
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Search for today's games and odds
+    const query = `${sportsQuery} ${betTypesQuery} odds ${oddsPlatform} today ${today}`;
+    
+    console.log('Searching web for:', query);
+    
+    const response = await fetcher('https://google.serper.dev/search', {
+      method: 'POST',
+      headers: {
+        'X-API-KEY': SERPER_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        q: query,
+        num: 10
+      })
+    });
+
+    if (!response.ok) {
+      console.warn('Web search failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    // Extract relevant snippets and links
+    const searchResults = data.organic?.slice(0, 5).map(result => ({
+      title: result.title,
+      snippet: result.snippet,
+      link: result.link
+    })) || [];
+
+    return {
+      query,
+      results: searchResults,
+      searchedAt: new Date().toISOString()
+    };
+
+  } catch (err) {
+    console.error('Web search error:', err);
+    return null;
+  }
+}
+
+function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel, oddsData, webSearchData }) {
   const sportsStr = (selectedSports || []).join(', ');
   const betTypesStr = (selectedBetTypes || []).join(', ');
+  const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
 
-  // Build a concise human-friendly summary of up to 10 events with UTC date/time
-  // Only include essential fields: teams + odds for the markets that match selectedBetTypes
-  let oddsContext = '';
-  const formatDateShort = (iso) => {
+  // Format odds data from API
+  const formatDate = (iso) => {
     if (!iso) return 'TBD';
     try {
       const d = new Date(iso);
-      // Format as MM/DD/YY TZ (e.g. 09/29/25 PDT)
-      const datePart = d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: '2-digit' });
-      // timeZoneName: 'short' gives a short timezone indicator
-      const tzPart = d.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
-      return `${datePart} ${tzPart}`;
+      return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
     } catch (e) {
       return 'TBD';
     }
   };
 
+  let oddsContext = '';
+  let dataSource = '';
+  let availableGames = [];
+
+  // Primary: Use Odds API data if available
   if (oddsData && oddsData.length > 0) {
     const marketKeys = (selectedBetTypes || []).flatMap(bt => MARKET_MAPPING[bt] || []);
-    const items = oddsData
-      .filter(ev => !selectedSports || selectedSports.length === 0 || selectedSports.includes(ev.sport_title) || selectedSports.includes(ev.sport_key))
-      .slice(0, 10)
-      .map(ev => {
-  const timeStr = formatDateShort(ev.commence_time);
-        const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
-        const bm = (ev.bookmakers && ev.bookmakers[0]) || null;
-        let marketsSummary = 'no-odds';
-        if (bm && Array.isArray(bm.markets)) {
-          const parts = [];
-          for (const m of bm.markets) {
-            if (!marketKeys.includes(m.key)) continue;
-            if (!Array.isArray(m.outcomes)) continue;
-            if (m.key === 'h2h') {
-              const h2h = m.outcomes.map(o => `${o.name}: ${o.price}`).join(' / ');
-              parts.push(`Moneyline: ${h2h}`);
-            } else if (m.key === 'spreads') {
-              const spread = m.outcomes.map(o => `${o.name}: ${o.price} (${o.point != null ? o.point : 'N/A'})`).join(' / ');
-              parts.push(`Spread: ${spread}`);
-            } else if (m.key === 'totals') {
-              const totals = m.outcomes.map(o => `${o.name}: ${o.price} (${o.point != null ? o.point : ''})`).join(' / ');
-              parts.push(`Totals: ${totals}`);
-            } else {
-              const generic = m.outcomes.map(o => `${o.name}: ${o.price}`).join(' / ');
-              parts.push(`${m.key}: ${generic}`);
-            }
+    
+    oddsData.slice(0, 15).forEach((ev, idx) => {
+      const gameDate = formatDate(ev.commence_time);
+      const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
+      const bm = (ev.bookmakers && ev.bookmakers[0]) || null;
+      
+      let marketsSummary = '';
+      if (bm && Array.isArray(bm.markets)) {
+        const parts = [];
+        for (const m of bm.markets) {
+          if (!marketKeys.includes(m.key)) continue;
+          if (!Array.isArray(m.outcomes)) continue;
+          
+          if (m.key === 'h2h') {
+            const h2h = m.outcomes.map(o => `${o.name}: ${o.price > 0 ? '+' : ''}${o.price}`).join(' vs ');
+            parts.push(`Moneyline: ${h2h}`);
+          } else if (m.key === 'spreads') {
+            const spread = m.outcomes.map(o => `${o.name} ${o.point > 0 ? '+' : ''}${o.point} (${o.price > 0 ? '+' : ''}${o.price})`).join(' vs ');
+            parts.push(`Spread: ${spread}`);
+          } else if (m.key === 'totals') {
+            const totals = m.outcomes.map(o => `${o.name} ${o.point} (${o.price > 0 ? '+' : ''}${o.price})`).join(' / ');
+            parts.push(`Total: ${totals}`);
           }
-          if (parts.length > 0) marketsSummary = parts.join(' | ');
         }
-        return `- ${timeStr} - ${teams} - ${marketsSummary}`;
-      });
-    oddsContext = `\n\n**Supplemental Odds Data (use if available)**:\n${items.join('\n')}`;
+        marketsSummary = parts.join(' | ');
+      }
+      
+      if (marketsSummary) {
+        availableGames.push({
+          number: idx + 1,
+          date: gameDate,
+          teams: teams,
+          markets: marketsSummary
+        });
+      }
+    });
+    
+    if (availableGames.length > 0) {
+      dataSource = 'Odds API';
+      const gamesList = availableGames.map(g => 
+        `GAME #${g.number}:\nDATE: ${g.date}\nMATCHUP: ${g.teams}\nAVAILABLE BETS: ${g.markets}`
+      ).join('\n\n');
+      
+      oddsContext = `\n\n════════════════════════════════════════════════════════════════
+🔥 AVAILABLE GAMES WITH REAL ODDS - YOU MUST USE THESE EXACT GAMES 🔥
+════════════════════════════════════════════════════════════════
+
+${gamesList}
+
+════════════════════════════════════════════════════════════════
+TOTAL AVAILABLE GAMES: ${availableGames.length}
+════════════════════════════════════════════════════════════════`;
+    }
+  }
+
+  // Fallback: Use web search data if API has insufficient data
+  if (availableGames.length < 3 && webSearchData && webSearchData.results.length > 0) {
+    const searchItems = webSearchData.results.map((result, idx) => {
+      return `SEARCH RESULT #${idx + 1}:\nTITLE: ${result.title}\nINFO: ${result.snippet}\nSOURCE: ${result.link}`;
+    });
+
+    dataSource = 'Web Search (API had insufficient data)';
+    
+    const webContext = `\n\n════════════════════════════════════════════════════════════════
+🌐 WEB SEARCH RESULTS - EXTRACT GAMES AND ODDS FROM THESE 🌐
+════════════════════════════════════════════════════════════════
+
+SEARCH QUERY: "${webSearchData.query}"
+
+${searchItems.join('\n\n')}
+
+════════════════════════════════════════════════════════════════`;
+    
+    oddsContext = oddsContext ? `${oddsContext}\n${webContext}` : webContext;
+  }
+
+  // No data warning
+  if (!oddsContext || availableGames.length === 0) {
+    return `ERROR: NO GAME DATA AVAILABLE
+
+Tell the user: "I couldn't find any upcoming games with odds data. Please try:
+1. Selecting different sports (NFL, NBA have most games)
+2. Different bet types
+3. Checking back during peak sports season
+4. Verifying API keys are configured correctly"
+
+Do not generate fake games or odds.`;
   }
 
   return `
-You are a professional sports betting analyst.
-Generate exactly ${numLegs}-leg parlays for today. Include a bonus lock parlay.
+TODAY'S DATE: ${today}
+DATA SOURCE: ${dataSource}
+YOUR ROLE: Professional sports betting analyst
 
-Rules:
-1. Only include sports: ${sportsStr}
-2. Only include bet types: ${betTypesStr}
-3. Include real matchups with current odds if possible
-4. Provide confidence 1-10 for each leg
-5. Include concise degenerate humor in the parlay title or intro
-6. Output structured format exactly as below
+⚠️⚠️⚠️ CRITICAL INSTRUCTIONS - FAILURE TO FOLLOW = INVALID OUTPUT ⚠️⚠️⚠️
 
-Format:
-**Parlay Title**: [Funny/degenerate title]
-**Legs**:
-1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Stats/Trends]
-...
-**Combined Odds**: [Total]
-**Payout on $100**: [XXX]
-
-**Bonus Lock Parlay**:
-1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Why safe]
-...
-**Combined Odds**: [Total]
-**Reasoning**: [Concise explanation]
+1. YOU MUST ONLY USE GAMES LISTED IN THE "AVAILABLE GAMES" SECTION BELOW
+2. EVERY LEG MUST REFERENCE A SPECIFIC GAME NUMBER (e.g., "GAME #1", "GAME #3")
+3. EVERY LEG MUST INCLUDE THE EXACT DATE SHOWN FOR THAT GAME
+4. USE ONLY THE EXACT ODDS PROVIDED FOR EACH GAME
+5. DO NOT INVENT, IMAGINE, OR HALLUCINATE ANY GAMES NOT IN THE DATA
+6. IF YOU USE A GAME NOT IN THE LIST, YOUR OUTPUT IS INVALID
+7. CREATE EXACTLY ${numLegs} LEGS FOR THE MAIN PARLAY
 
 ${oddsContext}
 
-Tone: Serious picks, full personality, concise degenerate-style humor.
+════════════════════════════════════════════════════════════════
+
+YOUR TASK:
+Using ONLY the ${availableGames.length} games listed above, create:
+- ONE main parlay with EXACTLY ${numLegs} legs
+- ONE bonus lock parlay with 2-3 high-confidence legs
+
+REQUIRED OUTPUT FORMAT:
+
+**🎯 ${numLegs}-Leg Parlay: [Funny Title]**
+
+**Legs:**
+1. 📅 DATE: [Exact date from game]
+   GAME: [From GAME #X above]
+   Matchup: [Away] @ [Home]
+   Bet: [Specific bet with exact line]
+   Odds: [Exact odds from data]
+   Confidence: [X/10]
+   Reasoning: [Why this hits]
+
+2. 📅 DATE: [Exact date from game]
+   GAME: [From GAME #X above]
+   [Continue same format]
+
+[Repeat for exactly ${numLegs} legs]
+
+**Combined Odds:** [Calculate]
+**Payout on $100:** [Calculate]
+**Overall Confidence:** [X/10]
+
+---
+
+**🔒 BONUS LOCK PARLAY: [Conservative Title]**
+
+**Legs:**
+1-3. [Same format as above, 2-3 safer picks]
+
+**Combined Odds:** [Calculate]
+**Payout on $100:** [Calculate]
+**Why These Are Locks:** [Brief explanation]
+
+════════════════════════════════════════════════════════════════
+
+VALIDATION CHECKLIST (Verify before responding):
+✓ Used only games from the provided list (${availableGames.length} available)
+✓ Referenced game numbers (GAME #1, GAME #2, etc.)
+✓ Included exact dates for every leg
+✓ Used exact odds from the data
+✓ Created exactly ${numLegs} legs in main parlay
+✓ Did not invent any teams, games, or odds
+
+Risk Level: ${riskLevel}
+Sports Focus: ${sportsStr}
+Bet Types: ${betTypesStr}
+
+TONE: Professional with subtle humor. Be concise.
 `.trim();
 }
 
 export default async function handler(req, res) {
-  // Resolve a fetch implementation: prefer globalThis.fetch, otherwise dynamic-import node-fetch
+  // Resolve fetch implementation
   let fetcher = globalThis.fetch;
   if (!fetcher) {
     try {
@@ -136,57 +284,138 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Server missing fetch implementation' });
     }
   }
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { selectedSports = [], selectedBetTypes = [], numLegs = 3, oddsPlatform = 'DraftKings', aiModel = 'openai' } = req.body || {};
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
 
-  // Server-side keys (must be set in Vercel as OPENAI_API_KEY / GEMINI_API_KEY / ODDS_API_KEY)
+  const { 
+    selectedSports = [], 
+    selectedBetTypes = [], 
+    numLegs = 3, 
+    oddsPlatform = 'DraftKings', 
+    aiModel = 'openai',
+    riskLevel = 'Medium'
+  } = req.body || {};
+
+  // Server-side API keys
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
   const ODDS_KEY = process.env.ODDS_API_KEY;
 
-  // Allow configurable model fallback lists via env, comma-separated.
-  const OPENAI_MODELS = (process.env.OPENAI_MODELS || 'gpt-4o-mini,gpt-4o,gpt-4,gpt-3.5-turbo').split(',').map(s => s.trim()).filter(Boolean);
-  const GEMINI_MODELS = (process.env.GEMINI_MODELS || 'gemini-2.5-flash,gemini-2.5-pro').split(',').map(s => s.trim()).filter(Boolean);
-
-  if (!ODDS_KEY) return res.status(500).json({ error: 'Server missing ODDS_API_KEY' });
+  // Configurable model lists
+  const OPENAI_MODELS = (process.env.OPENAI_MODELS || 'gpt-4o,gpt-4o-mini,gpt-4,gpt-3.5-turbo').split(',').map(s => s.trim()).filter(Boolean);
+  const GEMINI_MODELS = (process.env.GEMINI_MODELS || 'gemini-2.0-flash-exp,gemini-1.5-pro').split(',').map(s => s.trim()).filter(Boolean);
 
   try {
-    // Fetch odds server-side
+    // Step 1: Fetch real odds data from API
+    console.log('Fetching odds for:', selectedSports);
     const oddsResults = [];
-    const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
+    
+    if (ODDS_KEY) {
+      const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
 
-    for (const sport of selectedSports) {
-      const slug = SPORT_SLUGS[sport];
-      const markets = (selectedBetTypes || []).flatMap(bt => MARKET_MAPPING[bt] || []).join(',');
-      if (!markets) continue;
-      const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(markets)}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
-  const r = await fetcher(url);
-      if (!r.ok) continue;
-      const data = await r.json();
-      if (Array.isArray(data)) oddsResults.push(...data);
+      for (const sport of selectedSports) {
+        const slug = SPORT_SLUGS[sport];
+        if (!slug) {
+          console.warn(`Unknown sport slug for: ${sport}`);
+          continue;
+        }
+
+        const markets = (selectedBetTypes || [])
+          .flatMap(bt => MARKET_MAPPING[bt] || [])
+          .join(',');
+        
+        if (!markets) {
+          console.warn(`No markets for bet types: ${selectedBetTypes}`);
+          continue;
+        }
+
+        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(markets)}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
+        
+        try {
+          const r = await fetcher(url);
+          if (!r.ok) {
+            console.warn(`Odds API returned ${r.status} for ${sport}`);
+            continue;
+          }
+          const data = await r.json();
+          if (Array.isArray(data)) {
+            console.log(`Found ${data.length} games for ${sport} from API`);
+            oddsResults.push(...data);
+          }
+        } catch (fetchErr) {
+          console.error(`Error fetching ${sport}:`, fetchErr);
+          continue;
+        }
+      }
+    } else {
+      console.warn('No ODDS_API_KEY - will rely on web search only');
     }
 
-    const prompt = generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData: oddsResults });
+    console.log(`Total games from Odds API: ${oddsResults.length}`);
 
-    // Diagnostic mode: don't call any AI provider, return odds + prompt
+    // Log first game for debugging
+    if (oddsResults.length > 0) {
+      console.log('Sample game data:', JSON.stringify(oddsResults[0], null, 2));
+    }
+
+    // Step 2: Fallback to web search if insufficient data
+    let webSearchData = null;
+    const MIN_GAMES_THRESHOLD = 3; // Trigger web search if less than this
+
+    if (oddsResults.length < MIN_GAMES_THRESHOLD) {
+      console.log(`Only ${oddsResults.length} games found, triggering web search fallback...`);
+      webSearchData = await searchWebForOdds(selectedSports, selectedBetTypes, oddsPlatform, fetcher);
+      
+      if (webSearchData) {
+        console.log(`Web search returned ${webSearchData.results.length} results`);
+      }
+    }
+
+    // Step 3: Generate enhanced prompt with available data
+    const prompt = generateAIPrompt({ 
+      selectedSports, 
+      selectedBetTypes, 
+      numLegs, 
+      riskLevel,
+      oddsData: oddsResults,
+      webSearchData
+    });
+
+    // Diagnostic mode
     const diagnose = req.query?.diagnose === 'true' || req.body?.diagnose === true;
-    if (diagnose) return res.status(200).json({ prompt, oddsResults });
+    if (diagnose) {
+      return res.status(200).json({ 
+        prompt, 
+        oddsResults,
+        webSearchData,
+        gamesFound: oddsResults.length,
+        webSearchTriggered: oddsResults.length < MIN_GAMES_THRESHOLD
+      });
+    }
 
-    // Call AI provider with model fallback logic
+    // Step 4: Call AI with fallback logic
     let content = '';
+
     const tryOpenAIModel = async (model) => {
-  const response = await fetcher('https://api.openai.com/v1/chat/completions', {
+      const response = await fetcher('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${OPENAI_KEY}` 
+        },
         body: JSON.stringify({
           model,
           messages: [
-            { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
+            { 
+              role: 'system', 
+              content: 'You are a precise sports betting analyst. You ONLY use real game data provided (from APIs or web search) and ALWAYS include exact dates in MM/DD/YYYY format for every game. You can extract odds from web search snippets when needed.' 
+            },
             { role: 'user', content: prompt }
           ],
           temperature: 0.7,
-          max_tokens: 2000
+          max_tokens: 3000
         })
       });
       return response;
@@ -194,72 +423,120 @@ export default async function handler(req, res) {
 
     const tryGeminiModel = async (model) => {
       const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${GEMINI_KEY}`;
-  const response = await fetcher(url, {
+      const response = await fetcher(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 6000 }
+          contents: [{ 
+            parts: [{ 
+              text: prompt 
+            }] 
+          }],
+          generationConfig: { 
+            temperature: 0.3, 
+            maxOutputTokens: 6000 
+          }
         })
       });
       return response;
     };
 
     if (aiModel === 'openai') {
-      if (!OPENAI_KEY) return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
+      if (!OPENAI_KEY) {
+        return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
+      }
 
       let lastErrText = '';
       for (const model of OPENAI_MODELS) {
         try {
+          console.log(`Trying OpenAI model: ${model}`);
           const response = await tryOpenAIModel(model);
+          
           if (!response.ok) {
             lastErrText = await response.text();
-            // If 401 (invalid key) stop trying other models
-            if (response.status === 401) return res.status(401).json({ error: `OpenAI error: ${lastErrText}` });
-            // otherwise try next model
+            if (response.status === 401) {
+              return res.status(401).json({ error: `OpenAI auth error: ${lastErrText}` });
+            }
+            console.warn(`Model ${model} failed:`, lastErrText);
             continue;
           }
+          
           const data = await response.json();
-          content = data.choices?.[0]?.message?.content || JSON.stringify(data);
-          break;
+          content = data.choices?.[0]?.message?.content || '';
+          
+          if (content) {
+            console.log(`Success with model: ${model}`);
+            break;
+          }
         } catch (err) {
           lastErrText = err.message || String(err);
+          console.error(`Error with ${model}:`, lastErrText);
           continue;
         }
       }
-      if (!content) return res.status(500).json({ error: `OpenAI all-models-failed: ${lastErrText}` });
+      
+      if (!content) {
+        return res.status(500).json({ 
+          error: `OpenAI failed all models: ${lastErrText}` 
+        });
+      }
 
     } else if (aiModel === 'gemini') {
-      if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
+      if (!GEMINI_KEY) {
+        return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
+      }
 
       let lastErrText = '';
       for (const model of GEMINI_MODELS) {
         try {
+          console.log(`Trying Gemini model: ${model}`);
           const response = await tryGeminiModel(model);
+          
           if (!response.ok) {
             lastErrText = await response.text();
-            // If 404 (model not found) try next model; if 401 (invalid key) stop
-            if (response.status === 401) return res.status(401).json({ error: `Gemini error: ${lastErrText}` });
+            if (response.status === 401) {
+              return res.status(401).json({ error: `Gemini auth error: ${lastErrText}` });
+            }
+            console.warn(`Model ${model} failed:`, lastErrText);
             continue;
           }
+          
           const data = await response.json();
-          content = data.candidates?.[0]?.content?.parts?.[0]?.text || data.output?.[0]?.content?.[0]?.text || JSON.stringify(data);
-          break;
+          content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          
+          if (content) {
+            console.log(`Success with model: ${model}`);
+            break;
+          }
         } catch (err) {
           lastErrText = err.message || String(err);
+          console.error(`Error with ${model}:`, lastErrText);
           continue;
         }
       }
 
-      // If Gemini failed across models, return a clear Gemini error (no OpenAI fallback)
       if (!content) {
-        return res.status(500).json({ error: `Gemini all-models-failed: ${lastErrText}` });
+        return res.status(500).json({ 
+          error: `Gemini failed all models: ${lastErrText}` 
+        });
       }
+    } else {
+      return res.status(400).json({ error: 'Invalid AI model selection' });
     }
 
-    return res.status(200).json({ content });
+    // Step 5: Return results
+    return res.status(200).json({ 
+      content,
+      gamesFound: oddsResults.length,
+      webSearchUsed: webSearchData !== null,
+      dataSource: oddsResults.length >= MIN_GAMES_THRESHOLD ? 'Odds API' : 'Web Search Fallback'
+    });
+
   } catch (err) {
     console.error('generate-parlay error:', err);
-    return res.status(500).json({ error: err.message || 'Server error' });
+    return res.status(500).json({ 
+      error: err.message || 'Server error',
+      details: err.stack
+    });
   }
 }
