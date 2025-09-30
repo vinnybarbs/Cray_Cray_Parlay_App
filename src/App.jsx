@@ -58,9 +58,9 @@ const AiModelToggle = ({ aiModel, setAiModel }) => (
 );
 
 const RISK_LEVEL_DEFINITIONS = {
-  Low: "High probability to hit, heavy favorites, +200 to +400 odds, confidence 8/10+",
-  Medium: "Balanced value favorites with moderate props, +400 to +600 odds",
-  High: "Value underdogs and high-variance outcomes, +600+ odds",
+  Low: "High probability to hit, heavy favorites, +200 to +400 odds.",
+  Medium: "Balanced value favorites with moderate props, +400 to +600 odds.",
+  High: "Value underdogs and high-variance outcomes, +600+ odds.",
 };
 
 // --- Main App Component ---
@@ -71,6 +71,8 @@ const App = () => {
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
   const [aiModel, setAiModel] = useState('openai');
+  const [dateRange, setDateRange] = useState(1); // ADDED: State for date range
+  const [copied, setCopied] = useState(false); // ADDED: State for copy button feedback
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState('');
@@ -78,32 +80,24 @@ const App = () => {
   const [loadingMessage, setLoadingMessage] = useState('');
 
   const loadingMessages = [
-    "Consulting with Vegas insiders...",
-    "Bribing the refs for insider info...",
-    "Sacrificing a prop bet to the degen gods...",
-    "Checking if my bookie is watching...",
-    "Doing complex math (counting on fingers)...",
-    "Reading tea leaves and injury reports...",
-    "Asking my Magic 8-Ball for advice...",
-    "Channeling my inner degenerate...",
-    "Calculating odds while ignoring reality...",
-    "Pretending I know what I'm doing...",
+    "Consulting with Vegas insiders...", "Bribing the refs for insider info...", "Sacrificing a prop bet to the degen gods...",
+    "Checking if my bookie is watching...", "Doing complex math (counting on fingers)...", "Reading tea leaves and injury reports...",
+    "Asking my Magic 8-Ball for advice...", "Channeling my inner degenerate...", "Calculating odds while ignoring reality...", "Pretending I know what I'm doing...",
   ];
 
-  const getRandomLoadingMessage = () => {
-    return loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
-  };
+  const getRandomLoadingMessage = () => loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 
-  const toggleSport = (sport) => {
-    setSelectedSports(prev =>
-      prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]
-    );
-  };
+  const toggleSport = (sport) => setSelectedSports(prev => prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]);
+  const toggleBetType = (betType) => setSelectedBetTypes(prev => prev.includes(betType) ? prev.filter(b => b !== betType) : [...prev, betType]);
 
-  const toggleBetType = (betType) => {
-    setSelectedBetTypes(prev =>
-      prev.includes(betType) ? prev.filter(b => b !== betType) : [...prev, betType]
-    );
+  // ADDED: Function to handle copying results to clipboard
+  const handleCopy = () => {
+    if (results) {
+      navigator.clipboard.writeText(results).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+      });
+    }
   };
 
   const fetchParlaySuggestion = useCallback(async () => {
@@ -115,51 +109,39 @@ const App = () => {
     setLoadingMessage(getRandomLoadingMessage());
 
     try {
-      console.log('Calling API with:', { selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel });
-      
       const response = await fetch('/api/generate-parlay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           selectedSports,
           selectedBetTypes,
           numLegs,
           oddsPlatform,
           aiModel,
-          riskLevel
+          riskLevel,
+          dateRange // ADDED: Pass dateRange to the API
         })
       });
 
-      console.log('Response status:', response.status);
-
       if (!response.ok) {
         const errText = await response.text();
-        console.error('Server error response:', errText);
         throw new Error(`Server error: ${response.status} - ${errText}`);
       }
-
       const data = await response.json();
-      console.log('Response data:', data);
-      
-      if (!data.content) {
-        throw new Error('No content returned from AI');
-      }
+      if (!data.content) throw new Error('No content returned from AI');
 
       setResults(data.content);
     } catch (e) {
-      console.error('API Error:', e);
       setError(`Failed to generate parlays: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel]);
+  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, dateRange]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
       <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl">
-        <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">
-          Cray Cray
-        </h1>
+        <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">Cray Cray</h1>
         <p className="text-xl font-medium text-gray-300">for Parlays</p>
       </header>
 
@@ -167,7 +149,8 @@ const App = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
             label="1. Sports (Select Multiple)"
-            options={['NFL', 'NBA', 'MLB', 'NHL', 'Soccer', 'NCAAF', 'PGA/Golf', 'Tennis']}
+            // UPDATED: Added 'NCAAF' (College Football) to the options
+            options={['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis']}
             selectedOptions={selectedSports}
             onToggle={toggleSport}
           />
@@ -179,9 +162,28 @@ const App = () => {
           />
         </div>
 
+        {/* ADDED: Date Range Slider */}
         <div>
           <label className="text-gray-200 text-sm font-semibold block mb-3">
-            3. Number of Legs: <span className="text-yellow-400 text-lg font-bold">{numLegs}</span>
+            3. Game Date Range: <span className="text-yellow-400 text-lg font-bold">{dateRange} Day{dateRange > 1 ? 's' : ''}</span>
+          </label>
+          <input
+            type="range"
+            min="1"
+            max="4"
+            value={dateRange}
+            onChange={(e) => setDateRange(parseInt(e.target.value))}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+          />
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <span>Today</span>
+            <span>4 Days</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-gray-200 text-sm font-semibold block mb-3">
+            4. Number of Legs: <span className="text-yellow-400 text-lg font-bold">{numLegs}</span>
           </label>
           <input
             type="range"
@@ -191,22 +193,18 @@ const App = () => {
             onChange={(e) => setNumLegs(parseInt(e.target.value))}
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>1</span>
-            <span>10</span>
-          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Dropdown
-            label="4. Risk Level"
+            label="5. Risk Level"
             value={riskLevel}
             onChange={setRiskLevel}
             options={Object.keys(RISK_LEVEL_DEFINITIONS)}
             description={RISK_LEVEL_DEFINITIONS[riskLevel]}
           />
           <Dropdown
-            label="5. Odds Platform"
+            label="6. Odds Platform"
             value={oddsPlatform}
             onChange={setOddsPlatform}
             options={['DraftKings', 'FanDuel', 'MGM', 'Caesars', 'Bet365']}
@@ -216,35 +214,25 @@ const App = () => {
         <button
           onClick={fetchParlaySuggestion}
           disabled={loading || selectedSports.length === 0 || selectedBetTypes.length === 0}
-          className={`w-full py-4 mt-4 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95
-            ${loading || selectedSports.length === 0 || selectedBetTypes.length === 0
+          className={`w-full py-4 mt-4 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95 ${
+            loading || selectedSports.length === 0 || selectedBetTypes.length === 0
               ? 'bg-gray-500 cursor-not-allowed'
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
-            }`}
+          }`}
         >
           {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
         </button>
         
         <AiModelToggle aiModel={aiModel} setAiModel={setAiModel} />
 
-        {selectedSports.length === 0 && (
-          <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>
-        )}
-        {selectedBetTypes.length === 0 && (
-          <p className="text-xs text-center text-red-400">⚠️ Select at least one bet type</p>
-        )}
+        {selectedSports.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>}
+        {selectedBetTypes.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one bet type</p>}
       </div>
 
       <div className="mt-8 pt-4 border-t border-gray-700 max-w-2xl mx-auto">
         <h2 className="text-2xl font-bold mb-4 text-yellow-400">AI-Powered Parlay Analysis</h2>
 
-        {error && (
-          <div className="p-4 bg-red-800 rounded-xl text-red-100 shadow-md">
-            <p className="font-bold">Error:</p>
-            <p>{error}</p>
-          </div>
-        )}
-
+        {error && <div className="p-4 bg-red-800 rounded-xl text-red-100 shadow-md"><p className="font-bold">Error:</p><p>{error}</p></div>}
         {loading && (
           <div className="p-8 text-center border-2 border-yellow-500 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl">
             <div className="flex flex-col items-center space-y-4">
@@ -253,74 +241,44 @@ const App = () => {
                 <div className="absolute inset-2 border-4 border-red-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.6s' }}></div>
               </div>
               <p className="text-xl font-bold text-yellow-400 animate-pulse">{loadingMessage}</p>
-              <div className="flex space-x-1 mt-2">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-              </div>
             </div>
           </div>
         )}
 
+        {/* UPDATED: Added Share button and container for better styling */}
         {results && !loading && (
-          <div className="p-6 bg-gray-800 rounded-xl shadow-lg overflow-y-auto max-h-[70vh]">
-            <pre className="whitespace-pre-wrap text-gray-300 font-sans">{results}</pre>
+          <div className="relative p-6 bg-gray-800 rounded-xl shadow-lg">
+            <button
+              onClick={handleCopy}
+              className="absolute top-3 right-3 bg-gray-700 hover:bg-yellow-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition z-10"
+            >
+              {copied ? 'Copied! ✅' : 'Copy'}
+            </button>
+            <div className="overflow-y-auto max-h-[70vh]">
+              <pre className="whitespace-pre-wrap text-gray-300 font-sans">{results}</pre>
+            </div>
           </div>
         )}
 
         {!loading && !error && !results && (
           <div className="p-6 text-center text-gray-500 border border-dashed border-gray-700 rounded-xl">
-            <p>Configure your parlay preferences above and hit Generate to receive AI-powered picks with a bonus high-probability parlay!</p>
+            <p>Configure your parlay preferences above and hit Generate!</p>
           </div>
         )}
       </div>
 
+      {/* UPDATED: Revamped bottom widget */}
       <div className="max-w-2xl mx-auto mt-12 mb-4">
         <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-6 border border-gray-700 shadow-2xl">
-          <div className="flex items-center justify-center space-x-3 mb-4">
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-            <p className="uppercase font-bold text-sm text-gray-400 tracking-widest">
-              A BISQUE BOYS APPLICATION
-            </p>
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+          <div className="mb-4 bg-gray-900 border-2 border-gray-700 rounded-lg p-3 text-center">
+            <p className="text-xl font-bold text-yellow-300">{riskLevel} Risk</p>
+            <p className="text-xs text-gray-400 mt-1">{RISK_LEVEL_DEFINITIONS[riskLevel]}</p>
           </div>
-          
-          {riskLevel === 'Low' && (
-            <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
-              <p className="text-xs text-blue-400 mt-1">Playing it safe, huh? Boring but smart.</p>
-            </div>
-          )}
-          {riskLevel === 'Medium' && (
-            <div className="mb-4 bg-yellow-900 border-2 border-yellow-500 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-yellow-300">🤪 YOU'RE LOCO AND I LIKEY 🤪</p>
-              <p className="text-xs text-yellow-400 mt-1">Balanced chaos - my favorite!</p>
-            </div>
-          )}
-          {riskLevel === 'High' && (
-            <div className="mb-4 bg-red-900 border-2 border-red-500 rounded-lg p-3 text-center animate-pulse">
-              <p className="text-xl font-bold text-red-300">🔥 YOU'RE LOCO AND I LIKEY 🔥</p>
-              <p className="text-xs text-red-400 mt-1">Full degen mode activated! Let's gooo!</p>
-            </div>
-          )}
-          
           <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Sports</p>
-              <p className="text-sm font-bold text-yellow-400">{selectedSports.join(', ')}</p>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Bet Types</p>
-              <p className="text-sm font-bold text-green-400">{selectedBetTypes.join(', ')}</p>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Parlay Size</p>
-              <p className="text-sm font-bold text-blue-400">{numLegs} Legs</p>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Risk Level</p>
-              <p className="text-sm font-bold text-purple-400">{riskLevel}</p>
-            </div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Sports</p><p className="text-sm font-bold text-yellow-400">{selectedSports.join(', ')}</p></div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Bet Types</p><p className="text-sm font-bold text-green-400">{selectedBetTypes.join(', ')}</p></div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Parlay Size</p><p className="text-sm font-bold text-blue-400">{numLegs} Legs</p></div>
+            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700"><p className="text-xs text-gray-500 uppercase mb-1">Date Range</p><p className="text-sm font-bold text-purple-400">{dateRange} Day{dateRange > 1 ? 's' : ''}</p></div>
           </div>
         </div>
       </div>
