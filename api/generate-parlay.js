@@ -420,27 +420,25 @@ module.exports = async function handler(req, res) {
       });
       return response;
     };
-
-    const tryGeminiModel = async (model) => {
-      const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${GEMINI_KEY}`;
-      const response = await fetcher(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ 
-            parts: [{ 
-              text: prompt 
-            }] 
-          }],
-          generationConfig: { 
-            temperature: 0.3, 
-            maxOutputTokens: 6000 
-          }
-        })
-      });
-      return response;
-    };
-
+const tryGeminiModel = async (model) => {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_KEY}`;
+  const response = await fetcher(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ 
+        parts: [{ 
+          text: prompt 
+        }] 
+      }],
+      generationConfig: { 
+        temperature: 0.7, 
+        maxOutputTokens: 8192 
+      }
+    })
+  });
+  return response;
+};
     if (aiModel === 'openai') {
       if (!OPENAI_KEY) {
         return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
