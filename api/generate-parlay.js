@@ -84,6 +84,10 @@ export default async function handler(req, res) {
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
   const ODDS_KEY = process.env.ODDS_API_KEY;
 
+  // Allow configurable model fallback lists via env, comma-separated.
+  const OPENAI_MODELS = (process.env.OPENAI_MODELS || 'gpt-4o-mini,gpt-4o,gpt-4,gpt-3.5-turbo').split(',').map(s => s.trim()).filter(Boolean);
+  const GEMINI_MODELS = (process.env.GEMINI_MODELS || 'gemini-1.5-flash-latest,gemini-1.5,gemini-1.0,chat-bison-001,text-bison-001').split(',').map(s => s.trim()).filter(Boolean);
+
   if (!ODDS_KEY) return res.status(500).json({ error: 'Server missing ODDS_API_KEY' });
 
   try {
@@ -104,16 +108,18 @@ export default async function handler(req, res) {
 
     const prompt = generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, oddsData: oddsResults });
 
-    // Call AI provider
-    let content = '';
-    if (aiModel === 'openai') {
-      if (!OPENAI_KEY) return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
+    // Diagnostic mode: don't call any AI provider, return odds + prompt
+    const diagnose = req.query?.diagnose === 'true' || req.body?.diagnose === true;
+    if (diagnose) return res.status(200).json({ prompt, oddsResults });
 
+    // Call AI provider with model fallback logic
+    let content = '';
+    const tryOpenAIModel = async (model) => {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_KEY}` },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model,
           messages: [
             { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
             { role: 'user', content: prompt }
@@ -122,17 +128,11 @@ export default async function handler(req, res) {
           max_tokens: 2000
         })
       });
+      return response;
+    };
 
-      if (!response.ok) {
-        const errText = await response.text();
-        return res.status(response.status).json({ error: `OpenAI error: ${errText}` });
-      }
-      const data = await response.json();
-      content = data.choices?.[0]?.message?.content || JSON.stringify(data);
-
-    } else if (aiModel === 'gemini') {
-      if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
-      const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_KEY}`;
+    const tryGeminiModel = async (model) => {
+      const url = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${GEMINI_KEY}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -141,13 +141,59 @@ export default async function handler(req, res) {
           generationConfig: { temperature: 0.7, maxOutputTokens: 2000 }
         })
       });
+      return response;
+    };
 
-      if (!response.ok) {
-        const errText = await response.text();
-        return res.status(response.status).json({ error: `Gemini error: ${errText}` });
+    if (aiModel === 'openai') {
+      if (!OPENAI_KEY) return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
+
+      let lastErrText = '';
+      for (const model of OPENAI_MODELS) {
+        try {
+          const response = await tryOpenAIModel(model);
+          if (!response.ok) {
+            lastErrText = await response.text();
+            // If 401 (invalid key) stop trying other models
+            if (response.status === 401) return res.status(401).json({ error: `OpenAI error: ${lastErrText}` });
+            // otherwise try next model
+            continue;
+          }
+          const data = await response.json();
+          content = data.choices?.[0]?.message?.content || JSON.stringify(data);
+          break;
+        } catch (err) {
+          lastErrText = err.message || String(err);
+          continue;
+        }
       }
-      const data = await response.json();
-      content = data.candidates?.[0]?.content?.parts?.[0]?.text || JSON.stringify(data);
+      if (!content) return res.status(500).json({ error: `OpenAI all-models-failed: ${lastErrText}` });
+
+    } else if (aiModel === 'gemini') {
+      if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
+
+      let lastErrText = '';
+      for (const model of GEMINI_MODELS) {
+        try {
+          const response = await tryGeminiModel(model);
+          if (!response.ok) {
+            lastErrText = await response.text();
+            // If 404 (model not found) try next model; if 401 (invalid key) stop
+            if (response.status === 401) return res.status(401).json({ error: `Gemini error: ${lastErrText}` });
+            continue;
+          }
+          const data = await response.json();
+          content = data.candidates?.[0]?.content?.parts?.[0]?.text || data.output?.[0]?.content?.[0]?.text || JSON.stringify(data);
+          break;
+        } catch (err) {
+          lastErrText = err.message || String(err);
+          continue;
+        }
+      }
+
+      // If Gemini failed across models, return a clear Gemini error (no OpenAI fallback)
+      if (!content) {
+        return res.status(500).json({ error: `Gemini all-models-failed: ${lastErrText}` });
+      }
     }
 
     return res.status(200).json({ content });
