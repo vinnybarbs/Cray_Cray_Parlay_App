@@ -4,7 +4,7 @@ const SPORT_SLUGS = {
   MLB: 'baseball_mlb',
   NHL: 'icehockey_nhl',
   Soccer: 'soccer_epl',
-  NCAAF: 'americanfootball_ncaaf', // This was already here, ready for the frontend change
+  NCAAF: 'americanfootball_ncaaf',
   'PGA/Golf': 'golf_pga',
   Tennis: 'tennis_atp',
 };
@@ -12,8 +12,8 @@ const SPORT_SLUGS = {
 const MARKET_MAPPING = {
   'Moneyline/Spread': ['h2h', 'spreads'],
   'Totals (O/U)': ['totals'],
-  'Player Props': ['player_points'], // Note: Player props are often sport-specific (e.g., player_pass_yds, player_rebounds)
-  'Team Props': ['team_points'],
+  'Player Props': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_points', 'player_assists', 'player_rebounds'],
+  'Team Props': ['team_totals'],
 };
 
 const BOOKMAKER_MAPPING = {
@@ -50,7 +50,12 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel
           if (m.key === 'h2h') return `ML: ${m.outcomes.map(o => `${o.name}: ${o.price > 0 ? '+' : ''}${o.price}`).join(' vs ')}`;
           if (m.key === 'spreads') return `Spread: ${m.outcomes.map(o => `${o.name}: ${o.point > 0 ? '+' : ''}${o.point} (${o.price > 0 ? '+' : ''}${o.price})`).join(' vs ')}`;
           if (m.key === 'totals') return `Total: ${m.outcomes.map(o => `${o.name} ${o.point} (${o.price > 0 ? '+' : ''}${o.price})`).join(' / ')}`;
-          return ''; // Add other market keys here if needed
+          if (m.key.startsWith('player_')) {
+            const propType = m.key.replace('player_', '').replace(/_/g, ' ');
+            return `Player ${propType}: ${m.outcomes.slice(0, 2).map(o => `${o.description || o.name} ${o.point || ''} (${o.price > 0 ? '+' : ''}${o.price})`).join(' | ')}`;
+          }
+          if (m.key === 'team_totals') return `Team Total: ${m.outcomes.map(o => `${o.name} ${o.point} (${o.price > 0 ? '+' : ''}${o.price})`).join(' | ')}`;
+          return '';
         }).filter(Boolean).join(' | ');
         if (parts) marketsSummary = parts;
       }
@@ -142,7 +147,7 @@ async function handler(req, res) {
     oddsPlatform = 'DraftKings',
     aiModel = 'openai',
     riskLevel = 'Medium',
-    dateRange = 1 // UPDATED: Default to 1 day instead of 7
+    dateRange = 1
   } = req.body || {};
 
   const OPENAI_KEY = process.env.OPENAI_API_KEY;
@@ -157,60 +162,122 @@ async function handler(req, res) {
     const requestedMarkets = (selectedBetTypes || []).flatMap(bt => MARKET_MAPPING[bt] || []);
     const unavailableInfo = [];
 
+    // Date range filtering
+    const now = new Date();
+    const rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
+
     for (const sport of selectedSports) {
       const slug = SPORT_SLUGS[sport];
       if (!slug) continue;
 
-      const marketsStr = requestedMarkets.join(',');
-      const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(marketsStr)}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
-      
-      let success = false;
-      try {
-        const r = await fetcher(url);
-        if (r.ok) {
-          const data = await r.json();
-          if (Array.isArray(data) && data.length > 0) {
-            const now = new Date();
-            const rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
-            const upcoming = data.filter(game => {
-              const gameTime = new Date(game.commence_time);
-              return gameTime > now && gameTime < rangeEnd;
-            });
-            if (upcoming.length > 0) {
-              allOddsResults.push(...upcoming);
-              success = true;
-            }
-          }
-        }
-      } catch (err) { /* Gracefully ignore and let fallback handle it */ }
+      // CHANGE 1: Separate regular markets from props
+      const regularMarkets = requestedMarkets.filter(m => 
+        !m.startsWith('player_') && !m.startsWith('team_')
+      );
+      const propMarkets = requestedMarkets.filter(m => 
+        m.startsWith('player_') || m.startsWith('team_')
+      );
 
-      if (!success) {
-        // Fallback logic for individual markets (your existing code was great for this)
-        const sportSuccessfulMarkets = new Set();
-        for (const market of requestedMarkets) {
-          try {
-            const singleMarketUrl = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${market}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
-            const r = await fetcher(singleMarketUrl);
-            if (r.ok) {
-              const data = await r.json();
-              if (Array.isArray(data) && data.length > 0) {
-                 const now = new Date();
-                 const rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
-                 const upcoming = data.filter(game => new Date(game.commence_time) > now && new Date(game.commence_time) < rangeEnd);
-                 if (upcoming.length > 0) {
-                   allOddsResults.push(...upcoming);
-                   sportSuccessfulMarkets.add(market);
-                 }
+      // Fetch regular markets (h2h, spreads, totals)
+      if (regularMarkets.length > 0) {
+        const marketsStr = regularMarkets.join(',');
+        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(marketsStr)}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
+        
+        let success = false;
+        try {
+          const r = await fetcher(url);
+          if (r.ok) {
+            const data = await r.json();
+            if (Array.isArray(data) && data.length > 0) {
+              const upcoming = data.filter(game => {
+                const gameTime = new Date(game.commence_time);
+                return gameTime > now && gameTime < rangeEnd;
+              });
+              if (upcoming.length > 0) {
+                allOddsResults.push(...upcoming);
+                success = true;
               }
             }
-          } catch (err) { /* Gracefully ignore */ }
+          }
+        } catch (err) { /* Gracefully ignore */ }
+
+        if (!success) {
+          // Fallback: try each regular market individually
+          for (const market of regularMarkets) {
+            try {
+              const singleMarketUrl = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${market}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
+              const r = await fetcher(singleMarketUrl);
+              if (r.ok) {
+                const data = await r.json();
+                if (Array.isArray(data) && data.length > 0) {
+                  const upcoming = data.filter(game => new Date(game.commence_time) > now && new Date(game.commence_time) < rangeEnd);
+                  if (upcoming.length > 0) {
+                    allOddsResults.push(...upcoming);
+                  }
+                }
+              }
+            } catch (err) { /* Gracefully ignore */ }
+          }
         }
-        const foundMarkets = Array.from(sportSuccessfulMarkets);
-        if (foundMarkets.length > 0) {
-          const missing = requestedMarkets.filter(m => !foundMarkets.includes(m));
-          unavailableInfo.push(`✓ ${sport}: Found odds for ${foundMarkets.join(', ')}` + (missing.length > 0 ? ` (not for ${missing.join(', ')})` : ''));
-        } else {
-          unavailableInfo.push(`✗ ${sport}: No odds available for any requested markets.`);
+      }
+
+      // CHANGE 2: Two-step fetching for props
+      if (propMarkets.length > 0) {
+        console.log(`Fetching props for ${sport}...`);
+        
+        // Step 1: Get events
+        const eventsUrl = `https://api.the-odds-api.com/v4/sports/${slug}/events?apiKey=${ODDS_KEY}`;
+        
+        try {
+          const eventsRes = await fetcher(eventsUrl);
+          if (eventsRes.ok) {
+            const events = await eventsRes.json();
+            
+            if (Array.isArray(events) && events.length > 0) {
+              // Filter events by date range
+              const upcomingEvents = events.filter(event => {
+                const gameTime = new Date(event.commence_time);
+                return gameTime > now && gameTime < rangeEnd;
+              });
+
+              // Step 2: Fetch props for each event (limit to 10)
+              const eventsToFetch = upcomingEvents.slice(0, 10);
+              let propsFound = 0;
+
+              for (const event of eventsToFetch) {
+                const eventId = event.id;
+                const propUrl = `https://api.the-odds-api.com/v4/sports/${slug}/events/${eventId}/odds?regions=us&markets=${propMarkets.join(',')}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
+                
+                try {
+                  const propRes = await fetcher(propUrl);
+                  if (propRes.ok) {
+                    const propData = await propRes.json();
+                    
+                    if (propData && propData.bookmakers && propData.bookmakers.length > 0) {
+                      const hasMarkets = propData.bookmakers.some(bm => 
+                        bm.markets && bm.markets.length > 0
+                      );
+                      
+                      if (hasMarkets) {
+                        allOddsResults.push(propData);
+                        propsFound++;
+                      }
+                    }
+                  }
+                } catch (propErr) {
+                  // Silent fail for individual props
+                }
+              }
+
+              if (propsFound > 0) {
+                console.log(`  Found props for ${propsFound} ${sport} games`);
+              } else {
+                unavailableInfo.push(`⚠️ ${sport}: Props not available for ${oddsPlatform}`);
+              }
+            }
+          }
+        } catch (eventsErr) {
+          unavailableInfo.push(`⚠️ ${sport}: Couldn't fetch props`);
         }
       }
     }
@@ -240,12 +307,11 @@ async function handler(req, res) {
       const data = await response.json();
       content = data.choices?.[0]?.message?.content || '';
     
-    // --- UPDATED: Gemini API Implementation ---
     } else if (aiModel === 'gemini') {
       if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY. Add it to use Gemini.' });
       
       const geminiModel = 'gemini-1.5-flash-latest';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_API_KEY}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_KEY}`;
       
       try {
         const response = await fetcher(url, {
