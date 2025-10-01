@@ -326,36 +326,36 @@ async function handler(req, res) {
       content = data.choices?.[0]?.message?.content || '';
     
     } else if (aiModel === 'gemini') {
-      if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY. Add it to use Gemini.' });
-      
-      const geminiModel = 'gemini-1.5-flash-002';
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_KEY}`;
-      
-      try {
-        const response = await fetcher(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 3000 }
-          }),
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Gemini API Error:', errorData);
-          throw new Error(`Gemini API responded with status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        if (!content) throw new Error('Gemini returned an empty response.');
-        
-      } catch (err) {
-        console.error('Error with Gemini model:', err.message);
-        return res.status(500).json({ error: `Gemini API call failed: ${err.message}` });
-      }
+  if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY. Add it to use Gemini.' });
+  
+  const geminiModel = 'gemini-2.0-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_KEY}`;
+  
+  try {
+    const response = await fetcher(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 3000 }
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.text(); // Changed to text() for better debugging
+      console.error('Gemini API Error:', errorData);
+      throw new Error(`Gemini API responded with status: ${response.status} - ${errorData}`);
     }
+    
+    const data = await response.json();
+    content = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    if (!content) throw new Error('Gemini returned an empty response.');
+    
+  } catch (err) {
+    console.error('Error with Gemini model:', err.message);
+    return res.status(500).json({ error: `Gemini API call failed: ${err.message}` });
+  }
+}
 
     return res.status(200).json({ content });
 
