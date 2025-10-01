@@ -328,7 +328,7 @@ async function handler(req, res) {
     } else if (aiModel === 'gemini') {
       if (!GEMINI_KEY) return res.status(500).json({ error: 'Server missing GEMINI_API_KEY. Add it to use Gemini.' });
       
-      const geminiModel = 'gemini-1.5-flash-latest';
+      const geminiModel = 'gemini-1.5-flash-002';
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${GEMINI_KEY}`;
       
       try {
