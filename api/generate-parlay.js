@@ -153,7 +153,8 @@ ${marketAvailabilityNote}
 3. USE ONLY THE ACTUAL ODDS PROVIDED
 4. CONSIDER THE RESEARCH DATA when making picks - injuries, trends, recent form are CRITICAL factors
 5. In your reasoning, reference specific research insights when available
-6. Work with whatever markets are available - do not complain about missing data
+6. Do not include games that have already started or have already finished
+7. Work with whatever markets are available - do not complain about missing data
 
 ${oddsContext}
 
