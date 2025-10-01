@@ -92,7 +92,23 @@ ${marketAvailabilityNote}
 ${oddsContext}
 
 YOUR TASK:
-Create a ${numLegs}-leg parlay based on the user's risk level. Add a bonus "lock" parlay with 2-3 high-confidence picks.
+Create a ${numLegs}-leg parlay using VARIETY across different bet types and games. 
+
+CRITICAL REQUIREMENTS:
+- You MUST create exactly ${numLegs} legs (not fewer)
+- MIX bet types: If user selected multiple types (spreads, totals, props), use a variety
+- SPREAD across different games: Don't use same game multiple times
+- Prioritize HIGH PROBABILITY bets that match the ${riskLevel} risk level
+- If you have both regular markets (spreads/totals/ML) AND props, combine them for variety
+
+Example for 10-leg parlay with all bet types selected:
+- 3 spreads from different games
+- 2 moneylines from different games  
+- 2 over/unders from different games
+- 2 player props from different games
+- 1 team prop
+
+DO NOT create fewer than ${numLegs} legs unless there literally aren't enough unique games in the data.
 
 REQUIRED FORMAT:
 
@@ -108,9 +124,11 @@ REQUIRED FORMAT:
 
 [Continue for all legs]
 
-**Combined Odds:** [Calculate]
+**Combined Odds:** [Calculate by converting to decimal, multiply, convert back]
 **Payout on $100:** $[Amount]
-**Overall Confidence:** [X/10]
+**Overall Confidence:** [Average]/10
+
+NOTE: If you provided fewer than ${numLegs} legs, explain why (e.g., "Only 7 unique games available in the data").
 
 ---
 
