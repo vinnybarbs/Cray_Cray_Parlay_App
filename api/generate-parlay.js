@@ -155,8 +155,9 @@ ${marketAvailabilityNote}
 5. In your reasoning, reference specific research insights when available
 6. Do not include games that have already started or have already finished
 7. Do not conflict same-game bets, moneyline or spread on one team and another leg shouldn't be moneyline or spread on the other team. Similarly an over on a prop bet shoudn't have an under on the same bet as another leg
-8. If you take a team or pick for moneyline, do not also take them in another leg against the spread
-9. Work with whatever markets are available - do not complain about missing data
+8. If you take a team or pick for moneyline, do not reapeat as another leg against the spread
+9. do NOT repeat the same exact bet as multiple legs
+10. Work with whatever markets are available - do not complain about missing data
 
 ${oddsContext}
 
