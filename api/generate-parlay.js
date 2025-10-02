@@ -43,8 +43,8 @@ async function fetchGameResearch(games, fetcher) {
   console.log(`\n🔍 Researching top ${Math.min(games.length, 10)} games...`);
   const enrichedGames = [];
   
-  // Research top 10 games to save API quota
-  for (const game of games.slice(0, 10)) {
+  // Research top 30 games to save API quota
+  for (const game of games.slice(0, 30)) {
     const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const query = `${game.away_team} vs ${game.home_team} ${gameDate} injury report recent performance analysis prediction`;
     
