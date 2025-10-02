@@ -285,20 +285,19 @@ const App = () => {
           {riskLevel === 'Low' && (
             <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3 text-center">
               <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
-              <p className="text-xs text-blue-400 mt-1">Playing it safe, huh? Boring but smart.</p>
+              <p className="text-xs text-blue-400 mt-1">Low risk..Playing it safe, huh? Boring but smart.</p>
             </div>
           )}
           {riskLevel === 'Medium' && (
             <div className="mb-4 bg-yellow-900 border-2 border-yellow-500 rounded-lg p-3 text-center">
-              <p className="text-xs text-yellow-400 mt-1">Mid level risk</p>
               <p className="text-xl font-bold text-yellow-300">🤪 YOU'RE LOCO AND I LIKEY 🤪</p>
-              <p className="text-xs text-yellow-400 mt-1">Balanced chaos - my favorite!</p>
+              <p className="text-xs text-yellow-400 mt-1">Mid risk..Balanced chaos - my favorite!</p>
             </div>
           )}
           {riskLevel === 'High' && (
             <div className="mb-4 bg-red-900 border-2 border-red-500 rounded-lg p-3 text-center animate-pulse">
               <p className="text-xl font-bold text-red-300">🔥 DEGENERATE IN THE FLESH 🔥</p>
-              <p className="text-xs text-red-400 mt-1">Full degen mode activated! Let's gooo!</p>
+              <p className="text-xs text-red-400 mt-1">HIGH RISK...Full degen mode activated! Let's gooo!</p>
             </div>
           )}
           
