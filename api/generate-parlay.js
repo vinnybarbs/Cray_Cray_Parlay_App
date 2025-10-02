@@ -251,7 +251,17 @@ async function handler(req, res) {
   const GEMINI_KEY = process.env.GEMINI_API_KEY;
   const ODDS_KEY = process.env.ODDS_API_KEY;
 
-  if (!ODDS_KEY) return res.status(500).json({ error: 'Server missing ODDS_API_KEY' });
+  // Enhanced environment variable checking for deployment
+  console.log('\n🔍 ENVIRONMENT CHECK:');
+  console.log(`ODDS_KEY exists: ${!!ODDS_KEY} (length: ${ODDS_KEY?.length || 0})`);
+  console.log(`OPENAI_KEY exists: ${!!OPENAI_KEY} (length: ${OPENAI_KEY?.length || 0})`);
+  console.log(`SERPER_KEY exists: ${!!process.env.SERPER_API_KEY} (length: ${process.env.SERPER_API_KEY?.length || 0})`);
+  console.log(`NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
+
+  if (!ODDS_KEY) {
+    console.log('❌ CRITICAL: Missing ODDS_API_KEY in environment');
+    return res.status(500).json({ error: 'Server missing ODDS_API_KEY' });
+  }
 
   try {
     console.log('\n' + '='.repeat(60));
@@ -290,22 +300,38 @@ async function handler(req, res) {
         
         let success = false;
         try {
+          console.log(`  📡 Calling Odds API: ${url.substring(0, 100)}...`);
           const r = await fetcher(url);
+          console.log(`  📊 Response status: ${r.status}`);
+          
           if (r.ok) {
             const data = await r.json();
+            console.log(`  📈 Raw data length: ${Array.isArray(data) ? data.length : 'not array'}`);
+            
             if (Array.isArray(data) && data.length > 0) {
               const upcoming = data.filter(game => {
                 const gameTime = new Date(game.commence_time);
                 return gameTime > now && gameTime < rangeEnd;
               });
+              console.log(`  ⏰ Games in time range: ${upcoming.length} (from ${data.length} total)`);
+              
               if (upcoming.length > 0) {
                 allOddsResults.push(...upcoming);
                 success = true;
                 console.log(`  ✓ Regular markets: ${upcoming.length} games`);
+              } else {
+                console.log(`  ⚠️  No games in time window (${dateRange} days from now)`);
               }
+            } else {
+              console.log(`  ⚠️  API returned empty or invalid data`);
             }
+          } else {
+            const errorText = await r.text();
+            console.log(`  ❌ API Error ${r.status}: ${errorText}`);
           }
-        } catch (err) { /* Gracefully ignore */ }
+        } catch (err) { 
+          console.log(`  ❌ Fetch error: ${err.message}`);
+        }
 
         if (!success) {
           for (const market of regularMarkets) {
