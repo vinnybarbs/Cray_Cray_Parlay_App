@@ -290,6 +290,7 @@ const App = () => {
           )}
           {riskLevel === 'Medium' && (
             <div className="mb-4 bg-yellow-900 border-2 border-yellow-500 rounded-lg p-3 text-center">
+              <p className="text-xs text-yellow-400 mt-1">Mid level risk</p>
               <p className="text-xl font-bold text-yellow-300">🤪 YOU'RE LOCO AND I LIKEY 🤪</p>
               <p className="text-xs text-yellow-400 mt-1">Balanced chaos - my favorite!</p>
             </div>
