@@ -93,7 +93,7 @@ async function fetchGameResearch(games, fetcher) {
   return enrichedGames;
 }
 
-function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel, oddsData, unavailableInfo, dateRange }) {
+function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel, oddsData, unavailableInfo, dateRange, aiModel = 'openai' }) {
   const sportsStr = (selectedSports || []).join(', ');
   const betTypesStr = (selectedBetTypes || []).join(', ');
   const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
@@ -143,6 +143,15 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel
     marketAvailabilityNote = `\n\n📊 DATA AVAILABILITY:\n${unavailableInfo.join('\n')}`;
   }
 
+  // Different prompts for different AI models
+  if (aiModel === 'gemini') {
+    return generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext });
+  } else {
+    return generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext });
+  }
+}
+
+function generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext }) {
   return `
 TODAY'S DATE: ${today}
 TIME WINDOW: Next ${dateRangeText}
@@ -219,6 +228,79 @@ NOTE: If you provided fewer than ${numLegs} legs, explain why (e.g., "Only 7 uni
 **Why These Are Locks:** [Brief data backed explanation citing research]
 
 TONE: Professional with subtle humor. Be concise but reference research insights.
+`.trim();
+}
+
+function generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext }) {
+  return `
+You are a professional sports betting analyst. Your task is to create exactly ${numLegs} parlay legs using the provided data.
+
+STRICT REQUIREMENTS:
+1. Create EXACTLY ${numLegs} legs - no more, no less
+2. Use ONLY games and odds from the data below
+3. Each leg must have: Date (MM/DD/YYYY), Game, Bet, Odds, Confidence (1-10), Reasoning
+4. Use different games for each leg
+5. Include variety in bet types if multiple types are available
+6. Reference research data in reasoning when available
+
+TODAY: ${today}
+SPORTS: ${sportsStr}
+BET TYPES: ${betTypesStr}
+RISK LEVEL: ${riskLevel}
+
+${marketAvailabilityNote}
+
+${oddsContext}
+
+OUTPUT FORMAT - Follow this EXACT structure:
+
+**🎯 ${numLegs}-Leg Parlay: [Title]**
+
+**Legs:**
+1. 📅 DATE: MM/DD/YYYY
+   Game: Away Team @ Home Team
+   Bet: Specific bet with line
+   Odds: +XXX or -XXX
+   Confidence: X/10
+   Reasoning: Why this will hit
+
+2. 📅 DATE: MM/DD/YYYY
+   Game: Away Team @ Home Team
+   Bet: Specific bet with line
+   Odds: +XXX or -XXX
+   Confidence: X/10
+   Reasoning: Why this will hit
+
+[Continue for ${numLegs} total legs]
+
+**Combined Odds:** Calculate combined odds
+**Payout on $100:** $XXX
+**Overall Confidence:** X/10
+
+---
+
+**🔒 BONUS LOCK PARLAY: [Title]**
+
+**Legs:**
+1. 📅 DATE: MM/DD/YYYY
+   Game: Away Team @ Home Team
+   Bet: Specific bet with line
+   Odds: +XXX or -XXX
+   Confidence: X/10
+   Reasoning: Why this is safe
+
+2. 📅 DATE: MM/DD/YYYY
+   Game: Away Team @ Home Team
+   Bet: Specific bet with line
+   Odds: +XXX or -XXX
+   Confidence: X/10
+   Reasoning: Why this is safe
+
+**Combined Odds:** Calculate combined odds
+**Payout on $100:** $XXX
+**Why These Are Locks:** Brief explanation
+
+CRITICAL: You must create exactly ${numLegs} legs in the main parlay. Do not deviate from the format. Use research data to justify picks.
 `.trim();
 }
 
@@ -428,7 +510,8 @@ async function handler(req, res) {
       riskLevel, 
       oddsData: researchedGames,  // Using researched games
       unavailableInfo, 
-      dateRange 
+      dateRange,
+      aiModel
     });
 
     console.log(`🤖 Calling ${aiModel.toUpperCase()} API...\n`);
