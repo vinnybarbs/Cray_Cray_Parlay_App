@@ -87,7 +87,7 @@ async function fetchGameResearch(games, fetcher) {
   }
   
   // Add remaining games without research
-  enrichedGames.push(...games.slice(10).map(g => ({ ...g, research: null })));
+  enrichedGames.push(...games.slice(30).map(g => ({ ...g, research: null })));
   
   console.log(`✓ Research complete (${enrichedGames.filter(g => g.research).length} games enriched)\n`);
   return enrichedGames;
