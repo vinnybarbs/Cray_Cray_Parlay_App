@@ -26,12 +26,19 @@ const BOOKMAKER_MAPPING = {
 
 // NEW: Research function using Serper API
 async function fetchGameResearch(games, fetcher) {
+  console.log('🔍 Checking SERPER_API_KEY...');
+  console.log('Key exists:', !!process.env.SERPER_API_KEY);
+  console.log('Key length:', process.env.SERPER_API_KEY?.length);
+  console.log('Key preview:', process.env.SERPER_API_KEY?.substring(0, 10) + '...');
+  
   const SERPER_API_KEY = process.env.SERPER_API_KEY;
   
   if (!SERPER_API_KEY) {
     console.log('⚠️  No SERPER_API_KEY - skipping research enhancement');
     return games.map(g => ({ ...g, research: null }));
   }
+  
+  console.log('✅ SERPER_API_KEY loaded successfully');
 
   console.log(`\n🔍 Researching top ${Math.min(games.length, 10)} games...`);
   const enrichedGames = [];
