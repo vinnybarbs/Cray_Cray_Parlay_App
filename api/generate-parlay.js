@@ -154,7 +154,8 @@ ${marketAvailabilityNote}
 4. CONSIDER THE RESEARCH DATA when making picks - injuries, trends, recent form are CRITICAL factors
 5. In your reasoning, reference specific research insights when available
 6. Do not include games that have already started or have already finished
-7. Work with whatever markets are available - do not complain about missing data
+7. Do not conflict same game bets, moneyline or spread on one team and another leg shouldn't be moneyline or spread on the other team
+8. Work with whatever markets are available - do not complain about missing data
 
 ${oddsContext}
 
