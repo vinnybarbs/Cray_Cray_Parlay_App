@@ -239,9 +239,19 @@ STRICT REQUIREMENTS:
 1. Create EXACTLY ${numLegs} legs - no more, no less
 2. Use ONLY games and odds from the data below
 3. Each leg must have: Date (MM/DD/YYYY), Game, Bet, Odds, Confidence (1-10), Reasoning
-4. Use different games for each leg
+4. Use different games for each leg - NO REPEATING GAMES
 5. Include variety in bet types if multiple types are available
 6. Reference research data in reasoning when available
+
+CRITICAL CONFLICT PREVENTION RULES:
+- If you pick Team A moneyline, DO NOT pick Team B moneyline in same game
+- If you pick Team A spread, DO NOT pick Team B spread in same game  
+- If you pick Team A moneyline, DO NOT pick Team A spread in same game
+- If you pick OVER total, DO NOT pick UNDER total in same game
+- If you pick player OVER prop, DO NOT pick same player UNDER prop
+- NO conflicting bets from the same game
+- Each leg must be from a DIFFERENT game
+- NO duplicate bet types on same team/player
 
 TODAY: ${today}
 SPORTS: ${sportsStr}
@@ -251,6 +261,12 @@ RISK LEVEL: ${riskLevel}
 ${marketAvailabilityNote}
 
 ${oddsContext}
+
+BEFORE YOU START - CHECK FOR CONFLICTS:
+- Review each leg to ensure NO conflicting bets
+- Verify each leg is from a DIFFERENT game
+- Confirm no duplicate teams or players
+- Double-check no opposing sides of same bet
 
 OUTPUT FORMAT - Follow this EXACT structure:
 
@@ -300,7 +316,15 @@ OUTPUT FORMAT - Follow this EXACT structure:
 **Payout on $100:** $XXX
 **Why These Are Locks:** Brief explanation
 
-CRITICAL: You must create exactly ${numLegs} legs in the main parlay. Do not deviate from the format. Use research data to justify picks.
+CRITICAL FINAL CHECK:
+1. You MUST create exactly ${numLegs} legs in the main parlay
+2. Each leg MUST be from a different game
+3. NO conflicting bets (opposing sides of same wager)
+4. NO duplicate teams/players across legs
+5. Use research data to justify picks
+6. Follow the exact format above
+
+DO NOT DEVIATE FROM THESE RULES.
 `.trim();
 }
 
