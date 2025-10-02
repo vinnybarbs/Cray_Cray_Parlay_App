@@ -19,6 +19,17 @@ app.use(cors({
 
 app.use(express.json());
 
+// Force HTTPS in production
+if (process.env.NODE_ENV === 'production') {
+  app.use((req, res, next) => {
+    if (req.header('x-forwarded-proto') !== 'https') {
+      res.redirect(`https://${req.header('host')}${req.url}`);
+    } else {
+      next();
+    }
+  });
+}
+
 // Enhanced health check with environment info
 app.get('/health', (req, res) => {
   const hasOddsKey = !!process.env.ODDS_API_KEY;
