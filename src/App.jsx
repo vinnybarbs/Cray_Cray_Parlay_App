@@ -51,8 +51,13 @@ const AiModelToggle = ({ aiModel, setAiModel }) => (
           className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
               aiModel === 'gemini' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
           }`}
-      >
-          Gemini
+  >
+        <div className="flex flex-col items-center">
+        <span>Gemini</span>
+        <span className="text-xs font-bold mt-1">
+            (Under Construction, only for testing)
+        </span>
+    </div>
       </button>
   </div>
 );
