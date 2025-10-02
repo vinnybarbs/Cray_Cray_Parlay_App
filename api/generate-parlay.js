@@ -209,7 +209,7 @@ NOTE: If you provided fewer than ${numLegs} legs, explain why (e.g., "Only 7 uni
 
 **Combined Odds:** [Calculate]
 **Payout on $100:** $[Amount]
-**Why These Are Locks:** [Brief explanation citing research]
+**Why These Are Locks:** [Brief data backed explanation citing research]
 
 TONE: Professional with subtle humor. Be concise but reference research insights.
 `.trim();
