@@ -107,7 +107,7 @@ const App = () => {
     let summary = '';
     let inMainParlay = false;
     let inBonusParlay = false;
-    let legCount = 0;
+    let currentParlayTitle = '';
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -115,6 +115,8 @@ const App = () => {
       // Detect main parlay start
       if (line.includes('🎯') && line.includes('-Leg Parlay:')) {
         inMainParlay = true;
+        inBonusParlay = false;
+        currentParlayTitle = line;
         summary += line + '\n';
         continue;
       }
@@ -123,33 +125,31 @@ const App = () => {
       if (line.includes('🔒') && line.includes('LOCK PARLAY:')) {
         inBonusParlay = true;
         inMainParlay = false;
+        currentParlayTitle = line;
         summary += '\n' + line + '\n';
         continue;
       }
       
-      // Extract leg information
-      if ((inMainParlay || inBonusParlay) && line.match(/^\d+\./)) {
-        legCount++;
-        summary += line + '\n';
-        
-        // Get the next few lines for this leg
-        for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
-          const nextLine = lines[j].trim();
-          if (nextLine.startsWith('Game:') || nextLine.startsWith('Bet:') || nextLine.startsWith('Odds:')) {
-            summary += '   ' + nextLine + '\n';
-          }
-          if (nextLine.startsWith('Odds:')) break; // Stop after odds line
+      // Extract just Game and Bet lines
+      if ((inMainParlay || inBonusParlay)) {
+        if (line.startsWith('Game:')) {
+          summary += line + '\n';
+        }
+        if (line.startsWith('Bet:')) {
+          summary += line + '\n';
         }
       }
       
       // Get payout information
-      if (line.startsWith('**Payout on $100:**') || line.startsWith('Payout on $100:')) {
-        summary += line + '\n';
-      }
-      
-      // Stop processing after bonus parlay payout
-      if (inBonusParlay && (line.startsWith('**Payout on $100:**') || line.startsWith('Payout on $100:'))) {
-        break;
+      if ((inMainParlay || inBonusParlay) && (line.includes('Payout on $100:') || line.startsWith('**Payout on $100:**'))) {
+        // Clean up payout line
+        const cleanPayout = line.replace(/\*\*/g, '').replace('Payout on $100:', 'Payout:');
+        summary += cleanPayout + '\n';
+        
+        // If this was the bonus parlay payout, we're done
+        if (inBonusParlay) {
+          break;
+        }
       }
     }
     
