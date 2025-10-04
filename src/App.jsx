@@ -295,6 +295,7 @@ const App = () => {
 
       <div className="mt-8 pt-4 border-t border-gray-700 max-w-2xl mx-auto">
         <h2 className="text-2xl font-bold mb-4 text-yellow-400">AI-Powered Parlay Analysis</h2>
+        <p className="text-sm text-gray-500 mb-4 italic">I know you're gambling with your kids college fund but be patient. Odds are being pulled, external research is being done and the analyst is making custom picks....</p>
 
         {error && <div className="p-4 bg-red-800 rounded-xl text-red-100 shadow-md"><p className="font-bold">Error:</p><p>{error}</p></div>}
         
