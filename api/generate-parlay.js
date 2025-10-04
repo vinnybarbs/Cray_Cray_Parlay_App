@@ -12,7 +12,8 @@ const SPORT_SLUGS = {
 const MARKET_MAPPING = {
   'Moneyline/Spread': ['h2h', 'spreads'],
   'Totals (O/U)': ['totals'],
-  'Player Props': ['player_pass_tds', 'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_points', 'player_assists', 'player_rebounds'],
+  'Player Props': ['player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_points', 'player_assists', 'player_rebounds'],
+  'TD Props': ['player_pass_tds', 'player_tds_over', 'player_anytime_td', 'player_rush_tds', 'player_reception_tds'],
   'Team Props': ['team_totals'],
 };
 
@@ -124,7 +125,12 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel
           if (m.key === 'totals') return `Total: ${m.outcomes.map(o => `${o.name} ${o.point} (${o.price > 0 ? '+' : ''}${o.price})`).join(' / ')}`;
           if (m.key.startsWith('player_')) {
             const propType = m.key.replace('player_', '').replace(/_/g, ' ');
-            return `Player ${propType}: ${m.outcomes.slice(0, 2).map(o => `${o.description || o.name} ${o.point || ''} (${o.price > 0 ? '+' : ''}${o.price})`).join(' | ')}`;
+            // Special handling for TD props
+            if (m.key.includes('td') || m.key.includes('touchdown')) {
+              return `TD Prop ${propType}: ${m.outcomes.slice(0, 2).map(o => `${o.description || o.name} ${o.point || ''} (${o.price > 0 ? '+' : ''}${o.price})`).join(' | ')}`;
+            } else {
+              return `Player ${propType}: ${m.outcomes.slice(0, 2).map(o => `${o.description || o.name} ${o.point || ''} (${o.price > 0 ? '+' : ''}${o.price})`).join(' | ')}`;
+            }
           }
           if (m.key === 'team_totals') return `Team Total: ${m.outcomes.map(o => `${o.name} ${o.point} (${o.price > 0 ? '+' : ''}${o.price})`).join(' | ')}`;
           return '';
@@ -384,7 +390,17 @@ async function handler(req, res) {
     const unavailableInfo = [];
 
     const now = new Date();
-    const rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
+    
+    // Handle "Today only" vs multi-day ranges
+    let rangeEnd;
+    if (dateRange === 1) {
+      // For "Today only", set end to end of today (11:59:59 PM)
+      rangeEnd = new Date(now);
+      rangeEnd.setHours(23, 59, 59, 999);
+    } else {
+      // For multi-day, use the original logic
+      rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
+    }
 
     for (const sport of selectedSports) {
       const slug = SPORT_SLUGS[sport];

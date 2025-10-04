@@ -154,7 +154,7 @@ const App = () => {
           />
           <CheckboxGroup
             label="2. Bet-Type/Focus (Select Multiple)"
-            options={['Moneyline/Spread', 'Player Props', 'Totals (O/U)', 'Team Props']}
+            options={['Moneyline/Spread', 'Player Props', 'TD Props', 'Totals (O/U)', 'Team Props']}
             selectedOptions={selectedBetTypes}
             onToggle={toggleBetType}
           />
@@ -162,7 +162,7 @@ const App = () => {
 
         <div>
           <label className="text-gray-200 text-sm font-semibold block mb-3">
-            3. Game Date Range: <span className="text-yellow-400 text-lg font-bold">{dateRange} Day{dateRange > 1 ? 's' : ''}</span>
+            3. Game Date Range: <span className="text-yellow-400 text-lg font-bold">{dateRange === 1 ? '1 (Today Only)' : `${dateRange} Days`}</span>
           </label>
           <input
             type="range"
@@ -173,7 +173,7 @@ const App = () => {
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
           />
           <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>Today</span>
+            <span>Today Only</span>
             <span>4 Days</span>
           </div>
         </div>
