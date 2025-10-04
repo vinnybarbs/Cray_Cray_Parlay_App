@@ -130,13 +130,13 @@ const App = () => {
         continue;
       }
       
-      // Extract just Game and Bet lines
+      // Extract just Game and Bet lines (handle both indented and non-indented)
       if ((inMainParlay || inBonusParlay)) {
-        if (line.startsWith('Game:')) {
-          summary += line + '\n';
+        if (line.startsWith('Game:') || line.includes('Game:')) {
+          summary += line.replace(/^\s+/, '') + '\n'; // Remove leading spaces
         }
-        if (line.startsWith('Bet:')) {
-          summary += line + '\n';
+        if (line.startsWith('Bet:') || line.includes('Bet:')) {
+          summary += line.replace(/^\s+/, '') + '\n'; // Remove leading spaces
         }
       }
       
