@@ -282,7 +282,16 @@ STRICT REQUIREMENTS:
 3. Each leg must have: Date (MM/DD/YYYY), Game, Bet, Odds, Confidence (1-10), Reasoning
 4. Use different games for each leg - NO REPEATING GAMES
 5. Include variety in bet types if multiple types are available
-6. Reference research data in reasoning when available
+6. MANDATORY: Reference specific research data in reasoning when available
+7. NEVER use generic reasons like "winning record" or "home field advantage"
+8. ALWAYS cite injury reports, recent performance, or specific research insights
+
+RESEARCH ANALYSIS REQUIREMENTS:
+- When research data is provided (📰 RESEARCH: section), you MUST reference it
+- Cite specific injuries, lineup changes, recent form, head-to-head trends
+- Base confidence levels on concrete data points from research
+- Avoid generic analysis - use the provided research insights
+- If no research is available for a game, acknowledge it and be more conservative
 
 CRITICAL CONFLICT PREVENTION RULES:
 - If you pick Team A moneyline, DO NOT pick Team B moneyline in same game
@@ -319,14 +328,14 @@ OUTPUT FORMAT - Follow this EXACT structure:
    Bet: Specific bet with line
    Odds: +XXX or -XXX
    Confidence: X/10
-   Reasoning: Why this will hit
+   Reasoning: Why this will hit (cite specific research data)
 
 2. 📅 DATE: MM/DD/YYYY
    Game: Away Team @ Home Team
    Bet: Specific bet with line
    Odds: +XXX or -XXX
    Confidence: X/10
-   Reasoning: Why this will hit
+   Reasoning: Why this will hit (cite specific research data)
 
 [Continue for ${numLegs} total legs]
 
@@ -344,14 +353,14 @@ OUTPUT FORMAT - Follow this EXACT structure:
    Bet: Specific bet with line
    Odds: +XXX or -XXX
    Confidence: X/10
-   Reasoning: Why this is safe
+   Reasoning: Why this is safe (cite research data)
 
 2. 📅 DATE: MM/DD/YYYY
    Game: Away Team @ Home Team
    Bet: Specific bet with line
    Odds: +XXX or -XXX
    Confidence: X/10
-   Reasoning: Why this is safe
+   Reasoning: Why this is safe (cite research data)
 
 **Combined Odds:** Calculate combined odds
 **Payout on $100:** $XXX
@@ -362,8 +371,15 @@ CRITICAL FINAL CHECK:
 2. Each leg MUST be from a different game
 3. NO conflicting bets (opposing sides of same wager)
 4. NO duplicate teams/players across legs
-5. Use research data to justify picks
-6. Follow the exact format above
+5. MANDATORY: Use research data to justify picks with specific details
+6. Cite actual injuries, trends, or performance data in reasoning
+7. Follow the exact format above
+
+REASONING QUALITY REQUIREMENTS:
+- BAD: "Since they have a winning record I'm leaning toward them covering"
+- GOOD: "QB Smith is questionable with ankle injury (per research), backup has struggled in road games this season"
+- BAD: "Home field advantage should help"
+- GOOD: "Research shows they're 6-1 ATS at home this season, averaging 28 PPG vs 19 on road"
 
 DO NOT DEVIATE FROM THESE RULES.
 `.trim();
