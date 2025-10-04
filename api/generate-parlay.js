@@ -25,14 +25,6 @@ const BOOKMAKER_MAPPING = {
   Bet365: 'bet365',
 };
 
-const SPORTSBOOK_URLS = {
-  DraftKings: 'https://sportsbook.draftkings.com',
-  FanDuel: 'https://sportsbook.fanduel.com',
-  MGM: 'https://sports.betmgm.com',
-  Caesars: 'https://sportsbook.caesars.com',
-  Bet365: 'https://www.bet365.com',
-};
-
 // NEW: Research function using Serper API
 async function fetchGameResearch(games, fetcher) {
   console.log('🔍 Checking SERPER_API_KEY...');
@@ -100,61 +92,6 @@ async function fetchGameResearch(games, fetcher) {
   
   console.log(`✓ Research complete (${enrichedGames.filter(g => g.research).length} games enriched)\n`);
   return enrichedGames;
-}
-
-// Function to generate betslip data for sportsbook population
-function generateBetslipData(oddsData, parlayText, platform) {
-  const bets = [];
-  const lines = parlayText.split('\n');
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Look for Game: and Bet: patterns
-    if (line.startsWith('Game:')) {
-      const gameInfo = line.replace('Game:', '').trim();
-      const betLine = lines[i + 1]?.trim();
-      
-      if (betLine && betLine.startsWith('Bet:')) {
-        const betInfo = betLine.replace('Bet:', '').trim();
-        
-        // Try to match this with odds data to get game IDs
-        const matchedGame = findMatchingGame(gameInfo, oddsData);
-        
-        bets.push({
-          game: gameInfo,
-          bet: betInfo,
-          gameId: matchedGame?.id || null,
-          sportKey: matchedGame?.sport_key || null,
-          commenceTime: matchedGame?.commence_time || null
-        });
-      }
-    }
-  }
-  
-  return {
-    platform,
-    sportsbook_url: SPORTSBOOK_URLS[platform] || '',
-    bets,
-    generated_at: new Date().toISOString()
-  };
-}
-
-function findMatchingGame(gameText, oddsData) {
-  // Extract team names from "Team A @ Team B" format
-  const match = gameText.match(/(.+?)\s*@\s*(.+)/);
-  if (!match) return null;
-  
-  const [, awayTeam, homeTeam] = match;
-  
-  // Find matching game in odds data
-  return oddsData.find(game => 
-    game.away_team && game.home_team &&
-    (game.away_team.toLowerCase().includes(awayTeam.toLowerCase()) ||
-     awayTeam.toLowerCase().includes(game.away_team.toLowerCase())) &&
-    (game.home_team.toLowerCase().includes(homeTeam.toLowerCase()) ||
-     homeTeam.toLowerCase().includes(game.home_team.toLowerCase()))
-  );
 }
 
 function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel, oddsData, unavailableInfo, dateRange, aiModel = 'openai' }) {
@@ -673,13 +610,7 @@ async function handler(req, res) {
 
     console.log('✅ Parlay generated successfully!\n');
 
-    // Generate betslip data for sportsbook population
-    const betslipData = generateBetslipData(researchedGames, content, oddsPlatform);
-
-    return res.status(200).json({ 
-      content, 
-      betslip: betslipData 
-    });
+    return res.status(200).json({ content });
 
   } catch (err) {
     console.error('\n❌ ERROR:', err);
