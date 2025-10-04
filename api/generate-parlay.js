@@ -25,6 +25,41 @@ const BOOKMAKER_MAPPING = {
   Bet365: 'bet365',
 };
 
+// Odds calculation functions
+function americanToDecimal(americanOdds) {
+  const odds = parseInt(americanOdds);
+  if (odds > 0) {
+    return (odds / 100) + 1;
+  } else {
+    return (100 / Math.abs(odds)) + 1;
+  }
+}
+
+function decimalToAmerican(decimalOdds) {
+  if (decimalOdds >= 2) {
+    return '+' + Math.round((decimalOdds - 1) * 100);
+  } else {
+    return '-' + Math.round(100 / (decimalOdds - 1));
+  }
+}
+
+function calculateParlay(oddsArray) {
+  // Convert all odds to decimal and multiply
+  const decimalOdds = oddsArray.map(odds => americanToDecimal(odds));
+  const combinedDecimal = decimalOdds.reduce((acc, curr) => acc * curr, 1);
+  
+  // Convert back to American odds
+  const combinedAmerican = decimalToAmerican(combinedDecimal);
+  
+  // Calculate payout on $100
+  const payout = Math.round((combinedDecimal - 1) * 100);
+  
+  return {
+    combinedOdds: combinedAmerican,
+    payout: payout
+  };
+}
+
 // NEW: Research function using Serper API
 async function fetchGameResearch(games, fetcher) {
   console.log('🔍 Checking SERPER_API_KEY...');
@@ -217,8 +252,8 @@ REQUIRED FORMAT:
 
 [Continue for all legs]
 
-**Combined Odds:** [Calculate by converting to decimal, multiply, convert back]
-**Payout on $100:** $[Amount]
+**Combined Odds:** [WILL BE CALCULATED AUTOMATICALLY]
+**Payout on $100:** $[WILL BE CALCULATED AUTOMATICALLY]
 **Overall Confidence:** [Average]/10
 
 NOTE: If you provided fewer than ${numLegs} legs, explain why (e.g., "Only 7 unique games available in the data").
@@ -229,8 +264,8 @@ NOTE: If you provided fewer than ${numLegs} legs, explain why (e.g., "Only 7 uni
 
 [Same format, 2-3 safer picks based on research and odds]
 
-**Combined Odds:** [Calculate]
-**Payout on $100:** $[Amount]
+**Combined Odds:** [WILL BE CALCULATED AUTOMATICALLY]
+**Payout on $100:** $[WILL BE CALCULATED AUTOMATICALLY]
 **Why These Are Locks:** [Brief data backed explanation citing research]
 
 TONE: Professional with subtle humor. Be concise but reference research insights.
@@ -295,8 +330,8 @@ OUTPUT FORMAT - Follow this EXACT structure:
 
 [Continue for ${numLegs} total legs]
 
-**Combined Odds:** Calculate combined odds
-**Payout on $100:** $XXX
+**Combined Odds:** [WILL BE CALCULATED AUTOMATICALLY]
+**Payout on $100:** $[WILL BE CALCULATED AUTOMATICALLY]
 **Overall Confidence:** X/10
 
 ---
@@ -332,6 +367,88 @@ CRITICAL FINAL CHECK:
 
 DO NOT DEVIATE FROM THESE RULES.
 `.trim();
+}
+
+// Function to fix odds calculations in AI-generated content
+function fixOddsCalculations(content) {
+  const lines = content.split('\n');
+  const fixedLines = [];
+  
+  let currentParlayOdds = [];
+  let inParlay = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Detect start of a parlay
+    if (line.includes('🎯') && line.includes('-Leg Parlay:')) {
+      inParlay = true;
+      currentParlayOdds = [];
+      fixedLines.push(line);
+      continue;
+    }
+    
+    // Detect start of bonus parlay
+    if (line.includes('🔒') && line.includes('LOCK PARLAY:')) {
+      inParlay = true;
+      currentParlayOdds = [];
+      fixedLines.push(line);
+      continue;
+    }
+    
+    // Extract odds from legs
+    if (inParlay && line.trim().startsWith('Odds:')) {
+      const oddsMatch = line.match(/Odds:\s*([+-]\d+)/);
+      if (oddsMatch) {
+        currentParlayOdds.push(oddsMatch[1]);
+      }
+      fixedLines.push(line);
+      continue;
+    }
+    
+    // Fix Combined Odds calculation
+    if (line.includes('**Combined Odds:**') && currentParlayOdds.length > 0) {
+      try {
+        const calculation = calculateParlay(currentParlayOdds);
+        fixedLines.push(`**Combined Odds:** ${calculation.combinedOdds}`);
+        continue;
+      } catch (err) {
+        console.log('Error calculating odds:', err);
+        fixedLines.push(line);
+        continue;
+      }
+    }
+    
+    // Fix Payout calculation
+    if (line.includes('**Payout on $100:**') && currentParlayOdds.length > 0) {
+      try {
+        const calculation = calculateParlay(currentParlayOdds);
+        fixedLines.push(`**Payout on $100:** $${calculation.payout}`);
+        continue;
+      } catch (err) {
+        console.log('Error calculating payout:', err);
+        fixedLines.push(line);
+        continue;
+      }
+    }
+    
+    // End of parlay section
+    if (line.trim() === '' && inParlay) {
+      // Don't reset immediately, might be spacing within parlay
+      fixedLines.push(line);
+      continue;
+    }
+    
+    // Reset when we hit a new section or end
+    if (line.includes('---') || line.includes('**Why These Are Locks:**')) {
+      inParlay = false;
+      currentParlayOdds = [];
+    }
+    
+    fixedLines.push(line);
+  }
+  
+  return fixedLines.join('\n');
 }
 
 async function handler(req, res) {
@@ -610,7 +727,10 @@ async function handler(req, res) {
 
     console.log('✅ Parlay generated successfully!\n');
 
-    return res.status(200).json({ content });
+    // Post-process to fix odds calculations
+    const correctedContent = fixOddsCalculations(content);
+
+    return res.status(200).json({ content: correctedContent });
 
   } catch (err) {
     console.error('\n❌ ERROR:', err);
