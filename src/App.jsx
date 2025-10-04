@@ -77,6 +77,7 @@ const App = () => {
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState('');
+  const [betslipData, setBetslipData] = useState(null);
   const [error, setError] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState('');
 
@@ -166,6 +167,27 @@ const App = () => {
     }
   };
 
+  const handlePopulateBetslip = () => {
+    if (!betslipData || !betslipData.sportsbook_url) {
+      alert('Betslip data not available');
+      return;
+    }
+
+    // For now, open the sportsbook homepage
+    // In the future, this could be enhanced with deep links
+    const url = betslipData.sportsbook_url;
+    
+    // Copy bet details to clipboard for manual entry
+    const betDetails = betslipData.bets.map((bet, index) => 
+      `${index + 1}. ${bet.game}\n   ${bet.bet}`
+    ).join('\n\n');
+    
+    navigator.clipboard.writeText(betDetails).then(() => {
+      window.open(url, '_blank');
+      alert(`Opened ${betslipData.platform} sportsbook!\n\nBet details copied to clipboard - paste them for reference.`);
+    });
+  };
+
   const fetchParlaySuggestion = useCallback(async () => {
     if (loading || selectedSports.length === 0 || selectedBetTypes.length === 0) return;
 
@@ -197,6 +219,7 @@ const App = () => {
       if (!data.content) throw new Error('No content returned from AI');
 
       setResults(data.content);
+      setBetslipData(data.betslip || null);
     } catch (e) {
       setError(`Failed to generate parlays: ${e.message}`);
     } finally {
@@ -318,6 +341,14 @@ const App = () => {
         {results && !loading && (
           <div className="relative p-6 bg-gray-800 rounded-xl shadow-lg">
             <div className="absolute top-3 right-3 flex gap-2 z-10">
+              {betslipData && (
+                <button
+                  onClick={handlePopulateBetslip}
+                  className="bg-green-600 hover:bg-green-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition"
+                >
+                  🎯 Populate Betslip
+                </button>
+              )}
               <button
                 onClick={handleSummaryCopy}
                 className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition"
