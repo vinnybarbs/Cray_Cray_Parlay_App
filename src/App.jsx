@@ -73,6 +73,7 @@ const App = () => {
   const [aiModel, setAiModel] = useState('openai');
   const [dateRange, setDateRange] = useState(1);
   const [copied, setCopied] = useState(false);
+  const [summarycopied, setSummaryCopped] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState('');
@@ -95,6 +96,72 @@ const App = () => {
       navigator.clipboard.writeText(results).then(() => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
+      });
+    }
+  };
+
+  const extractSummary = (text) => {
+    if (!text) return '';
+    
+    const lines = text.split('\n');
+    let summary = '';
+    let inMainParlay = false;
+    let inBonusParlay = false;
+    let legCount = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      
+      // Detect main parlay start
+      if (line.includes('🎯') && line.includes('-Leg Parlay:')) {
+        inMainParlay = true;
+        summary += line + '\n';
+        continue;
+      }
+      
+      // Detect bonus parlay start
+      if (line.includes('🔒') && line.includes('LOCK PARLAY:')) {
+        inBonusParlay = true;
+        inMainParlay = false;
+        summary += '\n' + line + '\n';
+        continue;
+      }
+      
+      // Extract leg information
+      if ((inMainParlay || inBonusParlay) && line.match(/^\d+\./)) {
+        legCount++;
+        summary += line + '\n';
+        
+        // Get the next few lines for this leg
+        for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+          const nextLine = lines[j].trim();
+          if (nextLine.startsWith('Game:') || nextLine.startsWith('Bet:') || nextLine.startsWith('Odds:')) {
+            summary += '   ' + nextLine + '\n';
+          }
+          if (nextLine.startsWith('Odds:')) break; // Stop after odds line
+        }
+      }
+      
+      // Get payout information
+      if (line.startsWith('**Payout on $100:**') || line.startsWith('Payout on $100:')) {
+        summary += line + '\n';
+      }
+      
+      // Stop processing after bonus parlay payout
+      if (inBonusParlay && (line.startsWith('**Payout on $100:**') || line.startsWith('Payout on $100:'))) {
+        break;
+      }
+    }
+    
+    return summary.trim();
+  };
+
+  const handleSummaryCopy = () => {
+    if (results) {
+      const summary = extractSummary(results);
+      navigator.clipboard.writeText(summary).then(() => {
+        setSummaryCopped(true);
+        setTimeout(() => setSummaryCopped(false), 2000);
       });
     }
   };
@@ -250,12 +317,20 @@ const App = () => {
 
         {results && !loading && (
           <div className="relative p-6 bg-gray-800 rounded-xl shadow-lg">
-            <button
-              onClick={handleCopy}
-              className="absolute top-3 right-3 bg-gray-700 hover:bg-yellow-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition z-10"
-            >
-              {copied ? 'Copied! ✅' : 'Copy'}
-            </button>
+            <div className="absolute top-3 right-3 flex gap-2 z-10">
+              <button
+                onClick={handleSummaryCopy}
+                className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition"
+              >
+                {summarycopied ? 'Summary Copied! ✅' : 'Copy Summary'}
+              </button>
+              <button
+                onClick={handleCopy}
+                className="bg-gray-700 hover:bg-yellow-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition"
+              >
+                {copied ? 'Copied! ✅' : 'Copy All'}
+              </button>
+            </div>
             <div className="overflow-y-auto max-h-[70vh]">
               <pre className="whitespace-pre-wrap text-gray-300 font-sans">{results}</pre>
             </div>
