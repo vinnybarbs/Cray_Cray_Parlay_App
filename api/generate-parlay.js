@@ -7,6 +7,7 @@ const SPORT_SLUGS = {
   NCAAF: 'americanfootball_ncaaf',
   'PGA/Golf': 'golf_pga',
   Tennis: 'tennis_atp',
+  UFC: 'mma_mixed_martial_arts',
 };
 
 const MARKET_MAPPING = {

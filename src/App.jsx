@@ -215,7 +215,7 @@ const App = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
             label="1. Sports (Select Multiple)"
-            options={['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis']}
+            options={['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']}
             selectedOptions={selectedSports}
             onToggle={toggleSport}
           />
@@ -332,7 +332,7 @@ const App = () => {
                 {copied ? 'Copied! ✅' : 'Copy All'}
               </button>
             </div>
-            <div className="overflow-y-auto max-h-[70vh]">
+            <div className="overflow-y-auto max-h-[70vh] pt-12">
               <pre className="whitespace-pre-wrap text-gray-300 font-sans">{results}</pre>
             </div>
           </div>
