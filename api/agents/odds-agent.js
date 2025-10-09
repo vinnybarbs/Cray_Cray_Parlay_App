@@ -38,6 +38,13 @@ class TargetedOddsAgent {
       'caesars': ['draftkings', 'fanduel', 'mgm'],
       'bet365': ['draftkings', 'fanduel', 'mgm']
     };
+    
+    // Add response caching
+    this.cache = new Map();
+    this.cacheExpiry = 5 * 60 * 1000; // 5 minutes
+    
+    // Track in-flight requests to avoid duplicates
+    this.pendingRequests = new Map();
   }
 
   async fetchOddsForSelectedBook(request) {
@@ -45,6 +52,9 @@ class TargetedOddsAgent {
     const primaryBook = BOOKMAKER_MAPPING[oddsPlatform];
     
     console.log(`🎯 Fetching odds from user's selected book: ${oddsPlatform}`);
+    
+    // Clean expired cache entries
+    this.cleanExpiredCache();
     
     // Calculate date range
     const { now, rangeEnd } = this.calculateDateRange(dateRange);
@@ -59,7 +69,8 @@ class TargetedOddsAgent {
           odds: primaryOdds,
           source: oddsPlatform,
           fallbackUsed: false,
-          dataQuality: this.calculateDataQuality(primaryOdds)
+          dataQuality: this.calculateDataQuality(primaryOdds),
+          cached: this.cache.size > 0 ? `${this.cache.size} entries` : 'none'
         };
       } else {
         console.log(`⚠️ Primary book ${oddsPlatform} insufficient data, trying fallbacks`);
@@ -76,17 +87,16 @@ class TargetedOddsAgent {
     const now = new Date();
     console.log(`🕐 Current time: ${now.toISOString()} (${now.toLocaleString()})`);
     
+    // Simplified date range logic
     let rangeEnd;
     if (dateRange === 1) {
-      // For 1 day, be more inclusive - include games until end of tomorrow
-      // This handles timezone issues where "tomorrow" UTC games are "tonight" US time
-      rangeEnd = new Date(now);
-      rangeEnd.setDate(rangeEnd.getDate() + 2); // Two days to be safe for timezones
-      rangeEnd.setHours(5, 59, 59, 999); // Until 6 AM day after tomorrow
-      console.log(`📅 1 day mode (inclusive): until ${rangeEnd.toISOString()} (${rangeEnd.toLocaleString()})`);
+      // For 1 day: next 30 hours to handle timezone issues
+      rangeEnd = new Date(now.getTime() + 30 * 60 * 60 * 1000);
+      console.log(`📅 1 day mode: until ${rangeEnd.toISOString()}`);
     } else {
+      // For multi-day: exact calculation
       rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
-      console.log(`📅 Multi-day mode: ${dateRange} days until ${rangeEnd.toISOString()} (${rangeEnd.toLocaleString()})`);
+      console.log(`📅 ${dateRange} day mode: until ${rangeEnd.toISOString()}`);
     }
     
     return { now, rangeEnd };
@@ -125,20 +135,75 @@ class TargetedOddsAgent {
     return allOddsResults;
   }
 
+  // Cache management methods
+  getCacheKey(slug, bookmaker, markets) {
+    return `${slug}-${bookmaker}-${Array.isArray(markets) ? markets.sort().join(',') : markets}`;
+  }
+
+  isValidCacheEntry(entry) {
+    return entry && (Date.now() - entry.timestamp) < this.cacheExpiry;
+  }
+
+  // Enhanced fetch with caching and deduplication
+  async fetchWithCache(url, cacheKey) {
+    // Check cache first
+    const cached = this.cache.get(cacheKey);
+    if (this.isValidCacheEntry(cached)) {
+      console.log(`  💾 Cache hit for ${cacheKey}`);
+      return cached.data;
+    }
+
+    // Check if request is already in flight
+    if (this.pendingRequests.has(cacheKey)) {
+      console.log(`  ⏳ Request already pending for ${cacheKey}`);
+      return await this.pendingRequests.get(cacheKey);
+    }
+
+    // Make the request
+    const requestPromise = this.makeRequest(url);
+    this.pendingRequests.set(cacheKey, requestPromise);
+
+    try {
+      const data = await requestPromise;
+      
+      // Cache the result
+      this.cache.set(cacheKey, {
+        data: data,
+        timestamp: Date.now()
+      });
+      
+      // Clean up pending request
+      this.pendingRequests.delete(cacheKey);
+      
+      return data;
+    } catch (error) {
+      // Clean up pending request on error
+      this.pendingRequests.delete(cacheKey);
+      throw error;
+    }
+  }
+
+  async makeRequest(url) {
+    const response = await this.fetcher(url);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API error ${response.status}: ${errorText}`);
+    }
+    
+    return await response.json();
+  }
+
   async fetchRegularMarkets(slug, bookmaker, markets, now, rangeEnd) {
     const marketsStr = markets.join(',');
+    const cacheKey = this.getCacheKey(slug, bookmaker, markets);
     const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(marketsStr)}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
     
     try {
       console.log(`  📡 Regular markets: ${markets.join(', ')}`);
-      console.log(`  🔗 URL: ${url.substring(0, 120)}...`);
-      const response = await this.fetcher(url);
       
-      if (!response.ok) {
-        throw new Error(`API responded with ${response.status}`);
-      }
-      
-      const data = await response.json();
+      // Use cached/deduplicated fetch
+      const data = await this.fetchWithCache(url, cacheKey);
       
       if (Array.isArray(data) && data.length > 0) {
         console.log(`  📊 Raw API returned ${data.length} games`);
@@ -173,36 +238,60 @@ class TargetedOddsAgent {
     return [];
   }
 
+  // Utility function to batch arrays
+  chunkArray(array, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+
   async fetchPropMarkets(slug, bookmaker, markets, now, rangeEnd) {
     const propResults = [];
     
-    // Fetch props for each market separately (props API structure)
-    for (const market of markets) {
+    // Batch prop markets to reduce API calls (max 3 markets per request)
+    const marketBatches = this.chunkArray(markets, 3);
+    console.log(`  🎯 Fetching ${markets.length} prop markets in ${marketBatches.length} batches`);
+    
+    for (const batch of marketBatches) {
       try {
-        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${market}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
+        const batchStr = batch.join(',');
+        const cacheKey = this.getCacheKey(slug, bookmaker, batch);
+        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(batchStr)}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
         
-        console.log(`  🎯 Prop market: ${market}`);
-        const response = await this.fetcher(url);
+        console.log(`    📡 Prop batch: ${batch.join(', ')}`);
         
-        if (response.ok) {
-          const data = await response.json();
+        // Use cached/deduplicated fetch
+        const data = await this.fetchWithCache(url, cacheKey);
+        
+        if (Array.isArray(data) && data.length > 0) {
+          const upcoming = data.filter(game => {
+            const gameTime = new Date(game.commence_time);
+            return gameTime > now && gameTime < rangeEnd;
+          });
           
-          if (Array.isArray(data) && data.length > 0) {
-            const upcoming = data.filter(game => {
-              const gameTime = new Date(game.commence_time);
-              return gameTime > now && gameTime < rangeEnd;
-            });
-            
-            propResults.push(...upcoming);
-            console.log(`    ✓ Found ${upcoming.length} prop games`);
-          }
+          propResults.push(...upcoming);
+          console.log(`    ✓ Found ${upcoming.length} prop games in batch`);
         }
+        
+        // Small delay between batches to be respectful to API
+        if (marketBatches.length > 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        
       } catch (error) {
-        console.log(`    ❌ Prop market ${market} failed: ${error.message}`);
+        console.log(`    ❌ Prop batch failed: ${error.message}`);
       }
     }
     
-    return propResults;
+    // Deduplicate results by game ID
+    const uniqueResults = Array.from(
+      new Map(propResults.map(game => [game.id, game])).values()
+    );
+    
+    console.log(`  ✓ Total prop results: ${uniqueResults.length} unique games`);
+    return uniqueResults;
   }
 
   async tryFallbacks(primaryBook, existingOdds, request, now, rangeEnd) {
@@ -258,17 +347,15 @@ class TargetedOddsAgent {
   }
 
   combineOddsData(primary, fallback) {
-    // Merge odds data, preferring primary book data
+    // Merge odds data efficiently, preferring primary book data
     const combined = [...primary];
     const primaryGameIds = new Set(primary.map(g => g.id));
     
-    // Add fallback games that aren't in primary
-    fallback.forEach(game => {
-      if (!primaryGameIds.has(game.id)) {
-        combined.push(game);
-      }
-    });
+    // Add fallback games that aren't in primary (more efficient filtering)
+    const uniqueFallbackGames = fallback.filter(game => !primaryGameIds.has(game.id));
+    combined.push(...uniqueFallbackGames);
     
+    console.log(`📊 Combined data: ${primary.length} primary + ${uniqueFallbackGames.length} fallback = ${combined.length} total`);
     return combined;
   }
 
@@ -283,6 +370,23 @@ class TargetedOddsAgent {
     ).length;
     
     return Math.round((gamesWithFullMarkets / odds.length) * 100);
+  }
+
+  // Cache cleanup method
+  cleanExpiredCache() {
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [key, entry] of this.cache.entries()) {
+      if ((now - entry.timestamp) >= this.cacheExpiry) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned ${cleaned} expired cache entries`);
+    }
   }
 }
 
