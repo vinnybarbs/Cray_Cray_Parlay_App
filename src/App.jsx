@@ -42,6 +42,8 @@ const AIAgentsWorkflow = () => {
           {/* Degenerate Gambler - Top Center */}
           <div className="absolute" style={{ top: '5%', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
+              <h3 className="font-bold text-xs md:text-sm text-yellow-400 mb-1">Degenerate</h3>
+              <p className="text-xs text-yellow-400 text-center mb-2">(You)</p>
               <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
                 <img 
                   src={characterImages.degenerate} 
@@ -53,8 +55,6 @@ const AIAgentsWorkflow = () => {
                   }}
                 />
               </div>
-              <h3 className="font-bold text-xs md:text-sm text-yellow-400 mt-1">Degenerate</h3>
-              <p className="text-xs text-yellow-400 text-center">(You)</p>
             </div>
           </div>
 
