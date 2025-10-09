@@ -19,10 +19,12 @@ app.use(cors({
 
 app.use(express.json());
 
-// Force HTTPS in production
+// Force HTTPS in production (but not in local development)
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    if (req.header('x-forwarded-proto') !== 'https') {
+    if (req.headers.host?.includes('localhost')) {
+      next(); // Skip HTTPS redirect for localhost
+    } else if (req.header('x-forwarded-proto') !== 'https') {
       res.redirect(`https://${req.header('host')}${req.url}`);
     } else {
       next();
