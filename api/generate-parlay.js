@@ -138,7 +138,8 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel
   const formatDate = (iso) => {
     if (!iso) return 'TBD';
     const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    // Use proper month/day format (10/9 instead of 10/10 error)
+    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
   };
 
   let oddsContext = '';
@@ -277,7 +278,7 @@ function generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, toda
 You are a professional sports betting analyst. Your task is to create exactly ${numLegs} parlay legs using the provided data.
 
 STRICT REQUIREMENTS:
-1. Create EXACTLY ${numLegs} legs - no more, no less
+1. ⚠️ MANDATORY: Create EXACTLY ${numLegs} legs - no more, no less ⚠️
 2. Use ONLY games and odds from the data below
 3. Each leg must have: Date (MM/DD/YYYY), Game, Bet, Odds, Confidence (1-10), Reasoning
 4. Use different games for each leg - NO REPEATING GAMES
@@ -285,6 +286,7 @@ STRICT REQUIREMENTS:
 6. MANDATORY: Reference specific research data in reasoning when available
 7. NEVER use generic reasons like "winning record" or "home field advantage"
 8. ALWAYS cite injury reports, recent performance, or specific research insights
+9. ⚠️ COUNT YOUR LEGS: Must be exactly ${numLegs} legs total ⚠️
 
 RESEARCH ANALYSIS REQUIREMENTS:
 - When research data is provided (📰 RESEARCH: section), you MUST reference it
@@ -302,6 +304,13 @@ CRITICAL CONFLICT PREVENTION RULES:
 - NO conflicting bets from the same game
 - Each leg must be from a DIFFERENT game
 - NO duplicate bet types on same team/player
+- ABSOLUTELY NO same team appearing in multiple legs with different bet types
+
+EXAMPLES OF FORBIDDEN CONFLICTS:
+❌ Giants moneyline + Giants spread = FORBIDDEN
+❌ Cowboys +3.5 + Eagles -3.5 (same game) = FORBIDDEN  
+❌ Over 45.5 + Under 45.5 (same game) = FORBIDDEN
+❌ Player Over 250 yards + Player Under 250 yards = FORBIDDEN
 
 TODAY: ${today}
 SPORTS: ${sportsStr}
@@ -367,13 +376,15 @@ OUTPUT FORMAT - Follow this EXACT structure:
 **Why These Are Locks:** Brief explanation
 
 CRITICAL FINAL CHECK:
-1. You MUST create exactly ${numLegs} legs in the main parlay
+1. ⚠️ COUNT CHECK: You MUST create exactly ${numLegs} legs in the main parlay ⚠️
 2. Each leg MUST be from a different game
 3. NO conflicting bets (opposing sides of same wager)
-4. NO duplicate teams/players across legs
-5. MANDATORY: Use research data to justify picks with specific details
-6. Cite actual injuries, trends, or performance data in reasoning
-7. Follow the exact format above
+4. NO duplicate teams/players across legs  
+5. NO same team with different bet types (e.g., Giants ML + Giants spread)
+6. MANDATORY: Use research data to justify picks with specific details
+7. Cite actual injuries, trends, or performance data in reasoning
+8. Follow the exact format above
+9. ⚠️ FINAL COUNT: Main parlay has exactly ${numLegs} legs ⚠️
 
 REASONING QUALITY REQUIREMENTS:
 - BAD: "Since they have a winning record I'm leaning toward them covering"
@@ -523,16 +534,19 @@ async function handler(req, res) {
     const unavailableInfo = [];
 
     const now = new Date();
+    console.log(`🕐 Current time: ${now.toISOString()}`);
     
     // Handle "Today only" vs multi-day ranges
     let rangeEnd;
     if (dateRange === 1) {
-      // For "Today only", set end to end of today (11:59:59 PM)
+      // For "Today only", set end to end of today (11:59:59 PM local time)
       rangeEnd = new Date(now);
       rangeEnd.setHours(23, 59, 59, 999);
+      console.log(`📅 Today only mode: ${now.toLocaleDateString()} until ${rangeEnd.toISOString()}`);
     } else {
-      // For multi-day, use the original logic
+      // For multi-day, use the original logic  
       rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
+      console.log(`📅 Multi-day mode: ${dateRange} days until ${rangeEnd.toISOString()}`);
     }
 
     for (const sport of selectedSports) {
