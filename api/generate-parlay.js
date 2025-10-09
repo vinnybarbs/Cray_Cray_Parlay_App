@@ -229,17 +229,28 @@ Create a ${numLegs}-leg parlay using VARIETY across different bet types and game
 CRITICAL REQUIREMENTS:
 - You MUST create exactly ${numLegs} legs (not fewer)
 - MIX bet types: If user selected multiple types (spreads, totals, props), use a variety
-- SPREAD across different games: Don't use same game multiple times
+- PREFER different games when available, BUT if limited games:
+  * Use MULTIPLE BET TYPES from the same game (e.g., spread + total + player props)
+  * Different players for props to avoid correlation
+  * Mix of moneyline/spread + totals + player props from same game
 - Prioritize HIGH PROBABILITY bets that match the ${riskLevel} risk level
 - USE THE RESEARCH DATA to inform your picks - don't just pick favorites blindly
 - If you have both regular markets (spreads/totals/ML) AND props, combine them for variety
 
-Example for 10-leg parlay with all bet types selected:
-- 3 spreads from different games
-- 2 moneylines from different games  
-- 2 over/unders from different games
-- 2 player props from different games
-- 1 team prop
+SAME GAME STRATEGY (when few games available):
+- Game 1: Team A spread + Over total + Player X rushing yards + Player Y receiving yards
+- This creates 4 legs from one game using different bet types
+- Avoid conflicting bets (don't bet opposing spreads/moneylines)
+
+Example for limited games scenario:
+- Eagles @ Giants: Eagles -6.5 spread (-110)
+- Eagles @ Giants: Over 47.5 total (-110)  
+- Eagles @ Giants: Hurts Over 250.5 pass yards (-120)
+- Eagles @ Giants: Saquon Over 75.5 rush yards (+105)
+- Eagles @ Giants: AJ Brown anytime TD (+180)
+- Dolphins @ Jets: Dolphins ML (+150)
+- Dolphins @ Jets: Under 44.5 total (-105)
+- Dolphins @ Jets: Tua Over 275.5 pass yards (-115)
 
 DO NOT create fewer than ${numLegs} legs unless there literally aren't enough unique games in the data.
 
@@ -285,12 +296,20 @@ STRICT REQUIREMENTS:
 1. ⚠️ MANDATORY: Create EXACTLY ${numLegs} legs - no more, no less ⚠️
 2. Use ONLY games and odds from the data below
 3. Each leg must have: Date (MM/DD/YYYY), Game, Bet, Odds, Confidence (1-10), Reasoning
-4. Use different games for each leg - NO REPEATING GAMES
+4. SMART GAME USAGE:
+   - PREFER different games when available
+   - IF LIMITED GAMES: Use multiple bet types from same game (spread + total + props)
+   - Different players for props to avoid correlation
 5. Include variety in bet types if multiple types are available
 6. MANDATORY: Reference specific research data in reasoning when available
 7. NEVER use generic reasons like "winning record" or "home field advantage"
 8. ALWAYS cite injury reports, recent performance, or specific research insights
 9. ⚠️ COUNT YOUR LEGS: Must be exactly ${numLegs} legs total ⚠️
+
+SAME GAME PARLAY STRATEGY (when limited games):
+✅ Eagles @ Giants: Eagles -6.5 spread + Over 47.5 total + Hurts Over 250.5 pass yards + AJ Brown anytime TD
+✅ This creates 4 different bet types from one game
+✅ No conflicting bets (all support Eagles winning big in a high-scoring game)
 
 RESEARCH ANALYSIS REQUIREMENTS:
 - When research data is provided (📰 RESEARCH: section), you MUST reference it
@@ -300,21 +319,27 @@ RESEARCH ANALYSIS REQUIREMENTS:
 - If no research is available for a game, acknowledge it and be more conservative
 
 CRITICAL CONFLICT PREVENTION RULES:
-- If you pick Team A moneyline, DO NOT pick Team B moneyline in same game
-- If you pick Team A spread, DO NOT pick Team B spread in same game  
-- If you pick Team A moneyline, DO NOT pick Team A spread in same game
-- If you pick OVER total, DO NOT pick UNDER total in same game
-- If you pick player OVER prop, DO NOT pick same player UNDER prop
-- NO conflicting bets from the same game
-- Each leg must be from a DIFFERENT game
-- NO duplicate bet types on same team/player
-- ABSOLUTELY NO same team appearing in multiple legs with different bet types
+- AVOID OPPOSING BETS: No Team A moneyline + Team B moneyline (same game)
+- AVOID CONFLICTING SPREADS: No Team A spread + Team B spread (same game)  
+- AVOID CONFLICTING TOTALS: No Over + Under (same game)
+- AVOID CONFLICTING PROPS: No same player Over + Under prop
+- SAME GAME ALLOWED: Different bet types from same game (spread + total + props)
+- CORRELATION LOGIC: Choose bets that support each other when from same game
+
+SMART SAME GAME COMBINATIONS:
+✅ Favorite spread + Over total + Star player props (all align with blowout)
+✅ Underdog moneyline + Under total + Defensive props (align with upset)
+✅ Different players props from same team (QB yards + RB yards + WR TD)
 
 EXAMPLES OF FORBIDDEN CONFLICTS:
-❌ Giants moneyline + Giants spread = FORBIDDEN
+❌ Giants moneyline + Eagles moneyline (same game) = FORBIDDEN
 ❌ Cowboys +3.5 + Eagles -3.5 (same game) = FORBIDDEN  
 ❌ Over 45.5 + Under 45.5 (same game) = FORBIDDEN
-❌ Player Over 250 yards + Player Under 250 yards = FORBIDDEN
+❌ Player Over 250 yards + Same Player Under 250 yards = FORBIDDEN
+
+EXAMPLES OF ALLOWED SAME GAME PARLAYS:
+✅ Eagles -6.5 spread + Over 47.5 total + Hurts Over 250.5 pass yards = ALLOWED
+✅ Chiefs moneyline + Mahomes Over 2.5 pass TDs + Kelce anytime TD = ALLOWED
 
 TODAY: ${today}
 SPORTS: ${sportsStr}
@@ -524,6 +549,13 @@ async function handler(req, res) {
     // Validate and set defaults
     selectedSports = selectedSports || ['NFL'];
     selectedBetTypes = selectedBetTypes || ['Moneyline/Spread'];
+    
+    // Handle "ALL" bet types by expanding to all available types
+    if (selectedBetTypes.includes('ALL') || selectedBetTypes.includes('All') || selectedBetTypes.includes('all')) {
+      selectedBetTypes = Object.keys(MARKET_MAPPING); // Expand to all bet types
+      console.log(`🔥 ALL bet types selected - expanding to: ${selectedBetTypes.join(', ')}`);
+    }
+    
     numLegs = parseInt(numLegs) || 3;
     oddsPlatform = oddsPlatform || 'DraftKings';
     aiModel = aiModel || 'openai';

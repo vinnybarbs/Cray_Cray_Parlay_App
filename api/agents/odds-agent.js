@@ -104,7 +104,16 @@ class TargetedOddsAgent {
 
   async fetchFromBook(bookmaker, sports, betTypes, now, rangeEnd) {
     const allOddsResults = [];
-    const requestedMarkets = betTypes.flatMap(bt => MARKET_MAPPING[bt] || []);
+    
+    // Handle "ALL" bet types by expanding to all available markets
+    let requestedMarkets;
+    if (betTypes.includes('ALL') || betTypes.includes('All') || betTypes.includes('all')) {
+      // Get all available markets when "ALL" is selected
+      requestedMarkets = Object.values(MARKET_MAPPING).flat();
+      console.log(`🔥 ALL bet types selected - fetching ALL markets: ${requestedMarkets.join(', ')}`);
+    } else {
+      requestedMarkets = betTypes.flatMap(bt => MARKET_MAPPING[bt] || []);
+    }
     
     for (const sport of sports) {
       const slug = SPORT_SLUGS[sport];
