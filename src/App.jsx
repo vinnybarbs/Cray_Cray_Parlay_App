@@ -1,5 +1,147 @@
 import React, { useState, useCallback } from 'react';
 
+// AI Agents Workflow Component
+const AIAgentsWorkflow = () => {
+  // Replace these placeholder URLs with your actual character image paths
+  const characterImages = {
+    degenerate: '/images/degenerate-gambler.png', // Replace with your image path
+    carol: '/images/carol-coordinator.png',
+    oddjob: '/images/oddjob.png',
+    randy: '/images/randy-researcher.png',
+    andy: '/images/andy-analyst.png'
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto mt-12 mb-8">
+      <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-6 border border-gray-700 shadow-2xl">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 mb-2">
+            How AI Agents Work:
+          </h2>
+        </div>
+        
+        {/* Circular Flow */}
+        <div className="relative mx-auto" style={{ width: '500px', height: '500px' }}>
+          {/* SVG for curved arrows between agents - clean and simple */}
+          <svg className="absolute inset-0 w-full h-full" viewBox="0 0 500 500" style={{ zIndex: 1 }}>
+            <defs>
+              <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+                <polygon points="0 0, 6 3, 0 6" fill="#eab308" />
+              </marker>
+            </defs>
+            
+            {/* Clean shorter curved arrows that avoid text */}
+            <path d="M 240 120 Q 225 155 205 180" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" />
+            <path d="M 180 210 Q 160 250 180 290" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.2s' }} />
+            <path d="M 220 330 Q 250 350 280 330" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.4s' }} />
+            <path d="M 320 290 Q 340 250 320 210" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.6s' }} />
+            <path d="M 295 180 Q 275 155 260 120" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.8s' }} />
+          </svg>
+
+          {/* Degenerate Gambler - Top Center */}
+          <div className="absolute" style={{ top: '20px', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.degenerate} 
+                  alt="Degenerate Gambler" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-2xl">🎰</div>';
+                  }}
+                />
+              </div>
+              <h3 className="font-bold text-xs text-yellow-400 mt-1">Degenerate</h3>
+              <p className="text-xs text-yellow-400 text-center w-16">(You)</p>
+            </div>
+          </div>
+
+          {/* Carol - Left Side */}
+          <div className="absolute" style={{ top: '120px', left: '100px', zIndex: 10 }}>
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-purple-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.carol} 
+                  alt="Carol the Coordinator" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-2xl">👵</div>';
+                  }}
+                />
+              </div>
+              <h3 className="font-bold text-xs text-purple-400 mt-1">Carol the AI Coordinator</h3>
+            </div>
+          </div>
+
+          {/* Odd-Job - Bottom Left */}
+          <div className="absolute" style={{ bottom: '80px', left: '100px', zIndex: 10 }}>
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-yellow-700 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.oddjob} 
+                  alt="Odd-Job" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-2xl">🎩</div>';
+                  }}
+                />
+              </div>
+              <h3 className="font-bold text-xs text-yellow-400 mt-1">Odd-Job the Oddsmaker</h3>
+            </div>
+          </div>
+
+          {/* Andy - Right Side */}
+          <div className="absolute" style={{ top: '120px', right: '100px', zIndex: 10 }}>
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-green-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.andy} 
+                  alt="Andy the Analyst" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-2xl">📊</div>';
+                  }}
+                />
+              </div>
+              <h3 className="font-bold text-xs text-green-400 mt-1">Andy the Analyst</h3>
+            </div>
+          </div>
+
+          {/* Randy - Bottom Right */}
+          <div className="absolute" style={{ bottom: '80px', right: '100px', zIndex: 10 }}>
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 rounded-full bg-blue-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.randy} 
+                  alt="Randy the Researcher" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-2xl">🤓</div>';
+                  }}
+                />
+              </div>
+              <h3 className="font-bold text-xs text-blue-400 mt-1">Randy the Researcher</h3>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom tagline */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-500 italic">
+            Five AI agents working harder than your therapist to justify your gambling addiction
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Helper UI Components ---
 const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
   <div className="flex flex-col space-y-3">
@@ -345,10 +487,10 @@ const App = () => {
         )}
       </div>
 
-      {/* === UPDATED WIDGET AS REQUESTED === */}
+      {/* Updated Widget with Bisque Boys header and risk box, but replaced grid with AI workflow */}
       <div className="max-w-2xl mx-auto mt-12 mb-4">
         <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-6 border border-gray-700 shadow-2xl">
-          {/* 1. "A BISQUE BOYS APPLICATION" header re-added */}
+          {/* A BISQUE BOYS APPLICATION header */}
           <div className="flex items-center justify-center space-x-3 mb-4">
             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
             <p className="uppercase font-bold text-sm text-gray-400 tracking-widest">
@@ -357,7 +499,7 @@ const App = () => {
             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
           </div>
           
-          {/* 2. Funny risk-level box inserted here */}
+          {/* Risk-level box */}
           {riskLevel === 'Low' && (
             <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3 text-center">
               <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
@@ -377,28 +519,11 @@ const App = () => {
               <p className="text-xs text-red-400 mt-1">Full degen mode activated! Let's gooo!</p>
             </div>
           )}
-          
-          {/* 3. Original grid of selections restored below */}
-          <div className="grid grid-cols-2 gap-3 text-center">
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Sports</p>
-              <p className="text-sm font-bold text-yellow-400">{selectedSports.join(', ')}</p>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Bet Types</p>
-              <p className="text-sm font-bold text-green-400">{selectedBetTypes.join(', ')}</p>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Parlay Size</p>
-              <p className="text-sm font-bold text-blue-400">{numLegs} Legs</p>
-            </div>
-            <div className="bg-gray-800 rounded-lg p-3 border border-gray-700">
-              <p className="text-xs text-gray-500 uppercase mb-1">Risk Level</p>
-              <p className="text-sm font-bold text-purple-400">{riskLevel}</p>
-            </div>
-          </div>
         </div>
       </div>
+
+      {/* AI Agents Workflow Component */}
+      <AIAgentsWorkflow />
     </div>
   );
 };
