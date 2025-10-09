@@ -272,7 +272,7 @@ class MultiAgentCoordinator {
         }
       }
 
-      // Phase 4: Post-Processing & Validation
+  // Phase 4: Post-Processing & Validation
       console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');
       const correctedContent = fixOddsCalculations(aiContent);
 
@@ -294,29 +294,29 @@ class MultiAgentCoordinator {
         }
       }
 
-      // Ensure a 2-pick lock parlay exists; if missing, synthesize from highest-confidence legs (prefer JSON data)
-      let finalContent = correctedContent;
-      if (!/🔒\s*LOCK PARLAY:/i.test(finalContent)) {
-        let twoLock = null;
-        if (jsonLegs && jsonLegs.length >= 2) {
-          const picked = [...jsonLegs].sort((a,b) => (b.confidence||0) - (a.confidence||0)).slice(0,2);
-          if (picked.length === 2) {
-            const block = [
-              '**🔒 BONUS LOCK PARLAY: Two High-Confidence Picks**',
-              '',
-              '**Legs:**',
-              picked.map((l, i) => `${i+1}. 📅 DATE: ${l.date}\n   Game: ${l.game}\n   Bet: ${l.bet}\n   Odds: ${l.odds}\n   Confidence: ${l.confidence}/10`).join('\n\n'),
-              '',
-              '**Why These Are Locks:** Highest confidence legs with solid research support and reasonable odds.'
-            ].join('\n');
-            twoLock = block;
-          }
-        }
-        if (!twoLock) twoLock = this.buildTwoPickLock(correctedContent);
-        if (twoLock) {
-          finalContent = `${correctedContent}\n\n${twoLock}`;
-        }
+      // Build output: strip JSON from user-facing content, then normalize to exactly one 2-pick LOCK PARLAY
+      let baseContent = correctedContent;
+      if (jsonBlock) {
+        baseContent = this.stripParlayJson(baseContent);
       }
+
+      // Prepare a single lock parlay section from JSON legs (preferred) or fallback
+      let singleLockSection = null;
+      if (jsonLegs && jsonLegs.length >= 2) {
+        const picked = [...jsonLegs].sort((a,b) => (b.confidence||0) - (a.confidence||0)).slice(0,2);
+        singleLockSection = this.formatLockParlaySection(picked);
+      }
+      if (!singleLockSection) {
+        singleLockSection = this.buildTwoPickLock(baseContent); // fallback from text
+      }
+
+      // Remove any existing lock parlay sections and insert exactly one
+      let sanitized = this.removeLockParlaySections(baseContent);
+      if (singleLockSection) {
+        sanitized = `${sanitized}\n\n${singleLockSection}`;
+      }
+
+      let finalContent = sanitized;
       
       // Enhanced validation to catch actual conflicts (not same-game parlays)
   const validationResult = this.validateParlayContent(finalContent, enrichedGames);
@@ -368,6 +368,42 @@ class MultiAgentCoordinator {
       const block = text.substring(start + '===BEGIN_PARLAY_JSON==='.length, end).trim();
       return block;
     } catch { return null; }
+  }
+
+  stripParlayJson(text) {
+    try {
+      // Remove all JSON blocks between the markers globally
+      const re = /===BEGIN_PARLAY_JSON===([\s\S]*?)===END_PARLAY_JSON===/g;
+      return text.replace(re, '').replace(/\n{3,}/g, '\n\n').trim();
+    } catch { return text; }
+  }
+
+  formatLockParlaySection(legs) {
+    try {
+      const picked = (legs || []).slice(0,2);
+      if (picked.length < 2) return null;
+      const block = [
+        '**🔒 BONUS LOCK PARLAY: Two High-Confidence Picks**',
+        '',
+        '**Legs:**',
+        picked.map((l, i) => `${i+1}. 📅 DATE: ${l.date}\n   Game: ${l.game}\n   Bet: ${l.bet}\n   Odds: ${l.odds}\n   Confidence: ${l.confidence}/10`).join('\n\n'),
+        '',
+        '**Why These Are Locks:** Highest confidence legs with solid research support and reasonable odds.'
+      ].join('\n');
+      return block;
+    } catch { return null; }
+  }
+
+  removeLockParlaySections(text) {
+    try {
+      // Remove any block that starts with a LOCK PARLAY header and continues until the next top-level header or end
+      // Top-level headers begin with '**'. We non-greedily match until the next '**' line or end of text.
+      const pattern = /\*\*[^\n]*LOCK\s+PARLAY:[\s\S]*?(?=(\n\*\*[^\n]*\n)|$)/gi;
+      const cleaned = text.replace(pattern, '').replace(/\n{3,}/g, '\n\n').trim();
+      return cleaned;
+    } catch {
+      return text;
+    }
   }
 
   validateParlayJson(legs, expectedCount) {
