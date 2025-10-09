@@ -258,6 +258,33 @@ OUTPUT FORMAT:
 CRITICAL: Use the data exactly as provided. Same Game Parlays are valid when only one game available.
 
 🔢 FINAL LEG COUNT CHECK: Before submitting, count your legs: 1., 2., 3., 4., 5., 6., 7., 8... Must equal EXACTLY ${numLegs}!
+
+MACHINE-READABLE BLOCK (REQUIRED):
+Provide a strict JSON object between the markers below. Use EXACTLY American odds strings like "+105" or "-120" (use "+100" for EV/EVEN/PK). Ensure legs length is EXACTLY ${numLegs}.
+
+===BEGIN_PARLAY_JSON===
+{
+  "parlay": {
+    "title": "[Title]",
+    "legs": [
+      {
+        "date": "MM/DD/YYYY",
+        "game": "Away @ Home",
+        "bet": "[Specific bet with line]",
+        "odds": "+100",
+        "confidence": 8,
+        "citations": [1,2]
+      }
+      // ... repeat until exactly ${numLegs} legs
+    ]
+  },
+  "lockParlay": {
+    "legs": [
+      // 2 legs, optional if not applicable
+    ]
+  }
+}
+===END_PARLAY_JSON===
 `.trim();
   }
 
@@ -446,7 +473,7 @@ CRITICAL FINAL CHECK:
 - Exact dates from data ✓
 
 🔢 MANDATORY: Count your numbered legs (1., 2., 3...) = MUST EQUAL EXACTLY ${numLegs} LEGS!
-`.trim();
+\n\nMACHINE-READABLE BLOCK (REQUIRED):\nProvide a strict JSON object between the markers below. Use EXACTLY American odds strings like "+105" or "-120" (use "+100" for EV/EVEN/PK). Ensure legs length is EXACTLY ${numLegs}.\n\n===BEGIN_PARLAY_JSON===\n{\n  "parlay": {\n    "title": "[Title]",\n    "legs": [\n      {\n        "date": "MM/DD/YYYY",\n        "game": "Away @ Home",\n        "bet": "[Specific bet with line]",\n        "odds": "+100",\n        "confidence": 8,\n        "citations": [1,2]\n      }\n      // ... repeat until exactly ${numLegs} legs\n    ]\n  },\n  "lockParlay": {\n    "legs": [\n      // 2 legs, optional if not applicable\n    ]\n  }\n}\n===END_PARLAY_JSON===\n`.trim();
   }
 
   async generateParlayWithAI(prompt, aiModel, fetcher, openaiKey, geminiKey) {

@@ -257,10 +257,43 @@ class MultiAgentCoordinator {
       console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');
       const correctedContent = fixOddsCalculations(aiContent);
 
-      // Ensure a 2-pick lock parlay exists; if missing, synthesize from highest-confidence legs
+      // Try to extract machine-readable JSON
+      const jsonBlock = this.extractParlayJson(aiContent);
+      let jsonLegs = null;
+      let jsonLockLegs = null;
+      if (jsonBlock) {
+        try {
+          const parsed = JSON.parse(jsonBlock);
+          if (parsed && parsed.parlay && Array.isArray(parsed.parlay.legs)) {
+            jsonLegs = parsed.parlay.legs;
+          }
+          if (parsed && parsed.lockParlay && Array.isArray(parsed.lockParlay.legs)) {
+            jsonLockLegs = parsed.lockParlay.legs;
+          }
+        } catch (e) {
+          console.log('⚠️ Failed to parse parlay JSON:', e.message);
+        }
+      }
+
+      // Ensure a 2-pick lock parlay exists; if missing, synthesize from highest-confidence legs (prefer JSON data)
       let finalContent = correctedContent;
       if (!/🔒\s*LOCK PARLAY:/i.test(finalContent)) {
-        const twoLock = this.buildTwoPickLock(correctedContent);
+        let twoLock = null;
+        if (jsonLegs && jsonLegs.length >= 2) {
+          const picked = [...jsonLegs].sort((a,b) => (b.confidence||0) - (a.confidence||0)).slice(0,2);
+          if (picked.length === 2) {
+            const block = [
+              '**🔒 BONUS LOCK PARLAY: Two High-Confidence Picks**',
+              '',
+              '**Legs:**',
+              picked.map((l, i) => `${i+1}. 📅 DATE: ${l.date}\n   Game: ${l.game}\n   Bet: ${l.bet}\n   Odds: ${l.odds}\n   Confidence: ${l.confidence}/10`).join('\n\n'),
+              '',
+              '**Why These Are Locks:** Highest confidence legs with solid research support and reasonable odds.'
+            ].join('\n');
+            twoLock = block;
+          }
+        }
+        if (!twoLock) twoLock = this.buildTwoPickLock(correctedContent);
         if (twoLock) {
           finalContent = `${correctedContent}\n\n${twoLock}`;
         }
@@ -306,6 +339,16 @@ class MultiAgentCoordinator {
       console.error('\n❌ MULTI-AGENT ERROR:', error);
       throw error;
     }
+  }
+
+  extractParlayJson(text) {
+    try {
+      const start = text.indexOf('===BEGIN_PARLAY_JSON===');
+      const end = text.indexOf('===END_PARLAY_JSON===');
+      if (start === -1 || end === -1 || end <= start) return null;
+      const block = text.substring(start + '===BEGIN_PARLAY_JSON==='.length, end).trim();
+      return block;
+    } catch { return null; }
   }
 
   // Quick validation to count legs in generated content
