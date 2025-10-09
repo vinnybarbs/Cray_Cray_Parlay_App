@@ -535,19 +535,20 @@ async function handler(req, res) {
     const unavailableInfo = [];
 
     const now = new Date();
-    console.log(`🕐 Current time: ${now.toISOString()}`);
+    console.log(`🕐 Current time: ${now.toISOString()} (${now.toLocaleString()})`);
     
     // Handle "Today only" vs multi-day ranges
     let rangeEnd;
     if (dateRange === 1) {
-      // For "Today only", set end to end of today (11:59:59 PM local time)
+      // For "Today only", be more inclusive - include games until end of tomorrow to handle timezone issues
       rangeEnd = new Date(now);
-      rangeEnd.setHours(23, 59, 59, 999);
-      console.log(`📅 Today only mode: ${now.toLocaleDateString()} until ${rangeEnd.toISOString()}`);
+      rangeEnd.setDate(rangeEnd.getDate() + 1); // Add 1 day
+      rangeEnd.setHours(5, 59, 59, 999); // Until 6 AM next day (covers late night games)
+      console.log(`📅 Today only mode (inclusive): ${now.toLocaleDateString()} until ${rangeEnd.toISOString()} (${rangeEnd.toLocaleString()})`);
     } else {
       // For multi-day, use the original logic  
       rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
-      console.log(`📅 Multi-day mode: ${dateRange} days until ${rangeEnd.toISOString()}`);
+      console.log(`📅 Multi-day mode: ${dateRange} days until ${rangeEnd.toISOString()} (${rangeEnd.toLocaleString()})`);
     }
 
     for (const sport of selectedSports) {
@@ -579,6 +580,19 @@ async function handler(req, res) {
             console.log(`  📈 Raw data length: ${Array.isArray(data) ? data.length : 'not array'}`);
             
             if (Array.isArray(data) && data.length > 0) {
+              console.log(`  🔍 Debugging game times for date filtering:`);
+              data.forEach((game, idx) => {
+                const gameTime = new Date(game.commence_time);
+                const isAfterNow = gameTime > now;
+                const isBeforeEnd = gameTime < rangeEnd;
+                const isInRange = isAfterNow && isBeforeEnd;
+                console.log(`    Game ${idx + 1}: ${game.away_team} @ ${game.home_team}`);
+                console.log(`      Game time: ${gameTime.toISOString()} (${gameTime.toLocaleString()})`);
+                console.log(`      After now (${now.toISOString()}): ${isAfterNow}`);
+                console.log(`      Before end (${rangeEnd.toISOString()}): ${isBeforeEnd}`);
+                console.log(`      In range: ${isInRange}`);
+              });
+              
               const upcoming = data.filter(game => {
                 const gameTime = new Date(game.commence_time);
                 return gameTime > now && gameTime < rangeEnd;
@@ -604,6 +618,7 @@ async function handler(req, res) {
         }
 
         if (!success) {
+          console.log(`  🔄 Trying individual markets as fallback...`);
           for (const market of regularMarkets) {
             try {
               const singleMarketUrl = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${market}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${ODDS_KEY}`;
@@ -611,8 +626,17 @@ async function handler(req, res) {
               if (r.ok) {
                 const data = await r.json();
                 if (Array.isArray(data) && data.length > 0) {
-                  const upcoming = data.filter(game => new Date(game.commence_time) > now && new Date(game.commence_time) < rangeEnd);
+                  console.log(`    📊 Fallback market ${market}: ${data.length} games`);
+                  const upcoming = data.filter(game => {
+                    const gameTime = new Date(game.commence_time);
+                    const isInRange = gameTime > now && gameTime < rangeEnd;
+                    if (data.length <= 3) { // Only log details for small datasets
+                      console.log(`      ${game.away_team} @ ${game.home_team}: ${gameTime.toLocaleString()} - In range: ${isInRange}`);
+                    }
+                    return isInRange;
+                  });
                   if (upcoming.length > 0) {
+                    console.log(`    ✓ Added ${upcoming.length} games from ${market}`);
                     allOddsResults.push(...upcoming);
                   }
                 }
