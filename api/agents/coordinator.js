@@ -239,17 +239,36 @@ class MultiAgentCoordinator {
           this.apiKeys.gemini
         );
 
-  // Quick validation of leg count
+        // Validation: prefer machine-readable JSON; fallback to leg count
         const legCount = this.countLegsInContent(aiContent);
-        console.log(`📊 Generated ${legCount} legs (requested: ${request.numLegs})`);
-        
-        if (legCount === request.numLegs) {
-          console.log(`✅ AI Analysis Complete: Correct leg count achieved on attempt ${attempts}`);
+        const jsonBlockTry = this.extractParlayJson(aiContent);
+        let jsonOk = false;
+        if (jsonBlockTry) {
+          try {
+            const parsed = JSON.parse(jsonBlockTry);
+            const legs = parsed?.parlay?.legs || [];
+            const v = this.validateParlayJson(legs, request.numLegs);
+            jsonOk = v.ok;
+            if (!v.ok) {
+              console.log(`⚠️ JSON validation failed: ${v.errors.join('; ')}`);
+            }
+          } catch (e) {
+            console.log(`⚠️ JSON parse error: ${e.message}`);
+          }
+        } else {
+          console.log('⚠️ No machine-readable JSON block found');
+        }
+
+        const pass = jsonOk || (legCount === request.numLegs);
+        console.log(`📊 Validation: JSON ${jsonOk ? 'OK' : 'FAIL'}, Text legs ${legCount}/${request.numLegs}`);
+
+        if (pass) {
+          console.log(`✅ AI Analysis Complete on attempt ${attempts}`);
           break;
         } else if (attempts < maxAttempts) {
-          console.log(`⚠️ Leg count mismatch (${legCount}/${request.numLegs}), retrying...`);
+          console.log('🔁 Retrying due to invalid/missing JSON or leg mismatch...');
         } else {
-          console.log(`❌ Failed to achieve correct leg count after ${maxAttempts} attempts`);
+          console.log(`❌ Failed to produce valid output after ${maxAttempts} attempts`);
         }
       }
 
@@ -349,6 +368,29 @@ class MultiAgentCoordinator {
       const block = text.substring(start + '===BEGIN_PARLAY_JSON==='.length, end).trim();
       return block;
     } catch { return null; }
+  }
+
+  validateParlayJson(legs, expectedCount) {
+    const errors = [];
+    if (!Array.isArray(legs)) {
+      return { ok: false, errors: ['legs is not an array'] };
+    }
+    if (legs.length !== expectedCount) {
+      errors.push(`legs length ${legs.length} != expected ${expectedCount}`);
+    }
+    const oddsRe = /^[+-]\d{2,5}$/; // enforce normalized American odds, use +100 for EV/PK
+    legs.forEach((l, idx) => {
+      if (!l || typeof l !== 'object') {
+        errors.push(`leg ${idx+1} missing object`);
+        return;
+      }
+      if (!l.date) errors.push(`leg ${idx+1} missing date`);
+      if (!l.game) errors.push(`leg ${idx+1} missing game`);
+      if (!l.bet) errors.push(`leg ${idx+1} missing bet`);
+      if (!l.odds || !oddsRe.test(String(l.odds))) errors.push(`leg ${idx+1} invalid odds '${l.odds}'`);
+      if (typeof l.confidence !== 'number') errors.push(`leg ${idx+1} missing confidence`);
+    });
+    return { ok: errors.length === 0, errors };
   }
 
   // Quick validation to count legs in generated content
