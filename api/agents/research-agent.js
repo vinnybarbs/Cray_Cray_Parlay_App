@@ -4,28 +4,30 @@ class EnhancedResearchAgent {
     this.fetcher = fetcher;
     this.serperApiKey = serperApiKey;
     this.maxConcurrentRequests = 5;
+    this.cache = new Map();
+    this.cacheTtlMs = 10 * 60 * 1000; // 10 minutes
   }
 
-  async deepResearch(games) {
+  async deepResearch(games, { fastMode = false } = {}) {
     if (!this.serperApiKey) {
       console.log('⚠️ No SERPER_API_KEY - skipping research enhancement');
       return games.map(g => ({ ...g, research: null }));
     }
 
-    console.log(`🔍 Real-time research for ${games.length} games (no cache)`);
+    console.log(`🔍 Real-time research for ${games.length} games (fastMode=${fastMode})`);
     
     // Research all games with sufficient data
-    const researchTargets = this.prioritizeResearchTargets(games);
+    const researchTargets = this.prioritizeResearchTargets(games).slice(0, fastMode ? 8 : 25);
     
     // Process in batches to avoid overwhelming the API
-    const batchSize = this.maxConcurrentRequests;
+    const batchSize = fastMode ? Math.min(3, this.maxConcurrentRequests) : this.maxConcurrentRequests;
     const enrichedGames = [];
     
     for (let i = 0; i < researchTargets.length; i += batchSize) {
       const batch = researchTargets.slice(i, i + batchSize);
       console.log(`📋 Processing research batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(researchTargets.length/batchSize)}`);
       
-      const batchPromises = batch.map(game => this.comprehensiveGameAnalysis(game));
+  const batchPromises = batch.map(game => this.comprehensiveGameAnalysis(game, { fastMode }));
       const batchResults = await Promise.allSettled(batchPromises);
       
       batchResults.forEach((result, index) => {
@@ -89,14 +91,24 @@ class EnhancedResearchAgent {
     return priority;
   }
 
-  async comprehensiveGameAnalysis(game) {
+  async comprehensiveGameAnalysis(game, { fastMode = false } = {}) {
     const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const query = `${game.away_team} vs ${game.home_team} ${gameDate} injury report recent performance analysis prediction weather`;
     
     try {
       console.log(`  🔍 Researching: ${game.away_team} @ ${game.home_team}`);
-      
-      const research = await this.performSerperSearch(query);
+      // Use cache
+      const cacheKey = query.toLowerCase();
+      const now = Date.now();
+      const cached = this.cache.get(cacheKey);
+      if (cached && (now - cached.t) < this.cacheTtlMs) {
+        const { data } = cached;
+        const { summary, sources } = this.synthesizeResearch(data, game);
+        return { ...game, research: summary, researchSources: sources };
+      }
+
+      const research = await this.performSerperSearch(query, { fastMode });
+      this.cache.set(cacheKey, { t: now, data: research });
       const { summary, sources } = this.synthesizeResearch(research, game);
       return {
         ...game,
@@ -110,10 +122,12 @@ class EnhancedResearchAgent {
     }
   }
 
-  async performSerperSearch(query) {
+  async performSerperSearch(query, { fastMode = false } = {}) {
     const url = 'https://google.serper.dev/search';
     
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), fastMode ? 4000 : 8000);
       const response = await this.fetcher(url, {
         method: 'POST',
         headers: {
@@ -122,9 +136,11 @@ class EnhancedResearchAgent {
         },
         body: JSON.stringify({
           q: query,
-          num: 5 // Get top 5 results for comprehensive analysis
+          num: fastMode ? 3 : 5
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
       if (!response.ok) {
         throw new Error(`Serper API responded with ${response.status}`);

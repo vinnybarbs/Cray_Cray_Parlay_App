@@ -9,7 +9,7 @@ class ParlayAnalyst {
     ];
   }
 
-  generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel, oddsData, unavailableInfo, dateRange, aiModel = 'openai', attemptNumber = 1 }) {
+  generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel, oddsData, unavailableInfo, dateRange, aiModel = 'openai', attemptNumber = 1, fastMode = false, retryIssues = '' }) {
     const sportsStr = selectedSports.join(', ');
     const betTypesStr = selectedBetTypes.join(', ');
     const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
@@ -23,14 +23,16 @@ class ParlayAnalyst {
 
     let oddsContext = '';
   if (oddsData && oddsData.length > 0) {
-      const items = oddsData.slice(0, 20).map((ev, idx) => {
+    const maxItems = Math.min(Math.max(numLegs * 2, 6), fastMode ? 8 : 20);
+    const items = oddsData.slice(0, maxItems).map((ev, idx) => {
         const gameDate = formatDate(ev.commence_time);
         const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
         const bm = (ev.bookmakers && ev.bookmakers[0]) || null;
         
         let marketsSummary = 'no-odds';
         if (bm && bm.markets && bm.markets.length > 0) {
-          marketsSummary = bm.markets.map(market => {
+          const mkts = fastMode ? bm.markets.filter(m => ['h2h','spreads','totals'].includes(m.key)) : bm.markets;
+          marketsSummary = mkts.map(market => {
             const outcomes = market.outcomes || [];
             if (market.key === 'h2h') {
               return `ML: ${outcomes.map(o => `${o.name} ${o.price > 0 ? '+' : ''}${o.price}`).join(', ')}`;
@@ -88,7 +90,7 @@ class ParlayAnalyst {
     const currentRisk = riskConstraints[riskLevel] || riskConstraints['Medium'];
     
     const retryWarning = attemptNumber > 1 ? 
-      `\n🚨🚨🚨 RETRY ATTEMPT ${attemptNumber}: Previous attempt failed to create exactly ${numLegs} legs! This is CRITICAL - you MUST count each leg and ensure EXACTLY ${numLegs} numbered legs! 🚨🚨🚨\n` : 
+      `\n🚨🚨🚨 RETRY ATTEMPT ${attemptNumber}: Fix prior issues. Ensure EXACTLY ${numLegs} legs and resolve conflicts. ${retryIssues ? '\n' + retryIssues + '\n' : ''}🚨🚨🚨\n` : 
       '';
     
     return `${retryWarning}

@@ -61,7 +61,8 @@ class TargetedOddsAgent {
     
     try {
       // Try primary book first
-      const primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, selectedBetTypes, now, rangeEnd);
+  const capCount = Math.max(10, (parseInt(request.numLegs) || 6) * 2);
+  const primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, selectedBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
       
       if (this.hasSufficientData(primaryOdds, numLegs)) {
         console.log(`✅ Primary book ${oddsPlatform} has sufficient data`);
@@ -74,7 +75,7 @@ class TargetedOddsAgent {
         };
       } else {
         console.log(`⚠️ Primary book ${oddsPlatform} insufficient data, trying fallbacks`);
-        return await this.tryFallbacks(primaryBook, primaryOdds, request, now, rangeEnd);
+  return await this.tryFallbacks(primaryBook, primaryOdds, request, now, rangeEnd);
       }
       
     } catch (error) {
@@ -102,21 +103,24 @@ class TargetedOddsAgent {
     return { now, rangeEnd };
   }
 
-  async fetchFromBook(bookmaker, sports, betTypes, now, rangeEnd) {
+  async fetchFromBook(bookmaker, sports, betTypes, now, rangeEnd, { fastMode = false, capCount = 12 } = {}) {
     const allOddsResults = [];
     
     // Handle "ALL" bet types by expanding to all available markets
     let requestedMarkets;
     if (betTypes.includes('ALL') || betTypes.includes('All') || betTypes.includes('all')) {
-      // Get all available markets when "ALL" is selected
-      requestedMarkets = Object.values(MARKET_MAPPING).flat();
-      console.log(`🔥 ALL bet types selected - fetching ALL markets: ${requestedMarkets.join(', ')}`);
+      requestedMarkets = fastMode ? ['h2h','spreads','totals'] : Object.values(MARKET_MAPPING).flat();
+      console.log(`🔥 ALL bet types selected - markets: ${requestedMarkets.join(', ')} (fastMode=${fastMode})`);
     } else {
       requestedMarkets = betTypes.flatMap(bt => MARKET_MAPPING[bt] || []);
+      if (fastMode) {
+        // In fast mode, trim to core markets
+        requestedMarkets = requestedMarkets.filter(m => ['h2h','spreads','totals'].includes(m));
+      }
     }
     
     for (const sport of sports) {
-      const slug = SPORT_SLUGS[sport];
+  const slug = SPORT_SLUGS[sport];
       if (!slug) continue;
 
       console.log(`\n📊 Fetching ${sport} from ${bookmaker}...`);
@@ -128,16 +132,33 @@ class TargetedOddsAgent {
         m.startsWith('player_') || m.startsWith('team_')
       );
 
-      // Fetch regular markets
+      // Fetch regular and props in parallel (props skipped in fast mode)
+      const tasks = [];
+      let regularPromise = null;
       if (regularMarkets.length > 0) {
-        const regularOdds = await this.fetchRegularMarkets(slug, bookmaker, regularMarkets, now, rangeEnd);
-        allOddsResults.push(...regularOdds);
+        regularPromise = this.fetchRegularMarkets(slug, bookmaker, regularMarkets, now, rangeEnd);
+        tasks.push(regularPromise);
       }
-
-      // Fetch prop markets
-      if (propMarkets.length > 0) {
-        const propOdds = await this.fetchPropMarkets(slug, bookmaker, propMarkets, now, rangeEnd);
-        allOddsResults.push(...propOdds);
+      let propsPromise = null;
+      if (!fastMode && propMarkets.length > 0) {
+        propsPromise = this.fetchPropMarkets(slug, bookmaker, propMarkets, now, rangeEnd);
+        tasks.push(propsPromise);
+      }
+      if (tasks.length > 0) {
+        await Promise.allSettled(tasks);
+        if (regularPromise) {
+          try {
+            const regularOdds = await regularPromise;
+            const capped = fastMode ? regularOdds.slice(0, capCount) : regularOdds;
+            allOddsResults.push(...capped);
+          } catch {/* ignore; logged inside fetch */}
+        }
+        if (propsPromise) {
+          try {
+            const propOdds = await propsPromise;
+            allOddsResults.push(...propOdds);
+          } catch {/* ignore; logged inside fetch */}
+        }
       }
     }
 
@@ -258,47 +279,41 @@ class TargetedOddsAgent {
 
   async fetchPropMarkets(slug, bookmaker, markets, now, rangeEnd) {
     const propResults = [];
-    
-    // Batch prop markets to reduce API calls (max 3 markets per request)
     const marketBatches = this.chunkArray(markets, 3);
     console.log(`  🎯 Fetching ${markets.length} prop markets in ${marketBatches.length} batches`);
-    
-    for (const batch of marketBatches) {
-      try {
-        const batchStr = batch.join(',');
-        const cacheKey = this.getCacheKey(slug, bookmaker, batch);
-        const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(batchStr)}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
-        
-        console.log(`    📡 Prop batch: ${batch.join(', ')}`);
-        
-        // Use cached/deduplicated fetch
-        const data = await this.fetchWithCache(url, cacheKey);
-        
-        if (Array.isArray(data) && data.length > 0) {
-          const upcoming = data.filter(game => {
-            const gameTime = new Date(game.commence_time);
-            return gameTime > now && gameTime < rangeEnd;
-          });
-          
-          propResults.push(...upcoming);
-          console.log(`    ✓ Found ${upcoming.length} prop games in batch`);
+
+    // Run batches with limited concurrency to reduce total time while being polite to API
+    const concurrency = 2;
+    let index = 0;
+    const worker = async () => {
+      while (index < marketBatches.length) {
+        const myIndex = index++;
+        const batch = marketBatches[myIndex];
+        try {
+          const batchStr = batch.join(',');
+          const cacheKey = this.getCacheKey(slug, bookmaker, batch);
+          const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(batchStr)}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
+          console.log(`    📡 Prop batch: ${batch.join(', ')}`);
+          const data = await this.fetchWithCache(url, cacheKey);
+          if (Array.isArray(data) && data.length > 0) {
+            const upcoming = data.filter(game => {
+              const gameTime = new Date(game.commence_time);
+              return gameTime > now && gameTime < rangeEnd;
+            });
+            propResults.push(...upcoming);
+            console.log(`    ✓ Found ${upcoming.length} prop games in batch`);
+          }
+        } catch (error) {
+          console.log(`    ❌ Prop batch failed: ${error.message}`);
         }
-        
-        // Small delay between batches to be respectful to API
-        if (marketBatches.length > 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-      } catch (error) {
-        console.log(`    ❌ Prop batch failed: ${error.message}`);
       }
-    }
-    
+    };
+
+    const workers = Array.from({ length: Math.min(concurrency, marketBatches.length) }, () => worker());
+    await Promise.all(workers);
+
     // Deduplicate results by game ID
-    const uniqueResults = Array.from(
-      new Map(propResults.map(game => [game.id, game])).values()
-    );
-    
+    const uniqueResults = Array.from(new Map(propResults.map(game => [game.id, game])).values());
     console.log(`  ✓ Total prop results: ${uniqueResults.length} unique games`);
     return uniqueResults;
   }

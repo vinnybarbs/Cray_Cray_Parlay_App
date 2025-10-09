@@ -189,11 +189,15 @@ class MultiAgentCoordinator {
     console.log(`Request: ${request.numLegs} legs, ${request.selectedSports.join('+')}, ${request.riskLevel} risk`);
     console.log(`Sportsbook: ${request.oddsPlatform} (with smart fallbacks)`);
     console.log('='.repeat(80));
+    const tStart = Date.now();
+    let tOddsMs = 0, tResearchMs = 0, tAnalysisMs = 0, tPostMs = 0;
 
     try {
       // Phase 1: Targeted Odds Collection
-      console.log('\n🏗️ PHASE 1: TARGETED ODDS COLLECTION');
-      const oddsResult = await this.oddsAgent.fetchOddsForSelectedBook(request);
+    console.log('\n🏗️ PHASE 1: TARGETED ODDS COLLECTION');
+    const tOdds0 = Date.now();
+  const oddsResult = await this.oddsAgent.fetchOddsForSelectedBook(request);
+    tOddsMs = Date.now() - tOdds0;
       
       if (oddsResult.warning) {
         console.log(`⚠️ Warning: ${oddsResult.warning}`);
@@ -203,18 +207,22 @@ class MultiAgentCoordinator {
       console.log(`📊 Source: ${oddsResult.source}${oddsResult.fallbackUsed ? ' (fallback used)' : ''}`);
 
       // Phase 2: Enhanced Research
-      console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
-  const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds);
+    console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
+    const tResearch0 = Date.now();
+  const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds, { fastMode: !!request.fastMode });
+    tResearchMs = Date.now() - tResearch0;
       
       const researchedCount = enrichedGames.filter(g => g.research).length;
       console.log(`✅ Research Phase Complete: ${researchedCount}/${enrichedGames.length} games researched`);
 
       // Phase 3: AI Parlay Analysis with Retry Mechanism
-      console.log('\n🧠 PHASE 3: AI PARLAY ANALYSIS');
-      let aiContent = '';
-      let attempts = 0;
-      const maxAttempts = 3;
+    console.log('\n🧠 PHASE 3: AI PARLAY ANALYSIS');
+  let aiContent = '';
+  let attempts = 0;
+  const maxAttempts = request.fastMode ? 2 : 3;
+    const tAnalysis0 = Date.now();
       
+      let lastConflictSummary = '';
       while (attempts < maxAttempts) {
         attempts++;
         console.log(`🎯 Attempt ${attempts}/${maxAttempts}: Generating ${request.numLegs}-leg parlay`);
@@ -228,7 +236,9 @@ class MultiAgentCoordinator {
           unavailableInfo: [],
           dateRange: request.dateRange,
           aiModel: request.aiModel,
-          attemptNumber: attempts
+          attemptNumber: attempts,
+          retryIssues: lastConflictSummary || undefined,
+          fastMode: !!request.fastMode
         });
 
         aiContent = await this.analyst.generateParlayWithAI(
@@ -259,8 +269,19 @@ class MultiAgentCoordinator {
           console.log('⚠️ No machine-readable JSON block found');
         }
 
-        const pass = jsonOk || (legCount === request.numLegs);
-        console.log(`📊 Validation: JSON ${jsonOk ? 'OK' : 'FAIL'}, Text legs ${legCount}/${request.numLegs}`);
+        // Additional rule validation: reject if conflicts detected
+        const ruleCheck = this.validateParlayContent(aiContent, enrichedGames);
+        const hasConflicts = !!ruleCheck.hasConflicts && ruleCheck.betConflicts && ruleCheck.betConflicts.length > 0;
+        if (hasConflicts) {
+          const bullets = ruleCheck.betConflicts.slice(0,6).map(c => `- ${c.game}: "${c.bet1}" vs "${c.bet2}"`).join('\n');
+          lastConflictSummary = `CONFLICTS DETECTED (fix these):\n${bullets}\nRules: NO opposing sides in same game, NO same-team ML+Spread, NO duplicate exact bets.`;
+          console.log('❌ Conflicts detected, will retry with explicit feedback:\n' + lastConflictSummary);
+        } else {
+          lastConflictSummary = '';
+        }
+
+        const pass = (jsonOk || (legCount === request.numLegs)) && !hasConflicts;
+        console.log(`📊 Validation: JSON ${jsonOk ? 'OK' : 'FAIL'}, Text legs ${legCount}/${request.numLegs}, Conflicts: ${hasConflicts ? 'YES' : 'NO'}`);
 
         if (pass) {
           console.log(`✅ AI Analysis Complete on attempt ${attempts}`);
@@ -270,11 +291,13 @@ class MultiAgentCoordinator {
         } else {
           console.log(`❌ Failed to produce valid output after ${maxAttempts} attempts`);
         }
-      }
+  }
+  tAnalysisMs = Date.now() - tAnalysis0;
 
   // Phase 4: Post-Processing & Validation
-      console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');
-      const correctedContent = fixOddsCalculations(aiContent);
+  console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');
+  const tPost0 = Date.now();
+  const correctedContent = fixOddsCalculations(aiContent);
 
       // Try to extract machine-readable JSON
       const jsonBlock = this.extractParlayJson(aiContent);
@@ -327,11 +350,12 @@ class MultiAgentCoordinator {
       if (validationResult.actualLegCount !== request.numLegs) {
         console.log(`⚠️ Leg count mismatch: requested ${request.numLegs}, got ${validationResult.actualLegCount}`);
       }
-      
       console.log('✅ Odds calculations verified and corrected');
+      tPostMs = Date.now() - tPost0;
 
 
       // Phase 5: Quality Assurance
+      const totalMs = Date.now() - tStart;
       const metadata = {
         oddsSource: oddsResult.source,
         fallbackUsed: oddsResult.fallbackUsed,
@@ -340,6 +364,13 @@ class MultiAgentCoordinator {
         researchedGames: researchedCount,
         totalGames: enrichedGames.length,
         aiModel: request.aiModel,
+        timings: {
+          oddsMs: tOddsMs,
+          researchMs: tResearchMs,
+          analysisMs: tAnalysisMs,
+          postProcessingMs: tPostMs,
+          totalMs
+        },
         processingTime: Date.now()
       };
 
@@ -348,6 +379,7 @@ class MultiAgentCoordinator {
       console.log(`📊 Quality Score: ${metadata.dataQuality}%`);
       console.log(`🔍 Research Coverage: ${researchedCount}/${enrichedGames.length} games`);
       console.log(`💾 Data Source: ${metadata.oddsSource}`);
+      console.log(`⏱️ Timings (ms): odds=${tOddsMs} research=${tResearchMs} analysis=${tAnalysisMs} post=${tPostMs} total=${totalMs}`);
       console.log('='.repeat(80));
 
       return {
@@ -407,9 +439,11 @@ class MultiAgentCoordinator {
     }
   }
 
+        tAnalysisMs = Date.now() - tAnalysis0;
   validateParlayJson(legs, expectedCount) {
     const errors = [];
     if (!Array.isArray(legs)) {
+        const tPost0 = Date.now();
       return { ok: false, errors: ['legs is not an array'] };
     }
     if (legs.length !== expectedCount) {
@@ -465,6 +499,7 @@ class MultiAgentCoordinator {
         if (confMatch) {
           currentLeg.confidence = Math.max(currentLeg.confidence, parseInt(confMatch[1], 10));
         }
+        tPostMs = Date.now() - tPost0;
         const oddsMatch = line.match(/Odds:\s*([+\-]?\d{2,5}|EV|EVEN|PK|PICK)/i) || line.match(/\(([+\-]?\d{2,5}|EV|EVEN|PK|PICK)\)/i);
         if (oddsMatch && !currentLeg.odds) currentLeg.odds = oddsMatch[1];
       }
@@ -491,6 +526,7 @@ class MultiAgentCoordinator {
     let hasConflicts = false;
     let wrongDates = false;
     let actualLegCount = 0;
+        console.log(`⏱️ Timings (ms): odds=${tOddsMs} research=${tResearchMs} analysis=${tAnalysisMs} post=${tPostMs} total=${totalMs}`);
     
     // Extract all leg information
     lines.forEach((line, index) => {
@@ -521,6 +557,7 @@ class MultiAgentCoordinator {
     
     // Check for ACTUAL conflicts (same bet on opposing sides)
     const betConflicts = [];
+    const seenExactBets = new Set();
     for (let i = 0; i < legMatches.length; i++) {
       for (let j = i + 1; j < legMatches.length; j++) {
         const bet1 = legMatches[i].bet.toLowerCase();
@@ -531,12 +568,12 @@ class MultiAgentCoordinator {
         // Same game opposing bets (actual conflicts)
         if (game1 === game2) {
           // Check for opposing spreads/totals/moneylines
-          const isConflict = (
-            (bet1.includes('over') && bet2.includes('under')) ||
-            (bet1.includes('under') && bet2.includes('over')) ||
-            (bet1.includes('-') && bet2.includes('+') && bet1.split(' ')[0] !== bet2.split(' ')[0]) ||
-            (bet1 === bet2) // Exact same bet
-          );
+          const sameTeam = (txt) => txt.split(' ')[0];
+          const isOppositeTotals = (bet1.includes('over') && bet2.includes('under')) || (bet1.includes('under') && bet2.includes('over'));
+          const isOppositeSpread = (bet1.includes('+') && bet2.includes('-') && sameTeam(bet1) !== sameTeam(bet2)) || (bet1.includes('-') && bet2.includes('+') && sameTeam(bet1) !== sameTeam(bet2));
+          const isMLSpreadSameTeam = (bet1.includes('moneyline') && bet2.includes('spread') && sameTeam(bet1) === sameTeam(bet2)) || (bet2.includes('moneyline') && bet1.includes('spread') && sameTeam(bet1) === sameTeam(bet2));
+          const isExactDup = bet1 === bet2;
+          const isConflict = isOppositeTotals || isOppositeSpread || isMLSpreadSameTeam || isExactDup;
           
           if (isConflict) {
             hasConflicts = true;
@@ -545,6 +582,17 @@ class MultiAgentCoordinator {
         }
       }
     }
+
+    // Duplicate exact bets (across any games) are flagged
+    legMatches.forEach(leg => {
+      const key = `${leg.game}|${leg.bet.toLowerCase()}`;
+      if (seenExactBets.has(key)) {
+        hasConflicts = true;
+        betConflicts.push({ bet1: leg.bet, bet2: leg.bet, game: leg.game });
+      } else {
+        seenExactBets.add(key);
+      }
+    });
     
     if (betConflicts.length > 0) {
       console.log('❌ Actual bet conflicts detected:');

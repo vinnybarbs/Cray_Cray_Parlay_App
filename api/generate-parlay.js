@@ -593,7 +593,7 @@ async function handler(req, res) {
 
   try {
     // Extract request parameters
-    let { selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, dateRange } = req.body;
+  let { selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, dateRange, fastMode } = req.body;
     
     // Validate and set defaults
     selectedSports = selectedSports || ['NFL'];
@@ -609,7 +609,8 @@ async function handler(req, res) {
     oddsPlatform = oddsPlatform || 'DraftKings';
     aiModel = aiModel || 'openai';
     riskLevel = riskLevel || 'Medium';
-    dateRange = parseInt(dateRange) || 1;
+  dateRange = parseInt(dateRange) || 1;
+  fastMode = !!fastMode; // optional latency-optimized mode
 
     console.log('\n' + '='.repeat(60));
     console.log('🎯 MULTI-AGENT PARLAY GENERATION REQUEST');
@@ -631,7 +632,8 @@ async function handler(req, res) {
       oddsPlatform,
       aiModel,
       riskLevel,
-      dateRange
+      dateRange,
+      fastMode
     });
 
     console.log('✅ Multi-agent parlay generation successful!\n');
