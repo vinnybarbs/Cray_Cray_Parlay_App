@@ -158,37 +158,62 @@ class MultiAgentCoordinator {
       const researchedCount = enrichedGames.filter(g => g.research).length;
       console.log(`✅ Research Phase Complete: ${researchedCount}/${enrichedGames.length} games researched`);
 
-      // Phase 3: AI Parlay Analysis
+      // Phase 3: AI Parlay Analysis with Retry Mechanism
       console.log('\n🧠 PHASE 3: AI PARLAY ANALYSIS');
-      const prompt = this.analyst.generateAIPrompt({
-        selectedSports: request.selectedSports,
-        selectedBetTypes: request.selectedBetTypes,
-        numLegs: request.numLegs,
-        riskLevel: request.riskLevel,
-        oddsData: enrichedGames,
-        unavailableInfo: [],
-        dateRange: request.dateRange,
-        aiModel: request.aiModel
-      });
+      let aiContent = '';
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (attempts < maxAttempts) {
+        attempts++;
+        console.log(`🎯 Attempt ${attempts}/${maxAttempts}: Generating ${request.numLegs}-leg parlay`);
+        
+        const prompt = this.analyst.generateAIPrompt({
+          selectedSports: request.selectedSports,
+          selectedBetTypes: request.selectedBetTypes,
+          numLegs: request.numLegs,
+          riskLevel: request.riskLevel,
+          oddsData: enrichedGames,
+          unavailableInfo: [],
+          dateRange: request.dateRange,
+          aiModel: request.aiModel,
+          attemptNumber: attempts
+        });
 
-      const aiContent = await this.analyst.generateParlayWithAI(
-        prompt,
-        request.aiModel,
-        this.fetcher,
-        this.apiKeys.openai,
-        this.apiKeys.gemini
-      );
+        aiContent = await this.analyst.generateParlayWithAI(
+          prompt,
+          request.aiModel,
+          this.fetcher,
+          this.apiKeys.openai,
+          this.apiKeys.gemini
+        );
 
-      console.log(`✅ AI Analysis Complete: ${aiContent.length} characters generated`);
+        // Quick validation of leg count
+        const legCount = this.countLegsInContent(aiContent);
+        console.log(`📊 Generated ${legCount} legs (requested: ${request.numLegs})`);
+        
+        if (legCount === request.numLegs) {
+          console.log(`✅ AI Analysis Complete: Correct leg count achieved on attempt ${attempts}`);
+          break;
+        } else if (attempts < maxAttempts) {
+          console.log(`⚠️ Leg count mismatch (${legCount}/${request.numLegs}), retrying...`);
+        } else {
+          console.log(`❌ Failed to achieve correct leg count after ${maxAttempts} attempts`);
+        }
+      }
 
       // Phase 4: Post-Processing & Validation
       console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');
       const correctedContent = fixOddsCalculations(aiContent);
       
-      // Enhanced validation to catch same-game conflicts
+      // Enhanced validation to catch actual conflicts (not same-game parlays)
       const validationResult = this.validateParlayContent(correctedContent, enrichedGames);
       if (validationResult.hasConflicts) {
-        console.log('⚠️ Same-game conflicts detected, flagging in response');
+        console.log('⚠️ Actual bet conflicts detected (opposing sides), flagging in response');
+      }
+      
+      if (validationResult.actualLegCount !== request.numLegs) {
+        console.log(`⚠️ Leg count mismatch: requested ${request.numLegs}, got ${validationResult.actualLegCount}`);
       }
       
       console.log('✅ Odds calculations verified and corrected');
@@ -223,21 +248,46 @@ class MultiAgentCoordinator {
     }
   }
 
-  // Validate parlay content for same-game conflicts and date issues
+  // Quick validation to count legs in generated content
+  countLegsInContent(content) {
+    const lines = content.split('\n');
+    let legCount = 0;
+    
+    lines.forEach(line => {
+      // Look for numbered legs (1., 2., 3., etc.) followed by date emoji
+      const legMatch = line.match(/^\s*(\d+)\.\s*📅/);
+      if (legMatch) {
+        legCount++;
+      }
+    });
+    
+    return legCount;
+  }
+
+  // Validate parlay content for actual conflicts and date issues
   validateParlayContent(content, games) {
     const lines = content.split('\n');
-    const gameMatches = [];
+    const legMatches = [];
     let hasConflicts = false;
     let wrongDates = false;
+    let actualLegCount = 0;
     
-    // Extract game references from parlay legs
+    // Extract all leg information
     lines.forEach((line, index) => {
+      // Count actual legs (numbered format)
+      const legMatch = line.match(/^\s*(\d+)\.\s*📅/);
+      if (legMatch) {
+        actualLegCount++;
+      }
+      
       if (line.includes('Game:')) {
         const gameMatch = line.match(/Game:\s*(.+)/);
-        if (gameMatch) {
-          gameMatches.push({
+        const betMatch = lines[index + 1]?.match(/Bet:\s*(.+)/);
+        if (gameMatch && betMatch) {
+          legMatches.push({
             line: index,
             game: gameMatch[1].trim(),
+            bet: betMatch[1].trim(),
             originalLine: line
           });
         }
@@ -249,15 +299,37 @@ class MultiAgentCoordinator {
       }
     });
     
-    // Check for duplicate games
-    const gameNames = gameMatches.map(g => g.game);
-    const uniqueGames = new Set(gameNames);
+    // Check for ACTUAL conflicts (same bet on opposing sides)
+    const betConflicts = [];
+    for (let i = 0; i < legMatches.length; i++) {
+      for (let j = i + 1; j < legMatches.length; j++) {
+        const bet1 = legMatches[i].bet.toLowerCase();
+        const bet2 = legMatches[j].bet.toLowerCase();
+        const game1 = legMatches[i].game;
+        const game2 = legMatches[j].game;
+        
+        // Same game opposing bets (actual conflicts)
+        if (game1 === game2) {
+          // Check for opposing spreads/totals/moneylines
+          const isConflict = (
+            (bet1.includes('over') && bet2.includes('under')) ||
+            (bet1.includes('under') && bet2.includes('over')) ||
+            (bet1.includes('-') && bet2.includes('+') && bet1.split(' ')[0] !== bet2.split(' ')[0]) ||
+            (bet1 === bet2) // Exact same bet
+          );
+          
+          if (isConflict) {
+            hasConflicts = true;
+            betConflicts.push({ bet1, bet2, game: game1 });
+          }
+        }
+      }
+    }
     
-    if (gameNames.length > uniqueGames.size) {
-      hasConflicts = true;
-      console.log('❌ Same-game conflicts detected in AI response');
-      gameMatches.forEach(match => {
-        console.log(`   Line ${match.line}: ${match.game}`);
+    if (betConflicts.length > 0) {
+      console.log('❌ Actual bet conflicts detected:');
+      betConflicts.forEach(conflict => {
+        console.log(`   ${conflict.game}: ${conflict.bet1} vs ${conflict.bet2}`);
       });
     }
     
@@ -265,11 +337,18 @@ class MultiAgentCoordinator {
       console.log('❌ Incorrect dates detected (using today instead of game date)');
     }
     
+    const gameNames = legMatches.map(g => g.game);
+    const uniqueGames = new Set(gameNames);
+    
+    console.log(`✅ Legs generated: ${actualLegCount}, Unique games: ${uniqueGames.size}, Same-game parlays: ${gameNames.length > uniqueGames.size ? 'YES' : 'NO'}`);
+    
     return {
       hasConflicts,
       wrongDates,
       uniqueGamesCount: uniqueGames.size,
-      totalLegsAttempted: gameMatches.length
+      totalLegsAttempted: legMatches.length,
+      actualLegCount,
+      betConflicts
     };
   }
 
