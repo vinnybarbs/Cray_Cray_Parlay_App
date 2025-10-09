@@ -56,11 +56,13 @@ function calculateParlay(oddsArray) {
   const combinedAmerican = decimalToAmerican(combinedDecimal);
   
   // Calculate payout on $100
-  const payout = Math.round((combinedDecimal - 1) * 100);
+  const profit = Math.round((combinedDecimal - 1) * 100);
+  const payout = Math.round(combinedDecimal * 100); // total return on $100
   
   return {
     combinedOdds: combinedAmerican,
-    payout: payout
+    payout: payout,
+    profit
   };
 }
 
@@ -432,6 +434,17 @@ function fixOddsCalculations(content) {
   
   let currentParlayOdds = [];
   let inParlay = false;
+  let expectingOddsForCurrentLeg = false;
+  let pushedOddsForCurrentLeg = false;
+
+  const normalizeAmerican = (token) => {
+    const t = (token || '').toString().trim().toUpperCase();
+    if (t === 'EV' || t === 'EVEN' || t === 'PK' || t === 'PICK' || t === 'PICKEM' || t === "PICK'EM") {
+      return '+100';
+    }
+    const m = t.match(/^([+-]\d{2,5})/);
+    return m ? m[1] : null;
+  };
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -440,6 +453,8 @@ function fixOddsCalculations(content) {
     if (line.includes('🎯') && line.includes('-Leg Parlay:')) {
       inParlay = true;
       currentParlayOdds = [];
+      expectingOddsForCurrentLeg = false;
+      pushedOddsForCurrentLeg = false;
       fixedLines.push(line);
       continue;
     }
@@ -448,15 +463,47 @@ function fixOddsCalculations(content) {
     if (line.includes('🔒') && line.includes('LOCK PARLAY:')) {
       inParlay = true;
       currentParlayOdds = [];
+      expectingOddsForCurrentLeg = false;
+      pushedOddsForCurrentLeg = false;
       fixedLines.push(line);
       continue;
+    }
+
+    // Detect start of a new leg
+    if (inParlay) {
+      const legStart = line.match(/^\s*\d+\.\s*📅/);
+      if (legStart) {
+        expectingOddsForCurrentLeg = true;
+        pushedOddsForCurrentLeg = false;
+      }
     }
     
     // Extract odds from legs
     if (inParlay && line.trim().startsWith('Odds:')) {
-      const oddsMatch = line.match(/Odds:\s*([+-]\d+)/);
+      const oddsMatch = line.match(/Odds:\s*([+\-]?\d{2,5}|EV|EVEN|PK|PICK)/i);
       if (oddsMatch) {
-        currentParlayOdds.push(oddsMatch[1]);
+        const norm = normalizeAmerican(oddsMatch[1]);
+        if (norm) {
+          currentParlayOdds.push(norm);
+          pushedOddsForCurrentLeg = true;
+          expectingOddsForCurrentLeg = false;
+        }
+      }
+      fixedLines.push(line);
+      continue;
+    }
+
+    // Fallback: extract from Bet line parentheses
+    if (inParlay && expectingOddsForCurrentLeg && !pushedOddsForCurrentLeg && line.trim().startsWith('Bet:')) {
+      const parenMatches = [...line.matchAll(/\(([+\-]?\d{2,5}|EV|EVEN|PK|PICK)\)/gi)];
+      if (parenMatches.length > 0) {
+        const last = parenMatches[parenMatches.length - 1];
+        const norm = normalizeAmerican(last[1]);
+        if (norm) {
+          currentParlayOdds.push(norm);
+          pushedOddsForCurrentLeg = true;
+          expectingOddsForCurrentLeg = false;
+        }
       }
       fixedLines.push(line);
       continue;
@@ -479,7 +526,7 @@ function fixOddsCalculations(content) {
     if (line.includes('**Payout on $100:**') && currentParlayOdds.length > 0) {
       try {
         const calculation = calculateParlay(currentParlayOdds);
-        fixedLines.push(`**Payout on $100:** $${calculation.payout}`);
+        fixedLines.push(`**Payout on $100:** $${calculation.payout}`); // total return
         continue;
       } catch (err) {
         console.log('Error calculating payout:', err);
@@ -499,6 +546,8 @@ function fixOddsCalculations(content) {
     if (line.includes('---') || line.includes('**Why These Are Locks:**')) {
       inParlay = false;
       currentParlayOdds = [];
+      expectingOddsForCurrentLeg = false;
+      pushedOddsForCurrentLeg = false;
     }
     
     fixedLines.push(line);
