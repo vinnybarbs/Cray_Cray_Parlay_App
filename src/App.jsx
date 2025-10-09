@@ -229,7 +229,7 @@ const App = () => {
 
         <div>
           <label className="text-gray-200 text-sm font-semibold block mb-3">
-            3. Game Date Range: <span className="text-yellow-400 text-lg font-bold">{dateRange === 1 ? '1 (Today Only)' : `${dateRange} Days`}</span>
+            3. Game Date Range: <span className="text-yellow-400 text-lg font-bold">{dateRange === 1 ? '1 Day' : `${dateRange} Days`}</span>
           </label>
           <input
             type="range"
@@ -240,7 +240,7 @@ const App = () => {
             className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
           />
           <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>Today Only</span>
+            <span>1 Day</span>
             <span>4 Days</span>
           </div>
         </div>
