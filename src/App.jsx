@@ -320,16 +320,16 @@ const App = () => {
           <div className="relative p-6 bg-gray-800 rounded-xl shadow-lg">
             <div className="absolute top-3 right-3 flex gap-2 z-10">
               <button
-                onClick={handleSummaryCopy}
+                onClick={handleCopy}
                 className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition"
               >
-                {summarycopied ? 'Summary Copied! ✅' : 'Copy Summary'}
+                {copied ? 'Copied! ✅' : 'Copy All'}
               </button>
               <button
-                onClick={handleCopy}
-                className="bg-gray-700 hover:bg-yellow-500 text-white font-bold py-1 px-3 rounded-lg text-xs transition"
+                onClick={handleSummaryCopy}
+                className="bg-gray-700 hover:bg-gray-600 text-white font-bold py-1 px-3 rounded-lg text-xs transition"
               >
-                {copied ? 'Copied! ✅' : 'Copy All'}
+                {summarycopied ? 'Summary Copied! ✅' : 'Copy Summary'}
               </button>
             </div>
             <div className="overflow-y-auto max-h-[70vh] pt-12">
