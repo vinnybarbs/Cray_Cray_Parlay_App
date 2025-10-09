@@ -97,10 +97,11 @@ class EnhancedResearchAgent {
       console.log(`  🔍 Researching: ${game.away_team} @ ${game.home_team}`);
       
       const research = await this.performSerperSearch(query);
-      
+      const { summary, sources } = this.synthesizeResearch(research, game);
       return {
         ...game,
-        research: this.synthesizeResearch(research, game)
+        research: summary,
+        researchSources: sources
       };
       
     } catch (error) {
@@ -140,19 +141,22 @@ class EnhancedResearchAgent {
 
   synthesizeResearch(searchResults, game) {
     if (!searchResults || !searchResults.organic) {
-      return 'No research data available';
+      return { summary: 'No research data available', sources: [] };
     }
 
-    // Extract key insights from search results
-    const insights = searchResults.organic
+    // Extract key insights and capture top sources
+    const top = (searchResults.organic || []).slice(0, 5);
+    const insights = top
       .map(result => `${result.title}: ${result.snippet}`)
       .join(' | ')
       .substring(0, 800); // Limit length for token efficiency
+    const sources = top.map((r, idx) => ({ idx: idx + 1, title: r.title, link: r.link, snippet: r.snippet }));
 
     // Add structured analysis
     const analysis = this.extractKeyInsights(insights, game);
     
-    return `${insights}${analysis ? ` | Analysis: ${analysis}` : ''}`;
+    const summary = `${insights}${analysis ? ` | Analysis: ${analysis}` : ''}`;
+    return { summary, sources };
   }
 
   extractKeyInsights(text, game) {
@@ -184,16 +188,37 @@ class EnhancedResearchAgent {
 
   // Method to get research summary for AI prompts
   formatResearchForAI(games) {
-    return games
-      .filter(game => game.research)
-      .map(game => {
-        const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
-        const teams = `${game.away_team || '?'} @ ${game.home_team || '?'}`;
-        
-        return `${gameDate} - ${teams}\n   📰 RESEARCH: ${game.research}`;
-      })
-      .slice(0, 20) // Limit for prompt size
-      .join('\n\n');
+    const lines = [];
+    const aggregatedSources = [];
+    games.filter(g => g.research).slice(0, 20).forEach((game) => {
+      const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+      const teams = `${game.away_team || '?'} @ ${game.home_team || '?'}`;
+      lines.push(`${gameDate} - ${teams}\n   📰 RESEARCH: ${game.research}`);
+      (game.researchSources || []).forEach(src => {
+        aggregatedSources.push({
+          key: `${teams} (${gameDate})`,
+          idx: aggregatedSources.length + 1,
+          title: src.title,
+          link: src.link
+        });
+      });
+    });
+    const uniqueSources = [];
+    const seen = new Set();
+    aggregatedSources.forEach(s => {
+      const k = s.link;
+      if (!seen.has(k) && uniqueSources.length < 20) {
+        seen.add(k);
+        uniqueSources.push(s);
+      }
+    });
+    if (uniqueSources.length) {
+      lines.push('\nSOURCES:');
+      uniqueSources.forEach((s, i) => {
+        lines.push(`[${i + 1}] ${s.title} - ${s.link}`);
+      });
+    }
+    return lines.join('\n\n');
   }
 }
 

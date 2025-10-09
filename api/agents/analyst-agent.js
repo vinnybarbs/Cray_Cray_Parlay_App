@@ -22,7 +22,7 @@ class ParlayAnalyst {
     };
 
     let oddsContext = '';
-    if (oddsData && oddsData.length > 0) {
+  if (oddsData && oddsData.length > 0) {
       const items = oddsData.slice(0, 20).map((ev, idx) => {
         const gameDate = formatDate(ev.commence_time);
         const teams = `${ev.away_team || '?'} @ ${ev.home_team || '?'}`;
@@ -51,6 +51,16 @@ class ParlayAnalyst {
       });
 
       oddsContext = `\n\n🔥 AVAILABLE GAMES & ODDS 🔥\n${items.join('\n\n')}`;
+      // Add research block with sources when available
+      try {
+        const { EnhancedResearchAgent } = require('./research-agent');
+        // Safe formatting if oddsData objects came from research-agent
+        const ra = new EnhancedResearchAgent(null, null);
+        const researchBlock = ra.formatResearchForAI(oddsData);
+        if (researchBlock && researchBlock.trim().length > 0) {
+          oddsContext += `\n\n🔎 DATA-DRIVEN RESEARCH (with sources)\n${researchBlock}`;
+        }
+      } catch { /* no-op */ }
     } else {
       oddsContext = '\n\n⚠️ NO LIVE ODDS DATA AVAILABLE';
     }

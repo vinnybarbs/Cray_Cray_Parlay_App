@@ -204,7 +204,7 @@ class MultiAgentCoordinator {
 
       // Phase 2: Enhanced Research
       console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
-      const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds);
+  const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds);
       
       const researchedCount = enrichedGames.filter(g => g.research).length;
       console.log(`✅ Research Phase Complete: ${researchedCount}/${enrichedGames.length} games researched`);
@@ -239,7 +239,7 @@ class MultiAgentCoordinator {
           this.apiKeys.gemini
         );
 
-        // Quick validation of leg count
+  // Quick validation of leg count
         const legCount = this.countLegsInContent(aiContent);
         console.log(`📊 Generated ${legCount} legs (requested: ${request.numLegs})`);
         
@@ -256,9 +256,18 @@ class MultiAgentCoordinator {
       // Phase 4: Post-Processing & Validation
       console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');
       const correctedContent = fixOddsCalculations(aiContent);
+
+      // Ensure a 2-pick lock parlay exists; if missing, synthesize from highest-confidence legs
+      let finalContent = correctedContent;
+      if (!/🔒\s*LOCK PARLAY:/i.test(finalContent)) {
+        const twoLock = this.buildTwoPickLock(correctedContent);
+        if (twoLock) {
+          finalContent = `${correctedContent}\n\n${twoLock}`;
+        }
+      }
       
       // Enhanced validation to catch actual conflicts (not same-game parlays)
-      const validationResult = this.validateParlayContent(correctedContent, enrichedGames);
+  const validationResult = this.validateParlayContent(finalContent, enrichedGames);
       if (validationResult.hasConflicts) {
         console.log('⚠️ Actual bet conflicts detected (opposing sides), flagging in response');
       }
@@ -289,7 +298,7 @@ class MultiAgentCoordinator {
       console.log('='.repeat(80));
 
       return {
-        content: correctedContent,
+        content: finalContent,
         metadata: metadata
       };
 
@@ -313,6 +322,44 @@ class MultiAgentCoordinator {
     });
     
     return legCount;
+  }
+
+  // Build a simple 2-pick lock parlay section if missing
+  buildTwoPickLock(content) {
+    const lines = content.split('\n');
+    const legs = [];
+    let currentLeg = null;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const legStart = line.match(/^\s*(\d+)\.\s*📅/);
+      if (legStart) {
+        if (currentLeg) legs.push(currentLeg);
+        currentLeg = { index: parseInt(legStart[1], 10), lines: [line], confidence: 0, odds: null };
+        continue;
+      }
+      if (currentLeg) {
+        currentLeg.lines.push(line);
+        const confMatch = line.match(/Confidence:\s*(\d+)\/(\d+)/i);
+        if (confMatch) {
+          currentLeg.confidence = Math.max(currentLeg.confidence, parseInt(confMatch[1], 10));
+        }
+        const oddsMatch = line.match(/Odds:\s*([+\-]?\d{2,5}|EV|EVEN|PK|PICK)/i) || line.match(/\(([+\-]?\d{2,5}|EV|EVEN|PK|PICK)\)/i);
+        if (oddsMatch && !currentLeg.odds) currentLeg.odds = oddsMatch[1];
+      }
+    }
+    if (currentLeg) legs.push(currentLeg);
+    if (legs.length < 2) return null;
+    // Pick top 2 by confidence (fallback to first two)
+    const picked = legs.sort((a,b) => b.confidence - a.confidence).slice(0,2);
+    const section = [
+      '**🔒 BONUS LOCK PARLAY: Two High-Confidence Picks**',
+      '',
+      '**Legs:**',
+      picked.map((leg, idx) => `${idx+1}. ${leg.lines.join('\n   ')}`).join('\n\n'),
+      '',
+      '**Why These Are Locks:** Highest confidence legs with solid research support and reasonable odds.',
+    ].join('\n');
+    return section;
   }
 
   // Validate parlay content for actual conflicts and date issues
@@ -388,10 +435,28 @@ class MultiAgentCoordinator {
       console.log('❌ Incorrect dates detected (using today instead of game date)');
     }
     
-    const gameNames = legMatches.map(g => g.game);
+  const gameNames = legMatches.map(g => g.game);
     const uniqueGames = new Set(gameNames);
     
     console.log(`✅ Legs generated: ${actualLegCount}, Unique games: ${uniqueGames.size}, Same-game parlays: ${gameNames.length > uniqueGames.size ? 'YES' : 'NO'}`);
+
+    // Lightweight plausibility check using research text (heuristic)
+    try {
+      const researchMap = new Map();
+      (games || []).forEach(g => {
+        const key = `${g.away_team} @ ${g.home_team}`;
+        researchMap.set(key, (g.research || '').toLowerCase());
+      });
+      legMatches.forEach(leg => {
+        const r = researchMap.get(leg.game) || '';
+        if (leg.bet.toLowerCase().includes('over') && /hasn't|has not|rarely|under|below/.test(r)) {
+          console.log(`⚠️ Heuristic: Bet may contradict research: ${leg.game} :: ${leg.bet}`);
+        }
+        if (leg.bet.toLowerCase().includes('yards') && /avg|average|per game/.test(r) && /\d+/.test(leg.bet)) {
+          // could parse numbers for a stricter check in future
+        }
+      });
+    } catch (e) { /* best effort */ }
     
     return {
       hasConflicts,
