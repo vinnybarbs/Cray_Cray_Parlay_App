@@ -78,10 +78,11 @@ class TargetedOddsAgent {
     
     let rangeEnd;
     if (dateRange === 1) {
-      // For 1 day, be more inclusive (until 6 AM next day to handle timezone issues)
+      // For 1 day, be more inclusive - include games until end of tomorrow
+      // This handles timezone issues where "tomorrow" UTC games are "tonight" US time
       rangeEnd = new Date(now);
-      rangeEnd.setDate(rangeEnd.getDate() + 1);
-      rangeEnd.setHours(5, 59, 59, 999);
+      rangeEnd.setDate(rangeEnd.getDate() + 2); // Two days to be safe for timezones
+      rangeEnd.setHours(5, 59, 59, 999); // Until 6 AM day after tomorrow
       console.log(`📅 1 day mode (inclusive): until ${rangeEnd.toISOString()} (${rangeEnd.toLocaleString()})`);
     } else {
       rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
@@ -130,6 +131,7 @@ class TargetedOddsAgent {
     
     try {
       console.log(`  📡 Regular markets: ${markets.join(', ')}`);
+      console.log(`  🔗 URL: ${url.substring(0, 120)}...`);
       const response = await this.fetcher(url);
       
       if (!response.ok) {
@@ -139,6 +141,19 @@ class TargetedOddsAgent {
       const data = await response.json();
       
       if (Array.isArray(data) && data.length > 0) {
+        console.log(`  📊 Raw API returned ${data.length} games`);
+        
+        // Debug: Log first game structure
+        if (data[0]) {
+          const firstGame = data[0];
+          console.log(`  🎯 First game: ${firstGame.away_team} @ ${firstGame.home_team}`);
+          console.log(`  📅 Game time: ${firstGame.commence_time}`);
+          if (firstGame.bookmakers && firstGame.bookmakers[0]) {
+            const bm = firstGame.bookmakers[0];
+            console.log(`  💰 Markets: ${bm.markets ? bm.markets.map(m => m.key).join(', ') : 'none'}`);
+          }
+        }
+        
         const upcoming = data.filter(game => {
           const gameTime = new Date(game.commence_time);
           const isInRange = gameTime > now && gameTime < rangeEnd;
@@ -148,6 +163,8 @@ class TargetedOddsAgent {
         
         console.log(`  ✓ Found ${upcoming.length} games in time range`);
         return upcoming;
+      } else {
+        console.log(`  ⚠️ API returned no games or invalid data`);
       }
     } catch (error) {
       console.log(`  ❌ Regular markets failed: ${error.message}`);

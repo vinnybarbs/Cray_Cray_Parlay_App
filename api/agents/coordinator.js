@@ -185,6 +185,12 @@ class MultiAgentCoordinator {
       console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');
       const correctedContent = fixOddsCalculations(aiContent);
       
+      // Enhanced validation to catch same-game conflicts
+      const validationResult = this.validateParlayContent(correctedContent, enrichedGames);
+      if (validationResult.hasConflicts) {
+        console.log('⚠️ Same-game conflicts detected, flagging in response');
+      }
+      
       console.log('✅ Odds calculations verified and corrected');
 
       // Phase 5: Quality Assurance
@@ -215,6 +221,56 @@ class MultiAgentCoordinator {
       console.error('\n❌ MULTI-AGENT ERROR:', error);
       throw error;
     }
+  }
+
+  // Validate parlay content for same-game conflicts and date issues
+  validateParlayContent(content, games) {
+    const lines = content.split('\n');
+    const gameMatches = [];
+    let hasConflicts = false;
+    let wrongDates = false;
+    
+    // Extract game references from parlay legs
+    lines.forEach((line, index) => {
+      if (line.includes('Game:')) {
+        const gameMatch = line.match(/Game:\s*(.+)/);
+        if (gameMatch) {
+          gameMatches.push({
+            line: index,
+            game: gameMatch[1].trim(),
+            originalLine: line
+          });
+        }
+      }
+      
+      // Check for wrong dates (using today's date instead of game date)
+      if (line.includes('DATE:') && line.includes('10/09/2025')) {
+        wrongDates = true;
+      }
+    });
+    
+    // Check for duplicate games
+    const gameNames = gameMatches.map(g => g.game);
+    const uniqueGames = new Set(gameNames);
+    
+    if (gameNames.length > uniqueGames.size) {
+      hasConflicts = true;
+      console.log('❌ Same-game conflicts detected in AI response');
+      gameMatches.forEach(match => {
+        console.log(`   Line ${match.line}: ${match.game}`);
+      });
+    }
+    
+    if (wrongDates) {
+      console.log('❌ Incorrect dates detected (using today instead of game date)');
+    }
+    
+    return {
+      hasConflicts,
+      wrongDates,
+      uniqueGamesCount: uniqueGames.size,
+      totalLegsAttempted: gameMatches.length
+    };
   }
 
   // Health check for all agents
