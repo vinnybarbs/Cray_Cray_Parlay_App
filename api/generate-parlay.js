@@ -66,6 +66,72 @@ function calculateParlay(oddsArray) {
   };
 }
 
+// Build a mock result for local/dev without external APIs
+function buildMockParlayResponse({ aiModel = 'mock', selectedSports = ['NFL'], selectedBetTypes = ['Moneyline/Spread'], numLegs = 3 }) {
+  const legs = Array.from({ length: numLegs }, (_, i) => {
+    const n = i + 1;
+    const odds = i % 2 === 0 ? '+100' : '-110';
+    return `
+${n}. 📅 DATE: 10/10/2025
+   Game: TeamA @ TeamB
+   Bet: TeamA -${n}.5 (${odds})
+   Odds: ${odds}
+   Confidence: ${Math.min(9, 7 + (i % 3))}/10
+   Reasoning: Mock reasoning with research references.`.trim();
+  }).join('\n\n');
+
+  const oddsList = Array.from({ length: numLegs }, (_, i) => (i % 2 === 0 ? '+100' : '-110'));
+  const calc = calculateParlay(oddsList);
+
+  const content = `**🎯 ${numLegs}-Leg Parlay: Mock Data-Driven Picks**
+
+**Legs:**
+${legs}
+
+**Combined Odds:** ${calc.combinedOdds}
+**Payout on $100:** $${calc.payout}
+**Overall Confidence:** 8/10
+
+---
+
+**🔒 BONUS LOCK PARLAY: Two High-Confidence Picks**
+
+**Legs:**
+1. 📅 DATE: 10/10/2025
+   Game: TeamC @ TeamD
+   Bet: TeamC ML (+100)
+   Odds: +100
+   Confidence: 9/10
+
+2. 📅 DATE: 10/10/2025
+   Game: TeamE @ TeamF
+   Bet: Under 45.5 (-110)
+   Odds: -110
+   Confidence: 8/10
+
+**Why These Are Locks:** Mock highest confidence legs.`;
+
+  return {
+    content,
+    metadata: {
+      aiModel,
+      oddsSource: 'mock',
+      fallbackUsed: false,
+      dataQuality: 100,
+      researchedGames: 0,
+      totalGames: 0,
+      timings: {
+        oddsMs: 10,
+        researchMs: 0,
+        analysisMs: 20,
+        postProcessingMs: 5,
+        totalMs: 35
+      },
+      processingTime: Date.now()
+    }
+  };
+}
+
 // NEW: Research function using Serper API
 async function fetchGameResearch(games, fetcher) {
   console.log('🔍 Checking SERPER_API_KEY...');
@@ -586,8 +652,19 @@ async function handler(req, res) {
   console.log(`GEMINI_KEY exists: ${!!apiKeys.gemini} (length: ${apiKeys.gemini?.length || 0})`);
   console.log(`NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
 
+  const mockMode = String(process.env.MOCK_MODE || '').toLowerCase() === '1' || String(process.env.MOCK_MODE || '').toLowerCase() === 'true';
+
   if (!apiKeys.odds) {
     console.log('❌ CRITICAL: Missing ODDS_API_KEY in environment');
+    if (mockMode || req.body?.mock) {
+      console.log('🧪 MOCK_MODE active: returning mocked parlay without ODDS_API');
+      return res.status(200).json(buildMockParlayResponse({
+        aiModel: 'mock',
+        selectedSports: req.body?.selectedSports || ['NFL'],
+        selectedBetTypes: req.body?.selectedBetTypes || ['Moneyline/Spread'],
+        numLegs: parseInt(req.body?.numLegs) || 3
+      }));
+    }
     return res.status(500).json({ error: 'Server missing ODDS_API_KEY' });
   }
 
@@ -611,6 +688,32 @@ async function handler(req, res) {
     riskLevel = riskLevel || 'Medium';
   dateRange = parseInt(dateRange) || 1;
   fastMode = !!fastMode; // optional latency-optimized mode
+
+    // Preflight: ensure required AI key is present for selected model, with smart fallback or mock
+    if (aiModel === 'openai' && !apiKeys.openai) {
+      if (apiKeys.gemini) {
+        console.log('⚠️ Missing OPENAI_API_KEY; auto-falling back to Gemini');
+        aiModel = 'gemini';
+      } else if (mockMode || req.body?.mock) {
+        console.log('🧪 MOCK_MODE active: returning mocked parlay (no OpenAI/Gemini keys)');
+        return res.status(200).json(buildMockParlayResponse({ aiModel: 'mock', selectedSports, selectedBetTypes, numLegs }));
+      } else {
+        console.log('❌ Missing OPENAI_API_KEY and no fallback available');
+        return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
+      }
+    }
+    if (aiModel === 'gemini' && !apiKeys.gemini) {
+      if (apiKeys.openai) {
+        console.log('⚠️ Missing GEMINI_API_KEY; auto-falling back to OpenAI');
+        aiModel = 'openai';
+      } else if (mockMode || req.body?.mock) {
+        console.log('🧪 MOCK_MODE active: returning mocked parlay (no Gemini/OpenAI keys)');
+        return res.status(200).json(buildMockParlayResponse({ aiModel: 'mock', selectedSports, selectedBetTypes, numLegs }));
+      } else {
+        console.log('❌ Missing GEMINI_API_KEY and no fallback available');
+        return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
+      }
+    }
 
     console.log('\n' + '='.repeat(60));
     console.log('🎯 MULTI-AGENT PARLAY GENERATION REQUEST');
@@ -645,7 +748,5 @@ async function handler(req, res) {
     return res.status(500).json({ error: err.message || 'Server error' });
   }
 }
-
-module.exports = handler;
 
 module.exports = handler;

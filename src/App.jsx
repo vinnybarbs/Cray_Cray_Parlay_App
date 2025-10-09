@@ -1,5 +1,36 @@
 import React, { useState, useCallback } from 'react';
 
+// Simple Phase Progress component
+const PhaseProgress = ({ loading, progress, timings }) => {
+  const phases = ['Odds', 'Research', 'Analysis', 'Post'];
+  return (
+    <div className="mt-4 p-3 rounded-xl bg-gray-800 border border-gray-700">
+      <div className="text-sm font-semibold text-gray-300 mb-2">Generation Progress</div>
+      <div className="flex items-center space-x-3">
+        {phases.map((p, idx) => {
+          const isActive = loading && progress === idx;
+          const isDone = !loading && timings;
+          return (
+            <div key={p} className="flex items-center space-x-1">
+              <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-yellow-400 animate-pulse' : 'bg-gray-600'}`}></div>
+              <span className="text-xs text-gray-400">{p}</span>
+            </div>
+          );
+        })}
+      </div>
+      {timings && (
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-400">
+          <div>Odds: {timings.oddsMs} ms</div>
+          <div>Research: {timings.researchMs} ms</div>
+          <div>Analysis: {timings.analysisMs} ms</div>
+          <div>Post: {timings.postProcessingMs} ms</div>
+          <div className="col-span-2">Total: {timings.totalMs} ms</div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // AI Agents Workflow Component
 const AIAgentsWorkflow = () => {
   // Replace these placeholder URLs with your actual character image paths
@@ -221,6 +252,8 @@ const App = () => {
   const [results, setResults] = useState('');
   const [error, setError] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [progressPhase, setProgressPhase] = useState(0);
+  const [timings, setTimings] = useState(null);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...", "Bribing the refs for insider info...", "Sacrificing a prop bet to the degen gods...",
@@ -317,6 +350,7 @@ const App = () => {
     setLoadingMessage(getRandomLoadingMessage());
 
     try {
+      setProgressPhase(0);
       const response = await fetch('/api/generate-parlay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -332,12 +366,17 @@ const App = () => {
       });
 
       if (!response.ok) {
-        const errText = await response.text();
+        let errText = await response.text();
+        try {
+          const j = JSON.parse(errText);
+          if (j && j.error) errText = j.error;
+        } catch {}
         throw new Error(`Server error: ${response.status} - ${errText}`);
       }
+      // Simulate phases locally; backend has actual timings in metadata
       const data = await response.json();
       if (!data.content) throw new Error('No content returned from AI');
-
+      setTimings(data.metadata?.timings || null);
       setResults(data.content);
     } catch (e) {
       setError(`Failed to generate parlays: ${e.message}`);
@@ -354,6 +393,7 @@ const App = () => {
       </header>
 
       <div className="space-y-6 max-w-2xl mx-auto">
+        <PhaseProgress loading={loading} progress={progressPhase} timings={timings} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
             label="1. Sports (Select Multiple)"

@@ -73,13 +73,13 @@ class ParlayAnalyst {
     }
 
     if (aiModel === 'gemini') {
-      return this.generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber });
+      return this.generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber, retryIssues });
     } else {
-      return this.generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber });
+      return this.generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber, retryIssues });
     }
   }
 
-  generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber }) {
+  generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber, retryIssues = '' }) {
     // Define risk level constraints
     const riskConstraints = {
       'Low': { minConfidence: 8, maxConfidence: 9, description: 'Heavy favorites, low payout individual bets' },
@@ -290,7 +290,7 @@ Provide a strict JSON object between the markers below. Use EXACTLY American odd
 `.trim();
   }
 
-  generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber }) {
+  generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext, attemptNumber, retryIssues = '' }) {
     // Define risk level constraints
     const riskConstraints = {
       'Low': { minConfidence: 8, maxConfidence: 9, description: 'Heavy favorites, low payout individual bets' },
@@ -301,7 +301,7 @@ Provide a strict JSON object between the markers below. Use EXACTLY American odd
     const currentRisk = riskConstraints[riskLevel] || riskConstraints['Medium'];
     
     const retryWarning = attemptNumber > 1 ? 
-      `\n🚨🚨🚨 RETRY ATTEMPT ${attemptNumber}: Previous attempt failed to create exactly ${numLegs} legs! This is CRITICAL - you MUST count each leg and ensure EXACTLY ${numLegs} numbered legs! 🚨🚨🚨\n` : 
+      `\n🚨🚨🚨 RETRY ATTEMPT ${attemptNumber}: Previous attempt failed to create exactly ${numLegs} legs! This is CRITICAL - you MUST count each leg and ensure EXACTLY ${numLegs} numbered legs! ${retryIssues ? '\n' + retryIssues + '\n' : ''}🚨🚨🚨\n` : 
       '';
     
     return `${retryWarning}

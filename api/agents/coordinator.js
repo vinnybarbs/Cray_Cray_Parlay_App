@@ -206,6 +206,34 @@ class MultiAgentCoordinator {
       console.log(`✅ Odds Phase Complete: ${oddsResult.odds.length} games, ${oddsResult.dataQuality}% quality`);
       console.log(`📊 Source: ${oddsResult.source}${oddsResult.fallbackUsed ? ' (fallback used)' : ''}`);
 
+      // Smart bet type expansion: with conflict rules, max valid legs ≈ 2 × game count
+      // (1 total bet + 1 spread/ML per game, no conflicts allowed)
+      const currentBetTypes = Array.isArray(request.selectedBetTypes) ? request.selectedBetTypes : [];
+      const maxValidLegs = Math.max(2, oddsResult.odds.length * 2);
+      let addedPlayerProps = false;
+      
+      if (request.numLegs > maxValidLegs) {
+        console.log(`⚠️ WARNING: Requested ${request.numLegs} legs but only ${oddsResult.odds.length} games available.`);
+        console.log(`   With conflict rules (no opposing bets same game), max realistic legs: ${maxValidLegs}`);
+        
+        // Smart strategy: For single leg, just use ONE bet type to avoid conflicts
+        if (request.numLegs === 1) {
+          // Pick the first available bet type or default to spreads
+          const singleBetType = currentBetTypes[0] || 'spreads';
+          request.selectedBetTypes = [singleBetType];
+          console.log(`   ✅ Single leg requested: Using only ${singleBetType} to avoid conflicts`);
+        } else {
+          // For multiple legs, add player props to enable same-game parlays
+          console.log(`   📊 EXPANDING BET TYPES: Adding player props to fill remaining ${request.numLegs - maxValidLegs} legs`);
+          
+          if (!currentBetTypes.includes('player_props')) {
+            request.selectedBetTypes = [...currentBetTypes, 'player_props'];
+            addedPlayerProps = true;
+            console.log(`   ✅ Player props enabled to allow same-game parlays`);
+          }
+        }
+      }
+
       // Phase 2: Enhanced Research
     console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
     const tResearch0 = Date.now();
@@ -341,6 +369,12 @@ class MultiAgentCoordinator {
 
       let finalContent = sanitized;
       
+      // Add disclaimer if player props were auto-enabled
+      if (addedPlayerProps) {
+        const disclaimer = `\n\n---\n\n⚠️ **SAME-GAME PARLAY NOTICE**\n\nDue to limited games available (${oddsResult.odds.length} game${oddsResult.odds.length === 1 ? '' : 's'}), player props were automatically included to reach ${request.numLegs} legs. This parlay includes multiple bets from the same game(s). While this allows for more betting options, be aware that same-game parlays have correlated outcomes.\n\n**Conflict Prevention Rules Active:**\n- ✅ No opposing totals (Over/Under)\n- ✅ No opposing spreads\n- ✅ No Moneyline + Spread on same team\n- ✅ No duplicate bets\n\n---`;
+        finalContent = finalContent + disclaimer;
+      }
+      
       // Enhanced validation to catch actual conflicts (not same-game parlays)
   const validationResult = this.validateParlayContent(finalContent, enrichedGames);
       if (validationResult.hasConflicts) {
@@ -439,11 +473,9 @@ class MultiAgentCoordinator {
     }
   }
 
-        tAnalysisMs = Date.now() - tAnalysis0;
   validateParlayJson(legs, expectedCount) {
     const errors = [];
     if (!Array.isArray(legs)) {
-        const tPost0 = Date.now();
       return { ok: false, errors: ['legs is not an array'] };
     }
     if (legs.length !== expectedCount) {
@@ -499,7 +531,6 @@ class MultiAgentCoordinator {
         if (confMatch) {
           currentLeg.confidence = Math.max(currentLeg.confidence, parseInt(confMatch[1], 10));
         }
-        tPostMs = Date.now() - tPost0;
         const oddsMatch = line.match(/Odds:\s*([+\-]?\d{2,5}|EV|EVEN|PK|PICK)/i) || line.match(/\(([+\-]?\d{2,5}|EV|EVEN|PK|PICK)\)/i);
         if (oddsMatch && !currentLeg.odds) currentLeg.odds = oddsMatch[1];
       }
@@ -525,8 +556,7 @@ class MultiAgentCoordinator {
     const legMatches = [];
     let hasConflicts = false;
     let wrongDates = false;
-    let actualLegCount = 0;
-        console.log(`⏱️ Timings (ms): odds=${tOddsMs} research=${tResearchMs} analysis=${tAnalysisMs} post=${tPostMs} total=${totalMs}`);
+  let actualLegCount = 0;
     
     // Extract all leg information
     lines.forEach((line, index) => {

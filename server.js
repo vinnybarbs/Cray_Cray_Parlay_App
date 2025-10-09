@@ -51,6 +51,24 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Mirror health under /api for vite proxy convenience
+app.get('/api/health', (req, res) => {
+  const hasOddsKey = !!process.env.ODDS_API_KEY;
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const hasSerperKey = !!process.env.SERPER_API_KEY;
+  res.json({
+    status: 'ok',
+    environment: process.env.NODE_ENV || 'development',
+    port: PORT,
+    apis: {
+      odds: hasOddsKey,
+      openai: hasOpenAIKey,
+      serper: hasSerperKey
+    },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Debug endpoint to test Odds API directly
 app.get('/debug/odds-test', async (req, res) => {
   const ODDS_KEY = process.env.ODDS_API_KEY;
