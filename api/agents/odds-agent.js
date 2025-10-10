@@ -93,6 +93,27 @@ class TargetedOddsAgent {
       let currentBetTypes = [...selectedBetTypes];
       let primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, currentBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
       
+      // 🚨 CRITICAL: If we got 0 games, the bet type markets may not be available yet
+      if (primaryOdds.length === 0 && !currentBetTypes.includes('ALL')) {
+        const hasPlayerProps = currentBetTypes.some(bt => 
+          ['Player Props', 'TD Props'].includes(bt) || bt.startsWith('_player')
+        );
+        
+        if (hasPlayerProps) {
+          console.log(`🚨 Got 0 games with player props! Props may not be available yet for this date range.`);
+          console.log(`💡 Falling back to core markets (Moneyline/Spread, Totals)...`);
+        } else {
+          console.log(`🚨 Got 0 games! Falling back to core markets...`);
+        }
+        
+        currentBetTypes = ['Moneyline/Spread', 'Totals (O/U)'];
+        primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, currentBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
+        console.log(`📊 After fallback: ${primaryOdds.length} games available`);
+        request.marketExpanded = true;
+        request.selectedBetTypes = currentBetTypes;
+        request.fallbackReason = hasPlayerProps ? 'player-props-unavailable' : 'no-games-found';
+      }
+      
       // 🧠 SMART MARKET EXPANSION: Check if we have enough bet options
       const requiredBets = numLegs * 2; // Need 2x legs for safe selection
       const availableBets = primaryOdds.length;
@@ -210,17 +231,23 @@ class TargetedOddsAgent {
         m.startsWith('player_') || m.startsWith('team_')
       );
 
+      console.log(`  📋 Split: ${regularMarkets.length} regular markets, ${propMarkets.length} prop markets`);
+
       // Fetch regular and props in parallel (props skipped in fast mode)
       const tasks = [];
       let regularPromise = null;
       if (regularMarkets.length > 0) {
+        console.log(`  ⚡ Fetching regular markets: ${regularMarkets.slice(0, 3).join(', ')}${regularMarkets.length > 3 ? '...' : ''}`);
         regularPromise = this.fetchRegularMarkets(slug, bookmaker, regularMarkets, now, rangeEnd);
         tasks.push(regularPromise);
       }
       let propsPromise = null;
       if (!fastMode && propMarkets.length > 0) {
+        console.log(`  ⚡ Fetching player props (per-event): ${propMarkets.slice(0, 3).join(', ')}${propMarkets.length > 3 ? '...' : ''}`);
         propsPromise = this.fetchPropMarkets(slug, bookmaker, propMarkets, now, rangeEnd);
         tasks.push(propsPromise);
+      } else if (fastMode && propMarkets.length > 0) {
+        console.log(`  ⏩ Skipping ${propMarkets.length} prop markets (fast mode)`);
       }
       if (tasks.length > 0) {
         await Promise.allSettled(tasks);
@@ -309,8 +336,9 @@ class TargetedOddsAgent {
   async fetchRegularMarkets(slug, bookmaker, markets, now, rangeEnd) {
     const marketsStr = markets.join(',');
     // Use API's date filtering parameters to only get games in our time range
-    const commenceTimeFrom = now.toISOString();
-    const commenceTimeTo = rangeEnd.toISOString();
+    // Remove milliseconds from ISO string (API requires YYYY-MM-DDTHH:MM:SSZ format)
+    const commenceTimeFrom = now.toISOString().split('.')[0] + 'Z';
+    const commenceTimeTo = rangeEnd.toISOString().split('.')[0] + 'Z';
     const cacheKey = this.getCacheKey(slug, bookmaker, markets, commenceTimeFrom, commenceTimeTo);
     const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(marketsStr)}&oddsFormat=american&bookmakers=${bookmaker}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}&apiKey=${this.apiKey}`;
     
@@ -358,43 +386,73 @@ class TargetedOddsAgent {
   }
 
   async fetchPropMarkets(slug, bookmaker, markets, now, rangeEnd) {
+    console.log(`  🎯 Fetching player props for ${markets.length} markets using per-event endpoint`);
+    
+    // Step 1: Get all events (games) first using basic markets to get event IDs
+    console.log(`  📡 Step 1: Fetching events to get event IDs...`);
+    // Remove milliseconds from ISO string (API requires YYYY-MM-DDTHH:MM:SSZ format)
+    const commenceTimeFrom = now.toISOString().split('.')[0] + 'Z';
+    const commenceTimeTo = rangeEnd.toISOString().split('.')[0] + 'Z';
+    const eventsCacheKey = this.getCacheKey(slug, bookmaker, ['h2h'], commenceTimeFrom, commenceTimeTo);
+    const eventsUrl = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=h2h&oddsFormat=american&bookmakers=${bookmaker}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}&apiKey=${this.apiKey}`;
+    
+    let events = [];
+    try {
+      events = await this.fetchWithCache(eventsUrl, eventsCacheKey);
+      if (!Array.isArray(events) || events.length === 0) {
+        console.log(`  ⚠️ No events found for props`);
+        return [];
+      }
+      console.log(`  ✓ Found ${events.length} events`);
+    } catch (error) {
+      console.log(`  ❌ Failed to fetch events: ${error.message}`);
+      return [];
+    }
+    
+    // Step 2: Fetch props for each event using /events/{eventId}/odds endpoint
+    console.log(`  📡 Step 2: Fetching props for ${events.length} events...`);
     const propResults = [];
-    const marketBatches = this.chunkArray(markets, 3);
-    console.log(`  🎯 Fetching ${markets.length} prop markets in ${marketBatches.length} batches`);
-
-    // Run batches with limited concurrency to reduce total time while being polite to API
-    const concurrency = 2;
-    let index = 0;
+    const marketStr = markets.join(',');
+    
+    // Batch the event fetching with concurrency control
+    const concurrency = 3; // Fetch 3 events at a time
+    let eventIndex = 0;
+    
     const worker = async () => {
-      while (index < marketBatches.length) {
-        const myIndex = index++;
-        const batch = marketBatches[myIndex];
+      while (eventIndex < events.length) {
+        const myIndex = eventIndex++;
+        const event = events[myIndex];
+        
         try {
-          const batchStr = batch.join(',');
-          // Use API's date filtering parameters
-          const commenceTimeFrom = now.toISOString();
-          const commenceTimeTo = rangeEnd.toISOString();
-          const cacheKey = this.getCacheKey(slug, bookmaker, batch, commenceTimeFrom, commenceTimeTo);
-          const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(batchStr)}&oddsFormat=american&bookmakers=${bookmaker}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}&apiKey=${this.apiKey}`;
-          console.log(`    📡 Prop batch: ${batch.join(', ')}`);
-          const data = await this.fetchWithCache(url, cacheKey);
-          if (Array.isArray(data) && data.length > 0) {
-            propResults.push(...data);
-            console.log(`    ✓ Found ${data.length} prop games in batch`);
+          const eventId = event.id;
+          const propCacheKey = `event-${eventId}-${bookmaker}-${marketStr}`;
+          const propUrl = `https://api.the-odds-api.com/v4/sports/${slug}/events/${eventId}/odds/?regions=us&markets=${encodeURIComponent(marketStr)}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
+          
+          const eventData = await this.fetchWithCache(propUrl, propCacheKey);
+          
+          if (eventData && eventData.bookmakers && eventData.bookmakers.length > 0) {
+            // Merge prop markets into the base event data
+            const enrichedEvent = {
+              ...event,
+              bookmakers: eventData.bookmakers
+            };
+            propResults.push(enrichedEvent);
+            console.log(`    ✓ Event ${myIndex + 1}/${events.length}: ${event.away_team} @ ${event.home_team} - ${eventData.bookmakers[0].markets?.length || 0} prop markets`);
+          } else {
+            console.log(`    ⚠️ Event ${myIndex + 1}/${events.length}: No props for ${event.away_team} @ ${event.home_team}`);
           }
         } catch (error) {
-          console.log(`    ❌ Prop batch failed: ${error.message}`);
+          console.log(`    ❌ Event ${myIndex + 1}/${events.length} failed: ${error.message}`);
         }
       }
     };
-
-    const workers = Array.from({ length: Math.min(concurrency, marketBatches.length) }, () => worker());
+    
+    // Run workers in parallel
+    const workers = Array.from({ length: Math.min(concurrency, events.length) }, () => worker());
     await Promise.all(workers);
-
-    // Deduplicate results by game ID
-    const uniqueResults = Array.from(new Map(propResults.map(game => [game.id, game])).values());
-    console.log(`  ✓ Total prop results: ${uniqueResults.length} unique games`);
-    return uniqueResults;
+    
+    console.log(`  ✓ Total prop results: ${propResults.length} events with player props`);
+    return propResults;
   }
 
   async tryFallbacks(primaryBook, existingOdds, request, now, rangeEnd) {

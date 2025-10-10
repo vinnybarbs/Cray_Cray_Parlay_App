@@ -3,6 +3,53 @@ const { TargetedOddsAgent } = require('./odds-agent');
 const { EnhancedResearchAgent } = require('./research-agent');
 const { ParlayAnalyst } = require('./analyst-agent');
 
+// Market filtering to enforce bet type selection
+const MARKET_MAPPING = {
+  'Moneyline/Spread': ['h2h', 'spreads'],
+  'Totals (O/U)': ['totals'],
+  'Player Props': [
+    'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
+    'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
+    'player_receptions', 'player_reception_yds', 'player_reception_tds',
+    'player_points', 'player_rebounds', 'player_assists', 'player_threes',
+    'player_shots_on_goal', 'player_goals',
+    'batter_hits', 'batter_home_runs', 'pitcher_strikeouts'
+  ],
+  'TD Props': [
+    'player_pass_tds', 'player_rush_tds', 'player_reception_tds',
+    'player_anytime_td', 'player_1st_td', 'player_last_td'
+  ],
+  'Team Props': ['team_totals']
+};
+
+// Filter games to only include selected bet types
+function filterMarketsByBetTypes(games, selectedBetTypes) {
+  if (!selectedBetTypes || selectedBetTypes.length === 0 || selectedBetTypes.includes('ALL')) {
+    return games; // No filtering if ALL selected
+  }
+  
+  // Get all allowed market keys from selected bet types
+  const allowedMarkets = new Set();
+  selectedBetTypes.forEach(betType => {
+    const markets = MARKET_MAPPING[betType] || [];
+    markets.forEach(m => allowedMarkets.add(m));
+  });
+  
+  console.log(`🔍 Filtering markets to ONLY: ${Array.from(allowedMarkets).join(', ')}`);
+  
+  // Filter each game's bookmakers and markets
+  return games.map(game => {
+    const filteredBookmakers = (game.bookmakers || []).map(bookmaker => {
+      const filteredMarkets = (bookmaker.markets || []).filter(market => 
+        allowedMarkets.has(market.key)
+      );
+      return { ...bookmaker, markets: filteredMarkets };
+    }).filter(bookmaker => bookmaker.markets.length > 0);
+    
+    return { ...game, bookmakers: filteredBookmakers };
+  }).filter(game => game.bookmakers.length > 0);
+}
+
 // Odds calculation functions
 function americanToDecimal(americanOdds) {
   const odds = parseInt(americanOdds);
@@ -220,6 +267,22 @@ class MultiAgentCoordinator {
       const researchedCount = enrichedGames.filter(g => g.research).length;
       console.log(`✅ Research Phase Complete: ${researchedCount}/${enrichedGames.length} games researched`);
 
+      // Phase 2.5: Filter markets to ONLY selected bet types
+      console.log(`🔍 BEFORE FILTER: ${enrichedGames.length} games, selectedBetTypes: ${JSON.stringify(request.selectedBetTypes)}`);
+      let filteredGames;
+      try {
+        filteredGames = filterMarketsByBetTypes(enrichedGames, request.selectedBetTypes);
+        console.log(`🎯 AFTER FILTER: ${filteredGames.length} games with selected bet types`);
+      } catch (filterError) {
+        console.error('❌ ERROR IN FILTERING:', filterError);
+        throw filterError;
+      }
+      
+      if (!filteredGames || filteredGames.length === 0) {
+        console.warn(`⚠️ No games after filtering. Using unfiltered games.`);
+        filteredGames = enrichedGames; // Fallback to unfiltered
+      }
+
       // Phase 3: AI Parlay Analysis with Retry Mechanism
     console.log('\n🧠 PHASE 3: AI PARLAY ANALYSIS');
   let aiContent = '';
@@ -237,7 +300,7 @@ class MultiAgentCoordinator {
           selectedBetTypes: request.selectedBetTypes,
           numLegs: request.numLegs,
           riskLevel: request.riskLevel,
-          oddsData: enrichedGames,
+          oddsData: filteredGames, // Use filtered games instead of enrichedGames
           unavailableInfo: [],
           dateRange: request.dateRange,
           aiModel: request.aiModel,
