@@ -1,30 +1,78 @@
 import React, { useState, useCallback } from 'react';
 
-// Simple Phase Progress component
-const PhaseProgress = ({ loading, progress, timings }) => {
-  const phases = ['Odds', 'Research', 'Analysis', 'Post'];
+// Enhanced Phase Progress component with detailed status
+const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
+  const phases = [
+    { key: 'odds', label: 'Odds', icon: '📊' },
+    { key: 'research', label: 'Research', icon: '🔍' },
+    { key: 'analysis', label: 'Analysis', icon: '🧠' },
+    { key: 'post', label: 'Post', icon: '✨' }
+  ];
+  
   return (
-    <div className="mt-4 p-3 rounded-xl bg-gray-800 border border-gray-700">
-      <div className="text-sm font-semibold text-gray-300 mb-2">Generation Progress</div>
-      <div className="flex items-center space-x-3">
-        {phases.map((p, idx) => {
+    <div className="mt-4 p-4 rounded-xl bg-gray-800 border border-gray-700">
+      <div className="text-sm font-semibold text-gray-300 mb-3">Generation Progress</div>
+      
+      {/* Phase indicators */}
+      <div className="flex items-center justify-between mb-3">
+        {phases.map((phase, idx) => {
           const isActive = loading && progress === idx;
-          const isDone = !loading && timings;
+          const isDone = phaseData?.[phase.key]?.complete || (!loading && timings);
+          
           return (
-            <div key={p} className="flex items-center space-x-1">
-              <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-yellow-400 animate-pulse' : 'bg-gray-600'}`}></div>
-              <span className="text-xs text-gray-400">{p}</span>
+            <div key={phase.key} className="flex flex-col items-center space-y-1 flex-1">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
+                isDone ? 'bg-green-600' : isActive ? 'bg-yellow-400 animate-pulse' : 'bg-gray-700'
+              }`}>
+                {isDone ? '✓' : phase.icon}
+              </div>
+              <span className={`text-xs ${isDone || isActive ? 'text-gray-300' : 'text-gray-500'}`}>
+                {phase.label}
+              </span>
+              {isActive && (
+                <span className="text-xs text-yellow-400 animate-pulse">Running...</span>
+              )}
             </div>
           );
         })}
       </div>
+      
+      {/* Detailed phase information */}
+      {phaseData && !loading && (
+        <div className="mt-3 pt-3 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs">
+          {phaseData.odds && (
+            <div className="text-gray-400">
+              📊 Odds: {phaseData.odds.games} games ({phaseData.odds.quality}% quality)
+            </div>
+          )}
+          {phaseData.research && (
+            <div className="text-gray-400">
+              🔍 Research: {phaseData.research.researched}/{phaseData.research.total} games
+            </div>
+          )}
+          {phaseData.analysis && (
+            <div className="text-gray-400">
+              🧠 AI: {phaseData.analysis.model} ({phaseData.analysis.attempts} attempt{phaseData.analysis.attempts > 1 ? 's' : ''})
+            </div>
+          )}
+          {phaseData.postProcessing && (
+            <div className="text-gray-400">
+              ✨ Post: Validated & formatted
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Timing details */}
       {timings && (
-        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-gray-400">
-          <div>Odds: {timings.oddsMs} ms</div>
-          <div>Research: {timings.researchMs} ms</div>
-          <div>Analysis: {timings.analysisMs} ms</div>
-          <div>Post: {timings.postProcessingMs} ms</div>
-          <div className="col-span-2">Total: {timings.totalMs} ms</div>
+        <div className="mt-3 pt-3 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs text-gray-400">
+          <div>⏱️ Odds: {timings.oddsMs}ms</div>
+          <div>⏱️ Research: {timings.researchMs}ms</div>
+          <div>⏱️ Analysis: {timings.analysisMs}ms</div>
+          <div>⏱️ Post: {timings.postProcessingMs}ms</div>
+          <div className="col-span-2 font-semibold text-green-400">
+            ⚡ Total: {(timings.totalMs / 1000).toFixed(1)}s
+          </div>
         </div>
       )}
     </div>
@@ -254,6 +302,7 @@ const App = () => {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [progressPhase, setProgressPhase] = useState(0);
   const [timings, setTimings] = useState(null);
+  const [phaseData, setPhaseData] = useState(null);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...", "Bribing the refs for insider info...", "Sacrificing a prop bet to the degen gods...",
@@ -347,10 +396,21 @@ const App = () => {
     setLoading(true);
     setResults('');
     setError(null);
+    setPhaseData(null);
+    setTimings(null);
     setLoadingMessage(getRandomLoadingMessage());
 
     try {
       setProgressPhase(0);
+      
+      // Simulate progress updates during loading (since we don't have streaming)
+      const progressInterval = setInterval(() => {
+        setProgressPhase(prev => {
+          if (prev < 3) return prev + 1;
+          return 0; // Loop back to create animation
+        });
+      }, 3000); // Update every 3 seconds
+      
       const response = await fetch('/api/generate-parlay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -365,6 +425,8 @@ const App = () => {
         })
       });
 
+      clearInterval(progressInterval); // Stop the animation
+      
       if (!response.ok) {
         let errText = await response.text();
         try {
@@ -377,6 +439,8 @@ const App = () => {
       const data = await response.json();
       if (!data.content) throw new Error('No content returned from AI');
       setTimings(data.metadata?.timings || null);
+      setPhaseData(data.metadata?.phases || null);
+      setProgressPhase(3); // Set to last phase
       setResults(data.content);
     } catch (e) {
       setError(`Failed to generate parlays: ${e.message}`);
@@ -566,7 +630,7 @@ const App = () => {
 
       {/* Generation Progress at Bottom */}
       <div className="max-w-2xl mx-auto mt-8">
-        <PhaseProgress loading={loading} progress={progressPhase} timings={timings} />
+        <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
       </div>
     </div>
   );

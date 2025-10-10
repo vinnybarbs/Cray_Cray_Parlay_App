@@ -439,6 +439,12 @@ class MultiAgentCoordinator {
         researchedGames: researchedCount,
         totalGames: enrichedGames.length,
         aiModel: request.aiModel,
+        phases: {
+          odds: { complete: true, games: oddsResult.odds.length, quality: oddsResult.dataQuality },
+          research: { complete: true, researched: researchedCount, total: enrichedGames.length },
+          analysis: { complete: true, attempts: attempts, model: request.aiModel },
+          postProcessing: { complete: true }
+        },
         timings: {
           oddsMs: tOddsMs,
           researchMs: tResearchMs,

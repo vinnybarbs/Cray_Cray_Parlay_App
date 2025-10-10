@@ -48,11 +48,11 @@ class ParlayAnalyst {
           }).join('\n   ');
         }
 
-        // Add research context if available (condensed)
+        // Add research context if available (expanded for better insights)
         let researchSummary = '';
         if (ev.research) {
-          // Extract key injury/performance insights (first 200 chars)
-          const shortResearch = ev.research.substring(0, 200).replace(/\s+/g, ' ').trim();
+          // Extract key injury/performance insights (first 450 chars for more detail)
+          const shortResearch = ev.research.substring(0, 450).replace(/\s+/g, ' ').trim();
           if (shortResearch) {
             researchSummary = `\n   Context: ${shortResearch}...`;
           }
