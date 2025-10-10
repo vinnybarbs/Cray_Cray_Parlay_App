@@ -6,8 +6,8 @@ const express = require('express');
 const cors = require('cors');
 const generateParlayHandler = require('./api/generate-parlay');
 const { logger } = require('./shared/logger');
-const { parlayRateLimiter, generalRateLimiter } = require('./api/middleware/rateLimiter');
-const { validateParlayRequest, sanitizeInput } = require('./api/middleware/validation');
+const { parlayRateLimiter, generalRateLimiter } = require('./lib/middleware/rateLimiter');
+const { validateParlayRequest, sanitizeInput } = require('./lib/middleware/validation');
 
 const app = express();
 const PORT = process.env.PORT || 5001;

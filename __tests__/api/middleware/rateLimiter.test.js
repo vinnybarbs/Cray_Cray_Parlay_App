@@ -1,4 +1,4 @@
-const { RateLimiter } = require('../../../api/middleware/rateLimiter');
+const { RateLimiter } = require('../../../lib/middleware/rateLimiter');
 
 describe('Rate Limiter', () => {
   let rateLimiter, req, res, next;

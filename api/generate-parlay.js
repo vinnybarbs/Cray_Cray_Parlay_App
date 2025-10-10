@@ -1,5 +1,5 @@
 // Multi-Agent Parlay Generation API
-const { MultiAgentCoordinator } = require('./agents/coordinator');
+const { MultiAgentCoordinator } = require('../lib/agents/coordinator');
 const { SPORT_SLUGS, MARKET_MAPPING, BOOKMAKER_MAPPING } = require('../shared/constants');
 const { calculateParlay } = require('../shared/oddsCalculations');
 const { createLogger } = require('../shared/logger');

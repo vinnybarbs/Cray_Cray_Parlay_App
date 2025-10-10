@@ -1,4 +1,4 @@
-const { validateParlayRequest, sanitizeInput } = require('../../../api/middleware/validation');
+const { validateParlayRequest, sanitizeInput } = require('../../../lib/middleware/validation');
 
 describe('Validation Middleware', () => {
   let req, res, next;
