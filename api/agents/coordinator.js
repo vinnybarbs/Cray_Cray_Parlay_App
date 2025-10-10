@@ -205,36 +205,10 @@ class MultiAgentCoordinator {
       
       console.log(`✅ Odds Phase Complete: ${oddsResult.odds.length} games, ${oddsResult.dataQuality}% quality`);
       console.log(`📊 Source: ${oddsResult.source}${oddsResult.fallbackUsed ? ' (fallback used)' : ''}`);
-
-      // Smart bet type expansion: with conflict rules, max valid legs ≈ 2 × game count
-      // (1 total bet + 1 spread/ML per game, no conflicts allowed)
-      const currentBetTypes = Array.isArray(request.selectedBetTypes) ? request.selectedBetTypes : [];
-      const userSelectedMultipleBetTypes = currentBetTypes.length > 1; // User intentionally selected multiple types
-      const maxValidLegs = Math.max(2, oddsResult.odds.length * 2);
-      let addedPlayerPropsAutomatically = false;
       
-      if (request.numLegs > maxValidLegs) {
-        console.log(`⚠️ WARNING: Requested ${request.numLegs} legs but only ${oddsResult.odds.length} games available.`);
-        console.log(`   With conflict rules (no opposing bets same game), max realistic legs: ${maxValidLegs}`);
-        
-        // Smart strategy: For single leg, just use ONE bet type to avoid conflicts
-        if (request.numLegs === 1) {
-          // Pick the first available bet type or default to spreads
-          const singleBetType = currentBetTypes[0] || 'spreads';
-          request.selectedBetTypes = [singleBetType];
-          console.log(`   ✅ Single leg requested: Using only ${singleBetType} to avoid conflicts`);
-        } else if (!userSelectedMultipleBetTypes) {
-          // Only auto-add player props if user didn't already select multiple bet types
-          console.log(`   📊 EXPANDING BET TYPES: Adding player props to fill remaining ${request.numLegs - maxValidLegs} legs`);
-          
-          if (!currentBetTypes.includes('player_props')) {
-            request.selectedBetTypes = [...currentBetTypes, 'player_props'];
-            addedPlayerPropsAutomatically = true;
-            console.log(`   ✅ Player props automatically enabled to allow same-game parlays`);
-          }
-        } else {
-          console.log(`   ℹ️ User selected multiple bet types - no auto-expansion needed`);
-        }
+      // Check if Odds Agent expanded markets automatically
+      if (oddsResult.marketExpanded) {
+        console.log(`⚡ Odds Agent auto-expanded markets to ensure sufficient bet options`);
       }
 
       // Phase 2: Enhanced Research
@@ -374,9 +348,9 @@ class MultiAgentCoordinator {
 
       let finalContent = sanitized;
       
-      // Add disclaimer ONLY if we automatically added player props (not if user selected multiple bet types themselves)
-      if (addedPlayerPropsAutomatically) {
-        const disclaimer = `\n\n---\n\n⚠️ **SAME-GAME PARLAY NOTICE**\n\nDue to limited games available (${oddsResult.odds.length} game${oddsResult.odds.length === 1 ? '' : 's'}), player props were automatically included to reach ${request.numLegs} legs. This parlay includes multiple bets from the same game(s). While this allows for more betting options, be aware that same-game parlays have correlated outcomes.\n\n**Conflict Prevention Rules Active:**\n- ✅ No opposing totals (Over/Under)\n- ✅ No opposing spreads\n- ✅ No Moneyline + Spread on same team\n- ✅ No duplicate bets\n\n---`;
+      // Add disclaimer ONLY if Odds Agent automatically expanded markets
+      if (oddsResult.marketExpanded) {
+        const disclaimer = `\n\n---\n\n⚠️ **SAME-GAME PARLAY NOTICE**\n\nDue to limited games available (${oddsResult.odds.length} game${oddsResult.odds.length === 1 ? '' : 's'}), additional bet types were automatically included to reach ${request.numLegs} legs. This parlay includes multiple bets from the same game(s). While this allows for more betting options, be aware that same-game parlays have correlated outcomes.\n\n**Conflict Prevention Rules Active:**\n- ✅ No opposing totals (Over/Under)\n- ✅ No opposing spreads\n- ✅ No Moneyline + Spread on same team\n- ✅ No duplicate bets\n\n---`;
         finalContent = finalContent + disclaimer;
       }
       

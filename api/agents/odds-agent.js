@@ -61,8 +61,43 @@ class TargetedOddsAgent {
     
     try {
       // Try primary book first
-  const capCount = Math.max(10, (parseInt(request.numLegs) || 6) * 2);
-  const primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, selectedBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
+      const capCount = Math.max(10, (parseInt(request.numLegs) || 6) * 2);
+      let currentBetTypes = [...selectedBetTypes];
+      let primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, currentBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
+      
+      // 🧠 SMART MARKET EXPANSION: Check if we have enough bet options
+      const requiredBets = numLegs * 2; // Need 2x legs for safe selection
+      const availableBets = primaryOdds.length;
+      
+      console.log(`📊 Initial fetch: ${availableBets} bets available, need ${requiredBets} for ${numLegs} legs`);
+      
+      if (availableBets < requiredBets && !currentBetTypes.includes('ALL')) {
+        console.log(`⚡ Insufficient bets! Auto-expanding markets...`);
+        
+        // Expand to include player props if not already included
+        if (!currentBetTypes.includes('player_props') && !currentBetTypes.includes('All') && !currentBetTypes.includes('all')) {
+          currentBetTypes.push('player_props');
+          console.log(`➕ Added player_props to bet types`);
+          
+          // Re-fetch with expanded markets
+          primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, currentBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
+          console.log(`📊 After adding player_props: ${primaryOdds.length} bets available`);
+        }
+        
+        // If still insufficient, add team props
+        if (primaryOdds.length < requiredBets && !currentBetTypes.includes('team_props')) {
+          currentBetTypes.push('team_props');
+          console.log(`➕ Added team_props to bet types`);
+          
+          // Re-fetch with further expanded markets
+          primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, currentBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
+          console.log(`📊 After adding team_props: ${primaryOdds.length} bets available`);
+        }
+        
+        // Update request with expanded bet types for downstream agents
+        request.selectedBetTypes = currentBetTypes;
+        request.marketExpanded = true;
+      }
       
       if (this.hasSufficientData(primaryOdds, numLegs)) {
         console.log(`✅ Primary book ${oddsPlatform} has sufficient data`);
@@ -71,11 +106,12 @@ class TargetedOddsAgent {
           source: oddsPlatform,
           fallbackUsed: false,
           dataQuality: this.calculateDataQuality(primaryOdds),
-          cached: this.cache.size > 0 ? `${this.cache.size} entries` : 'none'
+          cached: this.cache.size > 0 ? `${this.cache.size} entries` : 'none',
+          marketExpanded: request.marketExpanded || false
         };
       } else {
         console.log(`⚠️ Primary book ${oddsPlatform} insufficient data, trying fallbacks`);
-  return await this.tryFallbacks(primaryBook, primaryOdds, request, now, rangeEnd);
+        return await this.tryFallbacks(primaryBook, primaryOdds, request, now, rangeEnd);
       }
       
     } catch (error) {
@@ -227,37 +263,27 @@ class TargetedOddsAgent {
   async fetchRegularMarkets(slug, bookmaker, markets, now, rangeEnd) {
     const marketsStr = markets.join(',');
     const cacheKey = this.getCacheKey(slug, bookmaker, markets);
-    const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(marketsStr)}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
+    // Use API's date filtering parameters to only get games in our time range
+    const commenceTimeFrom = now.toISOString();
+    const commenceTimeTo = rangeEnd.toISOString();
+    const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(marketsStr)}&oddsFormat=american&bookmakers=${bookmaker}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}&apiKey=${this.apiKey}`;
     
     try {
       console.log(`  📡 Regular markets: ${markets.join(', ')}`);
+      console.log(`  📅 Date filter: ${commenceTimeFrom} to ${commenceTimeTo}`);
       
       // Use cached/deduplicated fetch
       const data = await this.fetchWithCache(url, cacheKey);
       
       if (Array.isArray(data) && data.length > 0) {
-        console.log(`  📊 Raw API returned ${data.length} games`);
+        console.log(`  ✓ API returned ${data.length} games in date range`);
         
-        // Debug: Log first game structure
-        if (data[0]) {
-          const firstGame = data[0];
-          console.log(`  🎯 First game: ${firstGame.away_team} @ ${firstGame.home_team}`);
-          console.log(`  📅 Game time: ${firstGame.commence_time}`);
-          if (firstGame.bookmakers && firstGame.bookmakers[0]) {
-            const bm = firstGame.bookmakers[0];
-            console.log(`  💰 Markets: ${bm.markets ? bm.markets.map(m => m.key).join(', ') : 'none'}`);
-          }
-        }
-        
-        const upcoming = data.filter(game => {
-          const gameTime = new Date(game.commence_time);
-          const isInRange = gameTime > now && gameTime < rangeEnd;
-          console.log(`    ${game.away_team} @ ${game.home_team}: ${gameTime.toLocaleString()} - In range: ${isInRange}`);
-          return isInRange;
+        // Debug: Log first few games
+        data.slice(0, 3).forEach(game => {
+          console.log(`    ${game.away_team} @ ${game.home_team}: ${new Date(game.commence_time).toLocaleString()}`);
         });
         
-        console.log(`  ✓ Found ${upcoming.length} games in time range`);
-        return upcoming;
+        return data;
       } else {
         console.log(`  ⚠️ API returned no games or invalid data`);
       }
@@ -292,16 +318,15 @@ class TargetedOddsAgent {
         try {
           const batchStr = batch.join(',');
           const cacheKey = this.getCacheKey(slug, bookmaker, batch);
-          const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(batchStr)}&oddsFormat=american&bookmakers=${bookmaker}&apiKey=${this.apiKey}`;
+          // Use API's date filtering parameters
+          const commenceTimeFrom = now.toISOString();
+          const commenceTimeTo = rangeEnd.toISOString();
+          const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(batchStr)}&oddsFormat=american&bookmakers=${bookmaker}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}&apiKey=${this.apiKey}`;
           console.log(`    📡 Prop batch: ${batch.join(', ')}`);
           const data = await this.fetchWithCache(url, cacheKey);
           if (Array.isArray(data) && data.length > 0) {
-            const upcoming = data.filter(game => {
-              const gameTime = new Date(game.commence_time);
-              return gameTime > now && gameTime < rangeEnd;
-            });
-            propResults.push(...upcoming);
-            console.log(`    ✓ Found ${upcoming.length} prop games in batch`);
+            propResults.push(...data);
+            console.log(`    ✓ Found ${data.length} prop games in batch`);
           }
         } catch (error) {
           console.log(`    ❌ Prop batch failed: ${error.message}`);
