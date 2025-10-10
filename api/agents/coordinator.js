@@ -189,10 +189,14 @@ class MultiAgentCoordinator {
     console.log('='.repeat(80));
     const tStart = Date.now();
     let tOddsMs = 0, tResearchMs = 0, tAnalysisMs = 0, tPostMs = 0;
+    const requestId = request.requestId; // Get requestId from request
 
     try {
       // Phase 1: Targeted Odds Collection
     console.log('\n🏗️ PHASE 1: TARGETED ODDS COLLECTION');
+    if (requestId && global.emitProgress) {
+      global.emitProgress(requestId, 'odds', 'active', { message: 'Fetching odds data...' });
+    }
     const tOdds0 = Date.now();
   const oddsResult = await this.oddsAgent.fetchOddsForSelectedBook(request);
     tOddsMs = Date.now() - tOdds0;
@@ -208,9 +212,19 @@ class MultiAgentCoordinator {
       if (oddsResult.marketExpanded) {
         console.log(`⚡ Odds Agent auto-expanded markets to ensure sufficient bet options`);
       }
+      
+      if (requestId && global.emitProgress) {
+        global.emitProgress(requestId, 'odds', 'complete', { 
+          gameCount: oddsResult.odds.length,
+          source: oddsResult.source
+        });
+      }
 
       // Phase 2: Enhanced Research
     console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
+    if (requestId && global.emitProgress) {
+      global.emitProgress(requestId, 'research', 'active', { message: 'Researching games...' });
+    }
     const tResearch0 = Date.now();
   const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds, { 
       fastMode: !!request.fastMode,
@@ -221,6 +235,13 @@ class MultiAgentCoordinator {
       
       const researchedCount = enrichedGames.filter(g => g.research).length;
       console.log(`✅ Research Phase Complete: ${researchedCount}/${enrichedGames.length} games researched`);
+      
+      if (requestId && global.emitProgress) {
+        global.emitProgress(requestId, 'research', 'complete', { 
+          researchedCount,
+          totalGames: enrichedGames.length
+        });
+      }
 
       // Phase 2.5: Filter markets to ONLY selected bet types
       console.log(`🔍 BEFORE FILTER: ${enrichedGames.length} games, selectedBetTypes: ${JSON.stringify(request.selectedBetTypes)}`);
@@ -240,6 +261,9 @@ class MultiAgentCoordinator {
 
       // Phase 3: AI Parlay Analysis with Retry Mechanism
     console.log('\n🧠 PHASE 3: AI PARLAY ANALYSIS');
+    if (requestId && global.emitProgress) {
+      global.emitProgress(requestId, 'analysis', 'active', { message: 'AI analyzing picks...' });
+    }
   let aiContent = '';
   let attempts = 0;
   const maxAttempts = 1; // Reduced to 1 attempt for faster response (was 2-3)
@@ -318,6 +342,13 @@ class MultiAgentCoordinator {
         }
   }
   tAnalysisMs = Date.now() - tAnalysis0;
+  
+  if (requestId && global.emitProgress) {
+    global.emitProgress(requestId, 'analysis', 'complete', { 
+      attempts,
+      timeMs: tAnalysisMs
+    });
+  }
 
   // Phase 4: Post-Processing & Validation
   console.log('\n🔧 PHASE 4: POST-PROCESSING & VALIDATION');

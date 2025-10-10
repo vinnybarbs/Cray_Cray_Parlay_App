@@ -677,6 +677,9 @@ async function handler(req, res) {
     console.log(`AI Model: ${aiModel} | Date Range: ${dateRange} days`);
     console.log('='.repeat(60) + '\n');
 
+    // Generate unique request ID for progress tracking
+    const requestId = `parlay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     // Initialize multi-agent coordinator
     const coordinator = new MultiAgentCoordinator(fetcher, apiKeys);
 
@@ -689,7 +692,8 @@ async function handler(req, res) {
       aiModel,
       riskLevel,
       dateRange,
-      fastMode
+      fastMode,
+      requestId  // Pass requestId for progress tracking
     });
 
     console.log('✅ Multi-agent parlay generation successful!\n');
