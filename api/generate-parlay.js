@@ -1,98 +1,10 @@
 // Multi-Agent Parlay Generation API
 const { MultiAgentCoordinator } = require('./agents/coordinator');
+const { SPORT_SLUGS, MARKET_MAPPING, BOOKMAKER_MAPPING } = require('../shared/constants');
+const { calculateParlay } = require('../shared/oddsCalculations');
+const { createLogger } = require('../shared/logger');
 
-const SPORT_SLUGS = {
-  NFL: 'americanfootball_nfl',
-  NBA: 'basketball_nba',
-  MLB: 'baseball_mlb',
-  NHL: 'icehockey_nhl',
-  Soccer: 'soccer_epl',
-  NCAAF: 'americanfootball_ncaaf',
-  'PGA/Golf': 'golf_pga',
-  Tennis: 'tennis_atp',
-  UFC: 'mma_ufc',
-};
-
-// Valid market keys per The Odds API documentation
-// https://the-odds-api.com/sports-odds-data/betting-markets.html
-const MARKET_MAPPING = {
-  // User-selectable bet types
-  'Moneyline/Spread': ['h2h', 'spreads'],
-  'Totals (O/U)': ['totals'],
-  'Player Props': [
-    // NFL/Football player props
-    'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
-    'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
-    'player_receptions', 'player_reception_yds', 'player_reception_tds',
-    // Basketball player props
-    'player_points', 'player_rebounds', 'player_assists', 'player_threes',
-    // Hockey player props  
-    'player_shots_on_goal', 'player_goals',
-    // Baseball player props
-    'batter_hits', 'batter_home_runs', 'pitcher_strikeouts'
-  ],
-  'TD Props': [
-    // Valid touchdown markets per API docs
-    'player_pass_tds',        // Pass TDs (Over/Under)
-    'player_rush_tds',        // Rush TDs (Over/Under) 
-    'player_reception_tds',   // Reception TDs (Over/Under)
-    'player_anytime_td',      // Anytime TD Scorer (Yes/No)
-    'player_1st_td',          // 1st TD Scorer (Yes/No)
-    'player_last_td'          // Last TD Scorer (Yes/No)
-  ],
-  'Team Props': ['team_totals'],
-  // Internal keys for smart auto-expansion (not user-selectable)
-  '_player_props': [
-    'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds',
-    'player_pass_tds', 'player_anytime_td'
-  ],
-  '_team_props': ['team_totals'],
-};
-
-const BOOKMAKER_MAPPING = {
-  DraftKings: 'draftkings',
-  FanDuel: 'fanduel',
-  MGM: 'mgm',
-  Caesars: 'caesars',
-  Bet365: 'bet365',
-};
-
-// Odds calculation functions
-function americanToDecimal(americanOdds) {
-  const odds = parseInt(americanOdds);
-  if (odds > 0) {
-    return (odds / 100) + 1;
-  } else {
-    return (100 / Math.abs(odds)) + 1;
-  }
-}
-
-function decimalToAmerican(decimalOdds) {
-  if (decimalOdds >= 2) {
-    return '+' + Math.round((decimalOdds - 1) * 100);
-  } else {
-    return '-' + Math.round(100 / (decimalOdds - 1));
-  }
-}
-
-function calculateParlay(oddsArray) {
-  // Convert all odds to decimal and multiply
-  const decimalOdds = oddsArray.map(odds => americanToDecimal(odds));
-  const combinedDecimal = decimalOdds.reduce((acc, curr) => acc * curr, 1);
-  
-  // Convert back to American odds
-  const combinedAmerican = decimalToAmerican(combinedDecimal);
-  
-  // Calculate payout on $100
-  const profit = Math.round((combinedDecimal - 1) * 100);
-  const payout = Math.round(combinedDecimal * 100); // total return on $100
-  
-  return {
-    combinedOdds: combinedAmerican,
-    payout: payout,
-    profit
-  };
-}
+const logger = createLogger('GenerateParlay');
 
 // Build a mock result for local/dev without external APIs
 function buildMockParlayResponse({ aiModel = 'mock', selectedSports = ['NFL'], selectedBetTypes = ['Moneyline/Spread'], numLegs = 3 }) {
@@ -162,21 +74,14 @@ ${legs}
 
 // NEW: Research function using Serper API
 async function fetchGameResearch(games, fetcher) {
-  console.log('🔍 Checking SERPER_API_KEY...');
-  console.log('Key exists:', !!process.env.SERPER_API_KEY);
-  console.log('Key length:', process.env.SERPER_API_KEY?.length);
-  console.log('Key preview:', process.env.SERPER_API_KEY?.substring(0, 10) + '...');
-  
   const SERPER_API_KEY = process.env.SERPER_API_KEY;
   
   if (!SERPER_API_KEY) {
-    console.log('⚠️  No SERPER_API_KEY - skipping research enhancement');
+    logger.warn('SERPER_API_KEY not found - skipping research enhancement');
     return games.map(g => ({ ...g, research: null }));
   }
   
-  console.log('✅ SERPER_API_KEY loaded successfully');
-
-  console.log(`\n🔍 Researching top ${Math.min(games.length, 10)} games...`);
+  logger.info('Starting game research', { gameCount: Math.min(games.length, 10) });
   const enrichedGames = [];
   
   // Research top 30 games to save API quota
@@ -193,39 +98,35 @@ async function fetchGameResearch(games, fetcher) {
         },
         body: JSON.stringify({
           q: query,
-          num: 3
         })
       });
 
       if (response.ok) {
         const data = await response.json();
-        
-        // Extract insights from top results
-        const insights = data.organic?.slice(0, 3)
-          .map(result => result.snippet)
-          .filter(Boolean)
-          .join(' | ') || null;
-        
-        enrichedGames.push({
-          ...game,
-          research: insights
-        });
-        
-        console.log(`  ✓ ${game.away_team} @ ${game.home_team}`);
+        const organic = data.organic || [];
+        const snippets = organic.slice(0, 3).map(r => r.snippet || '').join(' ');
+        enrichedGames.push({ ...game, research: snippets || null });
       } else {
         enrichedGames.push({ ...game, research: null });
-        console.log(`  ⚠️  ${game.away_team} @ ${game.home_team} - API error`);
       }
-    } catch (err) {
+    } catch (error) {
+      logger.error('Research failed for game', { 
+        game: `${game.away_team} vs ${game.home_team}`,
+        error: error.message 
+      });
       enrichedGames.push({ ...game, research: null });
-      console.log(`  ✗ ${game.away_team} @ ${game.home_team} - ${err.message}`);
     }
   }
+  
+  const enrichedCount = enrichedGames.filter(g => g.research).length;
+  logger.info('Research complete', { 
+    enrichedCount, 
+    totalCount: enrichedGames.length 
+  });
   
   // Add remaining games without research
   enrichedGames.push(...games.slice(30).map(g => ({ ...g, research: null })));
   
-  console.log(`✓ Research complete (${enrichedGames.filter(g => g.research).length} games enriched)\n`);
   return enrichedGames;
 }
 
@@ -696,19 +597,20 @@ async function handler(req, res) {
     gemini: process.env.GEMINI_API_KEY
   };
 
-  console.log('\n🔍 ENVIRONMENT CHECK:');
-  console.log(`ODDS_KEY exists: ${!!apiKeys.odds} (length: ${apiKeys.odds?.length || 0})`);
-  console.log(`OPENAI_KEY exists: ${!!apiKeys.openai} (length: ${apiKeys.openai?.length || 0})`);
-  console.log(`SERPER_KEY exists: ${!!apiKeys.serper} (length: ${apiKeys.serper?.length || 0})`);
-  console.log(`GEMINI_KEY exists: ${!!apiKeys.gemini} (length: ${apiKeys.gemini?.length || 0})`);
-  console.log(`NODE_ENV: ${process.env.NODE_ENV || 'undefined'}`);
+  logger.debug('Environment check', {
+    hasOddsKey: !!apiKeys.odds,
+    hasOpenAIKey: !!apiKeys.openai,
+    hasSerperKey: !!apiKeys.serper,
+    hasGeminiKey: !!apiKeys.gemini,
+    nodeEnv: process.env.NODE_ENV || 'undefined'
+  });
 
   const mockMode = String(process.env.MOCK_MODE || '').toLowerCase() === '1' || String(process.env.MOCK_MODE || '').toLowerCase() === 'true';
 
   if (!apiKeys.odds) {
-    console.log('❌ CRITICAL: Missing ODDS_API_KEY in environment');
+    logger.error('Missing ODDS_API_KEY');
     if (mockMode || req.body?.mock) {
-      console.log('🧪 MOCK_MODE active: returning mocked parlay without ODDS_API');
+      logger.info('Returning mock parlay response');
       return res.status(200).json(buildMockParlayResponse({
         aiModel: 'mock',
         selectedSports: req.body?.selectedSports || ['NFL'],
@@ -730,7 +632,7 @@ async function handler(req, res) {
     // Handle "ALL" bet types by expanding to all available types
     if (selectedBetTypes.includes('ALL') || selectedBetTypes.includes('All') || selectedBetTypes.includes('all')) {
       selectedBetTypes = Object.keys(MARKET_MAPPING); // Expand to all bet types
-      console.log(`🔥 ALL bet types selected - expanding to: ${selectedBetTypes.join(', ')}`);
+      logger.info('ALL bet types selected', { expandedTo: selectedBetTypes });
     }
     
     numLegs = parseInt(numLegs) || 3;
@@ -743,25 +645,25 @@ async function handler(req, res) {
     // Preflight: ensure required AI key is present for selected model, with smart fallback or mock
     if (aiModel === 'openai' && !apiKeys.openai) {
       if (apiKeys.gemini) {
-        console.log('⚠️ Missing OPENAI_API_KEY; auto-falling back to Gemini');
+        logger.warn('Missing OPENAI_API_KEY, falling back to Gemini');
         aiModel = 'gemini';
       } else if (mockMode || req.body?.mock) {
-        console.log('🧪 MOCK_MODE active: returning mocked parlay (no OpenAI/Gemini keys)');
+        logger.info('Returning mock parlay (no AI keys)');
         return res.status(200).json(buildMockParlayResponse({ aiModel: 'mock', selectedSports, selectedBetTypes, numLegs }));
       } else {
-        console.log('❌ Missing OPENAI_API_KEY and no fallback available');
+        logger.error('Missing OPENAI_API_KEY and no fallback available');
         return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
       }
     }
     if (aiModel === 'gemini' && !apiKeys.gemini) {
       if (apiKeys.openai) {
-        console.log('⚠️ Missing GEMINI_API_KEY; auto-falling back to OpenAI');
+        logger.warn('Missing GEMINI_API_KEY, falling back to OpenAI');
         aiModel = 'openai';
       } else if (mockMode || req.body?.mock) {
-        console.log('🧪 MOCK_MODE active: returning mocked parlay (no Gemini/OpenAI keys)');
+        logger.info('Returning mock parlay (no AI keys)');
         return res.status(200).json(buildMockParlayResponse({ aiModel: 'mock', selectedSports, selectedBetTypes, numLegs }));
       } else {
-        console.log('❌ Missing GEMINI_API_KEY and no fallback available');
+        logger.error('Missing GEMINI_API_KEY and no fallback available');
         return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
       }
     }

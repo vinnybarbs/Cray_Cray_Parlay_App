@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useParlayHistory } from './hooks/useLocalStorage';
 
 // Enhanced Phase Progress component with detailed status
 const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
@@ -308,6 +309,7 @@ const App = () => {
   const [progressPhase, setProgressPhase] = useState(0);
   const [timings, setTimings] = useState(null);
   const [phaseData, setPhaseData] = useState(null);
+  const { history, addToHistory, clearHistory } = useParlayHistory(10);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...", "Bribing the refs for insider info...", "Sacrificing a prop bet to the degen gods...",
@@ -447,12 +449,42 @@ const App = () => {
       setPhaseData(data.metadata?.phases || null);
       setProgressPhase(3); // Set to last phase
       setResults(data.content);
+      
+      // Save to history
+      addToHistory({
+        content: data.content,
+        metadata: data.metadata,
+        settings: {
+          selectedSports,
+          selectedBetTypes,
+          numLegs,
+          oddsPlatform,
+          aiModel,
+          riskLevel,
+          dateRange
+        }
+      });
     } catch (e) {
-      setError(`Failed to generate parlays: ${e.message}`);
+      // Enhanced error handling
+      let errorMessage = 'Failed to generate parlays';
+      
+      if (e.message.includes('429')) {
+        errorMessage = 'Rate limit exceeded. Please wait a few minutes before trying again.';
+      } else if (e.message.includes('401') || e.message.includes('403')) {
+        errorMessage = 'API authentication failed. Please check your API keys.';
+      } else if (e.message.includes('Network')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (e.message.includes('timeout')) {
+        errorMessage = 'Request timed out. The server took too long to respond.';
+      } else {
+        errorMessage = `${errorMessage}: ${e.message}`;
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
-  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, dateRange]);
+  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, dateRange, addToHistory]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">

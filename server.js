@@ -5,6 +5,9 @@ require('dotenv').config(); // This will load .env if .env.local doesn't exist
 const express = require('express');
 const cors = require('cors');
 const generateParlayHandler = require('./api/generate-parlay');
+const { logger } = require('./shared/logger');
+const { parlayRateLimiter, generalRateLimiter } = require('./api/middleware/rateLimiter');
+const { validateParlayRequest, sanitizeInput } = require('./api/middleware/validation');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -21,6 +24,17 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Apply general rate limiting to all routes
+app.use(generalRateLimiter.middleware());
+
+// Validate API keys on startup
+const requiredKeys = ['ODDS_API_KEY', 'OPENAI_API_KEY'];
+const missingKeys = requiredKeys.filter(key => !process.env[key]);
+if (missingKeys.length > 0) {
+  logger.warn('Missing required API keys', { missingKeys });
+  logger.warn('Some features may not work. Check env.example for required keys.');
+}
 
 // Force HTTPS in production (but not in local development)
 if (process.env.NODE_ENV === 'production') {
@@ -182,8 +196,18 @@ global.emitComplete = (requestId) => {
   progressClients.delete(requestId);
 };
 
-app.post('/api/generate-parlay', generateParlayHandler);
+// Apply stricter rate limiting and validation to parlay generation
+app.post('/api/generate-parlay', 
+  parlayRateLimiter.middleware(),
+  sanitizeInput,
+  validateParlayRequest,
+  generateParlayHandler
+);
 
 app.listen(PORT, () => {
-  console.log(`🚀 Backend running on http://localhost:${PORT}`);
+  logger.info(`Backend server started`, { 
+    port: PORT, 
+    environment: process.env.NODE_ENV || 'development',
+    url: `http://localhost:${PORT}`
+  });
 });

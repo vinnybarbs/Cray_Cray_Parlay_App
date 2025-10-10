@@ -2,25 +2,11 @@
 const { TargetedOddsAgent } = require('./odds-agent');
 const { EnhancedResearchAgent } = require('./research-agent');
 const { ParlayAnalyst } = require('./analyst-agent');
+const { MARKET_MAPPING } = require('../../shared/constants');
+const { calculateParlay, americanToDecimal, decimalToAmerican } = require('../../shared/oddsCalculations');
+const { createLogger } = require('../../shared/logger');
 
-// Market filtering to enforce bet type selection
-const MARKET_MAPPING = {
-  'Moneyline/Spread': ['h2h', 'spreads'],
-  'Totals (O/U)': ['totals'],
-  'Player Props': [
-    'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
-    'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
-    'player_receptions', 'player_reception_yds', 'player_reception_tds',
-    'player_points', 'player_rebounds', 'player_assists', 'player_threes',
-    'player_shots_on_goal', 'player_goals',
-    'batter_hits', 'batter_home_runs', 'pitcher_strikeouts'
-  ],
-  'TD Props': [
-    'player_pass_tds', 'player_rush_tds', 'player_reception_tds',
-    'player_anytime_td', 'player_1st_td', 'player_last_td'
-  ],
-  'Team Props': ['team_totals']
-};
+const logger = createLogger('Coordinator');
 
 // Filter games to only include selected bet types
 function filterMarketsByBetTypes(games, selectedBetTypes) {
@@ -35,7 +21,10 @@ function filterMarketsByBetTypes(games, selectedBetTypes) {
     markets.forEach(m => allowedMarkets.add(m));
   });
   
-  console.log(`🔍 Filtering markets to ONLY: ${Array.from(allowedMarkets).join(', ')}`);
+  logger.info('Filtering markets', { 
+    allowedMarkets: Array.from(allowedMarkets),
+    selectedBetTypes 
+  });
   
   // Filter each game's bookmakers and markets
   return games.map(game => {
@@ -48,44 +37,6 @@ function filterMarketsByBetTypes(games, selectedBetTypes) {
     
     return { ...game, bookmakers: filteredBookmakers };
   }).filter(game => game.bookmakers.length > 0);
-}
-
-// Odds calculation functions
-function americanToDecimal(americanOdds) {
-  const odds = parseInt(americanOdds);
-  if (odds > 0) {
-    return (odds / 100) + 1;
-  } else {
-    return (100 / Math.abs(odds)) + 1;
-  }
-}
-
-function decimalToAmerican(decimalOdds) {
-  if (decimalOdds >= 2) {
-    return '+' + Math.round((decimalOdds - 1) * 100);
-  } else {
-    return '-' + Math.round(100 / (decimalOdds - 1));
-  }
-}
-
-function calculateParlay(oddsArray) {
-  // Convert all odds to decimal and multiply
-  const decimalOdds = oddsArray.map(odds => americanToDecimal(odds));
-  const combinedDecimal = decimalOdds.reduce((acc, curr) => acc * curr, 1);
-  
-  // Convert back to American odds
-  const combinedAmerican = decimalToAmerican(combinedDecimal);
-  
-  // Calculate payout on $100
-  // profit = (decimal - 1) * stake, totalReturn = decimal * stake
-  const profit = Math.round((combinedDecimal - 1) * 100);
-  const payout = Math.round(combinedDecimal * 100); // total return on $100
-  
-  return {
-    combinedOdds: combinedAmerican,
-    payout: payout,
-    profit
-  };
 }
 
 // Function to fix odds calculations in AI-generated content
