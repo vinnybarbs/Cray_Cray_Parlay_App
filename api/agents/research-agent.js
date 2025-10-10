@@ -15,42 +15,113 @@ class EnhancedResearchAgent {
       return games.map(g => ({ ...g, research: null }));
     }
 
-    console.log(`🔍 Real-time research for ${games.length} games (fastMode=${fastMode})`);
+    console.log(`🔍 NEW APPROACH: Bulk research for ${games.length} games`);
     
-    // Research all games with sufficient data
-    const researchTargets = this.prioritizeResearchTargets(games).slice(0, fastMode ? 8 : 25);
+    // Extract ALL players from ALL games upfront
+    const allPlayers = this.extractAllPlayersFromGames(games);
+    console.log(`📊 Found ${allPlayers.length} total players across all games`);
     
-    // Process in batches to avoid overwhelming the API
-    const batchSize = fastMode ? Math.min(3, this.maxConcurrentRequests) : this.maxConcurrentRequests;
-    const enrichedGames = [];
-    
-    for (let i = 0; i < researchTargets.length; i += batchSize) {
-      const batch = researchTargets.slice(i, i + batchSize);
-      console.log(`📋 Processing research batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(researchTargets.length/batchSize)}`);
-      
-  const batchPromises = batch.map(game => this.comprehensiveGameAnalysis(game, { fastMode }));
-      const batchResults = await Promise.allSettled(batchPromises);
-      
-      batchResults.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          enrichedGames.push(result.value);
-        } else {
-          console.log(`❌ Research failed for game ${batch[index].away_team} @ ${batch[index].home_team}: ${result.reason}`);
-          enrichedGames.push({ ...batch[index], research: null });
-        }
-      });
+    // Do ONE comprehensive search for all players + teams
+    let bulkResearch = null;
+    if (allPlayers.length > 0) {
+      bulkResearch = await this.performBulkPlayerSearch(allPlayers, games);
     }
-
-    // Add games that weren't researched
-    const researchedIds = new Set(enrichedGames.map(g => g.id));
-    games.forEach(game => {
-      if (!researchedIds.has(game.id)) {
-        enrichedGames.push({ ...game, research: null });
-      }
+    
+    // Attach relevant research to each game
+    const enrichedGames = games.map(game => {
+      const gamePlayers = this.extractPlayerNames(game);
+      const relevantResearch = this.getRelevantResearchForGame(game, gamePlayers, bulkResearch);
+      return {
+        ...game,
+        research: relevantResearch
+      };
     });
 
-    console.log(`✓ Research complete (${enrichedGames.filter(g => g.research).length} games enriched)`);
+    console.log(`✓ Bulk research complete - all games enriched with player data`);
     return enrichedGames;
+  }
+
+  extractAllPlayersFromGames(games) {
+    const allPlayers = new Set();
+    
+    games.forEach(game => {
+      if (!game.bookmakers || !game.bookmakers[0] || !game.bookmakers[0].markets) {
+        return;
+      }
+      
+      game.bookmakers[0].markets.forEach(market => {
+        if (market.key && market.key.startsWith('player_')) {
+          market.outcomes?.forEach(outcome => {
+            if (outcome.description && outcome.description !== 'Over' && outcome.description !== 'Under') {
+              allPlayers.add(outcome.description);
+            }
+          });
+        }
+      });
+    });
+    
+    return Array.from(allPlayers);
+  }
+
+  async performBulkPlayerSearch(players, games) {
+    try {
+      const currentYear = new Date().getFullYear();
+      const gameDate = new Date(games[0]?.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      // Create ONE comprehensive query with all key players
+      const topPlayers = players.slice(0, 15); // Limit to top 15 to keep query manageable
+      const teamNames = [...new Set(games.flatMap(g => [g.away_team, g.home_team]))];
+      
+      const query = `NFL ${currentYear} ${gameDate} player stats team rosters: ${topPlayers.slice(0, 10).join(', ')} touchdowns recent games injury report ${teamNames.slice(0, 5).join(' ')}`;
+      
+      console.log(`🔍 BULK SEARCH: "${query.substring(0, 100)}..."`);
+      
+      const cacheKey = query.toLowerCase();
+      const now = Date.now();
+      const cached = this.cache.get(cacheKey);
+      
+      if (cached && (now - cached.t) < this.cacheTtlMs) {
+        console.log(`✓ Using cached bulk research`);
+        return cached.data;
+      }
+      
+      const searchResults = await this.performSerperSearch(query, { fastMode: false });
+      this.cache.set(cacheKey, { t: now, data: searchResults });
+      
+      return searchResults;
+      
+    } catch (error) {
+      console.log(`❌ Bulk research failed: ${error.message}`);
+      return null;
+    }
+  }
+
+  getRelevantResearchForGame(game, gamePlayers, bulkResearch) {
+    if (!bulkResearch || !bulkResearch.organic) {
+      return `Game: ${game.away_team} @ ${game.home_team} - Limited research data available`;
+    }
+    
+    // Extract snippets that mention this game's teams or players
+    const relevantSnippets = [];
+    const teams = [game.away_team, game.home_team];
+    
+    bulkResearch.organic.forEach(result => {
+      const text = `${result.title} ${result.snippet}`.toLowerCase();
+      const isRelevant = teams.some(team => text.includes(team.toLowerCase())) || 
+                         gamePlayers.some(player => text.includes(player.toLowerCase()));
+      
+      if (isRelevant) {
+        relevantSnippets.push(`${result.snippet}`);
+      }
+    });
+    
+    if (relevantSnippets.length === 0) {
+      return `Game: ${game.away_team} @ ${game.home_team} - Players: ${gamePlayers.join(', ')}`;
+    }
+    
+    // Combine relevant snippets
+    const combined = relevantSnippets.join(' | ').substring(0, 1200);
+    return `${game.away_team} @ ${game.home_team}: ${combined}`;
   }
 
   prioritizeResearchTargets(games) {

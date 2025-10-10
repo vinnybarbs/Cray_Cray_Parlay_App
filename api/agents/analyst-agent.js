@@ -84,7 +84,7 @@ RULES:
 - Use EXACT dates/odds from data
 - No conflicts
 - Risk: ${riskLevel}
-- CRITICAL: For player props, check PLAYER STATS in context to verify which team each player plays for. Never assign a player to the wrong team.
+- CRITICAL TEAM VERIFICATION: When picking player props, the game format is "Away Team @ Home Team". Each player ONLY plays for ONE of these two teams. Example: In "Chicago Bears @ Washington Commanders", D'Andre Swift plays for Chicago Bears (NOT Commanders). Brian Robinson plays for Commanders (NOT Bears). ALWAYS verify the player's actual team before including them. If you see a player listed for a game, they play for EITHER the away team OR the home team - never both, never the wrong one.
 ${oddsContext}
 
 FORMAT:
