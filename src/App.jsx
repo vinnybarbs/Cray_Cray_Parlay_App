@@ -10,18 +10,18 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
   ];
   
   return (
-    <div className="mt-4 p-4 rounded-xl bg-gray-800 border border-gray-700">
-      <div className="text-sm font-semibold text-gray-300 mb-3">Generation Progress</div>
+    <div className="p-3 rounded-lg bg-black bg-opacity-30 border border-gray-700">
+      <div className="text-xs font-semibold text-gray-300 mb-2 text-center">Generation Progress</div>
       
       {/* Phase indicators */}
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2">
         {phases.map((phase, idx) => {
           const isActive = loading && progress === idx;
           const isDone = phaseData?.[phase.key]?.complete || (!loading && timings);
           
           return (
             <div key={phase.key} className="flex flex-col items-center space-y-1 flex-1">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base transition-all ${
                 isDone ? 'bg-green-600' : isActive ? 'bg-yellow-400 animate-pulse' : 'bg-gray-700'
               }`}>
                 {isDone ? '✓' : phase.icon}
@@ -30,7 +30,7 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
                 {phase.label}
               </span>
               {isActive && (
-                <span className="text-xs text-yellow-400 animate-pulse">Running...</span>
+                <span className="text-xs text-yellow-400 animate-pulse">Active</span>
               )}
             </div>
           );
@@ -39,25 +39,25 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
       
       {/* Detailed phase information */}
       {phaseData && !loading && (
-        <div className="mt-3 pt-3 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs">
+        <div className="mt-2 pt-2 border-t border-gray-600 grid grid-cols-2 gap-1 text-xs">
           {phaseData.odds && (
-            <div className="text-gray-400">
-              📊 Odds: {phaseData.odds.games} games ({phaseData.odds.quality}% quality)
+            <div className="text-gray-300">
+              📊 {phaseData.odds.games} games ({phaseData.odds.quality}%)
             </div>
           )}
           {phaseData.research && (
-            <div className="text-gray-400">
-              🔍 Research: {phaseData.research.researched}/{phaseData.research.total} games
+            <div className="text-gray-300">
+              🔍 {phaseData.research.researched}/{phaseData.research.total} researched
             </div>
           )}
           {phaseData.analysis && (
-            <div className="text-gray-400">
-              🧠 AI: {phaseData.analysis.model} ({phaseData.analysis.attempts} attempt{phaseData.analysis.attempts > 1 ? 's' : ''})
+            <div className="text-gray-300">
+              🧠 {phaseData.analysis.model}
             </div>
           )}
           {phaseData.postProcessing && (
-            <div className="text-gray-400">
-              ✨ Post: Validated & formatted
+            <div className="text-gray-300">
+              ✨ Validated
             </div>
           )}
         </div>
@@ -65,13 +65,18 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
       
       {/* Timing details */}
       {timings && (
-        <div className="mt-3 pt-3 border-t border-gray-700 grid grid-cols-2 gap-2 text-xs text-gray-400">
-          <div>⏱️ Odds: {timings.oddsMs}ms</div>
-          <div>⏱️ Research: {timings.researchMs}ms</div>
-          <div>⏱️ Analysis: {timings.analysisMs}ms</div>
-          <div>⏱️ Post: {timings.postProcessingMs}ms</div>
-          <div className="col-span-2 font-semibold text-green-400">
-            ⚡ Total: {(timings.totalMs / 1000).toFixed(1)}s
+        <div className="mt-2 pt-2 border-t border-gray-600 text-xs text-gray-300">
+          <div className="flex justify-between items-center">
+            <span>⏱️ Total Time:</span>
+            <span className="font-semibold text-green-400">
+              {(timings.totalMs / 1000).toFixed(1)}s
+            </span>
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-400">
+            <div>Odds: {(timings.oddsMs / 1000).toFixed(1)}s</div>
+            <div>Research: {(timings.researchMs / 1000).toFixed(1)}s</div>
+            <div>Analysis: {(timings.analysisMs / 1000).toFixed(1)}s</div>
+            <div>Post: {(timings.postProcessingMs / 1000).toFixed(1)}s</div>
           </div>
         </div>
       )}
@@ -602,24 +607,33 @@ const App = () => {
             <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
           </div>
           
-          {/* Risk-level box */}
+          {/* Risk-level box with integrated progress */}
           {riskLevel === 'Low' && (
-            <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
-              <p className="text-xs text-blue-400 mt-1">Playing it safe, huh? Boring but smart.</p>
+            <div className="mb-4 bg-blue-900 border-2 border-blue-500 rounded-lg p-3">
+              <div className="text-center mb-3">
+                <p className="text-xl font-bold text-blue-300">😴 SNOOZE BET 😴</p>
+                <p className="text-xs text-blue-400 mt-1">Playing it safe, huh? Boring but smart.</p>
+              </div>
+              <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
             </div>
           )}
           {riskLevel === 'Medium' && (
-            <div className="mb-4 bg-yellow-900 border-2 border-yellow-500 rounded-lg p-3 text-center">
-              <p className="text-xs text-yellow-400 mt-1">Mid level risk</p>
-              <p className="text-xl font-bold text-yellow-300">🤪 YOU'RE LOCO AND I LIKEY 🤪</p>
-              <p className="text-xs text-yellow-400 mt-1">Balanced chaos - my favorite!</p>
+            <div className="mb-4 bg-yellow-900 border-2 border-yellow-500 rounded-lg p-3">
+              <div className="text-center mb-3">
+                <p className="text-xs text-yellow-400 mt-1">Mid level risk</p>
+                <p className="text-xl font-bold text-yellow-300">🤪 YOU'RE LOCO AND I LIKEY 🤪</p>
+                <p className="text-xs text-yellow-400 mt-1">Balanced chaos - my favorite!</p>
+              </div>
+              <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
             </div>
           )}
           {riskLevel === 'High' && (
-            <div className="mb-4 bg-red-900 border-2 border-red-500 rounded-lg p-3 text-center animate-pulse">
-              <p className="text-xl font-bold text-red-300">🔥 DEGENERATE IN THE FLESH 🔥</p>
-              <p className="text-xs text-red-400 mt-1">Full degen mode activated! Let's gooo!</p>
+            <div className="mb-4 bg-red-900 border-2 border-red-500 rounded-lg p-3">
+              <div className={`text-center mb-3 ${loading ? '' : 'animate-pulse'}`}>
+                <p className="text-xl font-bold text-red-300">🔥 DEGENERATE IN THE FLESH 🔥</p>
+                <p className="text-xs text-red-400 mt-1">Full degen mode activated! Let's gooo!</p>
+              </div>
+              <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
             </div>
           )}
         </div>
@@ -627,11 +641,6 @@ const App = () => {
 
       {/* AI Agents Workflow Component */}
       <AIAgentsWorkflow />
-
-      {/* Generation Progress at Bottom */}
-      <div className="max-w-2xl mx-auto mt-8">
-        <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
-      </div>
     </div>
   );
 };
