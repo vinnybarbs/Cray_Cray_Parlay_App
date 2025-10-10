@@ -93,32 +93,116 @@ class EnhancedResearchAgent {
 
   async comprehensiveGameAnalysis(game, { fastMode = false } = {}) {
     const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const query = `${game.away_team} vs ${game.home_team} ${gameDate} injury report recent performance analysis prediction weather`;
     
     try {
       console.log(`  🔍 Researching: ${game.away_team} @ ${game.home_team}`);
-      // Use cache
-      const cacheKey = query.toLowerCase();
+      
+      // Extract player names from prop markets if available
+      const playerNames = this.extractPlayerNames(game);
+      
+      let combinedResearch = '';
+      
+      // 1. Game-level research (team matchup, weather, injuries)
+      const gameQuery = `${game.away_team} vs ${game.home_team} ${gameDate} injury report recent performance analysis prediction weather`;
+      const gameCache = gameQuery.toLowerCase();
       const now = Date.now();
-      const cached = this.cache.get(cacheKey);
+      const cached = this.cache.get(gameCache);
+      
       if (cached && (now - cached.t) < this.cacheTtlMs) {
-        const { data } = cached;
-        const { summary, sources } = this.synthesizeResearch(data, game);
-        return { ...game, research: summary, researchSources: sources };
+        const { summary } = this.synthesizeResearch(cached.data, game);
+        combinedResearch = summary;
+      } else {
+        const gameResearch = await this.performSerperSearch(gameQuery, { fastMode });
+        this.cache.set(gameCache, { t: now, data: gameResearch });
+        const { summary } = this.synthesizeResearch(gameResearch, game);
+        combinedResearch = summary;
       }
-
-      const research = await this.performSerperSearch(query, { fastMode });
-      this.cache.set(cacheKey, { t: now, data: research });
-      const { summary, sources } = this.synthesizeResearch(research, game);
+      
+      // 2. Player-specific research for top players (limit to 3-5 key players)
+      if (playerNames.length > 0 && !fastMode) {
+        const topPlayers = playerNames.slice(0, 3); // Research top 3 players to save API calls
+        const playerResearch = await this.researchPlayers(topPlayers);
+        if (playerResearch) {
+          combinedResearch += ` | PLAYER STATS: ${playerResearch}`;
+        }
+      }
+      
       return {
         ...game,
-        research: summary,
-        researchSources: sources
+        research: combinedResearch,
+        researchSources: []
       };
       
     } catch (error) {
       console.log(`  ❌ Research failed for ${game.away_team} @ ${game.home_team}: ${error.message}`);
       return { ...game, research: null };
+    }
+  }
+
+  extractPlayerNames(game) {
+    const players = new Set();
+    
+    if (!game.bookmakers || !game.bookmakers[0] || !game.bookmakers[0].markets) {
+      return [];
+    }
+    
+    // Extract player names from prop market outcomes
+    game.bookmakers[0].markets.forEach(market => {
+      if (market.key && market.key.startsWith('player_')) {
+        market.outcomes?.forEach(outcome => {
+          if (outcome.description && outcome.description !== 'Over' && outcome.description !== 'Under') {
+            players.add(outcome.description);
+          }
+        });
+      }
+    });
+    
+    return Array.from(players);
+  }
+
+  async researchPlayers(playerNames) {
+    if (playerNames.length === 0) return '';
+    
+    try {
+      // Research each player individually to get their team and recent stats
+      const playerQueries = playerNames.map(name => 
+        `${name} NFL stats recent games 2024 team touchdowns`
+      );
+      
+      const playerResults = await Promise.all(
+        playerQueries.map(async (query) => {
+          const cacheKey = query.toLowerCase();
+          const now = Date.now();
+          const cached = this.cache.get(cacheKey);
+          
+          if (cached && (now - cached.t) < this.cacheTtlMs) {
+            return cached.data;
+          }
+          
+          const result = await this.performSerperSearch(query, { fastMode: true });
+          this.cache.set(cacheKey, { t: now, data: result });
+          return result;
+        })
+      );
+      
+      // Synthesize player research into concise format
+      const playerSummaries = playerResults.map((result, idx) => {
+        if (!result || !result.organic || result.organic.length === 0) {
+          return null;
+        }
+        
+        const topResult = result.organic[0];
+        const snippet = topResult.snippet || '';
+        // Extract first 100 chars which usually contains team and key stats
+        const summary = snippet.substring(0, 150);
+        return `${playerNames[idx]}: ${summary}`;
+      }).filter(Boolean);
+      
+      return playerSummaries.join(' | ');
+      
+    } catch (error) {
+      console.log(`  ⚠️ Player research failed: ${error.message}`);
+      return '';
     }
   }
 

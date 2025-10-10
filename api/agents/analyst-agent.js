@@ -84,6 +84,7 @@ RULES:
 - Use EXACT dates/odds from data
 - No conflicts
 - Risk: ${riskLevel}
+- CRITICAL: For player props, check PLAYER STATS in context to verify which team each player plays for. Never assign a player to the wrong team.
 ${oddsContext}
 
 FORMAT:
@@ -117,6 +118,7 @@ RULES:
 - Use EXACT dates/odds from data
 - No conflicts
 - Risk: ${riskLevel}
+- CRITICAL: For player props, check PLAYER STATS in context to verify which team each player plays for. Never assign a player to the wrong team.
 ${oddsContext}
 
 FORMAT:
