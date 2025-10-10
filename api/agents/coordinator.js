@@ -212,7 +212,11 @@ class MultiAgentCoordinator {
       // Phase 2: Enhanced Research
     console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
     const tResearch0 = Date.now();
-  const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds, { fastMode: !!request.fastMode });
+  const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds, { 
+      fastMode: !!request.fastMode,
+      numLegs: request.numLegs,
+      riskLevel: request.riskLevel
+    });
     tResearchMs = Date.now() - tResearch0;
       
       const researchedCount = enrichedGames.filter(g => g.research).length;

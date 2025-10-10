@@ -3,42 +3,55 @@ class EnhancedResearchAgent {
   constructor(fetcher, serperApiKey) {
     this.fetcher = fetcher;
     this.serperApiKey = serperApiKey;
-    this.maxConcurrentRequests = 5;
+    this.maxConcurrentRequests = 20; // Increased from 5 - we have 300 qps!
     this.cache = new Map();
-    this.cacheTtlMs = 10 * 60 * 1000; // 10 minutes
-    this.playerResearchCount = 0; // Track player research to avoid rate limits
+    this.cacheTtlMs = 30 * 60 * 1000; // 30 minutes (was 10) - balance freshness vs API usage
+    this.playerResearchCount = 0;
+    this.requestsThisSecond = 0;
+    this.lastRequestTime = Date.now();
   }
 
-  async deepResearch(games, { fastMode = false } = {}) {
+  async deepResearch(games, { fastMode = false, numLegs = 3, riskLevel = 'Medium' } = {}) {
     if (!this.serperApiKey) {
       console.log('⚠️ No SERPER_API_KEY - skipping research enhancement');
       return games.map(g => ({ ...g, research: null }));
     }
 
-    console.log(`🔍 NEW APPROACH: Bulk research for ${games.length} games`);
+    console.log(`🔍 SMART TIERED RESEARCH: ${games.length} games, ${numLegs} legs needed, ${riskLevel} risk`);
     
-    // Extract ALL players from ALL games upfront
-    const allPlayers = this.extractAllPlayersFromGames(games);
-    console.log(`📊 Found ${allPlayers.length} total players across all games`);
+    // TIER 1: Prioritize games most likely to be selected
+    const prioritizedGames = this.prioritizeResearchTargets(games);
     
-    // Do ONE comprehensive search for all players + teams
-    let bulkResearch = null;
-    if (allPlayers.length > 0) {
-      bulkResearch = await this.performBulkPlayerSearch(allPlayers, games);
+    // TIER 2: Determine research depth based on needs
+    // For low risk: Need deep research on top games (8-9 confidence)
+    // For medium/high risk: Can be more selective
+    const researchDepth = riskLevel === 'Low' ? 'deep' : 'moderate';
+    const gamesToResearch = Math.min(prioritizedGames.length, numLegs * 3); // Research 3x the legs needed
+    
+    console.log(`📊 Researching top ${gamesToResearch} games with ${researchDepth} depth`);
+    
+    // TIER 3: Batch research in groups (aggressive with 300 qps!)
+    const enrichedGames = [];
+    const batchSize = 10; // Research 10 games at a time (was 5)
+    
+    for (let i = 0; i < gamesToResearch; i += batchSize) {
+      const batch = prioritizedGames.slice(i, i + batchSize);
+      console.log(`  📡 Researching batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(gamesToResearch/batchSize)}: ${batch.length} games`);
+      
+      const batchResults = await Promise.all(
+        batch.map(game => this.comprehensiveGameAnalysis(game, { fastMode, researchDepth }))
+      );
+      
+      enrichedGames.push(...batchResults);
     }
     
-    // Attach relevant research to each game
-    const enrichedGames = games.map(game => {
-      const gamePlayers = this.extractPlayerNames(game);
-      const relevantResearch = this.getRelevantResearchForGame(game, gamePlayers, bulkResearch);
-      return {
-        ...game,
-        research: relevantResearch
-      };
-    });
-
-    console.log(`✓ Bulk research complete - all games enriched with player data`);
-    return enrichedGames;
+    // Add remaining games without research
+    const unresearchedGames = games.filter(g => 
+      !enrichedGames.find(eg => eg.id === g.id)
+    ).map(g => ({ ...g, research: null }));
+    
+    console.log(`✓ Research complete: ${enrichedGames.length} games with research, ${unresearchedGames.length} without`);
+    return [...enrichedGames, ...unresearchedGames];
   }
 
   extractAllPlayersFromGames(games) {
@@ -163,49 +176,56 @@ class EnhancedResearchAgent {
     return priority;
   }
 
-  async comprehensiveGameAnalysis(game, { fastMode = false } = {}) {
-    const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  async comprehensiveGameAnalysis(game, { fastMode = false, researchDepth = 'moderate' } = {}) {
+    const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const currentYear = new Date().getFullYear();
     
     try {
-      console.log(`  🔍 Researching: ${game.away_team} @ ${game.home_team}`);
+      console.log(`  🔍 Researching: ${game.away_team} @ ${game.home_team} (${researchDepth} depth)`);
       
       // Extract player names from prop markets if available
       const playerNames = this.extractPlayerNames(game);
+      const hasPlayerProps = playerNames.length > 0;
       
       let combinedResearch = '';
+      const sources = [];
       
-      // 1. Game-level research (team matchup, weather, injuries)
-      const gameQuery = `${game.away_team} vs ${game.home_team} ${gameDate} injury report recent performance analysis prediction weather`;
+      // 1. GAME-LEVEL RESEARCH: Team matchup, injuries, trends, weather
+      const gameQuery = `${game.away_team} vs ${game.home_team} ${currentYear} ${gameDate} injury report recent performance trends prediction`;
       const gameCache = gameQuery.toLowerCase();
       const now = Date.now();
       const cached = this.cache.get(gameCache);
       
+      let gameResearch;
       if (cached && (now - cached.t) < this.cacheTtlMs) {
-        const { summary } = this.synthesizeResearch(cached.data, game);
-        combinedResearch = summary;
+        console.log(`    ✓ Using cached game research`);
+        gameResearch = cached.data;
       } else {
-        const gameResearch = await this.performSerperSearch(gameQuery, { fastMode });
+        gameResearch = await this.performSerperSearch(gameQuery, { fastMode: false }); // Always deep search for game
         this.cache.set(gameCache, { t: now, data: gameResearch });
-        const { summary } = this.synthesizeResearch(gameResearch, game);
-        combinedResearch = summary;
       }
       
-      // 2. Player-specific research for top players (limit to 2 key players to avoid rate limits)
-      // Only do player research for first few games to manage API quota
-      const shouldDoPlayerResearch = !fastMode && playerNames.length > 0 && this.playerResearchCount < 5;
-      if (shouldDoPlayerResearch) {
-        this.playerResearchCount = (this.playerResearchCount || 0) + 1;
-        const topPlayers = playerNames.slice(0, 2); // Research top 2 players to save API calls
-        const playerResearch = await this.researchPlayers(topPlayers);
+      const { summary: gameSummary, sources: gameSources } = this.synthesizeResearch(gameResearch, game);
+      combinedResearch = gameSummary;
+      sources.push(...gameSources);
+      
+      // 2. PLAYER-SPECIFIC RESEARCH (if player props available and deep research requested)
+      if (hasPlayerProps && researchDepth === 'deep' && playerNames.length > 0) {
+        console.log(`    🏈 Researching ${playerNames.length} players for detailed analysis`);
+        
+        // For deep research, get top 3-5 players
+        const topPlayers = playerNames.slice(0, researchDepth === 'deep' ? 5 : 3);
+        const playerResearch = await this.researchPlayersDetailed(topPlayers, game);
+        
         if (playerResearch) {
-          combinedResearch += ` | PLAYER STATS: ${playerResearch}`;
+          combinedResearch += ` | PLAYER INSIGHTS: ${playerResearch}`;
         }
       }
       
       return {
         ...game,
         research: combinedResearch,
-        researchSources: []
+        researchSources: sources.slice(0, 5) // Keep top 5 sources
       };
       
     } catch (error) {
@@ -235,57 +255,78 @@ class EnhancedResearchAgent {
     return Array.from(players);
   }
 
-  async researchPlayers(playerNames) {
+  async researchPlayersDetailed(playerNames, game) {
     if (playerNames.length === 0) return '';
     
     try {
-      // Research each player individually to get their team and recent stats
       const currentYear = new Date().getFullYear();
-      const playerQueries = playerNames.map(name => 
-        `${name} NFL stats recent games ${currentYear} team touchdowns`
-      );
+      const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       
-      const playerResults = await Promise.all(
-        playerQueries.map(async (query) => {
-          const cacheKey = query.toLowerCase();
-          const now = Date.now();
-          const cached = this.cache.get(cacheKey);
-          
-          if (cached && (now - cached.t) < this.cacheTtlMs) {
-            return cached.data;
-          }
-          
-          const result = await this.performSerperSearch(query, { fastMode: true });
-          this.cache.set(cacheKey, { t: now, data: result });
-          return result;
+      // Create ONE query with all top players for this specific game
+      const playersStr = playerNames.slice(0, 5).join(', ');
+      const query = `${game.away_team} ${game.home_team} ${gameDate} ${currentYear} players ${playersStr} stats recent performance touchdowns`;
+      
+      console.log(`      🔍 Player query: "${query.substring(0, 80)}..."`);
+      
+      const cacheKey = query.toLowerCase();
+      const now = Date.now();
+      const cached = this.cache.get(cacheKey);
+      
+      let result;
+      if (cached && (now - cached.t) < this.cacheTtlMs) {
+        console.log(`      ✓ Using cached player research`);
+        result = cached.data;
+      } else {
+        result = await this.performSerperSearch(query, { fastMode: false });
+        this.cache.set(cacheKey, { t: now, data: result });
+      }
+      
+      if (!result || !result.organic || result.organic.length === 0) {
+        return '';
+      }
+      
+      // Extract relevant snippets mentioning the players
+      const relevantSnippets = result.organic
+        .slice(0, 5)
+        .map(r => r.snippet)
+        .filter(snippet => {
+          const lower = snippet.toLowerCase();
+          return playerNames.some(name => lower.includes(name.toLowerCase()));
         })
-      );
+        .join(' | ');
       
-      // Synthesize player research into concise format
-      const playerSummaries = playerResults.map((result, idx) => {
-        if (!result || !result.organic || result.organic.length === 0) {
-          return null;
-        }
-        
-        const topResult = result.organic[0];
-        const snippet = topResult.snippet || '';
-        // Extract first 100 chars which usually contains team and key stats
-        const summary = snippet.substring(0, 150);
-        return `${playerNames[idx]}: ${summary}`;
-      }).filter(Boolean);
-      
-      return playerSummaries.join(' | ');
+      return relevantSnippets.substring(0, 800); // Limit to 800 chars
       
     } catch (error) {
       console.log(`  ⚠️ Player research failed: ${error.message}`);
       return '';
     }
   }
+  
+  // Keep old method for backward compatibility
+  async researchPlayers(playerNames) {
+    return this.researchPlayersDetailed(playerNames, {});
+  }
 
   async performSerperSearch(query, { fastMode = false } = {}) {
     const url = 'https://google.serper.dev/search';
     
     try {
+      // Track rate limiting (300 qps limit)
+      const now = Date.now();
+      if (now - this.lastRequestTime > 1000) {
+        // Reset counter every second
+        this.requestsThisSecond = 0;
+        this.lastRequestTime = now;
+      }
+      
+      this.requestsThisSecond++;
+      
+      // Log if approaching limit (just for monitoring)
+      if (this.requestsThisSecond > 250) {
+        console.log(`⚠️ High request rate: ${this.requestsThisSecond} requests this second`);
+      }
+      
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), fastMode ? 4000 : 8000);
       const response = await this.fetcher(url, {
@@ -296,13 +337,17 @@ class EnhancedResearchAgent {
         },
         body: JSON.stringify({
           q: query,
-          num: fastMode ? 3 : 5
+          num: fastMode ? 3 : 10 // Increased from 5 to 10 for better results
         }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
 
       if (!response.ok) {
+        // Check if it's a rate limit error
+        if (response.status === 429) {
+          console.log(`⚠️ Rate limit hit (${this.requestsThisSecond} requests this second)`);
+        }
         throw new Error(`Serper API responded with ${response.status}`);
       }
 
