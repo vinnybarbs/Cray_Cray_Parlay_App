@@ -76,6 +76,21 @@ class ParlayAnalyst {
   generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, oddsContext, attemptNumber, retryIssues }) {
     const retry = attemptNumber > 1 ? `RETRY ${attemptNumber}: ${retryIssues}\n\n` : '';
     
+    // Define confidence requirements based on risk level
+    let confidenceRule = '';
+    let confidenceExample = '8/10';
+    
+    if (riskLevel === 'Low') {
+      confidenceRule = '- CONFIDENCE REQUIREMENT: ALL legs MUST be 8-9/10 confidence. Low risk = high probability. Focus on favorites, safe bets, data-backed picks. Goal: WIN the parlay, not maximize payout.';
+      confidenceExample = '8/10 or 9/10';
+    } else if (riskLevel === 'Medium') {
+      confidenceRule = '- CONFIDENCE REQUIREMENT: ALL legs MUST be 6-9/10 confidence. Medium risk = balanced value. Mix of favorites and value picks. Goal: Balance probability and payout.';
+      confidenceExample = '7/10';
+    } else if (riskLevel === 'High') {
+      confidenceRule = '- CONFIDENCE REQUIREMENT: Legs can be 3-9/10 confidence. High risk = big payout potential. Include upsets, underdogs, analyst picks. Goal: Maximize payout with calculated risks.';
+      confidenceExample = '5/10';
+    }
+    
     return `${retry}Create ${numLegs}-leg parlay for ${sportsStr}.
 
 RULES:
@@ -84,6 +99,7 @@ RULES:
 - Use EXACT dates/odds from data
 - No conflicts
 - Risk: ${riskLevel}
+${confidenceRule}
 - CRITICAL TEAM VERIFICATION: When picking player props, the game format is "Away Team @ Home Team". Each player ONLY plays for ONE of these two teams. Example: In "Chicago Bears @ Washington Commanders", D'Andre Swift plays for Chicago Bears (NOT Commanders). Brian Robinson plays for Commanders (NOT Bears). ALWAYS verify the player's actual team before including them. If you see a player listed for a game, they play for EITHER the away team OR the home team - never both, never the wrong one.
 - REASONING REQUIREMENTS: Each leg MUST have 200-300 words of DATA-DRIVEN analysis. Reference specific stats, trends, injuries, or matchups from Context. NO subjective language ("feel", "should", "likely"). Use ONLY facts and numbers.
 ${oddsContext}
@@ -96,7 +112,7 @@ FORMAT:
    Game: [Away @ Home]
    Bet: [bet with line]
    Odds: [odds]
-   Confidence: 7/10
+   Confidence: ${confidenceExample}
    Reasoning: [200-300 word data-driven analysis. REQUIRED: Reference specific stats, trends, injuries, matchups, or recent performance from the Context provided. NO subjective phrases like "feel like", "should", "likely". Use ONLY factual data: "Team X is 8-2 ATS in last 10", "Player Y averaging 25 PPG vs this opponent", "Defense ranks 3rd against the run", etc. If Context is limited, focus on odds value and matchup analysis.]
 
 **Combined Odds:** +XXX
@@ -111,6 +127,21 @@ FORMAT:
   generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, oddsContext, attemptNumber, retryIssues }) {
     const retry = attemptNumber > 1 ? `RETRY ${attemptNumber}: ${retryIssues}\n\n` : '';
     
+    // Define confidence requirements based on risk level
+    let confidenceRule = '';
+    let confidenceExample = '8/10';
+    
+    if (riskLevel === 'Low') {
+      confidenceRule = '- CONFIDENCE REQUIREMENT: ALL legs MUST be 8-9/10 confidence. Low risk = high probability. Focus on favorites, safe bets, data-backed picks. Goal: WIN the parlay, not maximize payout.';
+      confidenceExample = '8/10 or 9/10';
+    } else if (riskLevel === 'Medium') {
+      confidenceRule = '- CONFIDENCE REQUIREMENT: ALL legs MUST be 6-9/10 confidence. Medium risk = balanced value. Mix of favorites and value picks. Goal: Balance probability and payout.';
+      confidenceExample = '7/10';
+    } else if (riskLevel === 'High') {
+      confidenceRule = '- CONFIDENCE REQUIREMENT: Legs can be 3-9/10 confidence. High risk = big payout potential. Include upsets, underdogs, analyst picks. Goal: Maximize payout with calculated risks.';
+      confidenceExample = '5/10';
+    }
+    
     return `${retry}Create ${numLegs}-leg parlay for ${sportsStr}.
 
 RULES:
@@ -119,6 +150,7 @@ RULES:
 - Use EXACT dates/odds from data
 - No conflicts
 - Risk: ${riskLevel}
+${confidenceRule}
 - CRITICAL: For player props, check PLAYER STATS in context to verify which team each player plays for. Never assign a player to the wrong team.
 - REASONING REQUIREMENTS: Each leg MUST have 200-300 words of DATA-DRIVEN analysis. Reference specific stats, trends, injuries, or matchups from Context. NO subjective language ("feel", "should", "likely"). Use ONLY facts and numbers.
 ${oddsContext}
@@ -131,7 +163,7 @@ FORMAT:
    Game: [Away @ Home]
    Bet: [bet with line]
    Odds: [odds]
-   Confidence: 7/10
+   Confidence: ${confidenceExample}
    Reasoning: [200-300 word data-driven analysis. REQUIRED: Reference specific stats, trends, injuries, matchups, or recent performance from the Context provided. NO subjective phrases like "feel like", "should", "likely". Use ONLY factual data: "Team X is 8-2 ATS in last 10", "Player Y averaging 25 PPG vs this opponent", "Defense ranks 3rd against the run", etc. If Context is limited, focus on odds value and matchup analysis.]
 
 **Combined Odds:** +XXX
