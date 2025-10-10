@@ -85,6 +85,7 @@ RULES:
 - No conflicts
 - Risk: ${riskLevel}
 - CRITICAL TEAM VERIFICATION: When picking player props, the game format is "Away Team @ Home Team". Each player ONLY plays for ONE of these two teams. Example: In "Chicago Bears @ Washington Commanders", D'Andre Swift plays for Chicago Bears (NOT Commanders). Brian Robinson plays for Commanders (NOT Bears). ALWAYS verify the player's actual team before including them. If you see a player listed for a game, they play for EITHER the away team OR the home team - never both, never the wrong one.
+- REASONING REQUIREMENTS: Each leg MUST have 200-300 words of DATA-DRIVEN analysis. Reference specific stats, trends, injuries, or matchups from Context. NO subjective language ("feel", "should", "likely"). Use ONLY facts and numbers.
 ${oddsContext}
 
 FORMAT:
@@ -96,7 +97,7 @@ FORMAT:
    Bet: [bet with line]
    Odds: [odds]
    Confidence: 7/10
-   Reasoning: [why]
+   Reasoning: [200-300 word data-driven analysis. REQUIRED: Reference specific stats, trends, injuries, matchups, or recent performance from the Context provided. NO subjective phrases like "feel like", "should", "likely". Use ONLY factual data: "Team X is 8-2 ATS in last 10", "Player Y averaging 25 PPG vs this opponent", "Defense ranks 3rd against the run", etc. If Context is limited, focus on odds value and matchup analysis.]
 
 **Combined Odds:** +XXX
 **Payout on $100:** $XXX
@@ -119,6 +120,7 @@ RULES:
 - No conflicts
 - Risk: ${riskLevel}
 - CRITICAL: For player props, check PLAYER STATS in context to verify which team each player plays for. Never assign a player to the wrong team.
+- REASONING REQUIREMENTS: Each leg MUST have 200-300 words of DATA-DRIVEN analysis. Reference specific stats, trends, injuries, or matchups from Context. NO subjective language ("feel", "should", "likely"). Use ONLY facts and numbers.
 ${oddsContext}
 
 FORMAT:
@@ -130,7 +132,7 @@ FORMAT:
    Bet: [bet with line]
    Odds: [odds]
    Confidence: 7/10
-   Reasoning: [why]
+   Reasoning: [200-300 word data-driven analysis. REQUIRED: Reference specific stats, trends, injuries, matchups, or recent performance from the Context provided. NO subjective phrases like "feel like", "should", "likely". Use ONLY factual data: "Team X is 8-2 ATS in last 10", "Player Y averaging 25 PPG vs this opponent", "Defense ranks 3rd against the run", etc. If Context is limited, focus on odds value and matchup analysis.]
 
 **Combined Odds:** +XXX
 **Payout on $100:** $XXX
