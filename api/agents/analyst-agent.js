@@ -51,8 +51,8 @@ class ParlayAnalyst {
         // Add research context if available (expanded for better insights)
         let researchSummary = '';
         if (ev.research) {
-          // Extract key injury/performance insights (first 450 chars for more detail)
-          const shortResearch = ev.research.substring(0, 450).replace(/\s+/g, ' ').trim();
+          // Extract key injury/performance insights (increased to 600 chars for more detail)
+          const shortResearch = ev.research.substring(0, 600).replace(/\s+/g, ' ').trim();
           if (shortResearch) {
             researchSummary = `\n   Context: ${shortResearch}...`;
           }

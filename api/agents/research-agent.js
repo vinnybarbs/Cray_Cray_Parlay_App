@@ -6,6 +6,7 @@ class EnhancedResearchAgent {
     this.maxConcurrentRequests = 5;
     this.cache = new Map();
     this.cacheTtlMs = 10 * 60 * 1000; // 10 minutes
+    this.playerResearchCount = 0; // Track player research to avoid rate limits
   }
 
   async deepResearch(games, { fastMode = false } = {}) {
@@ -118,9 +119,12 @@ class EnhancedResearchAgent {
         combinedResearch = summary;
       }
       
-      // 2. Player-specific research for top players (limit to 3-5 key players)
-      if (playerNames.length > 0 && !fastMode) {
-        const topPlayers = playerNames.slice(0, 3); // Research top 3 players to save API calls
+      // 2. Player-specific research for top players (limit to 2 key players to avoid rate limits)
+      // Only do player research for first few games to manage API quota
+      const shouldDoPlayerResearch = !fastMode && playerNames.length > 0 && this.playerResearchCount < 5;
+      if (shouldDoPlayerResearch) {
+        this.playerResearchCount = (this.playerResearchCount || 0) + 1;
+        const topPlayers = playerNames.slice(0, 2); // Research top 2 players to save API calls
         const playerResearch = await this.researchPlayers(topPlayers);
         if (playerResearch) {
           combinedResearch += ` | PLAYER STATS: ${playerResearch}`;
@@ -244,12 +248,12 @@ class EnhancedResearchAgent {
       return { summary: 'No research data available', sources: [] };
     }
 
-    // Extract key insights and capture top sources
+    // Extract key insights and capture top sources (increased from 800 to 1200 chars)
     const top = (searchResults.organic || []).slice(0, 5);
     const insights = top
       .map(result => `${result.title}: ${result.snippet}`)
       .join(' | ')
-      .substring(0, 800); // Limit length for token efficiency
+      .substring(0, 1200); // Increased for more detail since player research hits rate limits
     const sources = top.map((r, idx) => ({ idx: idx + 1, title: r.title, link: r.link, snippet: r.snippet }));
 
     // Add structured analysis
