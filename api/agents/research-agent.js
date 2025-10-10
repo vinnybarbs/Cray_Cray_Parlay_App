@@ -169,8 +169,9 @@ class EnhancedResearchAgent {
     
     try {
       // Research each player individually to get their team and recent stats
+      const currentYear = new Date().getFullYear();
       const playerQueries = playerNames.map(name => 
-        `${name} NFL stats recent games 2024 team touchdowns`
+        `${name} NFL stats recent games ${currentYear} team touchdowns`
       );
       
       const playerResults = await Promise.all(
