@@ -13,12 +13,40 @@ const SPORT_SLUGS = {
   UFC: 'mma_ufc',
 };
 
+// Valid market keys per The Odds API documentation
+// https://the-odds-api.com/sports-odds-data/betting-markets.html
 const MARKET_MAPPING = {
+  // User-selectable bet types
   'Moneyline/Spread': ['h2h', 'spreads'],
   'Totals (O/U)': ['totals'],
-  'Player Props': ['player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_points', 'player_assists', 'player_rebounds'],
-  'TD Props': ['player_pass_tds', 'player_tds_over', 'player_anytime_td', 'player_rush_tds', 'player_reception_tds'],
+  'Player Props': [
+    // NFL/Football player props
+    'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
+    'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
+    'player_receptions', 'player_reception_yds', 'player_reception_tds',
+    // Basketball player props
+    'player_points', 'player_rebounds', 'player_assists', 'player_threes',
+    // Hockey player props  
+    'player_shots_on_goal', 'player_goals',
+    // Baseball player props
+    'batter_hits', 'batter_home_runs', 'pitcher_strikeouts'
+  ],
+  'TD Props': [
+    // Valid touchdown markets per API docs
+    'player_pass_tds',        // Pass TDs (Over/Under)
+    'player_rush_tds',        // Rush TDs (Over/Under) 
+    'player_reception_tds',   // Reception TDs (Over/Under)
+    'player_anytime_td',      // Anytime TD Scorer (Yes/No)
+    'player_1st_td',          // 1st TD Scorer (Yes/No)
+    'player_last_td'          // Last TD Scorer (Yes/No)
+  ],
   'Team Props': ['team_totals'],
+  // Internal keys for smart auto-expansion (not user-selectable)
+  '_player_props': [
+    'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds',
+    'player_pass_tds', 'player_anytime_td'
+  ],
+  '_team_props': ['team_totals'],
 };
 
 const BOOKMAKER_MAPPING = {
@@ -201,18 +229,41 @@ async function fetchGameResearch(games, fetcher) {
   return enrichedGames;
 }
 
+// Helper function to format dates in US Mountain Time
+function formatDateMT(iso) {
+  if (!iso) return 'TBD';
+  const d = new Date(iso);
+  // Format in Mountain Time (America/Denver)
+  return d.toLocaleDateString('en-US', { 
+    month: 'numeric', 
+    day: 'numeric', 
+    year: 'numeric',
+    timeZone: 'America/Denver'
+  });
+}
+
+function formatDateTimeMT(iso) {
+  if (!iso) return 'TBD';
+  const d = new Date(iso);
+  // Format date and time in Mountain Time
+  return d.toLocaleString('en-US', {
+    month: 'numeric',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/Denver'
+  }) + ' MT';
+}
+
 function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel, oddsData, unavailableInfo, dateRange, aiModel = 'openai' }) {
   const sportsStr = (selectedSports || []).join(', ');
   const betTypesStr = (selectedBetTypes || []).join(', ');
-  const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+  const today = formatDateMT(new Date().toISOString());
   const dateRangeText = `${dateRange || 1} day(s)`;
 
-  const formatDate = (iso) => {
-    if (!iso) return 'TBD';
-    const d = new Date(iso);
-    // Use proper month/day format (10/9 instead of 10/10 error)
-    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
-  };
+  const formatDate = formatDateMT;
 
   let oddsContext = '';
   if (oddsData && oddsData.length > 0) {

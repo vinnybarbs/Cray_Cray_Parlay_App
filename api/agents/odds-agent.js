@@ -19,12 +19,40 @@ const BOOKMAKER_MAPPING = {
   Bet365: 'bet365',
 };
 
+// Valid market keys per The Odds API documentation
+// https://the-odds-api.com/sports-odds-data/betting-markets.html
 const MARKET_MAPPING = {
+  // User-selectable bet types
   'Moneyline/Spread': ['h2h', 'spreads'],
   'Totals (O/U)': ['totals'],
-  'Player Props': ['player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds', 'player_points', 'player_assists', 'player_rebounds'],
-  'TD Props': ['player_pass_tds', 'player_tds_over', 'player_anytime_td', 'player_rush_tds', 'player_reception_tds'],
+  'Player Props': [
+    // NFL/Football player props
+    'player_pass_yds', 'player_pass_tds', 'player_pass_completions', 'player_pass_attempts',
+    'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
+    'player_receptions', 'player_reception_yds', 'player_reception_tds',
+    // Basketball player props
+    'player_points', 'player_rebounds', 'player_assists', 'player_threes',
+    // Hockey player props  
+    'player_shots_on_goal', 'player_goals',
+    // Baseball player props
+    'batter_hits', 'batter_home_runs', 'pitcher_strikeouts'
+  ],
+  'TD Props': [
+    // Valid touchdown markets per API docs
+    'player_pass_tds',        // Pass TDs (Over/Under)
+    'player_rush_tds',        // Rush TDs (Over/Under) 
+    'player_reception_tds',   // Reception TDs (Over/Under)
+    'player_anytime_td',      // Anytime TD Scorer (Yes/No)
+    'player_1st_td',          // 1st TD Scorer (Yes/No)
+    'player_last_td'          // Last TD Scorer (Yes/No)
+  ],
   'Team Props': ['team_totals'],
+  // Internal keys for smart auto-expansion (not user-selectable)
+  '_player_props': [
+    'player_pass_yds', 'player_rush_yds', 'player_receptions', 'player_reception_yds',
+    'player_pass_tds', 'player_anytime_td'
+  ],
+  '_team_props': ['team_totals'],
 };
 
 class TargetedOddsAgent {
@@ -74,20 +102,20 @@ class TargetedOddsAgent {
       if (availableBets < requiredBets && !currentBetTypes.includes('ALL')) {
         console.log(`⚡ Insufficient bets! Auto-expanding markets...`);
         
-        // Expand to include player props if not already included
-        if (!currentBetTypes.includes('player_props') && !currentBetTypes.includes('All') && !currentBetTypes.includes('all')) {
-          currentBetTypes.push('player_props');
-          console.log(`➕ Added player_props to bet types`);
+        // Expand to include player props if not already included (use internal key)
+        if (!currentBetTypes.includes('_player_props') && !currentBetTypes.includes('All') && !currentBetTypes.includes('all')) {
+          currentBetTypes.push('_player_props');
+          console.log(`➕ Added _player_props to bet types`);
           
           // Re-fetch with expanded markets
           primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, currentBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
-          console.log(`📊 After adding player_props: ${primaryOdds.length} bets available`);
+          console.log(`📊 After adding _player_props: ${primaryOdds.length} bets available`);
         }
         
-        // If still insufficient, add team props
-        if (primaryOdds.length < requiredBets && !currentBetTypes.includes('team_props')) {
-          currentBetTypes.push('team_props');
-          console.log(`➕ Added team_props to bet types`);
+        // If still insufficient, add team props (use internal key)
+        if (primaryOdds.length < requiredBets && !currentBetTypes.includes('_team_props')) {
+          currentBetTypes.push('_team_props');
+          console.log(`➕ Added _team_props to bet types`);
           
           // Re-fetch with further expanded markets
           primaryOdds = await this.fetchFromBook(primaryBook, selectedSports, currentBetTypes, now, rangeEnd, { fastMode: !!request.fastMode, capCount });
@@ -122,18 +150,21 @@ class TargetedOddsAgent {
 
   calculateDateRange(dateRange) {
     const now = new Date();
-    console.log(`🕐 Current time: ${now.toISOString()} (${now.toLocaleString()})`);
+    const nowMT = now.toLocaleString('en-US', { timeZone: 'America/Denver', hour12: true });
+    console.log(`🕐 Current time: ${now.toISOString()} (${nowMT} MT)`);
     
     // Simplified date range logic
     let rangeEnd;
     if (dateRange === 1) {
       // For 1 day: next 30 hours to handle timezone issues
       rangeEnd = new Date(now.getTime() + 30 * 60 * 60 * 1000);
-      console.log(`📅 1 day mode: until ${rangeEnd.toISOString()}`);
+      const rangeEndMT = rangeEnd.toLocaleString('en-US', { timeZone: 'America/Denver', hour12: true });
+      console.log(`📅 1 day mode: until ${rangeEnd.toISOString()} (${rangeEndMT} MT)`);
     } else {
       // For multi-day: exact calculation
       rangeEnd = new Date(now.getTime() + dateRange * 24 * 60 * 60 * 1000);
-      console.log(`📅 ${dateRange} day mode: until ${rangeEnd.toISOString()}`);
+      const rangeEndMT = rangeEnd.toLocaleString('en-US', { timeZone: 'America/Denver', hour12: true });
+      console.log(`📅 ${dateRange} day mode: until ${rangeEnd.toISOString()} (${rangeEndMT} MT)`);
     }
     
     return { now, rangeEnd };
@@ -142,13 +173,24 @@ class TargetedOddsAgent {
   async fetchFromBook(bookmaker, sports, betTypes, now, rangeEnd, { fastMode = false, capCount = 12 } = {}) {
     const allOddsResults = [];
     
+    // Log what bet types we received from the user
+    console.log(`🎯 User selected bet types:`, betTypes);
+    
     // Handle "ALL" bet types by expanding to all available markets
     let requestedMarkets;
     if (betTypes.includes('ALL') || betTypes.includes('All') || betTypes.includes('all')) {
       requestedMarkets = fastMode ? ['h2h','spreads','totals'] : Object.values(MARKET_MAPPING).flat();
       console.log(`🔥 ALL bet types selected - markets: ${requestedMarkets.join(', ')} (fastMode=${fastMode})`);
     } else {
-      requestedMarkets = betTypes.flatMap(bt => MARKET_MAPPING[bt] || []);
+      requestedMarkets = betTypes.flatMap(bt => {
+        const markets = MARKET_MAPPING[bt];
+        if (!markets) {
+          console.warn(`⚠️  Unknown bet type "${bt}" - no market mapping found`);
+          return [];
+        }
+        return markets;
+      });
+      console.log(`📋 Mapped to API markets:`, requestedMarkets);
       if (fastMode) {
         // In fast mode, trim to core markets
         requestedMarkets = requestedMarkets.filter(m => ['h2h','spreads','totals'].includes(m));
@@ -202,8 +244,12 @@ class TargetedOddsAgent {
   }
 
   // Cache management methods
-  getCacheKey(slug, bookmaker, markets) {
-    return `${slug}-${bookmaker}-${Array.isArray(markets) ? markets.sort().join(',') : markets}`;
+  getCacheKey(slug, bookmaker, markets, commenceTimeFrom, commenceTimeTo) {
+    const marketKey = Array.isArray(markets) ? markets.sort().join(',') : markets;
+    const dateKey = commenceTimeFrom && commenceTimeTo 
+      ? `-${commenceTimeFrom}-${commenceTimeTo}` 
+      : '';
+    return `${slug}-${bookmaker}-${marketKey}${dateKey}`;
   }
 
   isValidCacheEntry(entry) {
@@ -262,10 +308,10 @@ class TargetedOddsAgent {
 
   async fetchRegularMarkets(slug, bookmaker, markets, now, rangeEnd) {
     const marketsStr = markets.join(',');
-    const cacheKey = this.getCacheKey(slug, bookmaker, markets);
     // Use API's date filtering parameters to only get games in our time range
     const commenceTimeFrom = now.toISOString();
     const commenceTimeTo = rangeEnd.toISOString();
+    const cacheKey = this.getCacheKey(slug, bookmaker, markets, commenceTimeFrom, commenceTimeTo);
     const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(marketsStr)}&oddsFormat=american&bookmakers=${bookmaker}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}&apiKey=${this.apiKey}`;
     
     try {
@@ -278,9 +324,17 @@ class TargetedOddsAgent {
       if (Array.isArray(data) && data.length > 0) {
         console.log(`  ✓ API returned ${data.length} games in date range`);
         
-        // Debug: Log first few games
+        // Debug: Log first few games with Mountain Time
         data.slice(0, 3).forEach(game => {
-          console.log(`    ${game.away_team} @ ${game.home_team}: ${new Date(game.commence_time).toLocaleString()}`);
+          const gameDateMT = new Date(game.commence_time).toLocaleString('en-US', { 
+            timeZone: 'America/Denver',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          });
+          console.log(`    ${game.away_team} @ ${game.home_team}: ${gameDateMT} MT`);
         });
         
         return data;
@@ -317,10 +371,10 @@ class TargetedOddsAgent {
         const batch = marketBatches[myIndex];
         try {
           const batchStr = batch.join(',');
-          const cacheKey = this.getCacheKey(slug, bookmaker, batch);
           // Use API's date filtering parameters
           const commenceTimeFrom = now.toISOString();
           const commenceTimeTo = rangeEnd.toISOString();
+          const cacheKey = this.getCacheKey(slug, bookmaker, batch, commenceTimeFrom, commenceTimeTo);
           const url = `https://api.the-odds-api.com/v4/sports/${slug}/odds/?regions=us&markets=${encodeURIComponent(batchStr)}&oddsFormat=american&bookmakers=${bookmaker}&commenceTimeFrom=${commenceTimeFrom}&commenceTimeTo=${commenceTimeTo}&apiKey=${this.apiKey}`;
           console.log(`    📡 Prop batch: ${batch.join(', ')}`);
           const data = await this.fetchWithCache(url, cacheKey);

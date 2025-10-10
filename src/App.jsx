@@ -393,7 +393,6 @@ const App = () => {
       </header>
 
       <div className="space-y-6 max-w-2xl mx-auto">
-        <PhaseProgress loading={loading} progress={progressPhase} timings={timings} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
             label="1. Sports (Select Multiple)"
@@ -564,6 +563,11 @@ const App = () => {
 
       {/* AI Agents Workflow Component */}
       <AIAgentsWorkflow />
+
+      {/* Generation Progress at Bottom */}
+      <div className="max-w-2xl mx-auto mt-8">
+        <PhaseProgress loading={loading} progress={progressPhase} timings={timings} />
+      </div>
     </div>
   );
 };
