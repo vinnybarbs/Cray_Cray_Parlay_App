@@ -196,12 +196,6 @@ class MultiAgentCoordinator {
       // Phase 1: Targeted Odds Collection
     console.log('\n🏗️ PHASE 1: TARGETED ODDS COLLECTION');
     const tOdds0 = Date.now();
-    
-    // Emit progress: odds phase started
-    if (request.requestId && global.emitProgress) {
-      global.emitProgress(request.requestId, 'odds', 'active');
-    }
-    
   const oddsResult = await this.oddsAgent.fetchOddsForSelectedBook(request);
     tOddsMs = Date.now() - tOdds0;
       
@@ -211,14 +205,6 @@ class MultiAgentCoordinator {
       
       console.log(`✅ Odds Phase Complete: ${oddsResult.odds.length} games, ${oddsResult.dataQuality}% quality`);
       console.log(`📊 Source: ${oddsResult.source}${oddsResult.fallbackUsed ? ' (fallback used)' : ''}`);
-
-      // Emit progress: odds phase complete
-      if (request.requestId && global.emitProgress) {
-        global.emitProgress(request.requestId, 'odds', 'complete', { 
-          gameCount: oddsResult.odds.length,
-          dataQuality: oddsResult.dataQuality
-        });
-      }
 
       // Smart bet type expansion: with conflict rules, max valid legs ≈ 2 × game count
       // (1 total bet + 1 spread/ML per game, no conflicts allowed)
@@ -254,38 +240,14 @@ class MultiAgentCoordinator {
       // Phase 2: Enhanced Research
     console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
     const tResearch0 = Date.now();
-    
-    // Emit progress: research phase started
-    if (request.requestId && global.emitProgress) {
-      global.emitProgress(request.requestId, 'research', 'active', {
-        gamesCount: oddsResult.odds.length
-      });
-    }
-    
   const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds, { fastMode: !!request.fastMode });
     tResearchMs = Date.now() - tResearch0;
       
       const researchedCount = enrichedGames.filter(g => g.research).length;
       console.log(`✅ Research Phase Complete: ${researchedCount}/${enrichedGames.length} games researched`);
-      
-      // Emit progress: research phase complete
-      if (request.requestId && global.emitProgress) {
-        global.emitProgress(request.requestId, 'research', 'complete', {
-          researchedCount,
-          totalGames: enrichedGames.length
-        });
-      }
 
       // Phase 3: AI Parlay Analysis with Retry Mechanism
     console.log('\n🧠 PHASE 3: AI PARLAY ANALYSIS');
-    
-    // Emit progress: analysis phase started
-    if (request.requestId && global.emitProgress) {
-      global.emitProgress(request.requestId, 'analysis', 'active', {
-        numLegs: request.numLegs
-      });
-    }
-    
   let aiContent = '';
   let attempts = 0;
   const maxAttempts = request.fastMode ? 2 : 3;
@@ -428,13 +390,6 @@ class MultiAgentCoordinator {
       console.log('✅ Odds calculations verified and corrected');
       tPostMs = Date.now() - tPost0;
 
-      // Emit progress: analysis phase complete
-      if (request.requestId && global.emitProgress) {
-        global.emitProgress(request.requestId, 'analysis', 'complete', {
-          legCount: validationResult.actualLegCount
-        });
-      }
-
       // Phase 5: Quality Assurance
       const totalMs = Date.now() - tStart;
       const metadata = {
@@ -462,11 +417,6 @@ class MultiAgentCoordinator {
       console.log(`💾 Data Source: ${metadata.oddsSource}`);
       console.log(`⏱️ Timings (ms): odds=${tOddsMs} research=${tResearchMs} analysis=${tAnalysisMs} post=${tPostMs} total=${totalMs}`);
       console.log('='.repeat(80));
-
-      // Emit final completion signal
-      if (request.requestId && global.emitComplete) {
-        global.emitComplete(request.requestId);
-      }
 
       return {
         content: finalContent,

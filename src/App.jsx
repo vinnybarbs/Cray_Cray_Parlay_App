@@ -1,5 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
-import ProgressSteps from './components/ProgressSteps';
+import React, { useState, useCallback } from 'react';
 
 // Simple Phase Progress component
 const PhaseProgress = ({ loading, progress, timings }) => {
@@ -255,12 +254,6 @@ const App = () => {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [progressPhase, setProgressPhase] = useState(0);
   const [timings, setTimings] = useState(null);
-  const [progress, setProgress] = useState({
-    odds: 'pending',
-    research: 'pending',
-    analysis: 'pending'
-  });
-  const eventSourceRef = useRef(null);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...", "Bribing the refs for insider info...", "Sacrificing a prop bet to the degen gods...",
@@ -355,42 +348,6 @@ const App = () => {
     setResults('');
     setError(null);
     setLoadingMessage(getRandomLoadingMessage());
-    setProgress({ odds: 'pending', research: 'pending', analysis: 'pending' });
-
-    // Generate unique request ID
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Close any existing EventSource
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
-
-    // Connect to SSE for progress updates
-    const eventSource = new EventSource(`/api/generate-parlay-stream/${requestId}`);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        
-        if (data.type === 'progress') {
-          setProgress(prev => ({
-            ...prev,
-            [data.phase]: data.status
-          }));
-        } else if (data.type === 'complete') {
-          eventSource.close();
-          eventSourceRef.current = null;
-        }
-      } catch (err) {
-        console.error('SSE parse error:', err);
-      }
-    };
-
-    eventSource.onerror = () => {
-      eventSource.close();
-      eventSourceRef.current = null;
-    };
 
     try {
       setProgressPhase(0);
@@ -404,8 +361,7 @@ const App = () => {
           oddsPlatform,
           aiModel,
           riskLevel,
-          dateRange,
-          requestId  // Pass the requestId
+          dateRange
         })
       });
 
@@ -426,21 +382,8 @@ const App = () => {
       setError(`Failed to generate parlays: ${e.message}`);
     } finally {
       setLoading(false);
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-      }
     }
   }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, dateRange]);
-
-  // Cleanup EventSource on unmount
-  useEffect(() => {
-    return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
@@ -540,8 +483,18 @@ const App = () => {
         
         {loading && (
           <div className="p-8 text-center border-2 border-yellow-500 rounded-xl bg-gradient-to-br from-gray-800 to-gray-900 shadow-2xl">
-            <ProgressSteps progress={progress} />
-            <p className="text-lg font-medium text-yellow-400 mt-6 animate-pulse">{loadingMessage}</p>
+            <div className="flex flex-col items-center space-y-4">
+              <div className="relative w-16 h-16">
+                <div className="absolute inset-0 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                <div className="absolute inset-2 border-4 border-red-500 border-t-transparent rounded-full animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.6s' }}></div>
+              </div>
+              <p className="text-xl font-bold text-yellow-400 animate-pulse">{loadingMessage}</p>
+              <div className="flex space-x-1 mt-2">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+              </div>
+            </div>
           </div>
         )}
 

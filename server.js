@@ -112,11 +112,14 @@ app.get('/debug/odds-test', async (req, res) => {
 app.get('/api/generate-parlay-stream/:requestId', (req, res) => {
   const { requestId } = req.params;
   
+  console.log(`🔌 SSE Client connected: ${requestId}`);
+  
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders(); // Flush headers immediately
   
   // Add this client to the progress tracking
   if (!progressClients.has(requestId)) {
@@ -126,6 +129,7 @@ app.get('/api/generate-parlay-stream/:requestId', (req, res) => {
   
   // Send initial connection message
   res.write(`data: ${JSON.stringify({ type: 'connected', requestId })}\n\n`);
+  console.log(`✅ SSE Client registered: ${requestId} (${progressClients.get(requestId).length} clients)`);
   
   // Clean up on client disconnect
   req.on('close', () => {

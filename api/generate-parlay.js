@@ -715,13 +715,9 @@ async function handler(req, res) {
       }
     }
 
-    // Generate unique request ID for progress tracking
-    const requestId = req.body.requestId || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
     console.log('\n' + '='.repeat(60));
     console.log('🎯 MULTI-AGENT PARLAY GENERATION REQUEST');
     console.log('='.repeat(60));
-    console.log(`Request ID: ${requestId}`);
     console.log(`Sports: ${selectedSports.join(', ')}`);
     console.log(`Bet Types: ${selectedBetTypes.join(', ')}`);
     console.log(`Legs: ${numLegs} | Risk: ${riskLevel} | Platform: ${oddsPlatform}`);
@@ -740,8 +736,7 @@ async function handler(req, res) {
       aiModel,
       riskLevel,
       dateRange,
-      fastMode,
-      requestId  // Pass requestId for progress tracking
+      fastMode
     });
 
     console.log('✅ Multi-agent parlay generation successful!\n');
