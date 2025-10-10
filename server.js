@@ -9,6 +9,9 @@ const generateParlayHandler = require('./api/generate-parlay');
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+// Progress tracking for SSE
+const progressClients = new Map(); // requestId -> [response objects]
+
 // Enhanced CORS for deployment
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
@@ -104,6 +107,76 @@ app.get('/debug/odds-test', async (req, res) => {
     res.json({ error: err.message });
   }
 });
+
+// SSE endpoint for real-time progress updates
+app.get('/api/generate-parlay-stream/:requestId', (req, res) => {
+  const { requestId } = req.params;
+  
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  
+  // Add this client to the progress tracking
+  if (!progressClients.has(requestId)) {
+    progressClients.set(requestId, []);
+  }
+  progressClients.get(requestId).push(res);
+  
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({ type: 'connected', requestId })}\n\n`);
+  
+  // Clean up on client disconnect
+  req.on('close', () => {
+    const clients = progressClients.get(requestId);
+    if (clients) {
+      const index = clients.indexOf(res);
+      if (index > -1) clients.splice(index, 1);
+      if (clients.length === 0) progressClients.delete(requestId);
+    }
+  });
+});
+
+// Helper function to emit progress to all connected clients
+global.emitProgress = (requestId, phase, status, details = {}) => {
+  const clients = progressClients.get(requestId);
+  if (!clients || clients.length === 0) return;
+  
+  const message = JSON.stringify({ 
+    type: 'progress',
+    phase,      // 'odds', 'research', 'analysis'
+    status,     // 'active', 'complete'
+    details,    // optional: { gameCount, researchCount, etc }
+    timestamp: Date.now()
+  });
+  
+  clients.forEach(client => {
+    try {
+      client.write(`data: ${message}\n\n`);
+    } catch (err) {
+      // Client disconnected
+    }
+  });
+};
+
+// Helper to emit completion and close connections
+global.emitComplete = (requestId) => {
+  const clients = progressClients.get(requestId);
+  if (!clients) return;
+  
+  const message = JSON.stringify({ type: 'complete', timestamp: Date.now() });
+  clients.forEach(client => {
+    try {
+      client.write(`data: ${message}\n\n`);
+      client.end();
+    } catch (err) {
+      // Already closed
+    }
+  });
+  
+  progressClients.delete(requestId);
+};
 
 app.post('/api/generate-parlay', generateParlayHandler);
 

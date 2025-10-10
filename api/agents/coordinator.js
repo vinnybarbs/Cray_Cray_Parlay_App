@@ -196,6 +196,12 @@ class MultiAgentCoordinator {
       // Phase 1: Targeted Odds Collection
     console.log('\n🏗️ PHASE 1: TARGETED ODDS COLLECTION');
     const tOdds0 = Date.now();
+    
+    // Emit progress: odds phase started
+    if (request.requestId && global.emitProgress) {
+      global.emitProgress(request.requestId, 'odds', 'active');
+    }
+    
   const oddsResult = await this.oddsAgent.fetchOddsForSelectedBook(request);
     tOddsMs = Date.now() - tOdds0;
       
@@ -206,11 +212,20 @@ class MultiAgentCoordinator {
       console.log(`✅ Odds Phase Complete: ${oddsResult.odds.length} games, ${oddsResult.dataQuality}% quality`);
       console.log(`📊 Source: ${oddsResult.source}${oddsResult.fallbackUsed ? ' (fallback used)' : ''}`);
 
+      // Emit progress: odds phase complete
+      if (request.requestId && global.emitProgress) {
+        global.emitProgress(request.requestId, 'odds', 'complete', { 
+          gameCount: oddsResult.odds.length,
+          dataQuality: oddsResult.dataQuality
+        });
+      }
+
       // Smart bet type expansion: with conflict rules, max valid legs ≈ 2 × game count
       // (1 total bet + 1 spread/ML per game, no conflicts allowed)
       const currentBetTypes = Array.isArray(request.selectedBetTypes) ? request.selectedBetTypes : [];
+      const userSelectedMultipleBetTypes = currentBetTypes.length > 1; // User intentionally selected multiple types
       const maxValidLegs = Math.max(2, oddsResult.odds.length * 2);
-      let addedPlayerProps = false;
+      let addedPlayerPropsAutomatically = false;
       
       if (request.numLegs > maxValidLegs) {
         console.log(`⚠️ WARNING: Requested ${request.numLegs} legs but only ${oddsResult.odds.length} games available.`);
@@ -222,29 +237,55 @@ class MultiAgentCoordinator {
           const singleBetType = currentBetTypes[0] || 'spreads';
           request.selectedBetTypes = [singleBetType];
           console.log(`   ✅ Single leg requested: Using only ${singleBetType} to avoid conflicts`);
-        } else {
-          // For multiple legs, add player props to enable same-game parlays
+        } else if (!userSelectedMultipleBetTypes) {
+          // Only auto-add player props if user didn't already select multiple bet types
           console.log(`   📊 EXPANDING BET TYPES: Adding player props to fill remaining ${request.numLegs - maxValidLegs} legs`);
           
           if (!currentBetTypes.includes('player_props')) {
             request.selectedBetTypes = [...currentBetTypes, 'player_props'];
-            addedPlayerProps = true;
-            console.log(`   ✅ Player props enabled to allow same-game parlays`);
+            addedPlayerPropsAutomatically = true;
+            console.log(`   ✅ Player props automatically enabled to allow same-game parlays`);
           }
+        } else {
+          console.log(`   ℹ️ User selected multiple bet types - no auto-expansion needed`);
         }
       }
 
       // Phase 2: Enhanced Research
     console.log('\n🔍 PHASE 2: ENHANCED RESEARCH');
     const tResearch0 = Date.now();
+    
+    // Emit progress: research phase started
+    if (request.requestId && global.emitProgress) {
+      global.emitProgress(request.requestId, 'research', 'active', {
+        gamesCount: oddsResult.odds.length
+      });
+    }
+    
   const enrichedGames = await this.researchAgent.deepResearch(oddsResult.odds, { fastMode: !!request.fastMode });
     tResearchMs = Date.now() - tResearch0;
       
       const researchedCount = enrichedGames.filter(g => g.research).length;
       console.log(`✅ Research Phase Complete: ${researchedCount}/${enrichedGames.length} games researched`);
+      
+      // Emit progress: research phase complete
+      if (request.requestId && global.emitProgress) {
+        global.emitProgress(request.requestId, 'research', 'complete', {
+          researchedCount,
+          totalGames: enrichedGames.length
+        });
+      }
 
       // Phase 3: AI Parlay Analysis with Retry Mechanism
     console.log('\n🧠 PHASE 3: AI PARLAY ANALYSIS');
+    
+    // Emit progress: analysis phase started
+    if (request.requestId && global.emitProgress) {
+      global.emitProgress(request.requestId, 'analysis', 'active', {
+        numLegs: request.numLegs
+      });
+    }
+    
   let aiContent = '';
   let attempts = 0;
   const maxAttempts = request.fastMode ? 2 : 3;
@@ -369,8 +410,8 @@ class MultiAgentCoordinator {
 
       let finalContent = sanitized;
       
-      // Add disclaimer if player props were auto-enabled
-      if (addedPlayerProps) {
+      // Add disclaimer ONLY if we automatically added player props (not if user selected multiple bet types themselves)
+      if (addedPlayerPropsAutomatically) {
         const disclaimer = `\n\n---\n\n⚠️ **SAME-GAME PARLAY NOTICE**\n\nDue to limited games available (${oddsResult.odds.length} game${oddsResult.odds.length === 1 ? '' : 's'}), player props were automatically included to reach ${request.numLegs} legs. This parlay includes multiple bets from the same game(s). While this allows for more betting options, be aware that same-game parlays have correlated outcomes.\n\n**Conflict Prevention Rules Active:**\n- ✅ No opposing totals (Over/Under)\n- ✅ No opposing spreads\n- ✅ No Moneyline + Spread on same team\n- ✅ No duplicate bets\n\n---`;
         finalContent = finalContent + disclaimer;
       }
@@ -387,6 +428,12 @@ class MultiAgentCoordinator {
       console.log('✅ Odds calculations verified and corrected');
       tPostMs = Date.now() - tPost0;
 
+      // Emit progress: analysis phase complete
+      if (request.requestId && global.emitProgress) {
+        global.emitProgress(request.requestId, 'analysis', 'complete', {
+          legCount: validationResult.actualLegCount
+        });
+      }
 
       // Phase 5: Quality Assurance
       const totalMs = Date.now() - tStart;
@@ -415,6 +462,11 @@ class MultiAgentCoordinator {
       console.log(`💾 Data Source: ${metadata.oddsSource}`);
       console.log(`⏱️ Timings (ms): odds=${tOddsMs} research=${tResearchMs} analysis=${tAnalysisMs} post=${tPostMs} total=${totalMs}`);
       console.log('='.repeat(80));
+
+      // Emit final completion signal
+      if (request.requestId && global.emitComplete) {
+        global.emitComplete(request.requestId);
+      }
 
       return {
         content: finalContent,
