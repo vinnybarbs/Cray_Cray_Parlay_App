@@ -482,7 +482,14 @@ class MultiAgentCoordinator {
     try {
       // Remove all JSON blocks between the markers globally
       const re = /===BEGIN_PARLAY_JSON===([\s\S]*?)===END_PARLAY_JSON===/g;
-      return text.replace(re, '').replace(/\n{3,}/g, '\n\n').trim();
+      let cleaned = text.replace(re, '');
+      
+      // Also remove any JSON blocks wrapped in code fences (Gemini sometimes does this)
+      cleaned = cleaned.replace(/```json\s*([\s\S]*?)```/g, '');
+      cleaned = cleaned.replace(/```\s*([\s\S]*?)```/g, '');
+      
+      // Clean up multiple newlines
+      return cleaned.replace(/\n{3,}/g, '\n\n').trim();
     } catch { return text; }
   }
 
