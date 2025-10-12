@@ -86,6 +86,29 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Debug endpoint for roster cache stats
+app.get('/debug/roster-cache', (req, res) => {
+  try {
+    const rosterCache = require('./lib/services/roster-cache');
+    const stats = rosterCache.getStats();
+    const hasKey = !!(process.env.APISPORTS_API_KEY || process.env.API_SPORTS_KEY);
+    
+    res.json({
+      status: 'ok',
+      apiKey: hasKey ? 'configured' : 'missing',
+      apiKeyName: process.env.APISPORTS_API_KEY ? 'APISPORTS_API_KEY' : (process.env.API_SPORTS_KEY ? 'API_SPORTS_KEY' : 'none'),
+      cache: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Debug endpoint to test Odds API directly
 app.get('/debug/odds-test', async (req, res) => {
   const ODDS_KEY = process.env.ODDS_API_KEY;
