@@ -109,6 +109,29 @@ app.get('/debug/roster-cache', (req, res) => {
   }
 });
 
+// Debug endpoint for NFL Stats service
+app.get('/debug/nfl-stats', (req, res) => {
+  try {
+    const nflStats = require('./lib/services/nfl-stats');
+    const stats = nflStats.getStats();
+    const hasKey = !!(process.env.APISPORTS_API_KEY || process.env.API_SPORTS_KEY);
+    
+    res.json({
+      status: 'ok',
+      service: 'NFL Stats',
+      apiKey: hasKey ? 'configured' : 'missing',
+      stats: stats,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      status: 'error',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Debug endpoint to test Odds API directly
 app.get('/debug/odds-test', async (req, res) => {
   const ODDS_KEY = process.env.ODDS_API_KEY;

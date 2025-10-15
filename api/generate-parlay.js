@@ -86,7 +86,7 @@ async function fetchGameResearch(games, fetcher) {
   
   // Research top 30 games to save API quota
   for (const game of games.slice(0, 30)) {
-    const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const gameDate = new Date(game.commence_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' });
     const query = `${game.away_team} vs ${game.home_team} ${gameDate} injury report recent performance analysis prediction`;
     
     try {
