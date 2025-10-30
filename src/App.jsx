@@ -463,7 +463,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, aiModel, riskLevel, dateRange, addToHistory]);
+  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, riskLevel, dateRange, addToHistory]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
@@ -548,7 +548,7 @@ const App = () => {
           {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
         </button>
         
-        <AiModelToggle aiModel={aiModel} setAiModel={setAiModel} />
+        
 
         {selectedSports.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>}
         {selectedBetTypes.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one bet type</p>}
