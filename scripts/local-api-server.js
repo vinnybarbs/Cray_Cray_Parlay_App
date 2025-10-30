@@ -38,7 +38,6 @@ app.listen(port, () => {
   console.log(`Local API server listening on http://localhost:${port}`);
   console.log('Using env keys present:', {
     OPENAI_KEY: !!process.env.OPENAI_API_KEY,
-    GEMINI_KEY: !!process.env.GEMINI_API_KEY,
     ODDS_KEY: !!process.env.ODDS_API_KEY,
   });
 });

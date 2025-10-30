@@ -33,7 +33,7 @@ const RISK_LEVEL_DEFINITIONS = {
   High: "Value underdogs and high-variance outcomes, +600+ odds",
 };
 
-const AI_MODELS = ['OpenAI', 'Gemini'];
+ 
 
 const App = () => {
   // --- UI State ---
@@ -42,7 +42,7 @@ const App = () => {
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
-  const [aiModel, setAiModel] = useState('OpenAI');
+  
 
   // --- API State ---
   const [loading, setLoading] = useState(false);
@@ -62,73 +62,9 @@ const App = () => {
     );
   };
 
-  // --- Fetch Odds Data ---
-  const fetchOddsData = async () => {
-    try {
-      const oddsResults = [];
-      const selectedBookmaker = BOOKMAKER_MAPPING[oddsPlatform];
-      const oddsApiKey = import.meta.env.VITE_ODDS_API_KEY;
-      const oddsApiBase = import.meta.env.VITE_API;
+  // Backend handles odds fetch and analysis now
 
-      for (const sport of selectedSports) {
-        const slug = SPORT_SLUGS[sport];
-        const markets = selectedBetTypes.flatMap(bt => MARKET_MAPPING[bt]).join(',');
-        const url = `${oddsApiBase}/sports/${slug}/odds/?regions=us&markets=${markets}&oddsFormat=american&bookmakers=${selectedBookmaker}&apiKey=${oddsApiKey}`;
-
-        const res = await fetch(url);
-        if (!res.ok) continue;
-
-        const data = await res.json();
-        oddsResults.push(...data);
-      }
-
-      return oddsResults;
-    } catch (e) {
-      console.error('Error fetching odds:', e);
-      return [];
-    }
-  };
-
-  // --- Generate AI Prompt ---
-  const generateAIPrompt = useCallback((oddsData) => {
-    const sportsStr = selectedSports.join(', ');
-    const betTypesStr = selectedBetTypes.join(', ');
-    const riskDesc = RISK_LEVEL_DEFINITIONS[riskLevel];
-    const oddsContext = oddsData.length
-      ? `\n\n**Supplemental Odds Data (use if available)**:\n${JSON.stringify(oddsData.slice(0, 10), null, 2)}`
-      : '';
-
-    return `
-You are a professional sports betting analyst.
-Generate exactly ${numLegs}-leg parlays for today. Include a bonus lock parlay.
-
-Rules:
-1. Only include sports: ${sportsStr}
-2. Only include bet types: ${betTypesStr}
-3. Include real matchups with current odds if possible
-4. Provide confidence 1-10 for each leg
-5. Include concise degenerate humor in the parlay title or intro
-6. Output structured format exactly as below
-
-Format:
-**Parlay Title**: [Funny/degenerate title]
-**Legs**:
-1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Stats/Trends]
-...
-**Combined Odds**: [Total]
-**Payout on $100**: [XXX]
-
-**Bonus Lock Parlay**:
-1. Game: [Team vs Team] - Bet Type: [Type] - Odds: [XXX] - Confidence: [X/10] - Notes: [Why safe]
-...
-**Combined Odds**: [Total]
-**Reasoning**: [Concise explanation]
-
-Supplemental context for odds: ${oddsContext}
-
-Tone: Serious picks, full personality, concise degenerate-style humor.
-`.trim();
-  }, [selectedSports, selectedBetTypes, numLegs, riskLevel]);
+  // Backend handles prompt generation and analysis
 
   // --- Fetch Parlay Suggestions ---
   const fetchParlaySuggestion = useCallback(async () => {
@@ -139,64 +75,34 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
     setError(null);
 
     try {
-      const oddsData = await fetchOddsData();
-      const prompt = generateAIPrompt(oddsData);
-
-      const apiKey =
-        aiModel === 'OpenAI'
-          ? import.meta.env.VITE_OPENAI_API_KEY
-          : import.meta.env.VITE_GEMINI_API_KEY;
-
-      const apiUrl =
-        aiModel === 'OpenAI'
-          ? 'https://api.openai.com/v1/chat/completions'
-          : import.meta.env.VITE_GEMINI_API_URL;
-
-      const body =
-        aiModel === 'OpenAI'
-          ? {
-              model: 'gpt-4o-mini',
-              messages: [
-                { role: 'system', content: 'You are a concise sports betting analyst producing actionable parlays.' },
-                { role: 'user', content: prompt },
-              ],
-              temperature: 0.7,
-              max_tokens: 2000,
-            }
-          : {
-              model: 'gemini-prototype',
-              prompt,
-              temperature: 0.7,
-              max_tokens: 2000,
-            };
-
-      const response = await fetch(apiUrl, {
+      const response = await fetch('/api/generate-parlay', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          selectedSports,
+          selectedBetTypes,
+          numLegs,
+          oddsPlatform,
+          riskLevel,
+          dateRange: 1
+        })
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`AI API error: ${response.status} - ${errorText}`);
+        throw new Error(`Server error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || data.output;
-
-      if (!content) throw new Error('No content returned from AI');
-
-      setResults(content);
+      if (!data.content) throw new Error('No content returned from backend');
+      setResults(data.content);
     } catch (e) {
       console.error('API Error:', e);
       setError(`Failed to generate parlays: ${e.message}`);
     } finally {
       setLoading(false);
     }
-  }, [aiModel, generateAIPrompt, loading, selectedSports, selectedBetTypes]);
+  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, riskLevel]);
 
   // --- UI Components ---
   const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -294,12 +200,7 @@ Tone: Serious picks, full personality, concise degenerate-style humor.
           />
         </div>
 
-        <Dropdown
-          label="AI Model"
-          value={aiModel}
-          onChange={setAiModel}
-          options={AI_MODELS}
-        />
+        
 
         <button
           onClick={fetchParlaySuggestion}

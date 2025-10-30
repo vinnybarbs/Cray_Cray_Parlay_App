@@ -209,12 +209,8 @@ function generateAIPrompt({ selectedSports, selectedBetTypes, numLegs, riskLevel
     marketAvailabilityNote = `\n\n📊 DATA AVAILABILITY:\n${unavailableInfo.join('\n')}`;
   }
 
-  // Different prompts for different AI models
-  if (aiModel === 'gemini') {
-    return generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext });
-  } else {
-    return generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext });
-  }
+  // Always use OpenAI prompt
+  return generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext });
 }
 
 function generateOpenAIPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext }) {
@@ -308,142 +304,7 @@ TONE: Professional with subtle humor. Be concise but reference research insights
 `.trim();
 }
 
-function generateGeminiPrompt({ sportsStr, betTypesStr, numLegs, riskLevel, today, dateRangeText, marketAvailabilityNote, oddsContext }) {
-  return `
-You are a professional sports betting analyst. Your task is to create exactly ${numLegs} parlay legs using the provided data.
-
-STRICT REQUIREMENTS:
-1. ⚠️ MANDATORY: Create EXACTLY ${numLegs} legs - no more, no less ⚠️
-2. Use ONLY games and odds from the data below
-3. Each leg must have: Date (MM/DD/YYYY), Game, Bet, Odds, Confidence (1-10), Reasoning
-4. SMART GAME USAGE:
-   - PREFER different games when available
-   - IF LIMITED GAMES: Use multiple bet types from same game (spread + total + props)
-   - Different players for props to avoid correlation
-5. Include variety in bet types if multiple types are available
-6. MANDATORY: Reference specific research data in reasoning when available
-7. NEVER use generic reasons like "winning record" or "home field advantage"
-8. ALWAYS cite injury reports, recent performance, or specific research insights
-9. ⚠️ COUNT YOUR LEGS: Must be exactly ${numLegs} legs total ⚠️
-
-SAME GAME PARLAY STRATEGY (when limited games):
-✅ Eagles @ Giants: Eagles -6.5 spread + Over 47.5 total + Hurts Over 250.5 pass yards + AJ Brown anytime TD
-✅ This creates 4 different bet types from one game
-✅ No conflicting bets (all support Eagles winning big in a high-scoring game)
-
-RESEARCH ANALYSIS REQUIREMENTS:
-- When research data is provided (📰 RESEARCH: section), you MUST reference it
-- Cite specific injuries, lineup changes, recent form, head-to-head trends
-- Base confidence levels on concrete data points from research
-- Avoid generic analysis - use the provided research insights
-- If no research is available for a game, acknowledge it and be more conservative
-
-CRITICAL CONFLICT PREVENTION RULES:
-- AVOID OPPOSING BETS: No Team A moneyline + Team B moneyline (same game)
-- AVOID CONFLICTING SPREADS: No Team A spread + Team B spread (same game)  
-- AVOID CONFLICTING TOTALS: No Over + Under (same game)
-- AVOID CONFLICTING PROPS: No same player Over + Under prop
-- SAME GAME ALLOWED: Different bet types from same game (spread + total + props)
-- CORRELATION LOGIC: Choose bets that support each other when from same game
-
-SMART SAME GAME COMBINATIONS:
-✅ Favorite spread + Over total + Star player props (all align with blowout)
-✅ Underdog moneyline + Under total + Defensive props (align with upset)
-✅ Different players props from same team (QB yards + RB yards + WR TD)
-
-EXAMPLES OF FORBIDDEN CONFLICTS:
-❌ Giants moneyline + Eagles moneyline (same game) = FORBIDDEN
-❌ Cowboys +3.5 + Eagles -3.5 (same game) = FORBIDDEN  
-❌ Over 45.5 + Under 45.5 (same game) = FORBIDDEN
-❌ Player Over 250 yards + Same Player Under 250 yards = FORBIDDEN
-
-EXAMPLES OF ALLOWED SAME GAME PARLAYS:
-✅ Eagles -6.5 spread + Over 47.5 total + Hurts Over 250.5 pass yards = ALLOWED
-✅ Chiefs moneyline + Mahomes Over 2.5 pass TDs + Kelce anytime TD = ALLOWED
-
-TODAY: ${today}
-SPORTS: ${sportsStr}
-BET TYPES: ${betTypesStr}
-RISK LEVEL: ${riskLevel}
-
-${marketAvailabilityNote}
-
-${oddsContext}
-
-BEFORE YOU START - CHECK FOR CONFLICTS:
-- Review each leg to ensure NO conflicting bets
-- Verify each leg is from a DIFFERENT game
-- Confirm no duplicate teams or players
-- Double-check no opposing sides of same bet
-
-OUTPUT FORMAT - Follow this EXACT structure:
-
-**🎯 ${numLegs}-Leg Parlay: [Title]**
-
-**Legs:**
-1. 📅 DATE: MM/DD/YYYY
-   Game: Away Team @ Home Team
-   Bet: Specific bet with line
-   Odds: +XXX or -XXX
-   Confidence: X/10
-   Reasoning: Why this will hit (cite specific research data)
-
-2. 📅 DATE: MM/DD/YYYY
-   Game: Away Team @ Home Team
-   Bet: Specific bet with line
-   Odds: +XXX or -XXX
-   Confidence: X/10
-   Reasoning: Why this will hit (cite specific research data)
-
-[Continue for ${numLegs} total legs]
-
-**Combined Odds:** [WILL BE CALCULATED AUTOMATICALLY]
-**Payout on $100:** $[WILL BE CALCULATED AUTOMATICALLY]
-**Overall Confidence:** X/10
-
----
-
-**🔒 BONUS LOCK PARLAY: [Title]**
-
-**Legs:**
-1. 📅 DATE: MM/DD/YYYY
-   Game: Away Team @ Home Team
-   Bet: Specific bet with line
-   Odds: +XXX or -XXX
-   Confidence: X/10
-   Reasoning: Why this is safe (cite research data)
-
-2. 📅 DATE: MM/DD/YYYY
-   Game: Away Team @ Home Team
-   Bet: Specific bet with line
-   Odds: +XXX or -XXX
-   Confidence: X/10
-   Reasoning: Why this is safe (cite research data)
-
-**Combined Odds:** Calculate combined odds
-**Payout on $100:** $XXX
-**Why These Are Locks:** Brief explanation
-
-CRITICAL FINAL CHECK:
-1. ⚠️ COUNT CHECK: You MUST create exactly ${numLegs} legs in the main parlay ⚠️
-2. Each leg MUST be from a different game
-3. NO conflicting bets (opposing sides of same wager)
-4. NO duplicate teams/players across legs  
-5. NO same team with different bet types (e.g., Giants ML + Giants spread)
-6. MANDATORY: Use research data to justify picks with specific details
-7. Cite actual injuries, trends, or performance data in reasoning
-8. Follow the exact format above
-9. ⚠️ FINAL COUNT: Main parlay has exactly ${numLegs} legs ⚠️
-
-REASONING QUALITY REQUIREMENTS:
-- BAD: "Since they have a winning record I'm leaning toward them covering"
-- GOOD: "QB Smith is questionable with ankle injury (per research), backup has struggled in road games this season"
-- BAD: "Home field advantage should help"
-- GOOD: "Research shows they're 6-1 ATS at home this season, averaging 28 PPG vs 19 on road"
-
-DO NOT DEVIATE FROM THESE RULES.
-`.trim();
-}
+ 
 
 // Function to fix odds calculations in AI-generated content
 function fixOddsCalculations(content) {
@@ -593,15 +454,13 @@ async function handler(req, res) {
   const apiKeys = {
     odds: process.env.ODDS_API_KEY,
     serper: process.env.SERPER_API_KEY,
-    openai: process.env.OPENAI_API_KEY,
-    gemini: process.env.GEMINI_API_KEY
+    openai: process.env.OPENAI_API_KEY
   };
 
   logger.debug('Environment check', {
     hasOddsKey: !!apiKeys.odds,
     hasOpenAIKey: !!apiKeys.openai,
     hasSerperKey: !!apiKeys.serper,
-    hasGeminiKey: !!apiKeys.gemini,
     nodeEnv: process.env.NODE_ENV || 'undefined'
   });
 
@@ -637,35 +496,19 @@ async function handler(req, res) {
     
     numLegs = parseInt(numLegs) || 3;
     oddsPlatform = oddsPlatform || 'DraftKings';
-    aiModel = aiModel || 'openai';
+    aiModel = 'openai'; // force OpenAI-only
     riskLevel = riskLevel || 'Medium';
   dateRange = parseInt(dateRange) || 1;
   fastMode = !!fastMode; // optional latency-optimized mode
 
-    // Preflight: ensure required AI key is present for selected model, with smart fallback or mock
-    if (aiModel === 'openai' && !apiKeys.openai) {
-      if (apiKeys.gemini) {
-        logger.warn('Missing OPENAI_API_KEY, falling back to Gemini');
-        aiModel = 'gemini';
-      } else if (mockMode || req.body?.mock) {
+    // Preflight: ensure OpenAI key is present or serve mock
+    if (!apiKeys.openai) {
+      if (mockMode || req.body?.mock) {
         logger.info('Returning mock parlay (no AI keys)');
         return res.status(200).json(buildMockParlayResponse({ aiModel: 'mock', selectedSports, selectedBetTypes, numLegs }));
-      } else {
-        logger.error('Missing OPENAI_API_KEY and no fallback available');
-        return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
       }
-    }
-    if (aiModel === 'gemini' && !apiKeys.gemini) {
-      if (apiKeys.openai) {
-        logger.warn('Missing GEMINI_API_KEY, falling back to OpenAI');
-        aiModel = 'openai';
-      } else if (mockMode || req.body?.mock) {
-        logger.info('Returning mock parlay (no AI keys)');
-        return res.status(200).json(buildMockParlayResponse({ aiModel: 'mock', selectedSports, selectedBetTypes, numLegs }));
-      } else {
-        logger.error('Missing GEMINI_API_KEY and no fallback available');
-        return res.status(500).json({ error: 'Server missing GEMINI_API_KEY' });
-      }
+      logger.error('Missing OPENAI_API_KEY');
+      return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
     }
 
     console.log('\n' + '='.repeat(60));
@@ -674,7 +517,7 @@ async function handler(req, res) {
     console.log(`Sports: ${selectedSports.join(', ')}`);
     console.log(`Bet Types: ${selectedBetTypes.join(', ')}`);
     console.log(`Legs: ${numLegs} | Risk: ${riskLevel} | Platform: ${oddsPlatform}`);
-    console.log(`AI Model: ${aiModel} | Date Range: ${dateRange} days`);
+    console.log(`AI Model: openai | Date Range: ${dateRange} days`);
     console.log('='.repeat(60) + '\n');
 
     // Generate unique request ID for progress tracking

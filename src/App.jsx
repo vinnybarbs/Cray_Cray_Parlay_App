@@ -263,31 +263,12 @@ const Dropdown = ({ label, value, onChange, options, description }) => (
   </div>
 );
 
-const AiModelToggle = ({ aiModel, setAiModel }) => (
-  <div className="flex justify-center items-center mt-4 p-1 rounded-xl bg-gray-700">
-      <button
-          onClick={() => setAiModel('openai')}
-          className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
-              aiModel === 'openai' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
-          }`}
-      >
-          OpenAI
-      </button>
-      <button
-          onClick={() => setAiModel('gemini')}
-          className={`w-1/2 py-2 text-sm font-bold rounded-lg transition-colors duration-300 ${
-              aiModel === 'gemini' ? 'bg-yellow-500 text-gray-900' : 'text-gray-300 hover:bg-gray-600'
-          }`}
-      >
-          Gemini
-      </button>
-  </div>
-);
+ 
 
 const RISK_LEVEL_DEFINITIONS = {
-  Low: "High probability to hit, heavy favorites, +200 to +400 odds.",
-  Medium: "Balanced value favorites with moderate props, +400 to +600 odds.",
-  High: "Value underdogs and high-variance outcomes, +600+ odds.",
+  Low: "Stack heavy favorites; prioritize per-leg probability over payout. Accept -200 to -1000 odds per leg. Target combined +200 to +400 via stacking.",
+  Medium: "Balanced value with mostly favorites; occasional plus-money when justified. Target combined +400 to +600.",
+  High: "Underdogs and high-variance outcomes allowed to chase payout; +600+ combined odds.",
 };
 
 // --- Main App Component ---
@@ -297,7 +278,7 @@ const App = () => {
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
-  const [aiModel, setAiModel] = useState('openai');
+  
   const [dateRange, setDateRange] = useState(1);
   const [copied, setCopied] = useState(false);
   const [summarycopied, setSummaryCopped] = useState(false);
@@ -426,7 +407,6 @@ const App = () => {
           selectedBetTypes,
           numLegs,
           oddsPlatform,
-          aiModel,
           riskLevel,
           dateRange
         })
@@ -459,7 +439,6 @@ const App = () => {
           selectedBetTypes,
           numLegs,
           oddsPlatform,
-          aiModel,
           riskLevel,
           dateRange
         }

@@ -33,7 +33,7 @@ function hexSnippet(s, n=8) {
   return { start, end, length: buf.length };
 }
 
-const keysToCheck = ['OPENAI_API_KEY','GEMINI_API_KEY','ODDS_API_KEY'];
+const keysToCheck = ['OPENAI_API_KEY','ODDS_API_KEY'];
 const results = {};
 
 for (const key of keysToCheck) {
