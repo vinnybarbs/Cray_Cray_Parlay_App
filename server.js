@@ -16,14 +16,32 @@ const PORT = process.env.PORT || 5001;
 const progressClients = new Map(); // requestId -> [response objects]
 
 // Enhanced CORS for deployment
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL, 'https://your-deployed-app.com'] 
-    : true,
-  credentials: true
-}));
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
 
-app.options('*', cors());
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow server-to-server or curl without Origin
+    if (!origin) return callback(null, true);
+    // Allow everything in non-production
+    if (process.env.NODE_ENV !== 'production') return callback(null, true);
+    // If no list configured, allow
+    if (allowedOrigins.length === 0) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
+  allowedHeaders: ['Content-Type','Authorization','Accept'],
+  credentials: true,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight for all routes (Express 5 requires /* not *)
+app.options('/*', cors(corsOptions));
 
 app.use(express.json());
 
@@ -41,6 +59,8 @@ if (missingKeys.length > 0) {
 // Force HTTPS in production (but not in local development)
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
+    // Never redirect preflight; let CORS respond
+    if (req.method === 'OPTIONS') return next();
     if (req.headers.host?.includes('localhost')) {
       next(); // Skip HTTPS redirect for localhost
     } else if (req.header('x-forwarded-proto') !== 'https') {
