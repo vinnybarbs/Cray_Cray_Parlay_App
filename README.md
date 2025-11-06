@@ -1,6 +1,6 @@
 # 🎰 Cray Cray for Parlays
 
-An AI-powered parlay betting suggestion tool that uses multi-agent architecture to generate data-driven betting recommendations.
+An AI-powered parlay builder that uses multi-agent architecture to provide data-driven betting suggestions for you to build custom parlays.
 
 ## 🌟 Features
 
@@ -148,7 +148,7 @@ Cray_Cray_Parlay_App/
    - **High**: Underdogs and high variance (+600+)
 6. **Select Sportsbook**: DraftKings, FanDuel, MGM, Caesars, Bet365
 7. **Choose AI Model**: OpenAI or Gemini
-8. **Generate**: Click to generate your parlay!
+8. **Build**: Click to get AI suggestions and build your parlay!
 
 ## 🧪 Testing
 
@@ -162,7 +162,7 @@ npm run lint
 
 ## 📊 API Rate Limits
 
-- **Parlay Generation**: 10 requests per 15 minutes per IP
+- **Parlay Builder**: 10 requests per 15 minutes per IP
 - **General Endpoints**: 60 requests per minute per IP
 
 ## 🔒 Security

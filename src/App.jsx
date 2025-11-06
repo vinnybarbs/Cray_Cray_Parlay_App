@@ -14,7 +14,7 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
   
   return (
     <div className="p-3 rounded-lg bg-black bg-opacity-30 border border-gray-700">
-      <div className="text-xs font-semibold text-gray-300 mb-2 text-center">Generation Progress</div>
+      <div className="text-xs font-semibold text-gray-300 mb-2 text-center">Building Your Parlay</div>
       
       {/* Phase indicators */}
       <div className="flex items-center justify-between mb-2">
@@ -447,7 +447,7 @@ const App = () => {
       });
     } catch (e) {
       // Enhanced error handling
-      let errorMessage = 'Failed to generate parlays';
+      let errorMessage = 'Failed to build parlay';
       
       if (e.message.includes('429')) {
         errorMessage = 'Rate limit exceeded. Please wait a few minutes before trying again.';
@@ -547,7 +547,7 @@ const App = () => {
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
           }`}
         >
-          {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
+          {loading ? 'Building Parlay...' : `Build ${numLegs}-Leg Parlay + Bonus`}
         </button>
         
         
@@ -603,7 +603,7 @@ const App = () => {
 
         {!loading && !error && !results && (
           <div className="p-6 text-center text-gray-500 border border-dashed border-gray-700 rounded-xl">
-            <p>Configure your parlay preferences above and hit Generate!</p>
+            <p>Configure your parlay preferences above and start building!</p>
           </div>
         )}
       </div>
