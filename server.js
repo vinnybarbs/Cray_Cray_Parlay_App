@@ -90,6 +90,17 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Debug CORS config
+app.get('/debug/cors', (req, res) => {
+  res.json({
+    allowedOrigins: allowedOrigins,
+    requestOrigin: req.headers.origin || 'none',
+    nodeEnv: process.env.NODE_ENV,
+    rawAllowedOriginsEnv: process.env.ALLOWED_ORIGINS || 'not set',
+    rawFrontendUrlEnv: process.env.FRONTEND_URL || 'not set'
+  });
+});
+
 // Mirror health under /api for vite proxy convenience
 app.get('/api/health', (req, res) => {
   const hasOddsKey = !!process.env.ODDS_API_KEY;
