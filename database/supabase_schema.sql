@@ -10,8 +10,14 @@ create table if not exists profiles (
 );
 
 alter table profiles enable row level security;
+
+drop policy if exists profiles_select on profiles;
 create policy profiles_select on profiles for select using (auth.uid() = user_id);
+
+drop policy if exists profiles_insert on profiles;
 create policy profiles_insert on profiles for insert with check (auth.uid() = user_id);
+
+drop policy if exists profiles_update on profiles;
 create policy profiles_update on profiles for update using (auth.uid() = user_id);
 
 create table if not exists parlays (
@@ -40,9 +46,17 @@ create index if not exists idx_parlays_status on parlays(status);
 create index if not exists idx_parlays_outcome on parlays(final_outcome);
 
 alter table parlays enable row level security;
+
+drop policy if exists parlays_select on parlays;
 create policy parlays_select on parlays for select using (auth.uid() = user_id);
+
+drop policy if exists parlays_insert on parlays;
 create policy parlays_insert on parlays for insert with check (auth.uid() = user_id);
+
+drop policy if exists parlays_update on parlays;
 create policy parlays_update on parlays for update using (auth.uid() = user_id);
+
+drop policy if exists parlays_delete on parlays;
 create policy parlays_delete on parlays for delete using (auth.uid() = user_id);
 
 create table if not exists parlay_legs (
@@ -72,21 +86,29 @@ create index if not exists idx_parlay_legs_teams on parlay_legs(home_team, away_
 create index if not exists idx_parlay_legs_bet_type on parlay_legs(bet_type);
 
 alter table parlay_legs enable row level security;
+
+drop policy if exists parlay_legs_select on parlay_legs;
 create policy parlay_legs_select on parlay_legs for select using (
   exists (
     select 1 from parlays p where p.id = parlay_id and p.user_id = auth.uid()
   )
 );
+
+drop policy if exists parlay_legs_insert on parlay_legs;
 create policy parlay_legs_insert on parlay_legs for insert with check (
   exists (
     select 1 from parlays p where p.id = parlay_id and p.user_id = auth.uid()
   )
 );
+
+drop policy if exists parlay_legs_update on parlay_legs;
 create policy parlay_legs_update on parlay_legs for update using (
   exists (
     select 1 from parlays p where p.id = parlay_id and p.user_id = auth.uid()
   )
 );
+
+drop policy if exists parlay_legs_delete on parlay_legs;
 create policy parlay_legs_delete on parlay_legs for delete using (
   exists (
     select 1 from parlays p where p.id = parlay_id and p.user_id = auth.uid()
@@ -108,8 +130,14 @@ create table if not exists user_stats_daily (
 );
 
 alter table user_stats_daily enable row level security;
+
+drop policy if exists user_stats_daily_select on user_stats_daily;
 create policy user_stats_daily_select on user_stats_daily for select using (auth.uid() = user_id);
+
+drop policy if exists user_stats_daily_upsert on user_stats_daily;
 create policy user_stats_daily_upsert on user_stats_daily for insert with check (auth.uid() = user_id);
+
+drop policy if exists user_stats_daily_update on user_stats_daily;
 create policy user_stats_daily_update on user_stats_daily for update using (auth.uid() = user_id);
 
 create table if not exists teams (
