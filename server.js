@@ -272,12 +272,25 @@ global.emitComplete = (requestId) => {
   progressClients.delete(requestId);
 };
 
-// Apply stricter rate limiting and validation to parlay generation
-app.post('/api/generate-parlay', 
+// Main parlay generation endpoint (legacy - will be deprecated)
+import { generateParlayHandler } from './api/generate-parlay.js';
+import { validateParlayRequest, sanitizeInput } from './lib/middleware/validation.js';
+
+app.post('/api/generate-parlay',
   parlayRateLimiter.middleware(),
-  sanitizeInput,
   validateParlayRequest,
+  sanitizeInput,
   generateParlayHandler
+);
+
+// New endpoint: Suggest individual picks (not full parlays)
+import { suggestPicksHandler } from './api/suggest-picks.js';
+
+app.post('/api/suggest-picks',
+  parlayRateLimiter.middleware(),
+  validateParlayRequest, // Reuse same validation
+  sanitizeInput,
+  suggestPicksHandler
 );
 
 app.listen(PORT, () => {
