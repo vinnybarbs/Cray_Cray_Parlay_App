@@ -40,9 +40,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Handle preflight for all routes (Express 5 requires /* not *)
-app.options('/*', cors(corsOptions));
-
 app.use(express.json());
 
 // Apply general rate limiting to all routes
