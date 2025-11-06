@@ -276,3 +276,25 @@ create table if not exists game_research_cache (
 );
 
 create index if not exists idx_research_expires_at on game_research_cache(expires_at);
+
+-- Odds cache for hourly refresh from Odds API
+create table if not exists odds_cache (
+  id uuid primary key default gen_random_uuid(),
+  sport varchar(20) not null,
+  game_id uuid references games(id) on delete cascade,
+  external_game_id varchar(100), -- Odds API game ID
+  commence_time timestamptz,
+  home_team varchar(100) not null,
+  away_team varchar(100) not null,
+  bookmaker varchar(50) not null,
+  market_type varchar(50) not null,
+  outcomes jsonb not null, -- [{name, price, point}]
+  last_updated timestamptz default now(),
+  unique (external_game_id, bookmaker, market_type)
+);
+
+create index if not exists idx_odds_cache_game on odds_cache(game_id);
+create index if not exists idx_odds_cache_external on odds_cache(external_game_id);
+create index if not exists idx_odds_cache_commence on odds_cache(commence_time);
+create index if not exists idx_odds_cache_updated on odds_cache(last_updated);
+create index if not exists idx_odds_cache_teams on odds_cache(home_team, away_team);
