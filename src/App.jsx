@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useParlayHistory } from './hooks/useLocalStorage';
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+
 // Enhanced Phase Progress component with detailed status
 const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
   const phases = [
@@ -399,7 +401,7 @@ const App = () => {
         });
       }, 3000); // Update every 3 seconds
       
-      const response = await fetch('/api/generate-parlay', {
+      const response = await fetch(`${API_BASE}/api/generate-parlay`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
