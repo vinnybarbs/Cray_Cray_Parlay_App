@@ -29,7 +29,7 @@ const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
   </div>
 )
 
-// AI Agents Workflow Component (from legacy)
+// AI Agents Workflow Component (exact copy from legacy)
 const AIAgentsWorkflow = () => {
   const characterImages = {
     degenerate: '/images/degenerate-gambler.png',
@@ -42,13 +42,16 @@ const AIAgentsWorkflow = () => {
   return (
     <div className="max-w-2xl mx-auto mt-8 mb-8 px-4">
       <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 shadow-2xl">
+        {/* Header */}
         <div className="text-center mb-8 md:mb-12">
           <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 mb-2">
             How AI Agents Work:
           </h2>
         </div>
         
+        {/* Circular Flow */}
         <div className="relative mx-auto w-full max-w-md md:max-w-lg" style={{ aspectRatio: '1/1' }}>
+          {/* SVG for curved arrows between agents - responsive */}
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 400" style={{ zIndex: 1 }}>
             <defs>
               <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
@@ -56,6 +59,7 @@ const AIAgentsWorkflow = () => {
               </marker>
             </defs>
             
+            {/* Clean shorter curved arrows that avoid text - responsive positioning */}
             <path d="M 192 96 Q 180 124 164 144" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" />
             <path d="M 144 168 Q 128 200 144 232" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.2s' }} />
             <path d="M 176 264 Q 200 280 224 264" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.4s' }} />
@@ -68,63 +72,98 @@ const AIAgentsWorkflow = () => {
             <div className="flex flex-col items-center">
               <h3 className="font-bold text-xs md:text-sm text-yellow-400 mb-1">Degenerate</h3>
               <p className="text-xs text-yellow-400 text-center mb-2">(You)</p>
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-yellow-500">
-                <span className="text-2xl">🎰</span>
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.degenerate} 
+                  alt="Degenerate Gambler" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-xl md:text-2xl">🎰</div>';
+                  }}
+                />
               </div>
             </div>
           </div>
 
-          {/* Carol Coordinator - Left */}
-          <div className="absolute" style={{ top: '30%', left: '5%', zIndex: 10 }}>
+          {/* Carol - Left Side */}
+          <div className="absolute" style={{ top: '30%', left: '20%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <h3 className="font-bold text-xs md:text-sm text-blue-400 mb-1">Carol</h3>
-              <p className="text-xs text-blue-300 text-center mb-2">Coordinator</p>
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-blue-500">
-                <span className="text-2xl">👩‍💼</span>
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-purple-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.carol} 
+                  alt="Carol the Coordinator" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-xl md:text-2xl">👵</div>';
+                  }}
+                />
               </div>
+              <h3 className="font-bold text-xs md:text-sm text-purple-400 mt-1 text-center whitespace-nowrap">Carol the AI Coordinator</h3>
             </div>
           </div>
 
-          {/* OddJob - Bottom Left */}
-          <div className="absolute" style={{ bottom: '15%', left: '15%', zIndex: 10 }}>
+          {/* Odd-Job - Bottom Left */}
+          <div className="absolute" style={{ bottom: '20%', left: '20%', transform: 'translate(-50%, 50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <h3 className="font-bold text-xs md:text-sm text-green-400 mb-1">OddJob</h3>
-              <p className="text-xs text-green-300 text-center mb-2">Odds Agent</p>
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-green-500">
-                <span className="text-2xl">📊</span>
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-yellow-700 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.oddjob} 
+                  alt="Odd-Job" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-xl md:text-2xl">🎩</div>';
+                  }}
+                />
               </div>
+              <h3 className="font-bold text-xs md:text-sm text-yellow-400 mt-1 text-center whitespace-nowrap">Odd-Job the Oddsmaker</h3>
             </div>
           </div>
 
-          {/* Randy Researcher - Bottom Right */}
-          <div className="absolute" style={{ bottom: '15%', right: '15%', zIndex: 10 }}>
+          {/* Andy - Right Side */}
+          <div className="absolute" style={{ top: '30%', right: '20%', transform: 'translate(50%, -50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <h3 className="font-bold text-xs md:text-sm text-purple-400 mb-1">Randy</h3>
-              <p className="text-xs text-purple-300 text-center mb-2">Researcher</p>
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-purple-500">
-                <span className="text-2xl">🔍</span>
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-green-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.andy} 
+                  alt="Andy the Analyst" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-xl md:text-2xl">📊</div>';
+                  }}
+                />
               </div>
+              <h3 className="font-bold text-xs md:text-sm text-green-400 mt-1 text-center whitespace-nowrap">Andy the Analyst</h3>
             </div>
           </div>
 
-          {/* Andy Analyst - Right */}
-          <div className="absolute" style={{ top: '30%', right: '5%', zIndex: 10 }}>
+          {/* Randy - Bottom Right */}
+          <div className="absolute" style={{ bottom: '20%', right: '20%', transform: 'translate(50%, 50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <h3 className="font-bold text-xs md:text-sm text-red-400 mb-1">Andy</h3>
-              <p className="text-xs text-red-300 text-center mb-2">Analyst</p>
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-red-500">
-                <span className="text-2xl">🧠</span>
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-blue-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+                <img 
+                  src={characterImages.randy} 
+                  alt="Randy the Researcher" 
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    e.target.parentElement.innerHTML += '<div class="text-xl md:text-2xl">🤓</div>';
+                  }}
+                />
               </div>
+              <h3 className="font-bold text-xs md:text-sm text-blue-400 mt-1 text-center whitespace-nowrap">Randy the Researcher</h3>
             </div>
           </div>
         </div>
 
-        <div className="mt-8 space-y-3 text-sm text-gray-300">
-          <p><strong className="text-yellow-400">1. You (Degenerate):</strong> Pick your sports, bet types, and risk level</p>
-          <p><strong className="text-blue-400">2. Carol (Coordinator):</strong> Orchestrates the entire process</p>
-          <p><strong className="text-green-400">3. OddJob (Odds Agent):</strong> Fetches live odds from sportsbooks</p>
-          <p><strong className="text-purple-400">4. Randy (Researcher):</strong> Gathers news, injuries, and stats</p>
-          <p><strong className="text-red-400">5. Andy (Analyst):</strong> Uses AI to rank and select best picks</p>
+        {/* Bottom tagline */}
+        <div className="mt-8 text-center">
+          <p className="text-xs text-gray-500 italic">
+            Five AI agents working harder than your therapist to justify your gambling addiction
+          </p>
         </div>
       </div>
     </div>
