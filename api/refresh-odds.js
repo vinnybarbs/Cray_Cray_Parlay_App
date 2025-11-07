@@ -10,6 +10,8 @@ async function refreshOddsCache(req, res) {
   try {
     // Verify cron secret
     const cronSecret = req.headers.authorization?.replace('Bearer ', '');
+    console.log('Received secret:', cronSecret);
+    console.log('Expected secret:', process.env.CRON_SECRET);
     if (cronSecret !== process.env.CRON_SECRET) {
       return res.status(401).json({ error: 'Unauthorized' });
     }

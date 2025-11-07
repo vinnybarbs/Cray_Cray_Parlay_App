@@ -172,8 +172,26 @@ const AIAgentsWorkflow = () => {
 
 export default function MainApp() {
   const { user, isAuthenticated, signOut } = useAuth()
-  const [showAuth, setShowAuth] = useState(false)
-  const [showDashboard, setShowDashboard] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+
+  const loadingMessages = [
+    "Consulting with Vegas insiders...",
+    "Bribing the refs for insider info...",
+    "Sacrificing a prop bet to the degen gods...",
+    "Checking if my bookie is watching...",
+    "Doing complex math (counting on fingers)...",
+    "Reading tea leaves and injury reports...",
+    "Asking my Magic 8-Ball for advice...",
+    "Channeling my inner degenerate...",
+    "Calculating odds while ignoring reality...",
+    "Pretending I know what I'm doing...",
+    "Consulting the Bisque Boys...",
+    "Crunching the numbers...",
+    "Finding the spiciest picks...",
+  ];
+
+  const getRandomLoadingMessage = () => loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 
   // Form state
   const [selectedSports, setSelectedSports] = useState([])
@@ -218,6 +236,7 @@ export default function MainApp() {
     setLoading(true)
     setError('')
     setSuggestions([])
+    setLoadingMessage(getRandomLoadingMessage())
     setSelectedPicks([])
 
     try {
@@ -468,7 +487,7 @@ export default function MainApp() {
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
           }`}
         >
-          {loading ? 'Getting Suggestions...' : 'Get AI Suggestions'}
+          {loading ? loadingMessage : 'Get AI Suggestions'}
         </button>
 
         {selectedSports.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>}
