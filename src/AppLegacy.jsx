@@ -547,7 +547,7 @@ const App = () => {
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
           }`}
         >
-          {loading ? 'Building Parlay...' : `Build ${numLegs}-Leg Parlay + Bonus`}
+          {loading ? 'Building Parlay...' : `Build ${numLegs}-Leg Parlay`}
         </button>
         
         
