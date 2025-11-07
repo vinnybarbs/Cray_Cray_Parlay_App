@@ -273,9 +273,6 @@ global.emitComplete = (requestId) => {
 };
 
 // Main parlay generation endpoint (legacy - will be deprecated)
-import { generateParlayHandler } from './api/generate-parlay.js';
-import { validateParlayRequest, sanitizeInput } from './lib/middleware/validation.js';
-
 app.post('/api/generate-parlay',
   parlayRateLimiter.middleware(),
   validateParlayRequest,
@@ -284,7 +281,7 @@ app.post('/api/generate-parlay',
 );
 
 // New endpoint: Suggest individual picks (not full parlays)
-import { suggestPicksHandler } from './api/suggest-picks.js';
+const { suggestPicksHandler } = require('./api/suggest-picks.js');
 
 app.post('/api/suggest-picks',
   parlayRateLimiter.middleware(),
@@ -294,8 +291,8 @@ app.post('/api/suggest-picks',
 );
 
 // User parlay management endpoints (protected)
-import { authenticateUser } from './lib/middleware/supabaseAuth.js';
-import { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } from './api/user-parlays.js';
+const { authenticateUser } = require('./lib/middleware/supabaseAuth.js');
+const { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } = require('./api/user-parlays.js');
 
 app.get('/api/user/parlays', authenticateUser, getUserParlays);
 app.get('/api/user/stats', authenticateUser, getUserStats);
