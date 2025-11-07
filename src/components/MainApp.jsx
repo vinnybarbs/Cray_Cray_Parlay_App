@@ -170,6 +170,12 @@ export default function MainApp() {
   }
 
   const fetchSuggestions = async () => {
+    // Require login to get suggestions
+    if (!isAuthenticated) {
+      setShowAuth(true)
+      return
+    }
+
     setLoading(true)
     setError('')
     setSuggestions([])
@@ -290,11 +296,6 @@ export default function MainApp() {
 
   const payout = calculatePayout()
 
-  // Show auth modal if not authenticated
-  if (!isAuthenticated) {
-    return <Auth onClose={() => {}} />
-  }
-
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
       {/* Header */}
@@ -306,18 +307,29 @@ export default function MainApp() {
 
         {/* User menu */}
         <div className="absolute top-4 right-4 flex items-center gap-3">
-          <button
-            onClick={() => setShowDashboard(true)}
-            className="text-sm text-gray-300 hover:text-yellow-400"
-          >
-            📊 Dashboard
-          </button>
-          <button
-            onClick={signOut}
-            className="text-sm text-gray-400 hover:text-white"
-          >
-            Sign Out
-          </button>
+          {isAuthenticated ? (
+            <>
+              <button
+                onClick={() => setShowDashboard(true)}
+                className="text-sm text-gray-300 hover:text-yellow-400"
+              >
+                📊 Dashboard
+              </button>
+              <button
+                onClick={signOut}
+                className="text-sm text-gray-400 hover:text-white"
+              >
+                Sign Out
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setShowAuth(true)}
+              className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-semibold"
+            >
+              Sign In
+            </button>
+          )}
         </div>
       </header>
 
