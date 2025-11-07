@@ -38,8 +38,13 @@ async function refreshOddsCache(req, res) {
       'mma_ufc'
     ];
     const regions = 'us';
-    const markets = 'h2h,spreads,totals'; // Core markets only (props fetched on-demand)
     const oddsFormat = 'american';
+    
+    // Core markets for all sports
+    const coreMarkets = 'h2h,spreads,totals';
+    
+    // Player prop markets (NFL/NCAAF only to avoid rate limits)
+    const playerPropMarkets = 'player_pass_tds,player_pass_yds,player_rush_yds,player_receptions,player_reception_yds,player_anytime_td';
 
     let totalGames = 0;
     let totalOdds = 0;
@@ -51,6 +56,10 @@ async function refreshOddsCache(req, res) {
           await new Promise(resolve => setTimeout(resolve, 7000)); // 7 second delay between sports
         }
         
+        // Determine which markets to fetch based on sport
+        const isFootball = sport.includes('football');
+        const markets = isFootball ? `${coreMarkets},${playerPropMarkets}` : coreMarkets;
+        
         const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${markets}&oddsFormat=${oddsFormat}`;
         
         const response = await fetch(url);
@@ -61,7 +70,7 @@ async function refreshOddsCache(req, res) {
         }
 
         const games = await response.json();
-        logger.info(`Fetched ${games.length} games for ${sport}`);
+        logger.info(`Fetched ${games.length} games for ${sport} (${isFootball ? 'with props' : 'core only'})`);
 
         for (const game of games) {
           totalGames++;
