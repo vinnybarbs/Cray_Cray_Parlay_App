@@ -170,32 +170,32 @@ const AIAgentsWorkflow = () => {
   )
 }
 
-const PhaseProgress = ({ loading, progress, phaseData }) => {
+const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
   const phases = [
     { key: 'odds', label: 'Odds', icon: '📊' },
     { key: 'research', label: 'Research', icon: '🔍' },
     { key: 'analysis', label: 'Analysis', icon: '🧠' },
-    { key: 'ranking', label: 'Ranking', icon: '✨' }
+    { key: 'post', label: 'Post', icon: '✨' }
   ];
   
   return (
-    <div className="p-4 rounded-lg bg-gray-800 border border-gray-700 mb-6">
-      <div className="text-sm font-semibold text-gray-300 mb-3 text-center">AI Agents Working...</div>
+    <div className="p-3 rounded-lg bg-black bg-opacity-30 border border-gray-700">
+      <div className="text-xs font-semibold text-gray-300 mb-2 text-center">Building Your Parlay</div>
       
       {/* Phase indicators */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between mb-2">
         {phases.map((phase, idx) => {
           const isActive = loading && progress === idx;
-          const isDone = progress > idx && !loading;
+          const isDone = phaseData?.[phase.key]?.complete || (!loading && timings);
           
           return (
             <div key={phase.key} className="flex flex-col items-center space-y-1 flex-1">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base transition-all ${
                 isDone ? 'bg-green-600' : isActive ? 'bg-yellow-400 animate-pulse' : 'bg-gray-700'
               }`}>
                 {isDone ? '✓' : phase.icon}
               </div>
-              <span className={`text-xs ${isDone || isActive ? 'text-gray-300 font-medium' : 'text-gray-500'}`}>
+              <span className={`text-xs ${isDone || isActive ? 'text-gray-300' : 'text-gray-500'}`}>
                 {phase.label}
               </span>
               {isActive && (
@@ -206,10 +206,47 @@ const PhaseProgress = ({ loading, progress, phaseData }) => {
         })}
       </div>
       
-      {/* Phase details */}
-      {phaseData && (
-        <div className="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-300 text-center">
-          {phaseData.message}
+      {/* Detailed phase information */}
+      {phaseData && !loading && (
+        <div className="mt-2 pt-2 border-t border-gray-600 grid grid-cols-2 gap-1 text-xs">
+          {phaseData.odds && (
+            <div className="text-gray-300">
+              📊 {phaseData.odds.games} games ({phaseData.odds.quality}%)
+            </div>
+          )}
+          {phaseData.research && (
+            <div className="text-gray-300">
+              🔍 {phaseData.research.researched}/{phaseData.research.total} researched
+            </div>
+          )}
+          {phaseData.analysis && (
+            <div className="text-gray-300">
+              🧠 {phaseData.analysis.model}
+            </div>
+          )}
+          {phaseData.postProcessing && (
+            <div className="text-gray-300">
+              ✨ Validated
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Timing details */}
+      {timings && (
+        <div className="mt-2 pt-2 border-t border-gray-600 text-xs text-gray-300">
+          <div className="flex justify-between items-center">
+            <span>⏱️ Total Time:</span>
+            <span className="font-semibold text-green-400">
+              {(timings.totalMs / 1000).toFixed(1)}s
+            </span>
+          </div>
+          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-400">
+            <div>Odds: {(timings.oddsMs / 1000).toFixed(1)}s</div>
+            <div>Research: {(timings.researchMs / 1000).toFixed(1)}s</div>
+            <div>Analysis: {(timings.analysisMs / 1000).toFixed(1)}s</div>
+            <div>Post: {(timings.postProcessingMs / 1000).toFixed(1)}s</div>
+          </div>
         </div>
       )}
     </div>
@@ -253,6 +290,7 @@ export default function MainApp() {
   const [error, setError] = useState('')
   const [progressPhase, setProgressPhase] = useState(0)
   const [phaseData, setPhaseData] = useState(null)
+  const [timings, setTimings] = useState(null)
 
   // Builder state
   const [selectedPicks, setSelectedPicks] = useState([])
@@ -314,6 +352,14 @@ export default function MainApp() {
 
       if (data.success && data.suggestions) {
         setSuggestions(data.suggestions)
+        
+        // Extract timing and phase data if available
+        if (data.timings) {
+          setTimings(data.timings)
+        }
+        if (data.phaseData) {
+          setPhaseData(data.phaseData)
+        }
       } else {
         throw new Error('Invalid response format')
       }
@@ -554,7 +600,7 @@ export default function MainApp() {
       {/* Progress Display */}
       {loading && (
         <div className="max-w-2xl mx-auto mt-6">
-          <PhaseProgress loading={loading} progress={progressPhase} phaseData={phaseData} />
+          <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
         </div>
       )}
 
