@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import Auth from './Auth'
 import PickCard from './PickCard'
 import ParlayBuilder from './ParlayBuilder'
+import Dashboard from './Dashboard'
 import { supabase } from '../lib/supabaseClient'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
@@ -10,6 +11,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 export default function ParlayBuilderApp() {
   const { user, isAuthenticated, signOut } = useAuth()
   const [showAuth, setShowAuth] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false)
   
   // Form state
   const [selectedSports, setSelectedSports] = useState(['NFL'])
@@ -153,6 +155,12 @@ export default function ParlayBuilderApp() {
           <div>
             {isAuthenticated ? (
               <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded text-sm font-semibold"
+                >
+                  📊 Dashboard
+                </button>
                 <span className="text-sm text-gray-400">
                   {user?.email}
                 </span>
@@ -359,6 +367,9 @@ export default function ParlayBuilderApp() {
 
       {/* Auth Modal */}
       {showAuth && <Auth onClose={() => setShowAuth(false)} />}
+      
+      {/* Dashboard Modal */}
+      {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
     </div>
   )
 }
