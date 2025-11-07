@@ -43,8 +43,26 @@ async function refreshOddsCache(req, res) {
     // Core markets for all sports
     const coreMarkets = 'h2h,spreads,totals';
     
-    // Player prop markets (NFL/NCAAF only to avoid rate limits)
-    const playerPropMarkets = 'player_pass_tds,player_pass_yds,player_rush_yds,player_receptions,player_reception_yds,player_anytime_td';
+    // ALL Football props (NFL/NCAAF)
+    const footballProps = [
+      'player_pass_tds', 'player_pass_yds', 'player_pass_completions', 'player_pass_attempts',
+      'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
+      'player_receptions', 'player_reception_yds', 'player_reception_tds',
+      'player_anytime_td', 'player_first_td', 'player_last_td'
+    ].join(',');
+    
+    // ALL NBA props
+    const nbaProps = [
+      'player_points', 'player_rebounds', 'player_assists', 'player_threes',
+      'player_blocks', 'player_steals', 'player_turnovers', 'player_points_rebounds_assists'
+    ].join(',');
+    
+    // ALL MLB props
+    const mlbProps = [
+      'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks',
+      'batter_hits', 'batter_total_bases', 'batter_rbis', 'batter_runs_scored',
+      'batter_home_runs', 'batter_stolen_bases'
+    ].join(',');
 
     let totalGames = 0;
     let totalOdds = 0;
@@ -56,9 +74,15 @@ async function refreshOddsCache(req, res) {
           await new Promise(resolve => setTimeout(resolve, 7000)); // 7 second delay between sports
         }
         
-        // Determine which markets to fetch based on sport
-        const isFootball = sport.includes('football');
-        const markets = isFootball ? `${coreMarkets},${playerPropMarkets}` : coreMarkets;
+        // Determine which markets to fetch based on sport (ALL in one call!)
+        let markets = coreMarkets;
+        if (sport.includes('football')) {
+          markets = `${coreMarkets},${footballProps}`;
+        } else if (sport === 'basketball_nba') {
+          markets = `${coreMarkets},${nbaProps}`;
+        } else if (sport === 'baseball_mlb') {
+          markets = `${coreMarkets},${mlbProps}`;
+        }
         
         const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${markets}&oddsFormat=${oddsFormat}`;
         
@@ -70,7 +94,8 @@ async function refreshOddsCache(req, res) {
         }
 
         const games = await response.json();
-        logger.info(`Fetched ${games.length} games for ${sport} (${isFootball ? 'with props' : 'core only'})`);
+        const hasProps = markets !== coreMarkets;
+        logger.info(`Fetched ${games.length} games for ${sport} (${hasProps ? 'with ALL props' : 'core only'})`);
 
         for (const game of games) {
           totalGames++;
