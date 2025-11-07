@@ -302,8 +302,10 @@ app.patch('/api/user/parlays/:id', authenticateUser, updateParlayOutcome);
 // Cron endpoints (protected by secret)
 const refreshOddsCache = require('./api/refresh-odds.js');
 const refreshStatsCache = require('./api/refresh-stats.js');
+const refreshNewsCache = require('./api/refresh-news.js');
 app.post('/cron/refresh-odds', refreshOddsCache);
 app.post('/cron/refresh-stats', refreshStatsCache);
+app.post('/cron/refresh-news', refreshNewsCache);
 
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 

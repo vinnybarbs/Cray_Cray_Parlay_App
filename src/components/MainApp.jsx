@@ -334,9 +334,9 @@ export default function MainApp() {
     }, 2000) // Advance every 2 seconds
 
     try {
-      // Add 60 second timeout
+      // Add 120 second timeout (research + AI can take time)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
       
       const response = await fetch(`${API_BASE}/api/suggest-picks`, {
         method: 'POST',
