@@ -170,6 +170,52 @@ const AIAgentsWorkflow = () => {
   )
 }
 
+const PhaseProgress = ({ loading, progress, phaseData }) => {
+  const phases = [
+    { key: 'odds', label: 'Odds', icon: '📊' },
+    { key: 'research', label: 'Research', icon: '🔍' },
+    { key: 'analysis', label: 'Analysis', icon: '🧠' },
+    { key: 'ranking', label: 'Ranking', icon: '✨' }
+  ];
+  
+  return (
+    <div className="p-4 rounded-lg bg-gray-800 border border-gray-700 mb-6">
+      <div className="text-sm font-semibold text-gray-300 mb-3 text-center">AI Agents Working...</div>
+      
+      {/* Phase indicators */}
+      <div className="flex items-center justify-between">
+        {phases.map((phase, idx) => {
+          const isActive = loading && progress === idx;
+          const isDone = progress > idx && !loading;
+          
+          return (
+            <div key={phase.key} className="flex flex-col items-center space-y-1 flex-1">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg transition-all ${
+                isDone ? 'bg-green-600' : isActive ? 'bg-yellow-400 animate-pulse' : 'bg-gray-700'
+              }`}>
+                {isDone ? '✓' : phase.icon}
+              </div>
+              <span className={`text-xs ${isDone || isActive ? 'text-gray-300 font-medium' : 'text-gray-500'}`}>
+                {phase.label}
+              </span>
+              {isActive && (
+                <span className="text-xs text-yellow-400 animate-pulse">Active</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Phase details */}
+      {phaseData && (
+        <div className="mt-3 pt-3 border-t border-gray-700 text-xs text-gray-300 text-center">
+          {phaseData.message}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function MainApp() {
   const { user, isAuthenticated, signOut } = useAuth()
   const [showDashboard, setShowDashboard] = useState(false);
@@ -205,6 +251,8 @@ export default function MainApp() {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [progressPhase, setProgressPhase] = useState(0)
+  const [phaseData, setPhaseData] = useState(null)
 
   // Builder state
   const [selectedPicks, setSelectedPicks] = useState([])
@@ -238,6 +286,13 @@ export default function MainApp() {
     setSuggestions([])
     setLoadingMessage(getRandomLoadingMessage())
     setSelectedPicks([])
+    setProgressPhase(0)
+    setPhaseData(null)
+
+    // Simulate progress through phases
+    const progressInterval = setInterval(() => {
+      setProgressPhase(prev => (prev < 3 ? prev + 1 : prev))
+    }, 2000) // Advance every 2 seconds
 
     try {
       const response = await fetch(`${API_BASE}/api/suggest-picks`, {
@@ -265,7 +320,9 @@ export default function MainApp() {
     } catch (err) {
       setError(err.message || 'Failed to fetch suggestions')
     } finally {
+      clearInterval(progressInterval)
       setLoading(false)
+      setProgressPhase(4) // Mark all complete
     }
   }
 
@@ -493,6 +550,13 @@ export default function MainApp() {
         {selectedSports.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>}
         {selectedBetTypes.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one bet type</p>}
       </div>
+
+      {/* Progress Display */}
+      {loading && (
+        <div className="max-w-2xl mx-auto mt-6">
+          <PhaseProgress loading={loading} progress={progressPhase} phaseData={phaseData} />
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (
