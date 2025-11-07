@@ -11,3 +11,9 @@ ALTER TABLE parlays
 ALTER TABLE parlay_legs
   ALTER COLUMN odds TYPE VARCHAR(50),
   ALTER COLUMN leg_result TYPE VARCHAR(50);
+
+-- Fix odds_cache table
+ALTER TABLE odds_cache
+  ALTER COLUMN sport TYPE VARCHAR(50),
+  ALTER COLUMN bookmaker TYPE VARCHAR(50),
+  ALTER COLUMN market_type TYPE VARCHAR(100);

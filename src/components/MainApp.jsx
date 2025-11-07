@@ -373,7 +373,13 @@ export default function MainApp() {
         throw new Error('Invalid response format')
       }
     } catch (err) {
-      setError(err.message || 'Failed to fetch suggestions')
+      const errorMsg = err.message || 'Failed to fetch suggestions';
+      // Check if it's a "sport not in season" error
+      if (errorMsg.includes('not available in cache') || errorMsg.includes('out of season')) {
+        setError(`${errorMsg}\n\n✅ Available sports: NFL, NHL, Soccer (EPL)`);
+      } else {
+        setError(errorMsg);
+      }
     } finally {
       clearInterval(progressInterval)
       setLoading(false)

@@ -35,6 +35,7 @@ async function refreshOddsCache(req, res) {
     ];
     const regions = 'us';
     const oddsFormat = 'american';
+    const bookmakers = 'draftkings,fanduel,betmgm,caesars'; // Only fetch bookmakers available in app
     
     // Core markets for all sports
     const coreMarkets = 'h2h,spreads,totals';
@@ -65,7 +66,7 @@ async function refreshOddsCache(req, res) {
         // Player props require expensive per-event API calls
         const markets = coreMarkets;
         
-        const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${markets}&oddsFormat=${oddsFormat}`;
+        const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${markets}&oddsFormat=${oddsFormat}&bookmakers=${bookmakers}`;
         
         console.log(`\n🔍 Fetching ${sport}...`);
         console.log(`📊 Markets: ${markets}`);
@@ -134,7 +135,7 @@ async function refreshOddsCache(req, res) {
       try {
         await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay
         
-        const propsUrl = `https://api.the-odds-api.com/v4/sports/${gameInfo.sport}/events/${gameInfo.id}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${nflPlayerProps},${nflTeamProps}&oddsFormat=${oddsFormat}`;
+        const propsUrl = `https://api.the-odds-api.com/v4/sports/${gameInfo.sport}/events/${gameInfo.id}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${nflPlayerProps},${nflTeamProps}&oddsFormat=${oddsFormat}&bookmakers=${bookmakers}`;
         
         const propsResponse = await fetch(propsUrl);
         if (!propsResponse.ok) continue;
