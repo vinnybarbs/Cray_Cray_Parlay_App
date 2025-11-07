@@ -1,6 +1,6 @@
 # Implementation Status - Pick Suggestions Architecture
 
-## ✅ Completed (Phase 1-3)
+## ✅ Completed (Phase 1-6)
 
 ### Backend Infrastructure
 - ✅ **Database Schema**: Added `odds_cache` table to `database/supabase_schema.sql`
@@ -16,67 +16,48 @@
 - ✅ **Auth UI**: Basic login/signup component ready
 - ✅ **Environment Variables**: Updated `env.example` with Supabase frontend vars
 
+### New UI Components
+- ✅ **PickCard**: Displays individual AI suggestions with reasoning and confidence
+- ✅ **ParlayBuilder**: Right panel with dynamic payout calculator
+- ✅ **ParlayBuilderApp**: Main app with dual-panel layout
+- ✅ **Dashboard**: User parlay history with win rate and stats
+- ✅ **Toggle**: Switch between new builder and legacy UI
+
+### Backend API Endpoints
+- ✅ **POST /api/suggest-picks**: Get AI pick suggestions
+- ✅ **GET /api/user/parlays**: Fetch user's parlay history (protected)
+- ✅ **GET /api/user/stats**: Get win rate and profit/loss (protected)
+- ✅ **GET /api/user/parlays/:id**: Get single parlay details (protected)
+- ✅ **PATCH /api/user/parlays/:id**: Update parlay outcome (protected)
+
 ### Files Modified/Created
 ```
 ✅ database/supabase_schema.sql (added odds_cache table)
 ✅ api/suggest-picks.js (new endpoint)
+✅ api/user-parlays.js (new - user data endpoints)
 ✅ lib/agents/coordinator.js (added generatePickSuggestions method)
 ✅ lib/agents/analyst-agent.js (added selectBestPicks method)
-✅ server.js (registered new endpoint)
+✅ lib/middleware/supabaseAuth.js (new - JWT verification)
+✅ server.js (registered new endpoints)
 ✅ src/lib/supabaseClient.js (new)
 ✅ src/contexts/AuthContext.jsx (new)
 ✅ src/components/Auth.jsx (new)
+✅ src/components/PickCard.jsx (new)
+✅ src/components/ParlayBuilder.jsx (new)
+✅ src/components/ParlayBuilderApp.jsx (new)
+✅ src/components/Dashboard.jsx (new)
+✅ src/App.jsx (new - router with toggle)
+✅ src/AppLegacy.jsx (renamed from App.jsx)
+✅ src/main.jsx (wrapped with AuthProvider)
 ✅ env.example (updated)
 ✅ package.json (added Supabase deps)
 ```
 
 ---
 
-## 🚧 Next Steps (Phase 4-6)
+## 🚧 Remaining Work
 
-### Phase 4: New UI Architecture
-**Goal**: Replace full parlay generation with pick suggestions + custom builder
-
-#### Left Panel: AI Suggestions
-- Display 10-30 pick cards based on `numLegs` selection
-- Each card shows:
-  - Game info (teams, date)
-  - Bet type and pick
-  - Odds
-  - **Spread context** (even for ML bets)
-  - Confidence score (1-10)
-  - Reasoning
-  - "Add to Parlay" button
-
-#### Right Panel: Parlay Builder
-- Empty state: "Select picks to build your parlay"
-- Shows selected picks with:
-  - Remove button for each
-  - Dynamic payout calculator at bottom
-  - "Lock Build" button (saves to DB)
-
-#### API Integration
-- Call `/api/suggest-picks` instead of `/api/generate-parlay`
-- Parse JSON response (never show raw JSON to user)
-- Handle loading states
-
-### Phase 5: User Dashboard
-**Goal**: Show parlay history and win rate
-
-#### Features Needed
-- List of past parlays (from `parlays` table)
-- Win rate calculation
-- Profit/loss tracking
-- Click to view parlay details
-
-#### Backend Endpoints
-```javascript
-GET /api/user/parlays - Get user's parlay history
-POST /api/user/parlays - Save new parlay
-GET /api/user/stats - Get win rate, profit/loss
-```
-
-### Phase 6: Odds Caching (Supabase Edge Functions)
+### Phase 7: Odds Caching (Supabase Edge Functions)
 **Goal**: Stop hitting Odds API live, use hourly refresh
 
 #### Supabase Edge Function
