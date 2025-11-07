@@ -1,11 +1,11 @@
-import { MultiAgentCoordinator } from '../lib/agents/coordinator.js';
-import logger from '../lib/utils/logger.js';
+const { MultiAgentCoordinator } = require('../lib/agents/coordinator.js');
+const { logger } = require('../shared/logger.js');
 
 /**
  * Suggest individual picks (not a full parlay)
  * Returns 10-30 independent betting suggestions based on user preferences
  */
-export async function suggestPicksHandler(req, res) {
+async function suggestPicksHandler(req, res) {
   const startTime = Date.now();
   
   try {
@@ -95,3 +95,5 @@ export async function suggestPicksHandler(req, res) {
     });
   }
 }
+
+module.exports = { suggestPicksHandler };
