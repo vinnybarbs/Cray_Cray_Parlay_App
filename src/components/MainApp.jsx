@@ -352,7 +352,7 @@ export default function MainApp() {
                 onClick={() => setShowDashboard(true)}
                 className="text-sm text-gray-300 hover:text-yellow-400"
               >
-                📊 Dashboard
+                Dashboard
               </button>
               <button
                 onClick={signOut}
@@ -468,7 +468,7 @@ export default function MainApp() {
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
           }`}
         >
-          {loading ? '🔄 Getting Suggestions...' : '🎯 Get AI Suggestions'}
+          {loading ? 'Getting Suggestions...' : 'Get AI Suggestions'}
         </button>
 
         {selectedSports.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>}

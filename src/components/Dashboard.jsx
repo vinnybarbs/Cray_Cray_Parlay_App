@@ -80,7 +80,7 @@ export default function Dashboard({ onClose }) {
       <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-700">
         {/* Header */}
         <div className="bg-gray-800 p-6 border-b border-gray-700 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-yellow-400">📊 Your Dashboard</h2>
+          <h2 className="text-2xl font-bold text-yellow-400">Your Dashboard</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-white text-2xl"
@@ -127,7 +127,6 @@ export default function Dashboard({ onClose }) {
             </div>
           ) : parlays.length === 0 ? (
             <div className="text-center py-12 text-gray-400">
-              <div className="text-4xl mb-4">🎯</div>
               <p>No parlays yet. Start building!</p>
             </div>
           ) : (
