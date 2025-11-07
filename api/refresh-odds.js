@@ -25,9 +25,20 @@ async function refreshOddsCache(req, res) {
 
     logger.info('Starting odds cache refresh');
 
-    const sports = ['americanfootball_nfl', 'basketball_nba', 'baseball_mlb', 'icehockey_nhl'];
+    // Cache core markets for all supported sports
+    const sports = [
+      'americanfootball_nfl',
+      'americanfootball_ncaaf',
+      'basketball_nba',
+      'baseball_mlb',
+      'icehockey_nhl',
+      'soccer_epl',
+      'golf_pga',
+      'tennis_atp',
+      'mma_ufc'
+    ];
     const regions = 'us';
-    const markets = 'h2h,spreads,totals';
+    const markets = 'h2h,spreads,totals'; // Core markets only (props fetched on-demand)
     const oddsFormat = 'american';
 
     let totalGames = 0;
