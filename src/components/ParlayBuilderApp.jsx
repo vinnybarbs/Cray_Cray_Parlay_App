@@ -14,8 +14,8 @@ export default function ParlayBuilderApp() {
   const [showDashboard, setShowDashboard] = useState(false)
   
   // Form state
-  const [selectedSports, setSelectedSports] = useState(['NFL'])
-  const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread'])
+  const [selectedSports, setSelectedSports] = useState([])
+  const [selectedBetTypes, setSelectedBetTypes] = useState([])
   const [numLegs, setNumLegs] = useState(3)
   const [riskLevel, setRiskLevel] = useState('Medium')
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings')

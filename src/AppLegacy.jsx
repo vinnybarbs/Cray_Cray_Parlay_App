@@ -275,8 +275,8 @@ const RISK_LEVEL_DEFINITIONS = {
 
 // --- Main App Component ---
 const App = () => {
-  const [selectedSports, setSelectedSports] = useState(['NFL']);
-  const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
+  const [selectedSports, setSelectedSports] = useState([]);
+  const [selectedBetTypes, setSelectedBetTypes] = useState([]);
   const [riskLevel, setRiskLevel] = useState('Low');
   const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
