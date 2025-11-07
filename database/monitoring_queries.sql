@@ -30,7 +30,7 @@ UNION ALL
 SELECT 
   'odds_cache', 
   COUNT(*), 
-  MAX(fetched_at)
+  MAX(last_updated)
 FROM odds_cache
 ORDER BY table_name;
 
@@ -44,11 +44,11 @@ SELECT
   bookmaker,
   market_type,
   COUNT(*) as odds_count,
-  MAX(fetched_at) as last_updated,
-  ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(fetched_at)))/3600, 1) as hours_old,
+  MAX(last_updated) as last_updated,
+  ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(last_updated)))/3600, 1) as hours_old,
   CASE 
-    WHEN NOW() - MAX(fetched_at) > INTERVAL '2 hours' THEN '⚠️ STALE'
-    WHEN NOW() - MAX(fetched_at) > INTERVAL '1 hour' THEN '⏰ AGING'
+    WHEN NOW() - MAX(last_updated) > INTERVAL '2 hours' THEN '⚠️ STALE'
+    WHEN NOW() - MAX(last_updated) > INTERVAL '1 hour' THEN '⏰ AGING'
     ELSE '✅ FRESH'
   END as status
 FROM odds_cache

@@ -66,15 +66,14 @@ async function refreshOddsCache(req, res) {
             for (const market of bookmaker.markets || []) {
               const oddsData = {
                 sport: sport,
-                game_id: game.id,
+                external_game_id: game.id,
                 commence_time: game.commence_time,
                 home_team: game.home_team,
                 away_team: game.away_team,
                 bookmaker: bookmaker.key,
                 market_type: market.key,
                 outcomes: market.outcomes,
-                last_update: bookmaker.last_update,
-                fetched_at: new Date().toISOString()
+                last_updated: new Date().toISOString()
               };
 
               // Upsert odds (update if exists, insert if not)
@@ -102,7 +101,7 @@ async function refreshOddsCache(req, res) {
     const { error: deleteError } = await supabase
       .from('odds_cache')
       .delete()
-      .lt('fetched_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+      .lt('last_updated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
     if (deleteError) {
       logger.error('Error cleaning up old odds', { error: deleteError.message });
