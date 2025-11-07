@@ -72,6 +72,8 @@ async function suggestPicksHandler(req, res) {
     res.json({
       success: true,
       suggestions: result.suggestions,
+      timings: result.timings,
+      phaseData: result.phaseData,
       metadata: {
         requestedSuggestions: numSuggestions,
         returnedSuggestions: result.suggestions?.length || 0,

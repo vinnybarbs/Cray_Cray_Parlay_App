@@ -299,9 +299,11 @@ app.get('/api/user/stats', authenticateUser, getUserStats);
 app.get('/api/user/parlays/:id', authenticateUser, getParlayById);
 app.patch('/api/user/parlays/:id', authenticateUser, updateParlayOutcome);
 
-// Cron endpoint for refreshing odds cache (protected by secret)
-const { refreshOddsCache } = require('./api/refresh-odds.js');
+// Cron endpoints (protected by secret)
+const refreshOddsCache = require('./api/refresh-odds.js');
+const refreshStatsCache = require('./api/refresh-stats.js');
 app.post('/cron/refresh-odds', refreshOddsCache);
+app.post('/cron/refresh-stats', refreshStatsCache);
 
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 

@@ -334,6 +334,10 @@ export default function MainApp() {
     }, 2000) // Advance every 2 seconds
 
     try {
+      // Add 60 second timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+      
       const response = await fetch(`${API_BASE}/api/suggest-picks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -344,14 +348,18 @@ export default function MainApp() {
           riskLevel,
           oddsPlatform,
           dateRange
-        })
+        }),
+        signal: controller.signal
       })
+      
+      clearTimeout(timeoutId)
 
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
 
       const data = await response.json()
 
       if (data.success && data.suggestions) {
+        console.log('✅ Received suggestions:', data.suggestions.length, data.suggestions);
         setSuggestions(data.suggestions)
         
         // Extract timing and phase data if available
