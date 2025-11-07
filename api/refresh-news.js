@@ -56,7 +56,8 @@ async function refreshNewsCache(req, res) {
           body: JSON.stringify({
             q: query,
             num: 5,
-            gl: 'us'
+            gl: 'us',
+            tbs: 'qdr:d' // Results from last day (fresh news)
           })
         });
 
@@ -110,7 +111,8 @@ async function refreshNewsCache(req, res) {
         body: JSON.stringify({
           q: analystQuery,
           num: 10,
-          gl: 'us'
+          gl: 'us',
+          tbs: 'qdr:d' // Results from last day (fresh picks)
         })
       });
 
