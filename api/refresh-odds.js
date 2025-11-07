@@ -10,8 +10,6 @@ async function refreshOddsCache(req, res) {
   try {
     // Verify cron secret
     const cronSecret = req.headers.authorization?.replace('Bearer ', '');
-    console.log('Received secret:', cronSecret);
-    console.log('Expected secret:', process.env.CRON_SECRET);
     if (cronSecret !== process.env.CRON_SECRET) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -48,6 +46,11 @@ async function refreshOddsCache(req, res) {
 
     for (const sport of sports) {
       try {
+        // Add delay to avoid rate limiting (max 10 requests/min)
+        if (totalGames > 0) {
+          await new Promise(resolve => setTimeout(resolve, 7000)); // 7 second delay between sports
+        }
+        
         const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${markets}&oddsFormat=${oddsFormat}`;
         
         const response = await fetch(url);
