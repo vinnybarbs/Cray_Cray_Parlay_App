@@ -1,7 +1,6 @@
 import React from 'react'
-import AppLegacy from './AppLegacy'
+import MainApp from './components/MainApp'
 
 export default function App() {
-  // Use legacy UI for now - will rebuild with new architecture but same design
-  return <AppLegacy />
+  return <MainApp />
 }
