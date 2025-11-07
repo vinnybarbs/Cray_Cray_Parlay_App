@@ -255,6 +255,7 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
 
 export default function MainApp() {
   const { user, isAuthenticated, signOut } = useAuth()
+  const [showAuth, setShowAuth] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
