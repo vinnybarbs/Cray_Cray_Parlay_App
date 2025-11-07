@@ -192,7 +192,7 @@ export default function ParlayBuilderApp() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             {/* Sports */}
             <div>
-              <label className="block text-sm font-semibold mb-2">Sports</label>
+              <label className="block text-sm font-semibold mb-2">Sport (Or Multiple)</label>
               <div className="flex flex-wrap gap-2">
                 {sports.map(sport => (
                   <button
@@ -218,7 +218,7 @@ export default function ParlayBuilderApp() {
 
             {/* Bet Types */}
             <div>
-              <label className="block text-sm font-semibold mb-2">Bet Types</label>
+              <label className="block text-sm font-semibold mb-2">Bet Types (Or Multiple)</label>
               <div className="flex flex-wrap gap-2">
                 {betTypes.map(type => (
                   <button

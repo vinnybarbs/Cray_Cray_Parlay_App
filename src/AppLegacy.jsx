@@ -477,13 +477,13 @@ const App = () => {
       <div className="space-y-6 max-w-2xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
-            label="1. Sports (Select Multiple)"
+            label="1. Sport (Or Multiple)"
             options={['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']}
             selectedOptions={selectedSports}
             onToggle={toggleSport}
           />
           <CheckboxGroup
-            label="2. Bet-Type/Focus (Select Multiple)"
+            label="2. Bet-Type/Focus (Or Multiple)"
             options={['Moneyline/Spread', 'Player Props', 'TD Props', 'Totals (O/U)', 'Team Props']}
             selectedOptions={selectedBetTypes}
             onToggle={toggleBetType}
