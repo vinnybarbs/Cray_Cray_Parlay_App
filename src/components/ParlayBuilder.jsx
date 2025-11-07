@@ -1,5 +1,5 @@
 import React from 'react'
-import { calculateParlay, decimalToAmerican } from '../../shared/oddsCalculations'
+import { calculateParlay, decimalToAmerican } from '../utils/oddsCalculations'
 
 export default function ParlayBuilder({ selectedPicks, onRemove, onLockBuild, isAuthenticated }) {
   // Calculate combined odds and payout

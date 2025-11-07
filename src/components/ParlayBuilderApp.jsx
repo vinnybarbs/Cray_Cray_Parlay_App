@@ -90,7 +90,7 @@ export default function ParlayBuilderApp() {
     try {
       // Calculate combined odds
       const americanOdds = selectedPicks.map(p => p.odds)
-      const { calculateParlay } = await import('../../shared/oddsCalculations')
+      const { calculateParlay } = await import('../utils/oddsCalculations')
       const result = calculateParlay(americanOdds, 100)
 
       // Save to Supabase
