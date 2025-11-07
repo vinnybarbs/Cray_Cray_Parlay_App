@@ -25,6 +25,20 @@ async function refreshOddsCache(req, res) {
 
     logger.info('Starting odds cache refresh');
 
+    // First, verify which sports are available
+    console.log('\n🔍 Checking available sports...');
+    const sportsCheckUrl = `https://api.the-odds-api.com/v4/sports/?apiKey=${oddsApiKey}`;
+    const sportsCheckResponse = await fetch(sportsCheckUrl);
+    
+    if (!sportsCheckResponse.ok) {
+      logger.error('Failed to fetch available sports', { status: sportsCheckResponse.status });
+      return res.status(500).json({ error: 'Failed to check available sports' });
+    }
+    
+    const availableSports = await sportsCheckResponse.json();
+    const availableSportKeys = availableSports.map(s => s.key);
+    console.log(`✅ Available sports: ${availableSportKeys.filter(k => k.includes('football') || k.includes('basketball') || k.includes('hockey') || k.includes('soccer')).join(', ')}`);
+    
     // Cache core markets for all supported sports
     const sports = [
       'americanfootball_nfl',
@@ -57,6 +71,13 @@ async function refreshOddsCache(req, res) {
 
     for (const sport of sports) {
       try {
+        // Check if sport is available
+        if (!availableSportKeys.includes(sport)) {
+          console.log(`⚠️ Skipping ${sport} - not available in API`);
+          logger.warn(`Sport not available: ${sport}`);
+          continue;
+        }
+        
         // Add delay between requests to avoid rate limiting
         if (sports.indexOf(sport) > 0) {
           await new Promise(resolve => setTimeout(resolve, 7000));
@@ -70,17 +91,34 @@ async function refreshOddsCache(req, res) {
         
         console.log(`\n🔍 Fetching ${sport}...`);
         console.log(`📊 Markets: ${markets}`);
+        console.log(`📚 Bookmakers: ${bookmakers}`);
         logger.info(`Fetching ${sport}...`);
         const response = await fetch(url);
         
+        // Log remaining API calls
+        const remaining = response.headers.get('x-requests-remaining');
+        const used = response.headers.get('x-requests-used');
+        if (remaining) console.log(`📊 API calls remaining: ${remaining} (used: ${used})`);
+        
         if (!response.ok) {
           const errorText = await response.text();
+          console.log(`❌ Failed to fetch ${sport}: ${response.status}`);
+          console.log(`Error details: ${errorText}`);
           logger.error(`Failed to fetch odds for ${sport}`, { status: response.status, error: errorText });
           continue;
         }
 
         const games = await response.json();
         console.log(`✅ Fetched ${games.length} games for ${sport} (core markets)`);
+        
+        // Debug: Show sample game and bookmakers
+        if (games.length > 0) {
+          const sampleGame = games[0];
+          const sampleBookmakers = sampleGame.bookmakers?.map(b => b.key).join(', ') || 'none';
+          console.log(`   Sample game: ${sampleGame.away_team} @ ${sampleGame.home_team}`);
+          console.log(`   Bookmakers in response: ${sampleBookmakers}`);
+        }
+        
         logger.info(`✅ Fetched ${games.length} games for ${sport} (core markets)`);
         
         // Track NFL/NCAAF games for props fetch
@@ -137,8 +175,14 @@ async function refreshOddsCache(req, res) {
         
         const propsUrl = `https://api.the-odds-api.com/v4/sports/${gameInfo.sport}/events/${gameInfo.id}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${nflPlayerProps},${nflTeamProps}&oddsFormat=${oddsFormat}&bookmakers=${bookmakers}`;
         
+        console.log(`   Fetching props for game ${gameInfo.id.substring(0, 8)}...`);
         const propsResponse = await fetch(propsUrl);
-        if (!propsResponse.ok) continue;
+        
+        if (!propsResponse.ok) {
+          const errorText = await propsResponse.text();
+          console.log(`   ⚠️ Failed: ${propsResponse.status} - ${errorText}`);
+          continue;
+        }
         
         const propsData = await propsResponse.json();
         
