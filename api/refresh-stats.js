@@ -30,11 +30,20 @@ async function refreshStatsCache(req, res) {
     let totalTeams = 0;
     let totalGames = 0;
     let totalPlayers = 0;
+    
+    // Check what type of refresh to do (query param: daily, weekly, or full)
+    const refreshType = req.query.type || 'daily';
+    logger.info(`Starting ${refreshType} stats refresh`);
+    
+    const shouldRefreshTeams = refreshType === 'full';
+    const shouldRefreshWeekly = refreshType === 'weekly' || refreshType === 'full';
+    const shouldRefreshGames = refreshType === 'full';
 
-    // Step 1: Fetch and cache team list (for ID mapping)
-    try {
-      logger.info('Fetching NFL teams...');
-      const teamsRes = await fetch('https://v1.american-football.api-sports.io/teams?league=1', {
+    // Step 1: Fetch and cache team list (FULL REFRESH ONLY - once per season)
+    if (shouldRefreshTeams) {
+      try {
+        logger.info('Fetching NFL teams (full refresh)...');
+        const teamsRes = await fetch('https://v1.american-football.api-sports.io/teams?league=1', {
         headers: {
           'x-rapidapi-key': apiKey,
           'x-rapidapi-host': 'v1.american-football.api-sports.io'
@@ -69,12 +78,14 @@ async function refreshStatsCache(req, res) {
         
         logger.info(`Stored ${totalTeams} team records`);
       }
-    } catch (error) {
-      logger.error('Error fetching teams', { error: error.message });
+      } catch (error) {
+        logger.error('Error fetching teams', { error: error.message });
+      }
     }
 
-    // Step 2: NFL Team Stats & Standings
-    try {
+    // Step 2: NFL Team Stats & Standings (WEEKLY REFRESH)
+    if (shouldRefreshWeekly) {
+      try {
       logger.info('Fetching NFL standings...');
       const standingsRes = await fetch('https://v1.american-football.api-sports.io/standings?league=1&season=' + currentSeason, {
         headers: {
@@ -145,11 +156,12 @@ async function refreshStatsCache(req, res) {
           }
         }
       }
-    } catch (error) {
-      logger.error('Error fetching NFL stats', { error: error.message });
+      } catch (error) {
+        logger.error('Error fetching NFL stats', { error: error.message });
+      }
     }
 
-    // NFL Injuries
+    // NFL Injuries (DAILY REFRESH - always run)
     try {
       logger.info('Fetching NFL injuries...');
       const injuriesRes = await fetch(`https://v1.american-football.api-sports.io/injuries?league=1&season=${currentSeason}`, {
@@ -195,8 +207,9 @@ async function refreshStatsCache(req, res) {
       logger.error('Error fetching injuries', { error: error.message });
     }
 
-    // Step 3: Fetch recent games for H2H analysis (last 20 games)
-    try {
+    // Step 3: Fetch recent games for H2H analysis (FULL REFRESH ONLY - once per season)
+    if (shouldRefreshGames) {
+      try {
       logger.info('Fetching recent NFL games for H2H analysis...');
       const gamesRes = await fetch(`https://v1.american-football.api-sports.io/games?league=1&season=${currentSeason}`, {
         headers: {
@@ -257,12 +270,14 @@ async function refreshStatsCache(req, res) {
 
         logger.info(`Stored ${totalGames} games with statistics`);
       }
-    } catch (error) {
-      logger.error('Error fetching games', { error: error.message });
+      } catch (error) {
+        logger.error('Error fetching games', { error: error.message });
+      }
     }
 
-    // Step 4: Fetch top player stats (for prop research)
-    try {
+    // Step 4: Fetch top player stats (WEEKLY REFRESH - for prop research)
+    if (shouldRefreshWeekly) {
+      try {
       logger.info('Fetching player statistics...');
       
       // Get players from standings teams
@@ -315,11 +330,12 @@ async function refreshStatsCache(req, res) {
 
         logger.info(`Stored ${totalPlayers} player stat records`);
       }
-    } catch (error) {
-      logger.error('Error fetching player stats', { error: error.message });
+      } catch (error) {
+        logger.error('Error fetching player stats', { error: error.message });
+      }
     }
 
-    logger.info('Stats cache refresh complete', { 
+    logger.info(`Stats cache refresh complete (${refreshType})`, { 
       totalTeams, 
       totalStats, 
       totalInjuries, 
