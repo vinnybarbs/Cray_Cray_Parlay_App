@@ -1,11 +1,11 @@
-import { supabase } from '../lib/middleware/supabaseAuth.js';
-import logger from '../lib/utils/logger.js';
+const { supabase } = require('../lib/middleware/supabaseAuth.js');
+const { logger } = require('../shared/logger.js');
 
 /**
  * Get user's parlay history
  * GET /api/user/parlays
  */
-export async function getUserParlays(req, res) {
+async function getUserParlays(req, res) {
   try {
     const userId = req.user.id;
     const limit = parseInt(req.query.limit) || 20;
@@ -40,7 +40,7 @@ export async function getUserParlays(req, res) {
  * Get user's stats
  * GET /api/user/stats
  */
-export async function getUserStats(req, res) {
+async function getUserStats(req, res) {
   try {
     const userId = req.user.id;
 
@@ -81,7 +81,7 @@ export async function getUserStats(req, res) {
  * Get single parlay details
  * GET /api/user/parlays/:id
  */
-export async function getParlayById(req, res) {
+async function getParlayById(req, res) {
   try {
     const userId = req.user.id;
     const parlayId = req.params.id;
@@ -117,7 +117,7 @@ export async function getParlayById(req, res) {
  * Update parlay outcome (for manual tracking)
  * PATCH /api/user/parlays/:id
  */
-export async function updateParlayOutcome(req, res) {
+async function updateParlayOutcome(req, res) {
   try {
     const userId = req.user.id;
     const parlayId = req.params.id;
@@ -157,3 +157,10 @@ export async function updateParlayOutcome(req, res) {
     res.status(500).json({ error: 'Failed to update parlay' });
   }
 }
+
+module.exports = {
+  getUserParlays,
+  getUserStats,
+  getParlayById,
+  updateParlayOutcome
+};
