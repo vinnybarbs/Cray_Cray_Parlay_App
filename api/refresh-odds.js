@@ -168,4 +168,4 @@ async function refreshOddsCache(req, res) {
   }
 }
 
-module.exports = { refreshOddsCache };
+module.exports = refreshOddsCache;
