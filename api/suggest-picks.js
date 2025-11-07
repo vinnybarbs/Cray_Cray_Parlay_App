@@ -45,8 +45,9 @@ async function suggestPicksHandler(req, res) {
     }
 
     // Initialize coordinator with supabase for odds caching
+    const fetcher = global.fetch || require('node-fetch');
     const coordinator = new MultiAgentCoordinator(
-      null, // fetcher (not used in new architecture)
+      fetcher,
       apiKeys,
       supabase // Pass supabase for odds caching
     );
