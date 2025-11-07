@@ -293,6 +293,15 @@ app.post('/api/suggest-picks',
   suggestPicksHandler
 );
 
+// User parlay management endpoints (protected)
+import { authenticateUser } from './lib/middleware/supabaseAuth.js';
+import { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } from './api/user-parlays.js';
+
+app.get('/api/user/parlays', authenticateUser, getUserParlays);
+app.get('/api/user/stats', authenticateUser, getUserStats);
+app.get('/api/user/parlays/:id', authenticateUser, getParlayById);
+app.patch('/api/user/parlays/:id', authenticateUser, updateParlayOutcome);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 
