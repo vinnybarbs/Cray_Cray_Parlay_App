@@ -608,6 +608,9 @@ export default function MainApp() {
       {/* AI Agents Workflow */}
       <AIAgentsWorkflow />
 
+      {/* Auth Modal */}
+      {showAuth && <Auth onClose={() => setShowAuth(false)} />}
+
       {/* Dashboard Modal */}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
     </div>
