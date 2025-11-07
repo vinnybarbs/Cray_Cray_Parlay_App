@@ -172,7 +172,7 @@ const AIAgentsWorkflow = () => {
 
 export default function MainApp() {
   const { user, isAuthenticated, signOut } = useAuth()
-  const [showAuth, setShowAuth] = useState(!isAuthenticated)
+  const [showAuth, setShowAuth] = useState(false)
   const [showDashboard, setShowDashboard] = useState(false)
 
   // Form state
@@ -366,7 +366,7 @@ export default function MainApp() {
               onClick={() => setShowAuth(true)}
               className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-semibold"
             >
-              Sign In
+              Sign In / Sign Up
             </button>
           )}
         </div>
