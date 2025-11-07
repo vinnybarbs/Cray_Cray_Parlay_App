@@ -1,5 +1,6 @@
 const { MultiAgentCoordinator } = require('../lib/agents/coordinator.js');
 const { logger } = require('../shared/logger.js');
+const { supabase } = require('../lib/middleware/supabaseAuth.js');
 
 /**
  * Suggest individual picks (not a full parlay)
@@ -43,13 +44,12 @@ async function suggestPicksHandler(req, res) {
       });
     }
 
-    // Initialize coordinator
-    const coordinator = new MultiAgentCoordinator({
-      oddsApiKey: apiKeys.odds,
-      serperApiKey: apiKeys.serper,
-      openaiApiKey: apiKeys.openai,
-      mode: 'suggestions' // New mode: generate individual picks, not parlays
-    });
+    // Initialize coordinator with supabase for odds caching
+    const coordinator = new MultiAgentCoordinator(
+      null, // fetcher (not used in new architecture)
+      apiKeys,
+      supabase // Pass supabase for odds caching
+    );
 
     // Generate suggestions
     const result = await coordinator.generatePickSuggestions({

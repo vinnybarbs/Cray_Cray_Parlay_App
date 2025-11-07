@@ -3,6 +3,7 @@ const { MultiAgentCoordinator } = require('../lib/agents/coordinator');
 const { SPORT_SLUGS, MARKET_MAPPING, BOOKMAKER_MAPPING } = require('../shared/constants');
 const { calculateParlay } = require('../shared/oddsCalculations');
 const { createLogger } = require('../shared/logger');
+const { supabase } = require('../lib/middleware/supabaseAuth.js');
 
 const logger = createLogger('GenerateParlay');
 
@@ -523,8 +524,8 @@ async function handler(req, res) {
     // Generate unique request ID for progress tracking
     const requestId = `parlay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-    // Initialize multi-agent coordinator
-    const coordinator = new MultiAgentCoordinator(fetcher, apiKeys);
+    // Initialize multi-agent coordinator with supabase for odds caching
+    const coordinator = new MultiAgentCoordinator(fetcher, apiKeys, supabase);
 
     // Generate parlays using multi-agent system
     const result = await coordinator.generateParlays({
