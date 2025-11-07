@@ -80,7 +80,7 @@ async function refreshOddsCache(req, res) {
               const { error } = await supabase
                 .from('odds_cache')
                 .upsert(oddsData, {
-                  onConflict: 'sport,game_id,bookmaker,market_type',
+                  onConflict: 'external_game_id,bookmaker,market_type',
                   ignoreDuplicates: false
                 });
 
