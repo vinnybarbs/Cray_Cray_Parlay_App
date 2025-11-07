@@ -30,12 +30,8 @@ async function refreshOddsCache(req, res) {
       'americanfootball_nfl',
       'americanfootball_ncaaf',
       'basketball_nba',
-      'baseball_mlb',
       'icehockey_nhl',
-      'soccer_epl',
-      'golf_pga',
-      'tennis_atp',
-      'mma_ufc'
+      'soccer_epl'
     ];
     const regions = 'us';
     const oddsFormat = 'american';
@@ -43,59 +39,47 @@ async function refreshOddsCache(req, res) {
     // Core markets for all sports
     const coreMarkets = 'h2h,spreads,totals';
     
-    // ALL Football props (NFL/NCAAF)
-    const footballProps = [
-      'player_pass_tds', 'player_pass_yds', 'player_pass_completions', 'player_pass_attempts',
-      'player_rush_yds', 'player_rush_tds', 'player_rush_attempts',
-      'player_receptions', 'player_reception_yds', 'player_reception_tds',
-      'player_anytime_td', 'player_first_td', 'player_last_td'
-    ].join(',');
+    // Football props (NFL/NCAAF) - ONLY core markets work with /odds endpoint
+    // Player props require /events/{eventId}/odds endpoint which is too expensive
+    const footballProps = '';
     
-    // ALL NBA props
-    const nbaProps = [
-      'player_points', 'player_rebounds', 'player_assists', 'player_threes',
-      'player_blocks', 'player_steals', 'player_turnovers', 'player_points_rebounds_assists'
-    ].join(',');
+    // NBA props - also require event-specific endpoint
+    const nbaProps = '';
     
-    // ALL MLB props
-    const mlbProps = [
-      'pitcher_strikeouts', 'pitcher_hits_allowed', 'pitcher_walks',
-      'batter_hits', 'batter_total_bases', 'batter_rbis', 'batter_runs_scored',
-      'batter_home_runs', 'batter_stolen_bases'
-    ].join(',');
+    // MLB props - also require event-specific endpoint  
+    const mlbProps = '';
 
     let totalGames = 0;
     let totalOdds = 0;
 
     for (const sport of sports) {
       try {
-        // Add delay to avoid rate limiting (max 10 requests/min)
-        if (totalGames > 0) {
-          await new Promise(resolve => setTimeout(resolve, 7000)); // 7 second delay between sports
+        // Add delay between requests to avoid rate limiting
+        if (sports.indexOf(sport) > 0) {
+          await new Promise(resolve => setTimeout(resolve, 7000));
         }
         
-        // Determine which markets to fetch based on sport (ALL in one call!)
-        let markets = coreMarkets;
-        if (sport.includes('football')) {
-          markets = `${coreMarkets},${footballProps}`;
-        } else if (sport === 'basketball_nba') {
-          markets = `${coreMarkets},${nbaProps}`;
-        } else if (sport === 'baseball_mlb') {
-          markets = `${coreMarkets},${mlbProps}`;
-        }
+        // Only fetch core markets (h2h, spreads, totals)
+        // Player props require expensive per-event API calls
+        const markets = coreMarkets;
         
         const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${markets}&oddsFormat=${oddsFormat}`;
         
+        console.log(`\n🔍 Fetching ${sport}...`);
+        console.log(`📊 Markets: ${markets}`);
+        logger.info(`Fetching ${sport}...`);
         const response = await fetch(url);
         
         if (!response.ok) {
-          logger.error(`Failed to fetch odds for ${sport}`, { status: response.status });
+          const errorText = await response.text();
+          logger.error(`Failed to fetch odds for ${sport}`, { status: response.status, error: errorText });
           continue;
         }
 
         const games = await response.json();
         const hasProps = markets !== coreMarkets;
-        logger.info(`Fetched ${games.length} games for ${sport} (${hasProps ? 'with ALL props' : 'core only'})`);
+        console.log(`✅ Fetched ${games.length} games for ${sport} (${hasProps ? 'with ALL props' : 'core only'})`);
+        logger.info(`✅ Fetched ${games.length} games for ${sport} (${hasProps ? 'with ALL props' : 'core only'})`);
 
         for (const game of games) {
           totalGames++;
