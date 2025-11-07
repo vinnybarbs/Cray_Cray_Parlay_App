@@ -320,43 +320,49 @@ export default function MainApp() {
       return
     }
 
-    setLoading(true)
-    setError('')
-    setSuggestions([])
-    setLoadingMessage(getRandomLoadingMessage())
-    setSelectedPicks([])
-    setProgressPhase(0)
-    setPhaseData(null)
-
-    // Simulate progress through phases
-    const progressInterval = setInterval(() => {
-      setProgressPhase(prev => (prev < 3 ? prev + 1 : prev))
-    }, 2000) // Advance every 2 seconds
-
-    try {
-      // Add 120 second timeout (research + AI can take time)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 120000);
-      
-      const response = await fetch(`${API_BASE}/api/suggest-picks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          selectedSports,
-          selectedBetTypes,
-          numLegs,
-          riskLevel,
-          oddsPlatform,
-          dateRange
-        }),
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
-      const data = await response.json()
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-800 via-gray-900 to-gray-800 text-white font-sans p-4">
+        {/* Header */}
+        <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl relative">
+          <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">Cray Cray
+          </h1>
+          <p className="text-xl font-medium text-gray-300">for Parlays</p>
+          {/* User menu */}
+          <div className="absolute top-4 right-4 flex items-center gap-3">
+            {isAuthenticated ? (
+              <>
+                <button
+                  onClick={() => setShowDashboard(true)}
+                  className="text-sm text-gray-300 hover:text-yellow-400"
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={signOut}
+                  className="text-sm text-gray-400 hover:text-white"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => setShowAuth(true)}
+                className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm font-semibold"
+              >
+                Sign In / Sign Up
+              </button>
+            )}
+          </div>
+        </header>
+        {/* Progress Display */}
+        {loading && (
+          <div className="max-w-2xl mx-auto mt-6">
+            <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
+          </div>
+        )}
+        {/* ...existing code... */}
+      </div>
+    )
 
       if (data.success && data.suggestions) {
         console.log('✅ Received suggestions:', data.suggestions.length, data.suggestions);
@@ -381,9 +387,9 @@ export default function MainApp() {
         setError(errorMsg);
       }
     } finally {
-      clearInterval(progressInterval)
-      setLoading(false)
-      setProgressPhase(4) // Mark all complete
+      clearInterval(progressInterval);
+      setLoading(false);
+      setProgressPhase(4); // Mark all complete
     }
   }
 
@@ -758,5 +764,5 @@ export default function MainApp() {
       {/* Dashboard Modal */}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
     </div>
-  )
+  );
 }
