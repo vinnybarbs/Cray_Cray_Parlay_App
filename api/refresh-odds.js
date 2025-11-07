@@ -100,6 +100,12 @@ async function refreshOddsCache(req, res) {
         const used = response.headers.get('x-requests-used');
         if (remaining) console.log(`📊 API calls remaining: ${remaining} (used: ${used})`);
         
+        // DEBUG: Print raw response body for NCAAF
+        if (sport === 'americanfootball_ncaaf') {
+          const rawText = await response.clone().text();
+          console.log('🟠 NCAAF RAW RESPONSE:', rawText.substring(0, 500));
+        }
+        
         if (!response.ok) {
           const errorText = await response.text();
           console.log(`❌ Failed to fetch ${sport}: ${response.status}`);
