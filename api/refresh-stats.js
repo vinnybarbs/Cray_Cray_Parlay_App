@@ -28,6 +28,8 @@ async function refreshStatsCache(req, res) {
     let totalStats = 0;
     let totalInjuries = 0;
     let totalTeams = 0;
+    let totalGames = 0;
+    let totalPlayers = 0;
 
     // Step 1: Fetch and cache team list (for ID mapping)
     try {
@@ -193,11 +195,145 @@ async function refreshStatsCache(req, res) {
       logger.error('Error fetching injuries', { error: error.message });
     }
 
-    logger.info('Stats cache refresh complete', { totalStats, totalInjuries });
-    res.json({ 
-      success: true, 
+    // Step 3: Fetch recent games for H2H analysis (last 20 games)
+    try {
+      logger.info('Fetching recent NFL games for H2H analysis...');
+      const gamesRes = await fetch(`https://v1.american-football.api-sports.io/games?league=1&season=${currentSeason}`, {
+        headers: {
+          'x-rapidapi-key': apiKey,
+          'x-rapidapi-host': 'v1.american-football.api-sports.io'
+        }
+      });
+
+      if (gamesRes.ok) {
+        const gamesData = await gamesRes.json();
+        const games = gamesData.response || [];
+        
+        logger.info(`Found ${games.length} games this season`);
+
+        // Store games with detailed stats
+        for (const game of games) {
+          if (game.game?.id && game.teams?.home?.id && game.teams?.away?.id) {
+            // Fetch detailed game statistics
+            await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit
+            
+            const gameStatsRes = await fetch(`https://v1.american-football.api-sports.io/games/statistics?id=${game.game.id}`, {
+              headers: {
+                'x-rapidapi-key': apiKey,
+                'x-rapidapi-host': 'v1.american-football.api-sports.io'
+              }
+            });
+
+            let gameStats = null;
+            if (gameStatsRes.ok) {
+              const statsData = await gameStatsRes.json();
+              gameStats = statsData.response;
+            }
+
+            // Store in h2h_cache for quick lookup
+            const homeTeamId = game.teams.home.id.toString();
+            const awayTeamId = game.teams.away.id.toString();
+            
+            // Store both directions for easy lookup
+            const { error: h2hError } = await supabase
+              .from('h2h_cache')
+              .upsert({
+                sport: 'NFL',
+                team1_id: homeTeamId,
+                team2_id: awayTeamId,
+                team1_name: game.teams.home.name,
+                team2_name: game.teams.away.name,
+                games: [{ ...game, statistics: gameStats }],
+                last_updated: new Date().toISOString()
+              }, {
+                onConflict: 'sport,team1_id,team2_id'
+              });
+
+            if (!h2hError) {
+              totalGames++;
+            }
+          }
+        }
+
+        logger.info(`Stored ${totalGames} games with statistics`);
+      }
+    } catch (error) {
+      logger.error('Error fetching games', { error: error.message });
+    }
+
+    // Step 4: Fetch top player stats (for prop research)
+    try {
+      logger.info('Fetching player statistics...');
+      
+      // Get players from standings teams
+      const { data: teams } = await supabase
+        .from('team_stats_cache')
+        .select('team_id')
+        .eq('sport', 'NFL')
+        .eq('season', currentSeason)
+        .limit(32);
+
+      if (teams && teams.length > 0) {
+        for (const team of teams.slice(0, 10)) { // Limit to 10 teams to save API calls
+          await new Promise(resolve => setTimeout(resolve, 500)); // Rate limit
+          
+          const playersRes = await fetch(`https://v1.american-football.api-sports.io/players?team=${team.team_id}&season=${currentSeason}`, {
+            headers: {
+              'x-rapidapi-key': apiKey,
+              'x-rapidapi-host': 'v1.american-football.api-sports.io'
+            }
+          });
+
+          if (playersRes.ok) {
+            const playersData = await playersRes.json();
+            const players = playersData.response || [];
+
+            // Store top players (QB, RB, WR, TE)
+            for (const player of players.slice(0, 5)) { // Top 5 per team
+              if (player.player?.id && player.statistics) {
+                const { error } = await supabase
+                  .from('player_stats_cache')
+                  .upsert({
+                    sport: 'NFL',
+                    season: currentSeason,
+                    player_id: player.player.id.toString(),
+                    player_name: player.player.name,
+                    team_id: team.team_id,
+                    stats: player.statistics,
+                    last_updated: new Date().toISOString()
+                  }, {
+                    onConflict: 'sport,season,player_id'
+                  });
+
+                if (!error) {
+                  totalPlayers++;
+                }
+              }
+            }
+          }
+        }
+
+        logger.info(`Stored ${totalPlayers} player stat records`);
+      }
+    } catch (error) {
+      logger.error('Error fetching player stats', { error: error.message });
+    }
+
+    logger.info('Stats cache refresh complete', { 
+      totalTeams, 
       totalStats, 
       totalInjuries, 
+      totalGames, 
+      totalPlayers 
+    });
+    
+    res.json({ 
+      success: true, 
+      totalTeams,
+      totalStats, 
+      totalInjuries,
+      totalGames,
+      totalPlayers,
       timestamp: new Date().toISOString() 
     });
 
