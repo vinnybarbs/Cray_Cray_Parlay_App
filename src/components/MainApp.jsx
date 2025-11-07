@@ -373,7 +373,7 @@ export default function MainApp() {
       setLoading(false);
       setProgressPhase(4); // Mark all complete
     }
-  }
+  } // <-- closes fetchSuggestions
 
   const togglePickSelection = (pick) => {
     setSelectedPicks(prev => {
