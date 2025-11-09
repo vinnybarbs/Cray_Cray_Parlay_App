@@ -94,7 +94,8 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(distPath));
 
   // Serve index.html for any unknown route (SPA fallback)
-  app.get('*', (req, res, next) => {
+  // use '/*' to avoid path-to-regexp '*' parsing issues with some router versions
+  app.get('/*', (req, res, next) => {
     // allow API routes to pass through
     if (req.path.startsWith('/api') || req.path.startsWith('/debug') || req.path.startsWith('/cron')) return next();
     res.sendFile(path.join(distPath, 'index.html'));
