@@ -12,6 +12,8 @@ const { validateParlayRequest, sanitizeInput } = require('./lib/middleware/valid
 const app = express();
 const PORT = process.env.PORT || 5001;
 
+const path = require('path');
+
 // Progress tracking for SSE
 const progressClients = new Map(); // requestId -> [response objects]
 
@@ -85,6 +87,19 @@ app.get('/api/health', (req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
+// Serve static frontend in production (Vite build output)
+if (process.env.NODE_ENV === 'production') {
+  const distPath = path.join(__dirname, 'dist');
+  app.use(express.static(distPath));
+
+  // Serve index.html for any unknown route (SPA fallback)
+  app.get('*', (req, res, next) => {
+    // allow API routes to pass through
+    if (req.path.startsWith('/api') || req.path.startsWith('/debug') || req.path.startsWith('/cron')) return next();
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Debug endpoint for roster cache stats
 app.get('/debug/roster-cache', (req, res) => {
