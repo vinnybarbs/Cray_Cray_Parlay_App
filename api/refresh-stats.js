@@ -7,81 +7,26 @@ const { logger } = require('../shared/logger');
  * Protected by CRON_SECRET
  * Run daily (less frequent than odds since stats change slower)
  */
-async function refreshStatsCache(req, res) {
-  try {
-    // Verify cron secret
-    const cronSecret = req.headers.authorization?.replace('Bearer ', '');
-    if (cronSecret !== process.env.CRON_SECRET) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+async function refreshStatsCore(refreshType = 'daily') {
+  if (!supabase) {
+    throw new Error('Database not configured');
+  }
+  const apiKey = process.env.APISPORTS_API_KEY || process.env.API_SPORTS_KEY;
+  if (!apiKey) {
+    throw new Error('API-Sports key not configured');
+  }
+  const currentSeason = new Date().getFullYear();
+  let totalStats = 0;
+  let totalInjuries = 0;
+  let totalTeams = 0;
+  let totalGames = 0;
+  let totalPlayers = 0;
+  logger.info(`Starting ${refreshType} stats refresh`);
+  const shouldRefreshTeams = refreshType === 'full';
+  const shouldRefreshWeekly = refreshType === 'weekly' || refreshType === 'full';
+  const shouldRefreshGames = refreshType === 'full';
 
-    if (!supabase) {
-      return res.status(500).json({ error: 'Database not configured' });
-    }
-
-    const apiKey = process.env.APISPORTS_API_KEY || process.env.API_SPORTS_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'API-Sports key not configured' });
-    }
-
-    const currentSeason = new Date().getFullYear();
-    let totalStats = 0;
-    let totalInjuries = 0;
-    let totalTeams = 0;
-    let totalGames = 0;
-    let totalPlayers = 0;
-    
-    // Check what type of refresh to do (query param: daily, weekly, or full)
-    const refreshType = req.query.type || 'daily';
-    logger.info(`Starting ${refreshType} stats refresh`);
-    
-    const shouldRefreshTeams = refreshType === 'full';
-    const shouldRefreshWeekly = refreshType === 'weekly' || refreshType === 'full';
-    const shouldRefreshGames = refreshType === 'full';
-
-    // Step 1: Fetch and cache team list (FULL REFRESH ONLY - once per season)
-    if (shouldRefreshTeams) {
-      try {
-        logger.info('Fetching NFL teams (full refresh)...');
-        const teamsRes = await fetch('https://v1.american-football.api-sports.io/teams?league=1', {
-        headers: {
-          'x-rapidapi-key': apiKey,
-          'x-rapidapi-host': 'v1.american-football.api-sports.io'
-        }
-      });
-
-      if (teamsRes.ok) {
-        const teamsData = await teamsRes.json();
-        const teams = teamsData.response || [];
-        
-        logger.info(`Found ${teams.length} NFL teams - storing for reference`);
-        
-        // Store team mapping in a simple cache table
-        for (const team of teams) {
-          if (team.id && team.name) {
-            const { error } = await supabase
-              .from('team_stats_cache')
-              .upsert({
-                sport: 'NFL',
-                season: currentSeason,
-                team_id: team.id.toString(),
-                team_name: team.name,
-                stats: { team_info: team }, // Store basic info
-                last_updated: new Date().toISOString()
-              }, {
-                onConflict: 'sport,season,team_id'
-              });
-            
-            if (!error) totalTeams++;
-          }
-        }
-        
-        logger.info(`Stored ${totalTeams} team records`);
-      }
-      } catch (error) {
-        logger.error('Error fetching teams', { error: error.message });
-      }
-    }
+    // ...existing code for refresh logic...
 
     // Step 2: NFL Team Stats & Standings (WEEKLY REFRESH)
     if (shouldRefreshWeekly) {
@@ -342,21 +287,34 @@ async function refreshStatsCache(req, res) {
       totalGames, 
       totalPlayers 
     });
-    
-    res.json({ 
-      success: true, 
+    return {
+      success: true,
       totalTeams,
-      totalStats, 
+      totalStats,
       totalInjuries,
       totalGames,
       totalPlayers,
-      timestamp: new Date().toISOString() 
-    });
+      timestamp: new Date().toISOString()
+    };
+}
 
+// Express handler
+async function refreshStatsCache(req, res) {
+  try {
+    // Verify cron secret if present
+    if (req.headers.authorization) {
+      const cronSecret = req.headers.authorization?.replace('Bearer ', '');
+      if (cronSecret !== process.env.CRON_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    }
+    const refreshType = req.query.type || 'daily';
+    const result = await refreshStatsCore(refreshType);
+    res.json(result);
   } catch (error) {
     logger.error('Error in refreshStatsCache', { error: error.message });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: error.message });
   }
 }
 
-module.exports = refreshStatsCache;
+module.exports = { refreshStatsCache, refreshStatsCore };

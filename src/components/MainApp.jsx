@@ -360,7 +360,8 @@ export default function MainApp() {
       } else {
         throw new Error('Invalid response format')
       }
-    } catch (err) {
+    }
+    catch (err) {
       const errorMsg = err.message || 'Failed to fetch suggestions';
       // Check if it's a "sport not in season" error
       if (errorMsg.includes('not available in cache') || errorMsg.includes('out of season')) {

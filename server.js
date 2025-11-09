@@ -16,29 +16,12 @@ const PORT = process.env.PORT || 5001;
 const progressClients = new Map(); // requestId -> [response objects]
 
 // Enhanced CORS for deployment
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
-  .split(',')
-  .map(o => o.trim())
-  .filter(Boolean);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow server-to-server or curl without Origin
-    if (!origin) return callback(null, true);
-    // Allow everything in non-production
-    if (process.env.NODE_ENV !== 'production') return callback(null, true);
-    // If no list configured, allow
-    if (allowedOrigins.length === 0) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  methods: ['GET','HEAD','PUT','PATCH','POST','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization','Accept'],
-  credentials: true,
-  optionsSuccessStatus: 204
-};
-
-app.use(cors(corsOptions));
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? [process.env.FRONTEND_URL, 'https://your-deployed-app.com'] 
+    : true,
+  credentials: true
+}));
 
 app.use(express.json());
 
@@ -56,8 +39,6 @@ if (missingKeys.length > 0) {
 // Force HTTPS in production (but not in local development)
 if (process.env.NODE_ENV === 'production') {
   app.use((req, res, next) => {
-    // Never redirect preflight; let CORS respond
-    if (req.method === 'OPTIONS') return next();
     if (req.headers.host?.includes('localhost')) {
       next(); // Skip HTTPS redirect for localhost
     } else if (req.header('x-forwarded-proto') !== 'https') {
@@ -84,17 +65,6 @@ app.get('/health', (req, res) => {
       serper: hasSerperKey
     },
     timestamp: new Date().toISOString()
-  });
-});
-
-// Debug CORS config
-app.get('/debug/cors', (req, res) => {
-  res.json({
-    allowedOrigins: allowedOrigins,
-    requestOrigin: req.headers.origin || 'none',
-    nodeEnv: process.env.NODE_ENV,
-    rawAllowedOriginsEnv: process.env.ALLOWED_ORIGINS || 'not set',
-    rawFrontendUrlEnv: process.env.FRONTEND_URL || 'not set'
   });
 });
 
@@ -272,40 +242,18 @@ global.emitComplete = (requestId) => {
   progressClients.delete(requestId);
 };
 
-// Main parlay generation endpoint (legacy - will be deprecated)
-app.post('/api/generate-parlay',
+// Apply stricter rate limiting and validation to parlay generation
+app.post('/api/generate-parlay', 
   parlayRateLimiter.middleware(),
-  validateParlayRequest,
   sanitizeInput,
+  validateParlayRequest,
   generateParlayHandler
 );
 
-// New endpoint: Suggest individual picks (not full parlays)
-const { suggestPicksHandler } = require('./api/suggest-picks.js');
 
-app.post('/api/suggest-picks',
-  parlayRateLimiter.middleware(),
-  validateParlayRequest, // Reuse same validation
-  sanitizeInput,
-  suggestPicksHandler
-);
-
-// User parlay management endpoints (protected)
-const { authenticateUser } = require('./lib/middleware/supabaseAuth.js');
-const { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } = require('./api/user-parlays.js');
-
-app.get('/api/user/parlays', authenticateUser, getUserParlays);
-app.get('/api/user/stats', authenticateUser, getUserStats);
-app.get('/api/user/parlays/:id', authenticateUser, getParlayById);
-app.patch('/api/user/parlays/:id', authenticateUser, updateParlayOutcome);
-
-// Cron endpoints (protected by secret)
-const refreshOddsCache = require('./api/refresh-odds.js');
-const refreshStatsCache = require('./api/refresh-stats.js');
-const refreshNewsCache = require('./api/refresh-news.js');
-app.post('/cron/refresh-odds', refreshOddsCache);
-app.post('/cron/refresh-stats', refreshStatsCache);
-app.post('/cron/refresh-news', refreshNewsCache);
+// Add refresh stats endpoint
+const { refreshStatsCache } = require('./api/refresh-stats');
+app.get('/api/refresh-stats', refreshStatsCache);
 
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
