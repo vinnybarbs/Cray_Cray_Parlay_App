@@ -319,13 +319,13 @@ export default function MainApp() {
       setShowAuth(true)
       return
     }
-
+    let progressInterval
     try {
       setLoading(true)
       setError('')
-      
+
       // Update loading message every 3 seconds
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setLoadingMessage(getRandomLoadingMessage())
       }, 3000)
 
@@ -334,59 +334,41 @@ export default function MainApp() {
         headers: {
           'Content-Type': 'application/json',
         },
-        try {
-          setLoading(true)
-          setError('')
-          // Update loading message every 3 seconds
-          const progressInterval = setInterval(() => {
-            setLoadingMessage(getRandomLoadingMessage())
-          }, 3000)
+        body: JSON.stringify({
+          sports: selectedSports,
+          betTypes: selectedBetTypes,
+          numLegs,
+          riskLevel,
+          oddsPlatform,
+          dateRange
+        })
+      })
 
-          const response = await fetch(`${API_BASE}/api/suggestions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              sports: selectedSports,
-              betTypes: selectedBetTypes,
-              numLegs,
-              riskLevel,
-              oddsPlatform,
-              dateRange
-            })
-          })
+      const data = await response.json()
 
-          const data = await response.json()
-
-          if (data.success && data.suggestions) {
-            console.log('✅ Received suggestions:', data.suggestions.length, data.suggestions);
-            setSuggestions(data.suggestions)
-            // Extract timing and phase data if available
-            if (data.timings) {
-              setTimings(data.timings)
-            }
-            if (data.phaseData) {
-              setPhaseData(data.phaseData)
-            }
-          } else {
-            throw new Error('Invalid response format')
-          }
-        }
-        catch (err) {
-          const errorMsg = err.message || 'Failed to fetch suggestions';
-          // Check if it's a "sport not in season" error
-          if (errorMsg.includes('not available in cache') || errorMsg.includes('out of season')) {
-            setError(`${errorMsg}\n\n✅ Available sports: NFL, NHL, Soccer (EPL)`);
-          } else {
-            setError(errorMsg);
-          }
-        }
-        finally {
-          clearInterval(progressInterval);
-          setLoading(false);
-          setProgressPhase(4); // Mark all complete
-        }
+      if (data.success && data.suggestions) {
+        console.log('✅ Received suggestions:', data.suggestions.length, data.suggestions);
+        setSuggestions(data.suggestions)
+        // Extract timing and phase data if available
+        if (data.timings) setTimings(data.timings)
+        if (data.phaseData) setPhaseData(data.phaseData)
+      } else {
+        throw new Error('Invalid response format')
+      }
+    } catch (err) {
+      const errorMsg = err.message || 'Failed to fetch suggestions'
+      // Check if it's a "sport not in season" error
+      if (errorMsg.includes('not available in cache') || errorMsg.includes('out of season')) {
+        setError(`${errorMsg}\n\n✅ Available sports: NFL, NHL, Soccer (EPL)`)
+      } else {
+        setError(errorMsg)
+      }
+    } finally {
+      if (progressInterval) clearInterval(progressInterval)
+      setLoading(false)
+      setProgressPhase(4) // Mark all complete
+    }
+  }
   const calculatePayout = () => {
     if (selectedPicks.length === 0) return null
     const americanOdds = selectedPicks.map(p => p.odds)
