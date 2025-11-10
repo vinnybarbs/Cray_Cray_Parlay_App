@@ -1,0 +1,25 @@
+name: Check Parlay Outcomes Daily
+
+on:
+  schedule:
+    # Run daily at 6 AM UTC (covers US evening games)
+    - cron: '0 6 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  check-outcomes:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Call Parlay Outcome Checker
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/functions/v1/check-parlay-outcomes"
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      
+      - name: Log completion
+        run: echo "Parlay outcome check completed at $(date)"
