@@ -197,14 +197,17 @@ async function getGameResult(leg: any): Promise<GameResult | null> {
     const gameDate = new Date(leg.game_date)
     const today = new Date()
     
-    // Only check games that should be completed (at least 4 hours after game date)
-    if (gameDate > new Date(today.getTime() - 4 * 60 * 60 * 1000)) {
+    // Only check games from the past (be more aggressive - check any game from yesterday or earlier)
+    if (gameDate > new Date(today.getTime() - 12 * 60 * 60 * 1000)) {
       return null // Game likely not finished yet
     }
 
     // ESPN API endpoints by sport
     const espnEndpoints: { [key: string]: string } = {
       'NFL': 'http://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
+      'NCAA': 'http://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
+      'NCAAF': 'http://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
+      'College Football': 'http://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
       'NBA': 'http://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
       'MLB': 'http://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
       'NHL': 'http://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard'
@@ -213,7 +216,10 @@ async function getGameResult(leg: any): Promise<GameResult | null> {
     const endpoint = espnEndpoints[leg.sport]
     if (!endpoint) return null
 
+    // Game dates are now stored in Mountain Time, so use them directly
     const dateStr = gameDate.toISOString().split('T')[0].replace(/-/g, '')
+    
+    console.log(`Checking ${leg.away_team} @ ${leg.home_team} on date: ${dateStr} (stored in MT)`)
     
     const response = await fetch(`${endpoint}?dates=${dateStr}`)
     if (!response.ok) return null
@@ -262,14 +268,24 @@ async function getGameResult(leg: any): Promise<GameResult | null> {
 function teamsMatch(apiTeamName: string, legTeamName: string): boolean {
   if (!apiTeamName || !legTeamName) return false
   
+  const apiLower = apiTeamName.toLowerCase().trim()
+  const legLower = legTeamName.toLowerCase().trim()
+  
   // Direct match
-  if (apiTeamName.toLowerCase() === legTeamName.toLowerCase()) {
+  if (apiLower === legLower) {
     return true
   }
 
-  // Basic contains match (could be enhanced with more mappings)
-  return apiTeamName.toLowerCase().includes(legTeamName.toLowerCase().split(' ').pop() || '') ||
-         legTeamName.toLowerCase().includes(apiTeamName.toLowerCase().split(' ').pop() || '')
+  // Remove common suffixes and try again
+  const cleanApi = apiLower.replace(/\s+(gamecocks|miners|falcons|eagles|flames|bears)$/, '')
+  const cleanLeg = legLower.replace(/\s+(gamecocks|miners|falcons|eagles|flames|bears)$/, '')
+  
+  if (cleanApi === cleanLeg) {
+    return true
+  }
+
+  // Check if one contains the other (for partial matches)
+  return apiLower.includes(legLower) || legLower.includes(apiLower)
 }
 
 /**
@@ -291,7 +307,7 @@ function determineLegOutcome(leg: any, gameResult: GameResult): any {
         return checkMoneylineOutcome(betDetails, scoreDiff, leg)
         
       case 'spread':
-        return checkSpreadOutcome(betDetails, scoreDiff)
+        return checkSpreadOutcome(betDetails, scoreDiff, leg)
         
       case 'total':
       case 'over/under':
@@ -312,22 +328,22 @@ function determineLegOutcome(leg: any, gameResult: GameResult): any {
  * Check moneyline bet outcome
  */
 function checkMoneylineOutcome(betDetails: any, scoreDiff: number, leg: any): any {
-  const description = betDetails.description?.toLowerCase() || ''
+  const pick = betDetails.pick?.toLowerCase() || betDetails.description?.toLowerCase() || ''
   
-  // Parse which team was picked from the description
+  if (!pick) return null
+  
+  // Parse which team was picked
   let teamWon = false
   
-  // Try to match team names in the description
-  if (description.includes(leg.home_team.toLowerCase())) {
+  // Check if the picked team matches home or away team
+  if (pick.includes(leg.home_team.toLowerCase()) || 
+      teamsMatch(pick, leg.home_team)) {
     teamWon = scoreDiff > 0 // Home team won
-  } else if (description.includes(leg.away_team.toLowerCase())) {
-    teamWon = scoreDiff < 0 // Away team won
-  } else if (description.includes('home')) {
-    teamWon = scoreDiff > 0
-  } else if (description.includes('away')) {
-    teamWon = scoreDiff < 0
+  } else if (pick.includes(leg.away_team.toLowerCase()) || 
+             teamsMatch(pick, leg.away_team)) {
+    teamWon = scoreDiff < 0 // Away team won  
   } else {
-    // Default logic - could be enhanced
+    console.warn(`Could not match pick "${pick}" to teams: ${leg.home_team} vs ${leg.away_team}`)
     return null
   }
 
@@ -345,16 +361,31 @@ function checkMoneylineOutcome(betDetails: any, scoreDiff: number, leg: any): an
 /**
  * Check spread bet outcome
  */
-function checkSpreadOutcome(betDetails: any, scoreDiff: number): any {
-  const line = betDetails.line || 0
-  const description = betDetails.description?.toLowerCase() || ''
+function checkSpreadOutcome(betDetails: any, scoreDiff: number, leg: any): any {
+  const pick = betDetails.pick || ''
   
-  // Determine if betting on home or away team with spread
-  let adjustedDiff
-  if (description.includes('home') || description.includes('+')) {
-    adjustedDiff = scoreDiff + line // Home team with spread
+  // Extract spread value from pick like "Bowling Green Falcons (2.5)"
+  const spreadMatch = pick.match(/\(([\d.-]+)\)/)
+  if (!spreadMatch) return null
+  
+  const spread = parseFloat(spreadMatch[1])
+  
+  // Determine which team was picked by checking team name in pick
+  let isHomePick = false
+  if (pick.toLowerCase().includes(leg.home_team.toLowerCase())) {
+    isHomePick = true
+  } else if (pick.toLowerCase().includes(leg.away_team.toLowerCase())) {
+    isHomePick = false
   } else {
-    adjustedDiff = -scoreDiff + line // Away team with spread
+    return null
+  }
+  
+  // Calculate adjusted score difference
+  let adjustedDiff
+  if (isHomePick) {
+    adjustedDiff = scoreDiff - spread // Home team minus spread
+  } else {
+    adjustedDiff = -scoreDiff - spread // Away team minus spread
   }
 
   if (adjustedDiff === 0) {
@@ -372,10 +403,14 @@ function checkSpreadOutcome(betDetails: any, scoreDiff: number): any {
  * Check total (over/under) bet outcome
  */
 function checkTotalOutcome(betDetails: any, totalScore: number): any {
-  const line = betDetails.line || 0
-  const description = betDetails.description?.toLowerCase() || ''
+  const pick = betDetails.pick || betDetails.description || ''
   
-  const isOver = description.includes('over')
+  // Extract over/under and line from pick like "Over (50.5)"
+  const totalMatch = pick.match(/(Over|Under)\s*\(([\d.]+)\)/i)
+  if (!totalMatch) return null
+  
+  const isOver = totalMatch[1].toLowerCase() === 'over'
+  const line = parseFloat(totalMatch[2])
   const diff = totalScore - line
 
   if (diff === 0) {
@@ -458,13 +493,12 @@ async function updateParlayOutcome(parlayId: string, outcome: any, parlay: any):
   try {
     // Calculate profit/loss if parlay won
     let profitLoss = 0
+    const betAmount = parlay.bet_amount || 100 // Use actual bet amount or default to $100
     if (outcome.outcome === 'won') {
-      // Assume $100 bet for calculation
-      const betAmount = 100
       const payout = parlay.potential_payout || 0
       profitLoss = payout - betAmount
     } else if (outcome.outcome === 'lost') {
-      profitLoss = -100 // Lost the bet amount
+      profitLoss = -betAmount // Lost the bet amount
     }
 
     const { error } = await supabase
@@ -473,8 +507,7 @@ async function updateParlayOutcome(parlayId: string, outcome: any, parlay: any):
         status: 'completed',
         final_outcome: outcome.outcome,
         hit_percentage: outcome.hitPercentage,
-        profit_loss: profitLoss,
-        updated_at: new Date().toISOString()
+        profit_loss: profitLoss
       })
       .eq('id', parlayId)
 

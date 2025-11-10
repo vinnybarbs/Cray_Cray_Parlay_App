@@ -2,7 +2,6 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Auth from './Auth'
 import Dashboard from './Dashboard'
-import ParlayOutcomeManager from './ParlayOutcomeManager'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -259,7 +258,6 @@ export default function MainApp() {
   const { user, isAuthenticated, signOut } = useAuth()
   const [showAuth, setShowAuth] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
-  const [showOutcomeManager, setShowOutcomeManager] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
   const loadingMessages = [
@@ -287,6 +285,7 @@ export default function MainApp() {
   const [riskLevel, setRiskLevel] = useState('Medium')
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings')
   const [dateRange, setDateRange] = useState(1)
+  const [unitSize, setUnitSize] = useState(25) // Default to $25 unit
 
   // Suggestions state
   const [suggestions, setSuggestions] = useState([])
@@ -406,11 +405,11 @@ export default function MainApp() {
   const calculatePayout = () => {
     if (selectedPicks.length === 0) return null
     const americanOdds = selectedPicks.map(p => p.odds)
-    const result = calculateParlay(americanOdds, 100)
+    const result = calculateParlay(americanOdds, unitSize)
     return {
       combinedOdds: result.combinedOdds,
       payout: result.payout.toFixed(2),
-      profit: (result.payout - 100).toFixed(2)
+      profit: (result.payout - unitSize).toFixed(2)
     }
   }
 
@@ -422,7 +421,7 @@ export default function MainApp() {
 
     try {
       const americanOdds = selectedPicks.map(p => p.odds)
-      const result = calculateParlay(americanOdds, 100)
+      const result = calculateParlay(americanOdds, unitSize)
 
       const { data: parlayData, error: parlayError } = await supabase
         .from('parlays')
@@ -435,6 +434,7 @@ export default function MainApp() {
           total_legs: selectedPicks.length,
           combined_odds: result.combinedOdds,
           potential_payout: result.payout,
+          bet_amount: unitSize,
           is_lock_bet: true,
           status: 'pending'
         })
@@ -495,12 +495,6 @@ export default function MainApp() {
                 className="text-sm text-gray-300 hover:text-yellow-400"
               >
                 Dashboard
-              </button>
-              <button
-                onClick={() => setShowOutcomeManager(true)}
-                className="text-sm text-gray-300 hover:text-yellow-400"
-              >
-                ⚡ Outcomes
               </button>
               <button
                 onClick={signOut}
@@ -604,6 +598,27 @@ export default function MainApp() {
                 <option key={book} value={book}>{book}</option>
               ))}
             </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="text-gray-200 text-sm font-semibold block mb-3">
+            7. How big's your unit? <span className="text-green-400 font-bold">${unitSize}</span>
+          </label>
+          <div className="flex gap-2">
+            {[10, 25, 50, 100].map(amount => (
+              <button
+                key={amount}
+                onClick={() => setUnitSize(amount)}
+                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  unitSize === amount
+                    ? 'bg-green-500 text-gray-900'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                ${amount}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -736,8 +751,8 @@ export default function MainApp() {
 
               <div className="border-t border-gray-700 pt-3 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Bet Amount:</span>
-                  <span className="text-white font-semibold">$100.00</span>
+                  <span className="text-gray-400">Unit Size:</span>
+                  <span className="text-white font-semibold">${unitSize}.00</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Potential Profit:</span>
@@ -768,9 +783,6 @@ export default function MainApp() {
 
       {/* Dashboard Modal */}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
-
-      {/* Parlay Outcome Manager Modal */}
-      {showOutcomeManager && <ParlayOutcomeManager onClose={() => setShowOutcomeManager(false)} />}
     </div>
   )
 }

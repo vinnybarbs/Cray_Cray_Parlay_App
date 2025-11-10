@@ -281,8 +281,8 @@ app.get('/api/refresh-stats', refreshStatsCache);
 // Add parlay outcome management endpoints
 const { checkParlayOutcomes, manualParlayUpdate, getPendingParlays } = require('./api/parlay-outcomes');
 app.post('/api/check-parlays', checkParlayOutcomes);
-app.patch('/api/parlays/:id/outcome', manualParlayUpdate);
-app.get('/api/parlays/pending', getPendingParlays);
+app.patch('/api/parlays/:id/outcome', ...manualParlayUpdate);
+app.get('/api/parlays/pending', ...getPendingParlays);
 
 // Add user parlay management endpoints
 const { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } = require('./api/user-parlays');
