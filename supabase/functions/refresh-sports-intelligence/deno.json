@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": false
+  },
+  "fmt": {
+    "files": {
+      "include": ["index.ts"]
+    }
+  }
+}
