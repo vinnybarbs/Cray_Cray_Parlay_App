@@ -1,7 +1,7 @@
 -- ============================================================================
--- ONE-QUERY DASHBOARD - Complete overview in a single result
+-- ENHANCED DASHBOARD - Complete overview with missing data analysis
 -- ============================================================================
--- Run this ONE query in Supabase SQL Editor to see everything
+-- Shows what you have + what's missing + actionable recommendations
 -- ============================================================================
 
 WITH summary_stats AS (
@@ -101,13 +101,138 @@ SELECT
   END as data_point,
   value,
   status,
-  timestamp as last_updated
+  timestamp as last_updated,
+  -- Add actionable recommendations
+  CASE 
+    WHEN metric = 'TOTAL_RECORDS' AND source = 'team_stats_cache' AND value = '0' 
+      THEN '🔧 Run: curl "http://localhost:5001/api/refresh-stats"'
+    WHEN metric = 'TOTAL_RECORDS' AND source = 'news_cache' AND value = '0' 
+      THEN '🔧 Run: curl "http://localhost:5001/api/refresh-news"'
+    WHEN metric = 'FRESHNESS_HOURS' AND source = 'odds_cache' AND value::float > 6 
+      THEN '🔧 Run: curl "http://localhost:5001/api/refresh-odds"'
+    WHEN metric = 'GAMES_COVERED' AND source LIKE '%nfl%' AND value::int < 5 
+      THEN '⏰ Wait for more NFL games (limited games this week)'
+    WHEN status LIKE '%STALE%' OR status LIKE '%OLD%' 
+      THEN '🔄 Refresh recommended'
+    WHEN status = '❌ NO DATA' 
+      THEN '🚨 Critical - API endpoint may not be working'
+    ELSE '✅ No action needed'
+  END as recommendation
 FROM data_status
 ORDER BY 
-  CASE metric
-    WHEN 'TOTAL_RECORDS' THEN 1
-    WHEN 'GAMES_COVERED' THEN 2  
-    WHEN 'BOOKMAKERS' THEN 3
-    WHEN 'FRESHNESS_HOURS' THEN 4
-  END,
-  source;
+  CASE 
+    WHEN status LIKE '%❌%' THEN 1  -- Critical issues first
+    WHEN status LIKE '%⚠️%' THEN 2  -- Warnings second  
+    WHEN metric = 'TOTAL_RECORDS' THEN 3
+    WHEN metric = 'GAMES_COVERED' THEN 4
+    WHEN metric = 'BOOKMAKERS' THEN 5
+    WHEN metric = 'FRESHNESS_HOURS' THEN 6
+  END, source;
+
+-- ============================================================================
+-- DETAILED ANALYSIS - What's actually missing and why
+-- ============================================================================
+
+-- Show missing data sources with explanations
+SELECT '🔍 MISSING DATA ANALYSIS' as analysis_type, * FROM (
+  SELECT 
+    'Missing Team Stats' as issue,
+    '0 records in team_stats_cache' as problem,
+    'No team performance data for AI analysis' as impact,
+    'curl "http://localhost:5001/api/refresh-stats"' as solution,
+    'High' as priority
+  WHERE NOT EXISTS (SELECT 1 FROM team_stats_cache LIMIT 1)
+  
+  UNION ALL
+  
+  SELECT 
+    'Missing News Data',
+    '0 records in news_cache',
+    'No injury reports or analyst insights for AI',
+    'curl "http://localhost:5001/api/refresh-news"', 
+    'High'
+  WHERE NOT EXISTS (SELECT 1 FROM news_cache LIMIT 1)
+  
+  UNION ALL
+  
+  SELECT 
+    'Stale Odds Data',
+    'Odds over 6 hours old (' || ROUND(EXTRACT(EPOCH FROM (NOW() - MAX(last_updated)))/3600, 1) || 'h)',
+    'AI making decisions on outdated lines',
+    'curl "http://localhost:5001/api/refresh-odds"',
+    'Medium'
+  FROM odds_cache
+  HAVING MAX(last_updated) < NOW() - INTERVAL '6 hours'
+  
+  UNION ALL
+  
+  SELECT 
+    'Limited NFL Games',
+    'Only ' || COUNT(DISTINCT CONCAT(home_team, ' vs ', away_team)) || ' NFL games',
+    'Reduced parlay options for primary sport',
+    'Normal - NFL has limited midweek games',
+    'Low'
+  FROM odds_cache 
+  WHERE sport = 'americanfootball_nfl' AND commence_time > NOW()
+  HAVING COUNT(DISTINCT CONCAT(home_team, ' vs ', away_team)) < 5
+) issues;
+
+-- ============================================================================
+-- API ENDPOINT STATUS - Check if your refresh endpoints work
+-- ============================================================================
+
+SELECT '🌐 API ENDPOINT STATUS' as check_type, * FROM (
+  SELECT 
+    'refresh-odds' as endpoint,
+    CASE WHEN MAX(last_updated) > NOW() - INTERVAL '24 hours' 
+         THEN '✅ Working (recent data)' 
+         ELSE '❌ Not working or not run' END as status,
+    COALESCE(MAX(last_updated)::text, 'Never') as last_successful_run,
+    'curl "http://localhost:5001/api/refresh-odds"' as test_command
+  FROM odds_cache
+  
+  UNION ALL
+  
+  SELECT 
+    'refresh-stats',
+    CASE WHEN EXISTS(SELECT 1 FROM team_stats_cache) 
+         THEN '✅ Has data' 
+         ELSE '❌ No data - never run' END,
+    COALESCE(MAX(last_updated)::text, 'Never'),
+    'curl "http://localhost:5001/api/refresh-stats"'
+  FROM team_stats_cache
+  
+  UNION ALL
+  
+  SELECT 
+    'refresh-news',
+    CASE WHEN EXISTS(SELECT 1 FROM news_cache) 
+         THEN '✅ Has data' 
+         ELSE '❌ No data - never run' END,
+    COALESCE(MAX(last_updated)::text, 'Never'),
+    'curl "http://localhost:5001/api/refresh-news"'
+  FROM news_cache
+) endpoint_status;
+
+-- ============================================================================
+-- GAME SCHEDULE INSIGHT - Why you have the games you do
+-- ============================================================================
+
+SELECT '📅 GAME SCHEDULE ANALYSIS' as schedule_type, * FROM (
+  SELECT 
+    sport,
+    COUNT(DISTINCT CONCAT(home_team, ' vs ', away_team)) as games_available,
+    MIN(commence_time) as next_game,
+    MAX(commence_time) as last_game,
+    CASE 
+      WHEN sport = 'americanfootball_nfl' AND COUNT(*) < 10 THEN 'Normal - NFL plays mainly Sunday/Monday/Thursday'
+      WHEN sport = 'americanfootball_ncaaf' AND COUNT(*) > 50 THEN 'Normal - College has many Saturday games'
+      WHEN sport = 'icehockey_nhl' AND COUNT(*) < 10 THEN 'Normal - NHL has 2-8 games per day'
+      WHEN sport = 'soccer_epl' AND COUNT(*) > 15 THEN 'Normal - EPL weekend fixtures'
+      ELSE 'Check if this is expected for ' || sport
+    END as explanation
+  FROM odds_cache 
+  WHERE commence_time > NOW() AND commence_time < NOW() + INTERVAL '7 days'
+  GROUP BY sport
+) schedule_analysis
+ORDER BY games_available DESC;
