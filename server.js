@@ -88,20 +88,18 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Serve static frontend in production (Vite build output)
-if (process.env.NODE_ENV === 'production') {
-  const distPath = path.join(__dirname, 'dist');
-  app.use(express.static(distPath));
+// Serve static frontend in production and development (Vite build output)
+const distPath = path.join(__dirname, 'dist');
+app.use(express.static(distPath));
 
-  // SPA fallback: use a middleware to avoid registering a route pattern that
-  // older router/path-to-regexp combinations may choke on.
-  app.use((req, res, next) => {
-    // allow API and debug routes to pass through to the server
-    if (req.path.startsWith('/api') || req.path.startsWith('/debug') || req.path.startsWith('/cron')) return next();
-    // otherwise serve the built frontend
-    res.sendFile(path.join(distPath, 'index.html'));
-  });
-}
+// SPA fallback: use a middleware to avoid registering a route pattern that
+// older router/path-to-regexp combinations may choke on.
+app.use((req, res, next) => {
+  // allow API and debug routes to pass through to the server
+  if (req.path.startsWith('/api') || req.path.startsWith('/debug') || req.path.startsWith('/cron')) return next();
+  // otherwise serve the built frontend
+  res.sendFile(path.join(distPath, 'index.html'));
+});
 
 // Debug endpoint for roster cache stats
 app.get('/debug/roster-cache', (req, res) => {
