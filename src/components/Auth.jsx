@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabaseClient'
-import { AuthDebug } from './AuthDebug'
 
 export default function Auth({ onClose }) {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -23,8 +22,7 @@ export default function Auth({ onClose }) {
         const origin = window.location.origin
         console.log('Current origin:', origin) // Debug log
         
-        // FIXED: Force correct port 3001 to match Supabase settings
-        // Something is causing redirect to port 3000 instead of 3001
+        // OAuth redirect should go to port 3001 for local development
         if (origin.includes('localhost')) {
           return 'http://localhost:3001/'
         }
@@ -175,10 +173,6 @@ export default function Auth({ onClose }) {
           </button>
         </div>
 
-        {/* Debug info - remove after fixing */}
-        <div className="mt-4">
-          <AuthDebug />
-        </div>
       </div>
     </div>
   )
