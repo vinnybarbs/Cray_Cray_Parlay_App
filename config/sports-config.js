@@ -11,8 +11,8 @@ const SPORTS = [
   'soccer_epl'
 ];
 
-// Only fetch bookmakers available in the app
-const BOOKMAKERS = 'draftkings,fanduel,betmgm,caesars';
+// Only fetch bookmakers available in the app (reduce to DraftKings & FanDuel to minimize API calls)
+const BOOKMAKERS = 'draftkings,fanduel';
 
 // Core markets available for all sports
 const CORE_MARKETS = 'h2h,spreads,totals';
@@ -30,6 +30,14 @@ const PROP_MARKETS = {
     'player_receptions',
     'player_reception_yds',
     'player_anytime_td'
+  ],
+  basketball_nba: [
+    'player_points',
+    'player_rebounds',
+    'player_assists',
+    'player_threes',
+    'player_steals',
+    'player_blocks'
   ],
   americanfootball_ncaaf: [
     'player_pass_tds',

@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { useParlayHistory } from './hooks/useLocalStorage';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app';
 
 // Enhanced Phase Progress component with detailed status
 const PhaseProgress = ({ loading, progress, timings, phaseData }) => {

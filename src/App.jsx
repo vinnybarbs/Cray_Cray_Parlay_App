@@ -532,7 +532,7 @@ const App = () => {
             label="6. Odds Platform"
             value={oddsPlatform}
             onChange={setOddsPlatform}
-            options={['DraftKings', 'FanDuel', 'MGM', 'Caesars', 'Bet365']}
+            options={['DraftKings', 'FanDuel']}
           />
         </div>
 

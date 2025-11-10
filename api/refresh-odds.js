@@ -23,7 +23,11 @@ async function refreshOddsCache(req, res) {
       return res.status(500).json({ error: 'Odds API key not configured' });
     }
 
-    logger.info('Starting odds cache refresh');
+  logger.info('Starting odds cache refresh');
+  const startTime = Date.now();
+
+  // Use configured sports/bookmakers/limits
+  const { SPORTS, CORE_MARKETS, PROP_MARKETS, TEAM_PROPS, RATE_LIMITS } = require('../config/sports-config');
 
     // First, verify which sports are available
     console.log('\n🔍 Checking available sports...');
@@ -39,53 +43,35 @@ async function refreshOddsCache(req, res) {
     const availableSportKeys = availableSports.map(s => s.key);
     console.log(`✅ Available sports: ${availableSportKeys.filter(k => k.includes('football') || k.includes('basketball') || k.includes('hockey') || k.includes('soccer')).join(', ')}`);
     
-    // Cache core markets for all supported sports
-    const sports = [
-      'americanfootball_nfl',
-      'americanfootball_ncaaf',
-      'basketball_nba',
-      'icehockey_nhl',
-      'soccer_epl'
-    ];
+    // Cache core markets for all configured sports (we'll filter by availability)
+    const sports = SPORTS || [];
     const regions = 'us';
     const oddsFormat = 'american';
-    const bookmakers = 'draftkings,fanduel,betmgm,caesars'; // Only fetch bookmakers available in app
+  // Only fetch bookmakers available in app. Controlled by env BOOKMAKERS or default to DraftKings and FanDuel only.
+  const bookmakers = process.env.BOOKMAKERS || 'draftkings,fanduel';
     
     // Core markets for all sports
     const coreMarkets = 'h2h,spreads,totals';
     
-    // Player props markets (require per-event endpoint)
-    const nflPlayerProps = [
-      'player_pass_tds', 'player_pass_yds', 'player_pass_completions', 'player_pass_attempts',
-      'player_pass_interceptions', 'player_rush_yds', 'player_rush_attempts',
-      'player_receptions', 'player_reception_yds', 'player_anytime_td'
-    ].join(',');
-    
-    const nflTeamProps = 'team_totals';
-    
-    // Track NFL/NCAAF game IDs for props fetch
-    const nflGameIds = [];
+    // Track per-sport game IDs for props fetch (only for sports that need props)
+    const propsGameIds = [];
 
     let totalGames = 0;
     let totalOdds = 0;
 
-    for (const sport of sports) {
+    // Filter to only the sports available from the Odds API
+    const sportsToFetch = sports.filter(s => availableSportKeys.includes(s));
+
+    for (const sport of sportsToFetch) {
       try {
-        // Check if sport is available
-        if (!availableSportKeys.includes(sport)) {
-          console.log(`⚠️ Skipping ${sport} - not available in API`);
-          logger.warn(`Sport not available: ${sport}`);
-          continue;
-        }
-        
         // Add delay between requests to avoid rate limiting
-        if (sports.indexOf(sport) > 0) {
-          await new Promise(resolve => setTimeout(resolve, 7000));
+        if (sportsToFetch.indexOf(sport) > 0) {
+          await new Promise(resolve => setTimeout(resolve, RATE_LIMITS.betweenSports || 7000));
         }
         
-        // Only fetch core markets (h2h, spreads, totals)
-        // Player props require expensive per-event API calls
-        const markets = coreMarkets;
+  // Only fetch core markets (h2h, spreads, totals)
+  // Player props require expensive per-event API calls (only fetched for NFL/NBA)
+  const markets = CORE_MARKETS || coreMarkets;
         
         const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${markets}&oddsFormat=${oddsFormat}&bookmakers=${bookmakers}`;
         
@@ -95,10 +81,10 @@ async function refreshOddsCache(req, res) {
         logger.info(`Fetching ${sport}...`);
         const response = await fetch(url);
         
-        // Log remaining API calls
-        const remaining = response.headers.get('x-requests-remaining');
-        const used = response.headers.get('x-requests-used');
-        if (remaining) console.log(`📊 API calls remaining: ${remaining} (used: ${used})`);
+  // Log remaining API calls
+  const remaining = response.headers.get('x-requests-remaining');
+  const used = response.headers.get('x-requests-used');
+  if (remaining) console.log(`📊 API calls remaining: ${remaining} (used: ${used})`);
         
         // DEBUG: Print raw response body for NCAAF
         if (sport === 'americanfootball_ncaaf') {
@@ -125,11 +111,11 @@ async function refreshOddsCache(req, res) {
           console.log(`   Bookmakers in response: ${sampleBookmakers}`);
         }
         
-        logger.info(`✅ Fetched ${games.length} games for ${sport} (core markets)`);
+  logger.info(`✅ Fetched ${games.length} games for ${sport} (core markets)`);
         
-        // Track NFL/NCAAF games for props fetch
-        if (sport.includes('football')) {
-          games.forEach(game => nflGameIds.push({ id: game.id, sport }));
+        // Track games for props fetch only for sports that need per-event props (NFL, NBA)
+        if (sport === 'americanfootball_nfl' || sport === 'basketball_nba') {
+          games.forEach(game => propsGameIds.push({ id: game.id, sport }));
         }
 
         for (const game of games) {
@@ -172,16 +158,21 @@ async function refreshOddsCache(req, res) {
     }
 
     // PHASE 2: Fetch player props for NFL/NCAAF games (limit to 20 games to control API usage)
-    console.log(`\n🏈 Phase 2: Fetching player props for ${Math.min(nflGameIds.length, 20)} NFL/NCAAF games...`);
-    const propsGames = nflGameIds.slice(0, 20); // Limit to 20 games = 20 API calls
+  console.log(`\n🏈 Phase 2: Fetching player/team/TD props for up to ${Math.min(propsGameIds.length, RATE_LIMITS.maxPropsGames || 20)} games (NFL/NBA)...`);
+  const propsGames = propsGameIds.slice(0, RATE_LIMITS.maxPropsGames || 20); // Limit to configured max games
     
     for (const gameInfo of propsGames) {
       try {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay
-        
-        const propsUrl = `https://api.the-odds-api.com/v4/sports/${gameInfo.sport}/events/${gameInfo.id}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${nflPlayerProps},${nflTeamProps}&oddsFormat=${oddsFormat}&bookmakers=${bookmakers}`;
-        
-        console.log(`   Fetching props for game ${gameInfo.id.substring(0, 8)}...`);
+        await new Promise(resolve => setTimeout(resolve, RATE_LIMITS.betweenProps || 2000)); // per-prop delay
+
+        // Build markets list for this sport: combine configured player props and team props
+        const sportPropMarkets = (PROP_MARKETS[gameInfo.sport] || []).join(',');
+        const teamProps = TEAM_PROPS || 'team_totals';
+        const marketsList = [sportPropMarkets, teamProps].filter(Boolean).join(',');
+
+        const propsUrl = `https://api.the-odds-api.com/v4/sports/${gameInfo.sport}/events/${gameInfo.id}/odds/?apiKey=${oddsApiKey}&regions=${regions}&markets=${encodeURIComponent(marketsList)}&oddsFormat=${oddsFormat}&bookmakers=${bookmakers}`;
+
+        console.log(`   Fetching props for game ${gameInfo.id.substring(0, 8)} (${gameInfo.sport})...`);
         const propsResponse = await fetch(propsUrl);
         
         if (!propsResponse.ok) {
@@ -236,18 +227,44 @@ async function refreshOddsCache(req, res) {
       logger.error('Error cleaning up old odds', { error: deleteError.message });
     }
 
-    logger.info('Odds cache refresh complete', { 
-      totalGames, 
+    const endTime = Date.now();
+    const durationMs = endTime - startTime;
+
+    // Log completion and metrics
+    const runSummary = {
+      totalGames,
       totalOdds,
       nflPropsGames: propsGames.length,
+      durationMs,
+      bookmakers,
       timestamp: new Date().toISOString()
-    });
+    };
+
+    logger.info('Odds cache refresh complete', runSummary);
+
+    // Try to record a lightweight run summary to Supabase (if table exists)
+    try {
+      if (supabase) {
+        await supabase.from('cron_runs').insert({
+          run_at: runSummary.timestamp,
+          total_games: runSummary.totalGames,
+          total_odds: runSummary.totalOdds,
+          nfl_props_games: runSummary.nflPropsGames,
+          duration_ms: runSummary.durationMs,
+          bookmakers: runSummary.bookmakers
+        });
+        logger.info('Recorded cron run to Supabase: cron_runs');
+      }
+    } catch (err) {
+      logger.warn('Could not record cron run to Supabase (table may not exist)', { error: err.message });
+    }
 
     res.json({
       success: true,
       totalGames,
       totalOdds,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      durationMs
     });
 
   } catch (error) {

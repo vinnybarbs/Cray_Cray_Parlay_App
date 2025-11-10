@@ -15,7 +15,8 @@ export default defineConfig([
     ],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      // Merge common globals so ESLint doesn't flag Node/Jest built-ins as undefined.
+      globals: { ...globals.node, ...globals.browser, ...globals.jest },
       parserOptions: {
         ecmaVersion: 'latest',
         ecmaFeatures: { jsx: true },

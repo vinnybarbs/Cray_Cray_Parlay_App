@@ -272,6 +272,10 @@ app.post('/api/generate-parlay',
 const { refreshStatsCache } = require('./api/refresh-stats');
 app.get('/api/refresh-stats', refreshStatsCache);
 
+// Add cron endpoint to refresh odds cache (secured by CRON_SECRET)
+const refreshOddsCache = require('./api/refresh-odds');
+app.post('/cron/refresh-odds', refreshOddsCache);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 

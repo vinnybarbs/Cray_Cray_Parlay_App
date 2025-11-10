@@ -5,7 +5,8 @@ import Dashboard from './Dashboard'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+// API_BASE defaults to Railway production URL; override with VITE_API_BASE_URL env var
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
 
 // CheckboxGroup component for sport/bet type selection
 const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -298,7 +299,9 @@ export default function MainApp() {
 
   const sports = ['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']
   const betTypes = ['Moneyline/Spread', 'Player Props', 'TD Props', 'Totals (O/U)', 'Team Props']
-  const sportsbooks = ['DraftKings', 'FanDuel', 'BetMGM', 'Caesars', 'Bet365']
+  // Use bookmaker names that match server validation (MGM expected, not 'BetMGM')
+  // Limit sportsbook choices to DraftKings and FanDuel only
+  const sportsbooks = ['DraftKings', 'FanDuel']
   const riskLevels = ['Low', 'Medium', 'High']
 
   const toggleSport = (sport) => {
