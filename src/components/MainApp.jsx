@@ -761,9 +761,14 @@ export default function MainApp() {
 
           <button
             onClick={handleLockBuild}
-            className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white py-3 rounded-lg font-bold text-lg shadow-lg"
+            disabled={selectedPicks.length === 0 || !isAuthenticated}
+            className={`w-full py-3 rounded-lg font-bold text-lg shadow-lg transition-all ${
+              selectedPicks.length === 0 || !isAuthenticated
+                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white'
+            }`}
           >
-            🔒 Lock Build
+            🔒 Lock Build {selectedPicks.length > 0 ? `(${selectedPicks.length} picks)` : ''}
           </button>
         </div>
       )}

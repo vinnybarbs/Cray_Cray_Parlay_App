@@ -134,10 +134,17 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           </div>
         </div>
         
-        {/* Spread Context */}
-        {pick.spread && (
+        {/* Spread Context - Always show for context when available */}
+        {(pick.spread !== undefined && pick.spread !== null && pick.spread !== '') && (
           <div className="text-xs text-gray-400 mt-1">
             Spread: {pick.homeTeam} {pick.spread > 0 ? '+' : ''}{pick.spread}
+          </div>
+        )}
+        
+        {/* Show point context for point spread bets */}
+        {pick.point !== undefined && pick.point !== null && (
+          <div className="text-xs text-gray-400 mt-1">
+            {pick.betType === 'Spread' ? 'Point:' : 'Line:'} {pick.point > 0 ? '+' : ''}{pick.point}
           </div>
         )}
       </div>
