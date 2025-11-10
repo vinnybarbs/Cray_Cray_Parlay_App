@@ -94,7 +94,8 @@ async function suggestPicksHandler(req, res) {
     res.status(500).json({
       success: false,
       error: 'Failed to generate pick suggestions',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      details: error.message, // Always show error details for debugging
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
