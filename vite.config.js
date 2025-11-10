@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3001, // Updated to match actual port being used
+    port: 3001, // Correct port - matches Supabase OAuth settings
     proxy: {
       '/api': {
         target: 'http://localhost:5001',

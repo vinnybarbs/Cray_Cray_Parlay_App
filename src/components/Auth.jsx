@@ -23,12 +23,13 @@ export default function Auth({ onClose }) {
         const origin = window.location.origin
         console.log('Current origin:', origin) // Debug log
         
-        // For local development
+        // FIXED: Force correct port 3001 to match Supabase settings
+        // Something is causing redirect to port 3000 instead of 3001
         if (origin.includes('localhost')) {
-          return `${origin}/`
+          return 'http://localhost:3001/'
         }
         
-        // For production (Vercel/Railway)
+        // For production (Vercel/Railway)  
         return `${origin}/`
       }
 
