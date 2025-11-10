@@ -188,6 +188,47 @@ app.get('/debug/odds-test', async (req, res) => {
   }
 });
 
+// Debug endpoint for Supabase configuration
+app.get('/debug/supabase', (req, res) => {
+  try {
+    const requiredEnvVars = {
+      'SUPABASE_URL': process.env.SUPABASE_URL,
+      'SUPABASE_SERVICE_ROLE_KEY': process.env.SUPABASE_SERVICE_ROLE_KEY,
+      'SUPABASE_ANON_KEY': process.env.SUPABASE_ANON_KEY
+    };
+
+    const apiKeys = {
+      'ODDS_API_KEY': process.env.ODDS_API_KEY,
+      'OPENAI_API_KEY': process.env.OPENAI_API_KEY,
+      'SERPER_API_KEY': process.env.SERPER_API_KEY
+    };
+
+    const config = {};
+    Object.entries(requiredEnvVars).forEach(([key, value]) => {
+      config[key] = value ? 'configured' : 'missing';
+    });
+
+    const keys = {};
+    Object.entries(apiKeys).forEach(([key, value]) => {
+      keys[key] = value ? 'configured' : 'missing';
+    });
+
+    res.json({
+      status: 'ok',
+      environment: process.env.NODE_ENV || 'development',
+      supabase: config,
+      apiKeys: keys,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // SSE endpoint for real-time progress updates
 app.get('/api/generate-parlay-stream/:requestId', (req, res) => {
   const { requestId } = req.params;
