@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabaseClient'
+import { AuthDebug } from './AuthDebug'
 
 export default function Auth({ onClose }) {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -17,18 +18,37 @@ export default function Auth({ onClose }) {
     }
 
     try {
+      // Get the correct redirect URL based on environment
+      const getRedirectUrl = () => {
+        const origin = window.location.origin
+        console.log('Current origin:', origin) // Debug log
+        
+        // For local development
+        if (origin.includes('localhost')) {
+          return `${origin}/`
+        }
+        
+        // For production (Vercel/Railway)
+        return `${origin}/`
+      }
+
+      const redirectTo = getRedirectUrl()
+      console.log('OAuth redirect URL:', redirectTo) // Debug log
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`
+          redirectTo: redirectTo
         }
       })
       
       if (error) {
+        console.error('OAuth error:', error) // Debug log
         setError(error.message)
       }
       // User will be redirected to Google, then back to app
     } catch (err) {
+      console.error('Sign in error:', err) // Debug log
       setError(err.message)
     }
   }
@@ -152,6 +172,11 @@ export default function Auth({ onClose }) {
               ? 'Already have an account? Sign in' 
               : "Don't have an account? Sign up"}
           </button>
+        </div>
+
+        {/* Debug info - remove after fixing */}
+        <div className="mt-4">
+          <AuthDebug />
         </div>
       </div>
     </div>
