@@ -3,38 +3,97 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-ignore - Deno imports  
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-/**
- * Sports Intelligence Caching Edge Function
- * Proactively caches news, analyst picks, injury reports, and betting trends
- * Runs daily to provide rich context for AI agents without real-time API calls
+/*
+ * Enhanced Sports Intelligence Gathering System
+ * 
+ * Sophisticated multi-category intelligence collection for AI analytical edge detection:
+ * 
+ * 🏥 INJURIES: Critical player availability and impact analysis
+ * 🎯 EXPERT ANALYSIS: Sharp money, matchup analysis, advanced analytics 
+ * 🎲 SITUATIONAL EDGES: Revenge games, rest advantages, weather, trap spots
+ * 💰 MARKET INTELLIGENCE: Public vs sharp money, line movement, contrarian opportunities
+ * 🔍 INSIDER INTELLIGENCE: Locker room dynamics, coaching changes, motivation factors
+ * 📊 HISTORICAL CONTEXT: Head-to-head trends, situational performance patterns
+ * 
+ * Runs every 2 hours via pg_cron, rotating through query templates for diverse intelligence
  */
 
-// Intelligence gathering configuration
+// Enhanced intelligence gathering configuration for sophisticated AI analysis
 const INTELLIGENCE_CONFIG = {
   searchCategories: {
+    // Critical injury intelligence - highest priority
     injuries: {
       priority: 1,
-      searchesPerSport: 6, // Top teams with upcoming games
-      queryTemplate: "{team} injury report latest news",
-      expiresHours: 12 // Injuries change quickly
+      searchesPerSport: 6,
+      queryTemplates: [
+        "{team} injury report latest news",
+        "{team} questionable doubtful injury status", 
+        "{team} key players injury impact"
+      ],
+      expiresHours: 12
     },
-    analyst_picks: {
-      priority: 2, 
-      searchesPerSport: 4,
-      queryTemplate: "{team} expert picks predictions {sport}",
+    
+    // Expert analysis and sharp money intelligence
+    expert_analysis: {
+      priority: 2,
+      searchesPerSport: 5,
+      queryTemplates: [
+        "{team} expert picks predictions betting analysis",
+        "{team} vs {opponent} matchup analysis expert preview",
+        "sharp money {team} {sport} betting line movement",
+        "{team} advanced analytics efficiency ratings",
+        "{team} fade or follow expert consensus {sport}"
+      ],
       expiresHours: 24
     },
-    team_news: {
+    
+    // Situational edge detection - revenge games, rest, weather
+    situational_edges: {
       priority: 3,
       searchesPerSport: 4,
-      queryTemplate: "{team} news roster updates {sport}",
+      queryTemplates: [
+        "{team} revenge game narrative {sport}",
+        "{team} rest advantage back to back {sport}", 
+        "{team} home field advantage weather {sport}",
+        "{team} trap game look ahead spot {sport}"
+      ],
+      expiresHours: 48
+    },
+    
+    // Market sentiment and contrarian opportunities
+    market_intelligence: {
+      priority: 4,
+      searchesPerSport: 4,
+      queryTemplates: [
+        "{sport} public betting percentages fade the public",
+        "{team} line movement steam moves sharp action",
+        "{team} contrarian betting value overreaction", 
+        "{sport} betting model predictions vs Vegas"
+      ],
+      expiresHours: 6
+    },
+    
+    // Insider information and team dynamics
+    insider_intelligence: {
+      priority: 5,
+      searchesPerSport: 3,
+      queryTemplates: [
+        "{team} insider reports locker room chemistry",
+        "{team} coaching changes game plan adjustments",
+        "{team} motivation factors playoff implications"
+      ],
       expiresHours: 24
     },
-    betting_trends: {
-      priority: 4,
-      searchesPerSport: 3,
-      queryTemplate: "{sport} betting trends public money sharp money",
-      expiresHours: 6 // Betting lines move frequently
+    
+    // Historical trends and head-to-head patterns
+    historical_context: {
+      priority: 6,
+      searchesPerSport: 2,
+      queryTemplates: [
+        "{team} historical performance similar situations",
+        "{team} vs {opponent} head to head betting trends"
+      ],
+      expiresHours: 72
     }
   },
   
@@ -216,25 +275,40 @@ async function gatherSportIntelligence(
     const categoryBudget = Math.min(config.searchesPerSport, budget - searchesUsed);
     console.log(`  🔍 ${category}: ${categoryBudget} searches`);
 
-    if (category === 'betting_trends') {
-      // General betting trends search
-      const query = config.queryTemplate.replace('{sport}', sport);
-      const result = await performSearch(query, serperKey, supabase, sport, category);
-      if (result) {
-        totalArticles += result.articleCount;
-        totalInsights += result.insightCount;
-        searchesUsed++;
+    // Enhanced search logic with multiple query templates
+    const queryTemplates = config.queryTemplates;
+    let templateIndex = 0;
+
+    if (category === 'market_intelligence' || category === 'historical_context') {
+      // General market/historical searches (not team-specific)
+      for (let i = 0; i < categoryBudget && searchesUsed < budget; i++) {
+        const template = queryTemplates[templateIndex % queryTemplates.length];
+        const query = template.replace('{sport}', sport);
+        
+        const result = await performSearch(query, serperKey, supabase, sport, category);
+        if (result) {
+          totalArticles += result.articleCount;
+          totalInsights += result.insightCount;
+          searchesUsed++;
+        }
+        templateIndex++;
+        
+        // Rate limiting between searches
+        await new Promise(resolve => setTimeout(resolve, 300));
       }
     } else {
-      // Team-specific searches
-      const teamsToSearch = teams.slice(0, categoryBudget);
+      // Team-specific searches with rotating query templates
+      const teamsToSearch = teams.slice(0, Math.ceil(categoryBudget / queryTemplates.length));
       
       for (const team of teamsToSearch) {
         if (searchesUsed >= budget) break;
         
-        const query = config.queryTemplate
+        // Use different query templates for each team to get diverse intelligence
+        const template = queryTemplates[templateIndex % queryTemplates.length];
+        const query = template
           .replace('{team}', team)
-          .replace('{sport}', sport);
+          .replace('{sport}', sport)
+          .replace('{opponent}', 'upcoming opponent'); // Will enhance this later with actual matchups
         
         const result = await performSearch(query, serperKey, supabase, sport, category, team);
         if (result) {
@@ -242,6 +316,7 @@ async function gatherSportIntelligence(
           totalInsights += result.insightCount;
         }
         searchesUsed++;
+        templateIndex++;
         
         // Rate limiting between searches
         await new Promise(resolve => setTimeout(resolve, 300));
