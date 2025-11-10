@@ -2,112 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 
-// Component for individual leg with expandable reasoning
-function LegWithReasoning({ leg, betDisplay, statusIcon }) {
-  const [showReasoning, setShowReasoning] = useState(false)
-  
-  // Parse reasoning from leg data - could be in bet_details or reasoning field
-  let reasoning = '';
-  let shortTagline = 'AI-analyzed pick based on data and trends';
-  
-  try {
-    if (leg.reasoning) {
-      reasoning = leg.reasoning;
-      // Extract first sentence as tagline
-      const sentences = reasoning.split(/[.!?]+/);
-      if (sentences.length > 0 && sentences[0].trim()) {
-        shortTagline = sentences[0].trim() + '.';
-      }
-    } else if (leg.bet_details) {
-      const betDetails = typeof leg.bet_details === 'string' 
-        ? JSON.parse(leg.bet_details) 
-        : leg.bet_details;
-      
-      if (betDetails.reasoning) {
-        reasoning = betDetails.reasoning;
-        const sentences = reasoning.split(/[.!?]+/);
-        if (sentences.length > 0 && sentences[0].trim()) {
-          shortTagline = sentences[0].trim() + '.';
-        }
-      }
-    }
-  } catch (e) {
-    console.warn('Error parsing leg reasoning:', e);
-  }
-  
-  // Fallback reasoning if none exists
-  if (!reasoning) {
-    reasoning = `Our AI analysis identified this as a strong pick based on multiple data factors including team performance metrics, historical matchup data, current form indicators, and statistical edge detection. The confidence rating reflects our algorithmic assessment of probability combined with market value analysis and situational context evaluation.`;
-    shortTagline = 'AI-analyzed pick with high confidence rating';
-  }
-  
-  return (
-    <div className="text-xs">
-      <div className="flex justify-between items-center">
-        <div className="flex-1">
-          <span className="text-gray-300">{leg.away_team} @ {leg.home_team}</span>
-          <span className="text-gray-400 ml-2">
-            {new Date(leg.game_date).toLocaleDateString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              timeZone: 'America/Denver'
-            })}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-gray-300 font-medium">{betDisplay}</span>
-          <span className="text-lg">{statusIcon}</span>
-        </div>
-      </div>
-      
-      {/* AI Reasoning Section */}
-      <div className="mt-2 ml-2 border-l-2 border-blue-500/30 pl-3">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-blue-400 text-xs">🧠</span>
-              <span className="text-gray-300 text-xs italic">{shortTagline}</span>
-            </div>
-            {leg.confidence && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-gray-500 text-xs">Confidence:</span>
-                <div className="flex">
-                  {[...Array(10)].map((_, i) => (
-                    <span 
-                      key={i} 
-                      className={`text-xs ${i < (leg.confidence || 7) ? 'text-green-400' : 'text-gray-600'}`}
-                    >
-                      ●
-                    </span>
-                  ))}
-                </div>
-                <span className="text-gray-400 text-xs">{leg.confidence || 7}/10</span>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => setShowReasoning(!showReasoning)}
-            className="text-blue-400 hover:text-blue-300 text-xs underline ml-2"
-          >
-            {showReasoning ? 'Hide Analysis' : 'Read Full Analysis'}
-          </button>
-        </div>
-        
-        {showReasoning && (
-          <div className="mt-3 p-3 bg-gray-800/50 rounded border border-gray-700">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-blue-400 text-sm">🎯 AI Deep Analysis</span>
-            </div>
-            <p className="text-gray-300 text-xs leading-relaxed">
-              {reasoning}
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 export default function Dashboard({ onClose }) {
   const { user } = useAuth()
   const [parlays, setParlays] = useState([])
@@ -294,8 +188,10 @@ export default function Dashboard({ onClose }) {
                       <div className="text-xs text-gray-400 mb-2">Legs:</div>
                       <div className="space-y-1">
                         {parlay.parlay_legs.map((leg, index) => {
-                          // Parse bet details to show actual picks
+                          // Parse bet details to show actual picks with spread context
                           let betDisplay = leg.bet_type;
+                          let spreadContext = '';
+                          
                           try {
                             const betDetails = typeof leg.bet_details === 'string' 
                               ? JSON.parse(leg.bet_details) 
@@ -303,6 +199,14 @@ export default function Dashboard({ onClose }) {
                             
                             if (betDetails) {
                               const description = betDetails.description || betDetails.pick || '';
+                              
+                              // Extract spread context from bet details for all bet types
+                              if (betDetails.spread || betDetails.line) {
+                                const spread = betDetails.spread || betDetails.line;
+                                if (typeof spread === 'number') {
+                                  spreadContext = spread > 0 ? ` (+${spread})` : ` (${spread})`;
+                                }
+                              }
                               
                               if (leg.bet_type === 'Total' && description) {
                                 // Extract "Over 50.5" or "Under 51.5" 
@@ -314,7 +218,6 @@ export default function Dashboard({ onClose }) {
                                 }
                               } else if (leg.bet_type === 'Spread' && description) {
                                 // Extract team and spread - handle multiple formats
-                                // Look for patterns like "Bowling Green Falcons (2.5)" or "Team Name +7"
                                 const spreadMatch = description.match(/([^()]+?)\s*\(([+-]?[\d.]+)\)/);
                                 if (spreadMatch) {
                                   const teamName = spreadMatch[1].trim();
@@ -329,11 +232,11 @@ export default function Dashboard({ onClose }) {
                                   betDisplay = description;
                                 }
                               } else if (leg.bet_type === 'Moneyline' && description) {
-                                // Show team name for moneyline
-                                betDisplay = `Moneyline: ${description}`;
+                                // Show team name for moneyline WITH spread context
+                                betDisplay = `Moneyline: ${description}${spreadContext}`;
                               } else if (description) {
-                                // Fallback - show description if available
-                                betDisplay = description;
+                                // Fallback - show description with spread context if available
+                                betDisplay = `${description}${spreadContext}`;
                               }
                             }
                           } catch (e) {
@@ -353,12 +256,22 @@ export default function Dashboard({ onClose }) {
                           }
                           
                           return (
-                            <LegWithReasoning 
-                              key={leg.id} 
-                              leg={leg} 
-                              betDisplay={betDisplay} 
-                              statusIcon={statusIcon}
-                            />
+                            <div key={leg.id} className="flex justify-between items-center text-xs">
+                              <div className="flex-1">
+                                <span className="text-gray-300">{leg.away_team} @ {leg.home_team}</span>
+                                <span className="text-gray-400 ml-2">
+                                  {new Date(leg.game_date).toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    timeZone: 'America/Denver'
+                                  })}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-300 font-medium">{betDisplay}</span>
+                                <span className="text-lg">{statusIcon}</span>
+                              </div>
+                            </div>
                           );
                         })}
                       </div>
