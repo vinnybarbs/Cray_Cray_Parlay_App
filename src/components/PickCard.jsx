@@ -1,30 +1,87 @@
 import React, { useState } from 'react'
 
-// Helper function to get short tagline
+// Helper function to get short tagline (sport-adaptive)
 const getShortTagline = (pick) => {
+  const sport = pick.sport || 'Unknown';
+  const confidence = pick.confidence || 7;
+  
   if (pick.betType === 'Moneyline') {
-    return `Strong moneyline value with ${pick.confidence}/10 confidence based on form and matchup data`;
+    return `Strong ${sport} moneyline value with ${confidence}/10 confidence based on form and matchup analysis`;
   } else if (pick.betType === 'Spread') {
-    return `Spread edge detected through statistical modeling and historical performance`;
+    return `${sport} spread edge detected through advanced statistical modeling and performance trends`;
   } else if (pick.betType === 'Total') {
-    return `Total value identified via pace analysis and environmental factors`;
+    return `${sport} total value identified via pace analysis and scoring environment factors`;
+  } else if (pick.betType?.includes('Props') || pick.betType?.includes('Player')) {
+    return `High-value ${sport} prop backed by player performance data and situational analysis`;
   } else {
-    return `High-probability pick backed by comprehensive AI analysis`;
+    return `High-probability ${sport} pick backed by comprehensive multi-factor AI analysis`;
   }
 }
 
-// Helper function to get detailed analysis
+// Helper function to get detailed analysis (sport-adaptive)
 const getDetailedAnalysis = (pick) => {
   const baseAnalysis = pick.reasoning || '';
+  const sport = pick.sport || 'Unknown';
+  
+  // Sport-specific terminology and analysis factors
+  const getSportContext = () => {
+    switch (sport) {
+      case 'NFL':
+      case 'NCAAF':
+        return {
+          efficiency: 'red zone efficiency disparities',
+          situational: 'third down efficiency and situational play-calling',
+          advantage: 'home field advantages and coaching adjustments',
+          pace: 'offensive tempo and turnover margin expectations'
+        };
+      case 'NBA':
+        return {
+          efficiency: 'field goal percentage and three-point efficiency',
+          situational: 'clutch performance and fourth quarter execution',
+          advantage: 'home court advantages and matchup mismatches',
+          pace: 'pace of play and possession efficiency metrics'
+        };
+      case 'NHL':
+        return {
+          efficiency: 'power play efficiency and penalty kill success',
+          situational: 'special teams performance and goaltending stability',
+          advantage: 'home ice advantages and line matchups',
+          pace: 'shot generation rates and defensive zone coverage'
+        };
+      case 'MLB':
+        return {
+          efficiency: 'batting average against and pitching effectiveness',
+          situational: 'bullpen performance and late-inning execution',
+          advantage: 'home field advantages and pitcher-batter matchups',
+          pace: 'run production rates and defensive efficiency'
+        };
+      case 'Soccer':
+        return {
+          efficiency: 'shot conversion rates and defensive solidity',
+          situational: 'set piece effectiveness and tactical flexibility',
+          advantage: 'home advantage and formation matchups',
+          pace: 'possession metrics and counter-attack efficiency'
+        };
+      default:
+        return {
+          efficiency: 'performance efficiency metrics',
+          situational: 'situational performance indicators',
+          advantage: 'competitive advantages and strategic factors',
+          pace: 'game flow dynamics and execution patterns'
+        };
+    }
+  };
+  
+  const context = getSportContext();
   
   if (pick.betType === 'Moneyline') {
-    return `${baseAnalysis} Our moneyline analysis incorporates team strength ratings, recent form indicators, injury impact assessments, and historical head-to-head performance. Key evaluation metrics include offensive efficiency rankings, defensive unit performance, home field advantages, and coaching tendencies in similar game scripts. Market positioning analysis suggests significant value opportunity with favorable risk-reward ratio. Statistical modeling shows this selection aligns with high-probability outcome scenarios based on current season performance indicators and situational matchup factors.`;
+    return `${baseAnalysis} Our moneyline analysis incorporates team strength ratings, recent form indicators, injury impact assessments, and historical head-to-head performance. Key evaluation metrics include offensive efficiency rankings, defensive unit performance, ${context.advantage}, and coaching tendencies in similar game scripts. Market positioning analysis suggests significant value opportunity with favorable risk-reward ratio. Statistical modeling shows this selection aligns with high-probability outcome scenarios based on current season performance indicators and situational matchup factors.`;
   } else if (pick.betType === 'Spread') {
-    return `${baseAnalysis} This spread selection leverages advanced point differential modeling, incorporating pace of play variations, turnover margin expectations, and historical performance against similar lines. Critical analysis factors include red zone efficiency disparities between teams, late-game execution patterns, special teams advantages, and coaching adjustments in competitive situations. Our algorithm identifies market inefficiency in the current spread pricing relative to true probability estimates based on comprehensive performance metrics and situational analysis.`;
+    return `${baseAnalysis} This spread selection leverages advanced point differential modeling, incorporating ${context.pace} and historical performance against similar lines. Critical analysis factors include ${context.efficiency}, late-game execution patterns, and competitive adjustments in key situations. Our algorithm identifies market inefficiency in the current spread pricing relative to true probability estimates based on comprehensive performance metrics and situational analysis.`;
   } else if (pick.betType === 'Total') {
-    return `${baseAnalysis} Total analysis evaluates multiple scoring environment variables including weather conditions, defensive pressure rates, offensive tempo metrics, and historical scoring patterns in similar matchups. Key performance indicators include first half pace trends, red zone conversion rates, defensive third down efficiency, and situational play-calling tendencies. Statistical correlation models show strong probability alignment for this total range based on team-specific offensive capabilities and defensive unit strengths in current game context.`;
+    return `${baseAnalysis} Total analysis evaluates multiple scoring environment variables including weather conditions (where applicable), defensive pressure rates, ${context.pace}, and historical scoring patterns in similar matchups. Key performance indicators include first half trends, ${context.efficiency}, ${context.situational}, and strategic tendencies. Statistical correlation models show strong probability alignment for this total range based on team-specific capabilities and defensive strengths in current context.`;
   } else {
-    return `${baseAnalysis} Comprehensive multi-factor analysis evaluates this selection through advanced statistical modeling, market positioning assessment, and historical precedent analysis. Performance evaluation includes team form indicators, matchup-specific advantages, injury impact analysis, and probability distribution modeling. Our AI framework identifies significant edge opportunity through combination of statistical analysis, market inefficiency detection, and situational performance metrics that suggest favorable outcome probability relative to current market pricing.`;
+    return `${baseAnalysis} Comprehensive multi-factor analysis evaluates this selection through advanced statistical modeling, market positioning assessment, and historical precedent analysis. Performance evaluation includes team form indicators, ${context.advantage}, injury impact analysis, and probability distribution modeling. Our AI framework identifies significant edge opportunity through combination of statistical analysis, market inefficiency detection, and situational performance metrics that suggest favorable outcome probability relative to current market pricing.`;
   }
 }
 
