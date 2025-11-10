@@ -94,19 +94,36 @@ const INTELLIGENCE_CONFIG = {
         "{team} vs {opponent} head to head betting trends"
       ],
       expiresHours: 72
+    },
+
+    // Breaking news and last-minute intelligence
+    breaking_news: {
+      priority: 7,
+      searchesPerSport: 3,
+      queryTemplates: [
+        "{team} breaking news last minute changes {sport}",
+        "{team} late scratch lineup changes {sport}",
+        "{team} weather delay venue change {sport}"
+      ],
+      expiresHours: 2 // Very time-sensitive
     }
   },
   
   dailyBudget: {
-    total: 200, // Serper searches per day
+    total: 200, // Daily searches - with 50k credits = 250 days of coverage
     allocation: {
-      NFL: 60,     // 30% - highest priority during season
-      NBA: 50,     // 25% 
-      MLB: 30,     // 15% - seasonal
-      NCAAF: 25,   // 12.5%
-      NHL: 20,     // 10%
-      SOCCER: 15   // 7.5%
+      // Optimized for 27 searches per sport = teams covered efficiently
+      NFL: 108,    // 4 teams × 27 searches = comprehensive NFL coverage
+      NBA: 54,     // 2 teams × 27 searches = key NBA matchups  
+      NCAAF: 27,   // 1 team × 27 searches = top college game
+      NHL: 0,      // Off during peak NFL/NBA season (Oct-Feb)
+      MLB: 0,      // Off-season now (resumes March with 81 searches)
+      SOCCER: 0,   // Minimal during American sports peak
+      MMA: 8,      // Selective high-value events only
+      GOLF: 3      // Major tournament weekends only
     }
+    // Summer allocation (Apr-Sep): MLB: 81, NBA: 54, NFL: 27, NCAAF: 27, others: 11
+    // This gives you comprehensive coverage of 4 NFL teams + 2 NBA teams daily
   }
 };
 
