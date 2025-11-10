@@ -2,6 +2,10 @@
   "name": "craycrayapp",
   "private": true,
   "version": "0.0.0",
+  "engines": {
+    "node": ">=20.19.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
   "dev": "vite",
   "build": "vite build",
@@ -10,7 +14,6 @@
   "server": "node server.js",
   "server:dev": "nodemon server.js",
   "start": "node server.js",
-  "postinstall": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
