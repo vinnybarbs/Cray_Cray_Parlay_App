@@ -435,7 +435,7 @@ export default function MainApp() {
           total_legs: selectedPicks.length,
           combined_odds: result.combinedOdds,
           potential_payout: result.payout,
-          bet_amount: unitSize,
+          // bet_amount: unitSize, // TODO: Add this after running database migration
           is_lock_bet: true,
           status: 'pending'
         })
