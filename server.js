@@ -278,6 +278,10 @@ app.post('/api/suggest-picks',
 const { refreshStatsCache } = require('./api/refresh-stats');
 app.get('/api/refresh-stats', refreshStatsCache);
 
+// Add refresh news endpoint
+const refreshNewsCache = require('./api/refresh-news');
+app.get('/api/refresh-news', refreshNewsCache);
+
 // Add parlay outcome management endpoints
 const { checkParlayOutcomes, manualParlayUpdate, getPendingParlays } = require('./api/parlay-outcomes');
 app.post('/api/check-parlays', checkParlayOutcomes);

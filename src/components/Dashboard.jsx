@@ -46,9 +46,9 @@ export default function Dashboard({ onClose }) {
       if (error) throw error
 
       const total = data.length
-      const wins = data.filter(p => p.final_outcome === 'win').length
-      const losses = data.filter(p => p.final_outcome === 'loss').length
-      const pending = data.filter(p => !p.final_outcome || p.final_outcome === 'pending').length
+      const wins = data.filter(p => p.final_outcome?.toLowerCase() === 'win' || p.final_outcome?.toLowerCase() === 'won').length
+      const losses = data.filter(p => p.final_outcome?.toLowerCase() === 'loss' || p.final_outcome?.toLowerCase() === 'lost').length
+      const pending = data.filter(p => !p.final_outcome || p.final_outcome?.toLowerCase() === 'pending').length
       const winRate = total > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : 0
       const totalProfit = data.reduce((sum, p) => sum + (parseFloat(p.profit_loss) || 0), 0)
 
@@ -66,13 +66,16 @@ export default function Dashboard({ onClose }) {
   }
 
   const getStatusBadge = (status) => {
+    const normalizedStatus = status?.toLowerCase()
     const badges = {
       pending: 'bg-yellow-900 text-yellow-300',
       win: 'bg-green-900 text-green-300',
-      loss: 'bg-red-900 text-red-300',
+      won: 'bg-green-900 text-green-300',
+      loss: 'bg-red-900 text-red-300', 
+      lost: 'bg-red-900 text-red-300',
       push: 'bg-gray-700 text-gray-300'
     }
-    return badges[status] || badges.pending
+    return badges[normalizedStatus] || badges.pending
   }
 
   return (

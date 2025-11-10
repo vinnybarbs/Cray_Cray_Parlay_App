@@ -134,17 +134,24 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           </div>
         </div>
         
-        {/* Spread Context - Always show for context when available */}
-        {(pick.spread !== undefined && pick.spread !== null && pick.spread !== '') && (
-          <div className="text-xs text-gray-400 mt-1">
-            Spread: {pick.homeTeam} {pick.spread > 0 ? '+' : ''}{pick.spread}
+        {/* Show what you're actually betting - clear and unambiguous */}
+        {pick.betType === 'Spread' && pick.point !== undefined && pick.point !== null && (
+          <div className="text-xs text-green-400 mt-1 font-medium">
+            Betting: {pick.pick} {pick.point > 0 ? '+' : ''}{pick.point}
           </div>
         )}
         
-        {/* Show point context for point spread bets */}
-        {pick.point !== undefined && pick.point !== null && (
-          <div className="text-xs text-gray-400 mt-1">
-            {pick.betType === 'Spread' ? 'Point:' : 'Line:'} {pick.point > 0 ? '+' : ''}{pick.point}
+        {/* Show other bet details for non-spread bets */}
+        {pick.betType !== 'Spread' && pick.point !== undefined && pick.point !== null && (
+          <div className="text-xs text-green-400 mt-1 font-medium">
+            {pick.betType === 'Moneyline' ? 'Betting:' : 'Line:'} {pick.pick} {pick.betType !== 'Moneyline' && (pick.point > 0 ? '+' : '')}{pick.betType !== 'Moneyline' ? pick.point : ''}
+          </div>
+        )}
+        
+        {/* Always show game spread for context (for all bet types) */}
+        {(pick.spread !== undefined && pick.spread !== null && pick.spread !== '') && (
+          <div className="text-xs text-gray-500 mt-1">
+            Game Spread: {pick.homeTeam} {pick.spread > 0 ? '+' : ''}{pick.spread}
           </div>
         )}
       </div>
