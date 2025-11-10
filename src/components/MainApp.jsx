@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Auth from './Auth'
 import Dashboard from './Dashboard'
+import ParlayOutcomeManager from './ParlayOutcomeManager'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -258,6 +259,7 @@ export default function MainApp() {
   const { user, isAuthenticated, signOut } = useAuth()
   const [showAuth, setShowAuth] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showOutcomeManager, setShowOutcomeManager] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
 
   const loadingMessages = [
@@ -493,6 +495,12 @@ export default function MainApp() {
                 className="text-sm text-gray-300 hover:text-yellow-400"
               >
                 Dashboard
+              </button>
+              <button
+                onClick={() => setShowOutcomeManager(true)}
+                className="text-sm text-gray-300 hover:text-yellow-400"
+              >
+                ⚡ Outcomes
               </button>
               <button
                 onClick={signOut}
@@ -760,6 +768,9 @@ export default function MainApp() {
 
       {/* Dashboard Modal */}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
+
+      {/* Parlay Outcome Manager Modal */}
+      {showOutcomeManager && <ParlayOutcomeManager onClose={() => setShowOutcomeManager(false)} />}
     </div>
   )
 }
