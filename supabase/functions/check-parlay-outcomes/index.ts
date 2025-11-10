@@ -202,13 +202,12 @@ async function getGameResult(leg: any): Promise<GameResult | null> {
       return null // Game likely not finished yet
     }
 
-    // ESPN API endpoints by sport
+    // ESPN API endpoints by sport - normalized sport keys
     const espnEndpoints: { [key: string]: string } = {
       'NFL': 'http://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard',
-      'NCAA': 'http://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
-      'NCAAF': 'http://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
-      'College Football': 'http://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard',
+      'NCAAF': 'http://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard', // College Football
       'NBA': 'http://site.api.espn.com/apis/site/v2/sports/basketball/nba/scoreboard',
+      'NCAAB': 'http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball/scoreboard', // Ready for college basketball
       'MLB': 'http://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard',
       'NHL': 'http://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard'
     }

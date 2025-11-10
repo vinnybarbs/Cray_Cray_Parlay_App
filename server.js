@@ -89,6 +89,10 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Real-time dashboard status endpoint
+const { getDashboardStatus } = require('./api/dashboard-status');
+app.get('/api/dashboard-status', getDashboardStatus);
+
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath));
