@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Auth from './Auth'
 import Dashboard from './Dashboard'
+import PickCard from './PickCard'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -666,55 +667,12 @@ export default function MainApp() {
             {suggestions.map(pick => {
               const isSelected = selectedPicks.find(p => p.id === pick.id)
               return (
-                <div
+                <PickCard
                   key={pick.id}
-                  onClick={() => togglePickSelection(pick)}
-                  className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                    isSelected
-                      ? 'bg-yellow-900 border-yellow-500'
-                      : 'bg-gray-800 border-gray-700 hover:border-gray-600'
-                  }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex-1">
-                      <div className="text-xs text-gray-400 mb-1">
-                        {new Date(pick.gameDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • {pick.sport}
-                      </div>
-                      <div className="text-sm font-semibold text-gray-200">
-                        {pick.awayTeam} @ {pick.homeTeam}
-                      </div>
-                    </div>
-                    <div className="text-xs font-bold px-2 py-1 rounded bg-gray-900 text-yellow-400">
-                      {pick.confidence}/10
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center mb-2 p-2 bg-gray-900 rounded">
-                    <div>
-                      <div className="text-xs text-gray-400">{pick.betType}</div>
-                      <div className="text-base font-bold text-white">{pick.pick}</div>
-                    </div>
-                    <div className="text-xl font-bold text-green-400">
-                      {pick.odds}
-                    </div>
-                  </div>
-
-                  {pick.spread && (
-                    <div className="text-xs text-gray-400 mb-2">
-                      Spread: {pick.homeTeam} {pick.spread > 0 ? '+' : ''}{pick.spread}
-                    </div>
-                  )}
-
-                  <div className="text-xs text-gray-400">
-                    {pick.reasoning}
-                  </div>
-
-                  {isSelected && (
-                    <div className="mt-2 text-xs text-yellow-400 font-semibold">
-                      ✓ Added to parlay
-                    </div>
-                  )}
-                </div>
+                  pick={pick}
+                  onAdd={togglePickSelection}
+                  isAdded={!!isSelected}
+                />
               )
             })}
           </div>
