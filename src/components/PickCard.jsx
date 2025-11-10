@@ -1,21 +1,22 @@
 import React, { useState } from 'react'
 
-// Helper function to get short tagline (sport-adaptive)
+// Helper function to get short tagline (edge-focused)
 const getShortTagline = (pick) => {
   const sport = pick.sport || 'Unknown';
   const confidence = pick.confidence || 7;
+  const edgeType = pick.edgeType || 'value';
   
-  if (pick.betType === 'Moneyline') {
-    return `Strong ${sport} moneyline value with ${confidence}/10 confidence based on form and matchup analysis`;
-  } else if (pick.betType === 'Spread') {
-    return `${sport} spread edge detected through advanced statistical modeling and performance trends`;
-  } else if (pick.betType === 'Total') {
-    return `${sport} total value identified via pace analysis and scoring environment factors`;
-  } else if (pick.betType?.includes('Props') || pick.betType?.includes('Player')) {
-    return `High-value ${sport} prop backed by player performance data and situational analysis`;
-  } else {
-    return `High-probability ${sport} pick backed by comprehensive multi-factor AI analysis`;
-  }
+  const edgeLabels = {
+    'line_value': 'Line Value Edge',
+    'situational': 'Situational Edge', 
+    'information': 'Information Edge',
+    'contrarian': 'Contrarian Edge',
+    'value': 'Value Edge'
+  };
+  
+  const edgeLabel = edgeLabels[edgeType] || 'Analytical Edge';
+  
+  return `${edgeLabel} detected: ${confidence}/10 confidence based on market analysis`;
 }
 
 // Helper function to get detailed analysis (sport-adaptive)
@@ -144,8 +145,19 @@ export default function PickCard({ pick, onAdd, isAdded }) {
       {/* AI Reasoning with Expandable Analysis */}
       <div className="mb-3">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-blue-400 text-xs">🧠</span>
-          <div className="text-xs font-semibold text-gray-300">AI Analysis:</div>
+          <span className="text-blue-400 text-xs">🎯</span>
+          <div className="text-xs font-semibold text-gray-300">Analytical Edge:</div>
+          {pick.edgeType && (
+            <span className={`text-xs px-2 py-0.5 rounded ${
+              pick.edgeType === 'line_value' ? 'bg-green-900/50 text-green-300' :
+              pick.edgeType === 'situational' ? 'bg-yellow-900/50 text-yellow-300' :
+              pick.edgeType === 'information' ? 'bg-blue-900/50 text-blue-300' :
+              pick.edgeType === 'contrarian' ? 'bg-purple-900/50 text-purple-300' :
+              'bg-gray-900/50 text-gray-300'
+            }`}>
+              {pick.edgeType.replace('_', ' ').toUpperCase()}
+            </span>
+          )}
         </div>
         
         {/* Short tagline - always visible */}
@@ -165,11 +177,23 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         {showFullAnalysis && (
           <div className="mt-3 p-4 bg-gray-900/70 rounded-lg border border-blue-500/30">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-blue-400 text-sm font-semibold">🎯 Deep AI Analysis</span>
+              <span className="text-blue-400 text-sm font-semibold">🎯 Analytical Edge Analysis</span>
             </div>
-            <div className="text-sm text-gray-200 leading-relaxed">
+            <div className="text-sm text-gray-200 leading-relaxed mb-3">
               {getDetailedAnalysis(pick)}
             </div>
+            
+            {/* Contrary Evidence for intellectual honesty */}
+            {pick.contraryEvidence && (
+              <div className="mt-3 p-3 bg-orange-900/20 border border-orange-700/50 rounded">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-orange-400 text-xs font-semibold">⚠️ Counter-Arguments</span>
+                </div>
+                <div className="text-xs text-orange-200 leading-relaxed">
+                  {pick.contraryEvidence}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
