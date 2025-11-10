@@ -292,6 +292,7 @@ export default function MainApp() {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [alert, setAlert] = useState(null)
   const [progressPhase, setProgressPhase] = useState(0)
   const [phaseData, setPhaseData] = useState(null)
   const [timings, setTimings] = useState(null)
@@ -328,6 +329,7 @@ export default function MainApp() {
     setLoading(true)
     setError('')
     setSuggestions([])
+    setAlert(null)
     setLoadingMessage(getRandomLoadingMessage())
     setSelectedPicks([])
     setProgressPhase(0)
@@ -366,6 +368,11 @@ export default function MainApp() {
       if (data.success && data.suggestions) {
         console.log('✅ Received suggestions:', data.suggestions.length, data.suggestions);
         setSuggestions(data.suggestions)
+        
+        // Set alert if provided
+        if (data.alert) {
+          setAlert(data.alert)
+        }
         
         // Extract timing and phase data if available
         if (data.timings) {
@@ -650,6 +657,34 @@ export default function MainApp() {
       {error && (
         <div className="max-w-2xl mx-auto mt-6 bg-red-900 border border-red-700 rounded-lg p-4">
           <p className="text-red-200">❌ {error}</p>
+        </div>
+      )}
+
+      {/* Smart Alert for Limited Data */}
+      {alert && (
+        <div className="max-w-2xl mx-auto mt-6">
+          <div className={`p-4 rounded-lg border-2 ${
+            alert.severity === 'warning' 
+              ? 'bg-orange-900/30 border-orange-500 text-orange-200'
+              : 'bg-blue-900/30 border-blue-500 text-blue-200'
+          }`}>
+            <div className="flex items-start gap-3">
+              <span className="text-2xl">
+                {alert.severity === 'warning' ? '⚠️' : 'ℹ️'}
+              </span>
+              <div className="flex-1">
+                <h3 className="font-bold text-lg mb-2">{alert.title}</h3>
+                <p className="mb-3">{alert.message}</p>
+                <ul className="space-y-1">
+                  {alert.suggestions.map((suggestion, idx) => (
+                    <li key={idx} className="text-sm">
+                      {suggestion}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
