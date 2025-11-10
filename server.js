@@ -5,6 +5,7 @@ require('dotenv').config(); // This will load .env if .env.local doesn't exist
 const express = require('express');
 const cors = require('cors');
 const generateParlayHandler = require('./api/generate-parlay');
+const { suggestPicksHandler } = require('./api/suggest-picks');
 const { logger } = require('./shared/logger');
 const { parlayRateLimiter, generalRateLimiter } = require('./lib/middleware/rateLimiter');
 const { validateParlayRequest, sanitizeInput } = require('./lib/middleware/validation');
@@ -265,6 +266,13 @@ app.post('/api/generate-parlay',
   generateParlayHandler
 );
 
+// Add suggest-picks endpoint for pick builder
+app.post('/api/suggest-picks',
+  parlayRateLimiter.middleware(),
+  sanitizeInput,
+  validateParlayRequest,
+  suggestPicksHandler
+);
 
 // Add refresh stats endpoint
 const { refreshStatsCache } = require('./api/refresh-stats');
