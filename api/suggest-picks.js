@@ -19,14 +19,21 @@ async function suggestPicksHandler(req, res) {
     } = req.body;
 
     // Determine number of suggestions based on numLegs
-    const numSuggestions = numLegs <= 3 ? 10 : Math.min(30, numLegs * 5);
+    let numSuggestions = numLegs <= 3 ? 10 : Math.min(30, numLegs * 5);
+    
+    // Production optimization: reduce scope for faster responses
+    const isProduction = process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      numSuggestions = Math.min(numSuggestions, 8); // Limit to 8 games max in production
+    }
 
     logger.info('Generating pick suggestions', {
       selectedSports,
       selectedBetTypes,
       riskLevel,
       dateRange,
-      numSuggestions
+      numSuggestions,
+      isProduction
     });
 
     // API keys
