@@ -229,6 +229,44 @@ app.get('/debug/supabase', (req, res) => {
   }
 });
 
+// Debug endpoint to manually refresh odds (for testing only)
+app.post('/debug/refresh-odds', async (req, res) => {
+  try {
+    logger.info('Manual odds refresh triggered');
+    const refreshOddsModule = require('./api/refresh-odds');
+    
+    // Create a mock request with the correct CRON_SECRET
+    const mockReq = {
+      headers: {
+        authorization: `Bearer ${process.env.CRON_SECRET}`
+      }
+    };
+    
+    // Call the refresh odds function
+    const mockRes = {
+      status: (code) => mockRes,
+      json: (data) => {
+        res.status(200).json({
+          status: 'completed',
+          message: 'Odds refresh triggered',
+          result: data,
+          timestamp: new Date().toISOString()
+        });
+        return mockRes;
+      }
+    };
+    
+    await refreshOddsModule(mockReq, mockRes);
+  } catch (error) {
+    logger.error('Manual odds refresh failed', { error: error.message });
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // SSE endpoint for real-time progress updates
 app.get('/api/generate-parlay-stream/:requestId', (req, res) => {
   const { requestId } = req.params;
