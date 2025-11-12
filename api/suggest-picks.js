@@ -106,15 +106,26 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerName = bestOutcome.description || bestOutcome.name;
     processedPlayers.add(playerName);
     
-    // Create suggestion with safer date handling
-    let gameDate;
-    try {
-      gameDate = odds.commence_time ? 
-        new Date(odds.commence_time).toISOString().split('T')[0] : 
-        new Date().toISOString().split('T')[0];
-    } catch (dateError) {
-      console.log(`Date parsing error for: ${odds.commence_time}`, dateError);
-      gameDate = new Date().toISOString().split('T')[0]; // Fallback to today
+    // Create suggestion with robust date handling
+    let gameDate = new Date().toISOString().split('T')[0]; // Default fallback
+    
+    if (odds.commence_time) {
+      try {
+        // Handle various date formats from database
+        let dateString = odds.commence_time;
+        if (typeof dateString === 'string') {
+          // Convert timezone format if needed: "2025-11-11 01:15:00-07" -> ISO format
+          if (dateString.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}[-+]\d{2}$/)) {
+            dateString = dateString.replace(' ', 'T') + ':00';
+          }
+        }
+        const parsedDate = new Date(dateString);
+        if (!isNaN(parsedDate.getTime())) {
+          gameDate = parsedDate.toISOString().split('T')[0];
+        }
+      } catch (dateError) {
+        console.log(`Date parsing error for: ${odds.commence_time}`, dateError);
+      }
     }
       
     suggestions.push({
