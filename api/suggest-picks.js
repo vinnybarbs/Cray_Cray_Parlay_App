@@ -1,6 +1,59 @@
 const { MultiAgentCoordinator } = require('../lib/agents/coordinator.js');
 const { logger } = require('../shared/logger.js');
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
+const { toMountainTime, formatGameTime, getCurrentMountainTime } = require('../lib/timezone-utils.js');
+
+/**
+ * Get essential player data for prop validation and anti-hallucination
+ */
+async function getPlayerDataForProps(sports) {
+  try {
+    // Ultra-simple query: just get player name, sport, position, and extract team from provider_ids
+    const { data: players, error } = await supabase
+      .from('players')
+      .select('name, sport, position, provider_ids')
+      .in('sport', sports.map(s => s.toLowerCase()))
+      .not('provider_ids', 'is', null)
+      .limit(500); // Limit for fast results
+
+    if (error) throw error;
+
+    // Extract team names from provider_ids JSON - fast and simple
+    const playerData = players
+      .map(player => {
+        try {
+          const providerIds = JSON.parse(player.provider_ids || '{}');
+          const teamName = providerIds.team_name;
+          
+          if (!teamName) return null; // Skip players without team info
+          
+          return {
+            name: player.name,
+            sport: player.sport.toUpperCase(),
+            position: player.position,
+            team: teamName
+          };
+        } catch (e) {
+          return null; // Skip players with invalid JSON
+        }
+      })
+      .filter(Boolean); // Remove null entries
+
+    logger.info('Retrieved player data for prop validation', {
+      totalPlayers: playerData.length,
+      bySport: playerData.reduce((acc, p) => {
+        acc[p.sport] = (acc[p.sport] || 0) + 1;
+        return acc;
+      }, {})
+    });
+
+    return playerData;
+
+  } catch (error) {
+    logger.error('Error fetching player data for props', error);
+    return [];
+  }
+}
 
 /**
  * Suggest individual picks (not a full parlay)
@@ -14,7 +67,7 @@ async function suggestPicksHandler(req, res) {
       selectedSports = ['NFL'],
       selectedBetTypes = ['Moneyline/Spread'],
       riskLevel = 'Medium',
-      dateRange = 1,
+      dateRange = 2, // Default to 2 days to capture upcoming NFL games
       numLegs = 3 // Used to determine how many suggestions to return
     } = req.body;
 
@@ -59,14 +112,19 @@ async function suggestPicksHandler(req, res) {
       supabase // Pass supabase for odds caching
     );
 
-    // Generate suggestions
+    // Get player data for prop validation (prevent AI hallucinations)
+    const playerData = await getPlayerDataForProps(selectedSports);
+    console.log(`📊 Retrieved ${playerData.length} players for validation`);
+
+    // Generate suggestions with player validation context
     const result = await coordinator.generatePickSuggestions({
       sports: selectedSports,
       betTypes: selectedBetTypes,
       riskLevel,
       dateRange,
       numSuggestions,
-      sportsbook: req.body.oddsPlatform || 'DraftKings'
+      sportsbook: req.body.oddsPlatform || 'DraftKings',
+      playerContext: playerData // Simple validation data to prevent hallucinations
     });
 
     const duration = Date.now() - startTime;
@@ -88,7 +146,18 @@ async function suggestPicksHandler(req, res) {
         betTypes: selectedBetTypes,
         riskLevel,
         generatedAt: new Date().toISOString(),
-        duration: `${duration}ms`
+        generatedAtMT: getCurrentMountainTime(),
+        duration: `${duration}ms`,
+        
+        // Add player context metadata
+        playerDataStats: {
+          totalPlayers: playerData.length,
+          playersBySport: playerData.reduce((acc, p) => {
+            acc[p.sport] = (acc[p.sport] || 0) + 1;
+            return acc;
+          }, {}),
+          dataSource: 'ESPN API'
+        }
       }
     });
 
