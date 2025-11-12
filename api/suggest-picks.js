@@ -65,6 +65,27 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       };
     }
     
+    // Create a simple test suggestion to verify the pipeline works
+    const testSuggestion = {
+      id: "test_001",
+      gameDate: "2025-11-13",
+      sport: "NFL",
+      homeTeam: "Test Home",
+      awayTeam: "Test Away", 
+      betType: "Player Props",
+      pick: "Test Player Over 100.5 Rush Yards",
+      odds: "+110",
+      spread: 100.5,
+      confidence: 8,
+      reasoning: "Test suggestion to verify pipeline works with real prop data from Supabase",
+      researchSummary: "",
+      edgeType: "test",
+      contraryEvidence: "This is a test",
+      analyticalSummary: "Test analytical summary"
+    };
+    
+    return { suggestions: [testSuggestion] };
+    
     // Convert cached odds to suggestions format
     const suggestions = await convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel);
     
