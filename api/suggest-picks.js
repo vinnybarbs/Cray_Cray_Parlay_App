@@ -17,13 +17,13 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
              sportUpper === 'NHL' ? 'icehockey_nhl' : sport.toLowerCase();
     });
     
-    // Fetch player prop odds from Supabase cache (using MT fields)
+    // Fetch player prop odds from Supabase base table (single source of truth)
     const { data: propOdds, error } = await supabase
       .from('odds_cache')
       .select('*')
       .in('sport', sportKeys)
       .ilike('market_type', 'player_%')
-      .order('commence_time_mt', { ascending: false })
+      .order('commence_time', { ascending: false })
       .limit(50);
       
     if (error) throw error;
@@ -102,20 +102,15 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerName = bestOutcome.description || bestOutcome.name;
     processedPlayers.add(playerName);
     
-    // Create suggestion with simple string date handling (no parsing)
+    // Create suggestion with UTC date handling from base table
     let gameDate = new Date().toISOString().split('T')[0]; // Safe fallback
     
     try {
-      // Use MT fields from your database schema
-      const dateSource = odds.commence_time_mt || odds.commence_time_utc || odds.commence_time;
-      console.log(`Processing date source: ${dateSource}`);
-      
-      if (dateSource) {
-        // Handle MT format: "2025-11-11 01:15:00-07" - just extract date part
-        const dateStr = dateSource.toString().split(' ')[0]; // Get "2025-11-11"
+      // Use commence_time from base odds_cache table (UTC from Odds API)
+      if (odds.commence_time) {
+        const dateStr = odds.commence_time.split('T')[0]; // Get "2025-11-11" from ISO format
         if (dateStr && dateStr.includes('-') && dateStr.length >= 10) {
           gameDate = dateStr;
-          console.log(`Extracted game date: ${gameDate}`);
         }
       }
     } catch (dateError) {
