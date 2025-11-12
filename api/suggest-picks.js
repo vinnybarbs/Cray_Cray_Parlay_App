@@ -23,7 +23,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       .select('*')
       .in('sport', sportKeys)
       .ilike('market_type', 'player_%')
-      .gte('commence_time', new Date().toISOString()) // Only future games
+      .order('commence_time', { ascending: false })
       .limit(50);
       
     if (error) throw error;
@@ -101,10 +101,14 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerName = bestOutcome.description || bestOutcome.name;
     processedPlayers.add(playerName);
     
-    // Create suggestion
+    // Create suggestion  
+    const gameDate = odds.commence_time ? 
+      new Date(odds.commence_time).toISOString().split('T')[0] : 
+      new Date().toISOString().split('T')[0];
+      
     suggestions.push({
       id: `prop_${suggestionId.toString().padStart(3, '0')}`,
-      gameDate: new Date(odds.commence_time).toISOString().split('T')[0],
+      gameDate,
       sport: odds.sport === 'americanfootball_nfl' ? 'NFL' : 
              odds.sport === 'basketball_nba' ? 'NBA' : 
              odds.sport.toUpperCase(),
