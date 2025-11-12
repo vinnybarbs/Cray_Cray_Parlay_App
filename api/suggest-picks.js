@@ -31,11 +31,29 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     
     console.log(`📊 Found ${propOdds.length} player prop markets in cache`);
     
+    // Debug: Test the exact same query as working test endpoint
+    const { data: testQuery, error: testError } = await supabase
+      .from('odds_cache')
+      .select('market_type')
+      .eq('sport', 'americanfootball_nfl')
+      .ilike('market_type', 'player_%')
+      .limit(5);
+      
+    console.log(`🔍 Direct test query found ${testQuery?.length || 0} records`);
+    if (testQuery?.length > 0) {
+      console.log('Test query market types:', testQuery.map(r => r.market_type));
+    }
+    
     // Debug: log sample data structure 
     if (propOdds.length > 0) {
-      console.log('First prop odds record:', JSON.stringify(propOdds[0], null, 2));
+      console.log('First prop odds record keys:', Object.keys(propOdds[0]));
     } else {
       console.log('⚠️ No prop odds returned from query - debugging needed');
+      console.log('Query parameters used:', {
+        sportKeys,
+        firstSportKey: sportKeys[0],
+        table: 'odds_cache'
+      });
     }
     
     if (propOdds.length === 0) {
