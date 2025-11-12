@@ -357,10 +357,12 @@ app.post('/api/suggest-picks',
   suggestPicksHandler
 );
 
-// Add test endpoint for player props validation
-const testPlayerProps = require('./api/test-player-props');
-app.get('/api/test-player-props', testPlayerProps);
+// Removed test endpoint for player props validation
+// const testPlayerProps = require('./api/test-player-props');
+// app.get('/api/test-player-props', testPlayerProps);
 
+// Add refresh stats endpoint
+// The following lines are unchanged and provide context for the surrounding code
 // Add refresh stats endpoint
 const { refreshStatsCache } = require('./api/refresh-stats');
 app.get('/api/refresh-stats', refreshStatsCache);
