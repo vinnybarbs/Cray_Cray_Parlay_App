@@ -21,19 +21,29 @@ async function testPlayerProps(req, res) {
 
     if (playersError) throw playersError;
 
-        // Get sample prop odds for NFL players using Supabase
+        // Get sample prop odds for NFL/NBA players using Supabase
+    // Look for player prop markets: player_anytime_td, player_assists, player_points, etc.
+    const sportUpper = sport.toUpperCase();
+    const sportKey = sportUpper === 'NFL' ? 'americanfootball_nfl' : 
+                    sportUpper === 'NBA' ? 'basketball_nba' : 
+                    sportUpper === 'MLB' ? 'baseball_mlb' : 
+                    sportUpper === 'NHL' ? 'icehockey_nhl' : sport.toLowerCase();
+    
     const { data: propOdds, error: oddsError } = await supabase
       .from('odds_cache')
       .select('market_type, outcomes, bookmaker, home_team, away_team')
-      .eq('sport', sport.toUpperCase())
-      .ilike('market_type', '%player%')
-      .limit(5);
+      .eq('sport', sportKey)
+      .ilike('market_type', 'player_%')
+      .limit(10);
 
+    const uniqueMarkets = [...new Set(propOdds.map(o => o.market_type))];
+    
     const response = {
       success: true,
       sport: sport.toUpperCase(),
+      sportKey: sportKey,
       playersWithTeams: players.length,
-      totalPlayers: players.map(p => {
+      samplePlayers: players.slice(0, 3).map(p => {
         const providerIds = JSON.parse(p.provider_ids || '{}');
         return {
           name: p.name,
@@ -42,8 +52,14 @@ async function testPlayerProps(req, res) {
         };
       }),
       propOddsAvailable: propOdds.length,
-      samplePropMarkets: [...new Set(propOdds.map(o => o.market_type))],
-      message: `✅ Found ${players.length} ${sport.toUpperCase()} players with team mappings and ${propOdds.length} prop betting markets available`
+      propMarketTypes: uniqueMarkets,
+      samplePropMarkets: propOdds.slice(0, 2).map(odds => ({
+        market: odds.market_type,
+        bookmaker: odds.bookmaker,
+        game: `${odds.away_team} @ ${odds.home_team}`,
+        playerCount: JSON.parse(odds.outcomes).length
+      })),
+      message: `✅ Found ${players.length} ${sport.toUpperCase()} players with team mappings and ${propOdds.length} prop betting markets available (${uniqueMarkets.join(', ')})`
     };
 
     res.json(response);
