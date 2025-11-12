@@ -30,12 +30,11 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     
     console.log(`📊 Found ${propOdds.length} player prop markets in cache`);
     
-    // Debug: log sample data structure with focus on date fields
+    // Debug: log sample data structure 
     if (propOdds.length > 0) {
-      console.log('Sample prop odds date fields:');
-      console.log('commence_time:', propOdds[0].commence_time);
-      console.log('commence_time_mt:', propOdds[0].commence_time_mt);
-      console.log('commence_time_utc:', propOdds[0].commence_time_utc);
+      console.log('First prop odds record:', JSON.stringify(propOdds[0], null, 2));
+    } else {
+      console.log('⚠️ No prop odds returned from query - debugging needed');
     }
     
     if (propOdds.length === 0) {
