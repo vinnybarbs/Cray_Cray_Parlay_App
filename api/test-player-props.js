@@ -36,7 +36,10 @@ async function testPlayerProps(req, res) {
       .ilike('market_type', 'player_%')
       .limit(10);
 
-    const uniqueMarkets = [...new Set(propOdds.map(o => o.market_type))];
+    if (oddsError) throw oddsError;
+
+    const validPropOdds = propOdds || [];
+    const uniqueMarkets = [...new Set(validPropOdds.map(o => o.market_type))];
     
     const response = {
       success: true,
@@ -51,15 +54,27 @@ async function testPlayerProps(req, res) {
           team: providerIds.team_name || 'Unknown'
         };
       }),
-      propOddsAvailable: propOdds.length,
+      propOddsAvailable: validPropOdds.length,
       propMarketTypes: uniqueMarkets,
-      samplePropMarkets: propOdds.slice(0, 2).map(odds => ({
-        market: odds.market_type,
-        bookmaker: odds.bookmaker,
-        game: `${odds.away_team} @ ${odds.home_team}`,
-        playerCount: JSON.parse(odds.outcomes).length
-      })),
-      message: `✅ Found ${players.length} ${sport.toUpperCase()} players with team mappings and ${propOdds.length} prop betting markets available (${uniqueMarkets.join(', ')})`
+      samplePropMarkets: validPropOdds.slice(0, 2).map(odds => {
+        try {
+          const outcomes = typeof odds.outcomes === 'string' ? JSON.parse(odds.outcomes) : odds.outcomes;
+          return {
+            market: odds.market_type,
+            bookmaker: odds.bookmaker,
+            game: `${odds.away_team} @ ${odds.home_team}`,
+            playerCount: Array.isArray(outcomes) ? outcomes.length : 0
+          };
+        } catch (e) {
+          return {
+            market: odds.market_type,
+            bookmaker: odds.bookmaker,
+            game: `${odds.away_team} @ ${odds.home_team}`,
+            playerCount: 'Parse Error'
+          };
+        }
+      }),
+      message: `✅ Found ${players.length} ${sport.toUpperCase()} players with team mappings and ${validPropOdds.length} prop betting markets available (${uniqueMarkets.join(', ')})`
     };
 
     res.json(response);
