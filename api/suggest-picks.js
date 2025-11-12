@@ -99,7 +99,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     if (suggestions.length >= numSuggestions) break;
     
     const odds = gameOdds[0]; // Take first bookmaker for this game/market
-    const outcomes = JSON.parse(odds.outcomes);
+    const outcomes = typeof odds.outcomes === 'string' ? JSON.parse(odds.outcomes) : odds.outcomes;
     
     // Find best value props (players with good odds that haven't been used)
     const validOutcomes = outcomes.filter(outcome => {
