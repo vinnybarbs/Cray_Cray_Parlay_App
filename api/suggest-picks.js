@@ -30,21 +30,21 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     
     console.log(`📊 Found ${propOdds.length} player prop markets in cache`);
     
-    // Debug: log sample data structure
+    // Debug: log sample data structure with focus on date fields
     if (propOdds.length > 0) {
-      console.log('Sample prop odds structure:', JSON.stringify(propOdds[0], null, 2));
+      console.log('Sample prop odds date fields:');
+      console.log('commence_time:', propOdds[0].commence_time);
+      console.log('commence_time_mt:', propOdds[0].commence_time_mt);
+      console.log('commence_time_utc:', propOdds[0].commence_time_utc);
     }
     
     if (propOdds.length === 0) {
-      // Fallback to AI suggestions if no cached props
-      return await coordinator.generatePickSuggestions({
-        sports,
-        betTypes: ['Player Props'],
-        riskLevel,
-        numSuggestions,
-        sportsbook,
-        playerContext: playerData
-      });
+      // Return empty suggestions instead of fallback to avoid date parsing errors
+      console.log('⚠️ No player prop odds found in cache, returning empty suggestions');
+      return { 
+        suggestions: [],
+        message: "No player prop odds currently available in cache. Check back after the next odds refresh."
+      };
     }
     
     // Convert cached odds to suggestions format
@@ -54,15 +54,11 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     
   } catch (error) {
     console.error('Error generating player prop suggestions:', error);
-    // Fallback to coordinator on error
-    return await coordinator.generatePickSuggestions({
-      sports,
-      betTypes: ['Player Props'],
-      riskLevel,
-      numSuggestions,
-      sportsbook,
-      playerContext: playerData
-    });
+    // Return error message instead of fallback to avoid coordinator date issues
+    return { 
+      suggestions: [],
+      error: `Failed to generate player prop suggestions: ${error.message}`
+    };
   }
 }
 
@@ -106,21 +102,25 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerName = bestOutcome.description || bestOutcome.name;
     processedPlayers.add(playerName);
     
-    // Create suggestion with MT-aware date handling
-    let gameDate;
+    // Create suggestion with simple string date handling (no parsing)
+    let gameDate = new Date().toISOString().split('T')[0]; // Safe fallback
+    
     try {
       // Use MT fields from your database schema
       const dateSource = odds.commence_time_mt || odds.commence_time_utc || odds.commence_time;
+      console.log(`Processing date source: ${dateSource}`);
+      
       if (dateSource) {
-        // Handle MT format: "2025-11-11 01:15:00-07"
-        const dateStr = dateSource.toString().split(' ')[0]; // Get just the date part
-        gameDate = dateStr;
-      } else {
-        gameDate = new Date().toISOString().split('T')[0];
+        // Handle MT format: "2025-11-11 01:15:00-07" - just extract date part
+        const dateStr = dateSource.toString().split(' ')[0]; // Get "2025-11-11"
+        if (dateStr && dateStr.includes('-') && dateStr.length >= 10) {
+          gameDate = dateStr;
+          console.log(`Extracted game date: ${gameDate}`);
+        }
       }
     } catch (dateError) {
-      console.log(`Date parsing error for: ${odds.commence_time_mt || odds.commence_time}`, dateError);
-      gameDate = new Date().toISOString().split('T')[0]; // Fallback to today
+      console.log(`Date extraction error:`, dateError);
+      // gameDate already set to safe fallback
     }
       
     suggestions.push({
