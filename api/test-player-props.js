@@ -21,21 +21,13 @@ async function testPlayerProps(req, res) {
 
     if (playersError) throw playersError;
 
-        // Get sample prop odds for NFL players
-    const propOddsQuery = `
-      SELECT 
-        oc.market_type,
-        oc.outcomes,
-        oc.bookmaker,
-        oc.home_team,
-        oc.away_team
-      FROM odds_cache oc 
-      WHERE oc.sport = $1 
-      AND oc.market_type ILIKE '%player%'
-      LIMIT 5
-    `;
-    
-    const propOddsResult = await client.query(propOddsQuery, [sport.toUpperCase()]);
+        // Get sample prop odds for NFL players using Supabase
+    const { data: propOdds, error: oddsError } = await supabase
+      .from('odds_cache')
+      .select('market_type, outcomes, bookmaker, home_team, away_team')
+      .eq('sport', sport.toUpperCase())
+      .ilike('market_type', '%player%')
+      .limit(5);
 
     const response = {
       success: true,
@@ -50,7 +42,7 @@ async function testPlayerProps(req, res) {
         };
       }),
       propOddsAvailable: propOdds.length,
-      samplePropMarkets: [...new Set(propOdds.map(o => o.market))],
+      samplePropMarkets: [...new Set(propOdds.map(o => o.market_type))],
       message: `✅ Found ${players.length} ${sport.toUpperCase()} players with team mappings and ${propOdds.length} prop betting markets available`
     };
 
