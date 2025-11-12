@@ -30,6 +30,11 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     
     console.log(`📊 Found ${propOdds.length} player prop markets in cache`);
     
+    // Debug: log sample data structure
+    if (propOdds.length > 0) {
+      console.log('Sample prop odds structure:', JSON.stringify(propOdds[0], null, 2));
+    }
+    
     if (propOdds.length === 0) {
       // Fallback to AI suggestions if no cached props
       return await coordinator.generatePickSuggestions({
@@ -101,10 +106,16 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerName = bestOutcome.description || bestOutcome.name;
     processedPlayers.add(playerName);
     
-    // Create suggestion  
-    const gameDate = odds.commence_time ? 
-      new Date(odds.commence_time).toISOString().split('T')[0] : 
-      new Date().toISOString().split('T')[0];
+    // Create suggestion with safer date handling
+    let gameDate;
+    try {
+      gameDate = odds.commence_time ? 
+        new Date(odds.commence_time).toISOString().split('T')[0] : 
+        new Date().toISOString().split('T')[0];
+    } catch (dateError) {
+      console.log(`Date parsing error for: ${odds.commence_time}`, dateError);
+      gameDate = new Date().toISOString().split('T')[0]; // Fallback to today
+    }
       
     suggestions.push({
       id: `prop_${suggestionId.toString().padStart(3, '0')}`,
