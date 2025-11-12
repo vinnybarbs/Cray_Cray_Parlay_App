@@ -364,8 +364,9 @@ app.post('/api/suggest-picks',
 // Add refresh stats endpoint
 // The following lines are unchanged and provide context for the surrounding code
 // Add refresh stats endpoint
-const { refreshStatsCache } = require('./api/refresh-stats');
-app.get('/api/refresh-stats', refreshStatsCache);
+// Removed refresh stats endpoint after API cleanup
+// const { refreshStatsCache } = require('./api/refresh-stats');
+// app.get('/api/refresh-stats', refreshStatsCache);
 
 // Add refresh news endpoint
 const refreshNewsCache = require('./api/refresh-news');
