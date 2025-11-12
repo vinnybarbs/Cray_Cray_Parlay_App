@@ -21,14 +21,21 @@ async function testPlayerProps(req, res) {
 
     if (playersError) throw playersError;
 
-    // Get available prop odds
-    const { data: propOdds, error: oddsError } = await supabase
-      .from('odds_cache')
-      .select('market, home_team, away_team, bookmaker')
-      .like('market', 'player_%')
-      .limit(10);
-
-    if (oddsError) throw oddsError;
+        // Get sample prop odds for NFL players
+    const propOddsQuery = `
+      SELECT 
+        oc.market_type,
+        oc.outcomes,
+        oc.bookmaker,
+        oc.home_team,
+        oc.away_team
+      FROM odds_cache oc 
+      WHERE oc.sport = $1 
+      AND oc.market_type ILIKE '%player%'
+      LIMIT 5
+    `;
+    
+    const propOddsResult = await client.query(propOddsQuery, [sport.toUpperCase()]);
 
     const response = {
       success: true,
