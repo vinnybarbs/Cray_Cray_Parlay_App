@@ -18,10 +18,11 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     });
     
     // Fetch player prop odds from Supabase base table (single source of truth)
+    // Use the same query pattern as working test endpoint
     const { data: propOdds, error } = await supabase
       .from('odds_cache')
       .select('*')
-      .in('sport', sportKeys)
+      .eq('sport', sportKeys[0]) // Use first sport with .eq() like test endpoint
       .ilike('market_type', 'player_%')
       .order('commence_time', { ascending: false })
       .limit(50);
