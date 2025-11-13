@@ -136,6 +136,16 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       // gameDate already set to safe fallback
     }
       
+    // Group TD-related props under 'TD', others under 'Player Props'
+    const tdMarkets = [
+      'player_anytime_td',
+      'player_pass_tds',
+      'player_rush_tds',
+      'player_receiving_tds',
+      'player_first_td',
+      'player_last_td'
+    ];
+    const betType = tdMarkets.includes(odds.market_type) ? 'TD' : 'Player Props';
     suggestions.push({
       id: `prop_${suggestionId.toString().padStart(3, '0')}`,
       gameDate,
@@ -144,10 +154,10 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
              odds.sport.toUpperCase(),
       homeTeam: odds.home_team,
       awayTeam: odds.away_team,
-      betType: "Player Props",
+      betType,
       pick: formatPlayerPropPick(playerName, odds.market_type, bestOutcome),
       odds: formatOdds(bestOutcome.price),
-      spread: bestOutcome.point || null,
+  // spread field removed for player props
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
       reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds),
       researchSummary: "",
