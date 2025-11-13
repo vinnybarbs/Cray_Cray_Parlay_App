@@ -165,17 +165,19 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
 // Helper functions for prop suggestion formatting
 
 // Improved formatting for player prop pick to always show line and direction
+
 function formatPlayerPropPick(playerName, marketType, outcome) {
   const point = outcome.point;
   const side = outcome.side || '';
   let direction = '';
   // Try to infer Over/Under from side or marketType
   if (side) {
-    if (side.toLowerCase().includes('over')) direction = 'Over';
-    else if (side.toLowerCase().includes('under')) direction = 'Under';
-    else direction = side;
-  } else if (marketType.includes('over')) direction = 'Over';
-  else if (marketType.includes('under')) direction = 'Under';
+    if (typeof side === 'string' && side.toLowerCase().includes('over')) direction = 'Over';
+    else if (typeof side === 'string' && side.toLowerCase().includes('under')) direction = 'Under';
+    else if (typeof side === 'string' && side.length > 0) direction = side;
+  } else if (typeof marketType === 'string' && marketType.includes('over')) direction = 'Over';
+  else if (typeof marketType === 'string' && marketType.includes('under')) direction = 'Under';
+
   // Build readable market label
   let marketLabel = '';
   switch (marketType) {
@@ -204,15 +206,21 @@ function formatPlayerPropPick(playerName, marketType, outcome) {
       marketLabel = 'Interceptions';
       break;
     default:
-      marketLabel = marketType.replace('player_', '').replace('_', ' ');
+      marketLabel = typeof marketType === 'string' ? marketType.replace('player_', '').replace('_', ' ') : '';
   }
-  // Compose pick string
+
+  // Compose pick string, fallback to previous formatting if missing info
   if (point !== undefined && direction) {
     return `${playerName} ${direction} ${point} ${marketLabel}`;
   } else if (point !== undefined) {
     return `${playerName} ${point} ${marketLabel}`;
-  } else {
+  } else if (direction && marketLabel) {
+    return `${playerName} ${direction} ${marketLabel}`;
+  } else if (marketLabel) {
     return `${playerName} ${marketLabel}`;
+  } else {
+    // Fallback to basic formatting
+    return `${playerName} ${marketType}`;
   }
 }
 
@@ -229,8 +237,8 @@ function calculateConfidence(price, riskLevel) {
 }
 
 function generatePropReasoning(playerName, marketType, outcome, odds) {
-  const propType = formatPropBet(marketType, outcome);
-  return `${playerName} has favorable ${propType} odds at ${formatOdds(outcome.price)} for the ${odds.away_team} @ ${odds.home_team} matchup. Recent performance metrics and matchup analysis suggest this represents good value.`;
+  const propType = formatPlayerPropPick(playerName, marketType, outcome);
+  return `${propType} odds at ${formatOdds(outcome.price)} for the ${odds.away_team} @ ${odds.home_team} matchup. Recent performance metrics and matchup analysis suggest this represents good value.`;
 }
 
 function generateContraryEvidence(playerName, marketType) {
