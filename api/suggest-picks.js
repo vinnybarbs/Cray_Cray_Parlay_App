@@ -145,7 +145,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       homeTeam: odds.home_team,
       awayTeam: odds.away_team,
       betType: "Player Props",
-      pick: `${playerName} ${formatPropBet(odds.market_type, bestOutcome)}`,
+      pick: formatPlayerPropPick(playerName, odds.market_type, bestOutcome),
       odds: formatOdds(bestOutcome.price),
       spread: bestOutcome.point || null,
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
@@ -163,17 +163,56 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
 }
 
 // Helper functions for prop suggestion formatting
-function formatPropBet(marketType, outcome) {
+
+// Improved formatting for player prop pick to always show line and direction
+function formatPlayerPropPick(playerName, marketType, outcome) {
   const point = outcome.point;
+  const side = outcome.side || '';
+  let direction = '';
+  // Try to infer Over/Under from side or marketType
+  if (side) {
+    if (side.toLowerCase().includes('over')) direction = 'Over';
+    else if (side.toLowerCase().includes('under')) direction = 'Under';
+    else direction = side;
+  } else if (marketType.includes('over')) direction = 'Over';
+  else if (marketType.includes('under')) direction = 'Under';
+  // Build readable market label
+  let marketLabel = '';
   switch (marketType) {
-    case 'player_anytime_td': return 'Anytime TD';
-    case 'player_pass_tds': return point ? `${point}+ Pass TDs` : 'Pass TDs';
-    case 'player_rush_yds': return point ? `${point}+ Rush Yards` : 'Rush Yards';
-    case 'player_receptions': return point ? `${point}+ Receptions` : 'Receptions';
-    case 'player_pass_yds': return point ? `${point}+ Pass Yards` : 'Pass Yards';
-    case 'player_assists': return point ? `${point}+ Assists` : 'Assists';
-    case 'player_points': return point ? `${point}+ Points` : 'Points';
-    default: return marketType.replace('player_', '').replace('_', ' ');
+    case 'player_anytime_td':
+      marketLabel = 'Anytime TD';
+      break;
+    case 'player_pass_tds':
+      marketLabel = 'Pass TDs';
+      break;
+    case 'player_rush_yds':
+      marketLabel = 'Rush Yards';
+      break;
+    case 'player_receptions':
+      marketLabel = 'Receptions';
+      break;
+    case 'player_pass_yds':
+      marketLabel = 'Pass Yards';
+      break;
+    case 'player_assists':
+      marketLabel = 'Assists';
+      break;
+    case 'player_points':
+      marketLabel = 'Points';
+      break;
+    case 'player_interceptions':
+      marketLabel = 'Interceptions';
+      break;
+    default:
+      marketLabel = marketType.replace('player_', '').replace('_', ' ');
+  }
+  // Compose pick string
+  if (point !== undefined && direction) {
+    return `${playerName} ${direction} ${point} ${marketLabel}`;
+  } else if (point !== undefined) {
+    return `${playerName} ${point} ${marketLabel}`;
+  } else {
+    return `${playerName} ${marketLabel}`;
   }
 }
 
