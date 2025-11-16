@@ -38,16 +38,7 @@ async function checkPlayerPropsInOddsCache() {
   });
 
   // Check specifically for player props
-  const { data: playerProps, error: propError } = await supabase
-    .from('odds_cache')
-    .select('market_type, COUNT(*)')
-    .like('market_type', 'player_%')
-    .group('market_type');
-
-  if (propError) {
-    console.error('❌ Error fetching player props:', propError);
-    return;
-  }
+  const playerProps = marketTypes.filter(m => m.market_type.startsWith('player_'));
 
   console.log('\n🎯 Player prop markets:');
   if (playerProps.length === 0) {

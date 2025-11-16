@@ -264,7 +264,34 @@ async function refreshOddsFast(req: Request): Promise<Response> {
     // STEP 1: Get unique game IDs from fresh API data
     const freshGameIds = [...new Set(allOddsEntries.map(entry => entry.external_game_id))];
     console.log(`🎯 Fresh games from API: ${freshGameIds.length} games`);
-    
+
+    // STEP 1.5: Upsert games before inserting odds
+    const gameRecords = allOddsEntries.map(entry => ({
+      game_id: entry.external_game_id,
+      commence_time: entry.commence_time,
+      home_team: entry.home_team,
+      away_team: entry.away_team,
+      sport: entry.sport
+    }));
+    // Remove duplicates by game_id
+    const uniqueGames = Object.values(
+      gameRecords.reduce((acc, game) => {
+        acc[game.game_id] = game;
+        return acc;
+      }, {})
+    );
+    if (uniqueGames.length > 0) {
+      console.log(`💾 Upserting ${uniqueGames.length} games into games table...`);
+      const { error: gameUpsertError } = await supabase
+        .from('games')
+        .upsert(uniqueGames, { onConflict: ['game_id'] });
+      if (gameUpsertError) {
+        console.error('Error upserting games:', gameUpsertError);
+        throw new Error(`Game upsert failed: ${gameUpsertError.message}`);
+      }
+      console.log(`✅ Upserted ${uniqueGames.length} games`);
+    }
+
     // STEP 2: Delete ONLY the games we have fresh data for (preserves other games)
     if (freshGameIds.length > 0) {
       console.log('🗑️ Removing stale odds for games with fresh data...');
@@ -279,12 +306,12 @@ async function refreshOddsFast(req: Request): Promise<Response> {
       }
       console.log(`✅ Cleared stale data for ${freshGameIds.length} games`);
     }
-    
+
     // STEP 3: Insert all fresh data (includes updates + new games/markets)
     console.log(`💾 Inserting ${allOddsEntries.length} fresh odds entries...`);
     const chunkSize = 500;
     let totalInserted = 0;
-    
+
     for (let i = 0; i < allOddsEntries.length; i += chunkSize) {
       const chunk = allOddsEntries.slice(i, i + chunkSize);
       console.log(`📤 Processing fresh batch ${Math.floor(i/chunkSize) + 1}: ${chunk.length} entries`);

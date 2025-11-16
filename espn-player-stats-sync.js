@@ -8,21 +8,17 @@ class ESPNPlayerStatsSync {
       process.env.SUPABASE_SERVICE_ROLE_KEY
     );
     
-    // Focus on prop betting relevant sports
+    // Focus on prop betting relevant sports for current season
+    // 2025 season: only NFL and NBA for now (MLB stats skipped)
     this.sports = {
-      'NFL': { 
+      'NFL': {
         path: 'football/nfl',
-        currentSeason: 2024,
+        currentSeason: 2025,
         statsPeriod: 'season'
       },
-      'NBA': { 
+      'NBA': {
         path: 'basketball/nba',
-        currentSeason: 2024,
-        statsPeriod: 'season'
-      },
-      'MLB': { 
-        path: 'baseball/mlb',
-        currentSeason: 2024,
+        currentSeason: 2025,
         statsPeriod: 'season'
       }
     };
@@ -75,7 +71,7 @@ class ESPNPlayerStatsSync {
         .from('players')
         .select('id, name, provider_ids')
         .eq('sport', sport.toLowerCase())
-        .limit(50); // Start with 50 players for testing
+        .limit(300); // Start with 50 players for testing
 
       if (error) throw error;
 
@@ -134,26 +130,64 @@ class ESPNPlayerStatsSync {
    */
   async fetchPlayerStats(playerId, sport, config) {
     try {
-      // ESPN Core API for player statistics
-      const statsUrl = `https://sports.core.api.espn.com/v2/sports/${config.path.split('/')[0]}/leagues/${config.path.split('/')[1]}/seasons/${config.currentSeason}/athletes/${playerId}/statistics`;
-      
-      console.log(`      📡 Fetching from ESPN: ${statsUrl}`);
+      const sportKey = config.path.split('/')[0];
+      const leagueKey = config.path.split('/')[1];
 
-      const response = await fetch(statsUrl);
-      
-      if (!response.ok) {
-        if (response.status === 404) {
+      // 1) Fetch the season-specific athlete resource to discover the stats URL
+      const athleteUrl = `https://sports.core.api.espn.com/v2/sports/${sportKey}/leagues/${leagueKey}/seasons/${config.currentSeason}/athletes/${playerId}`;
+      console.log(`      📡 Fetching athlete from ESPN: ${athleteUrl}`);
+
+      const athleteResponse = await fetch(athleteUrl);
+
+      if (!athleteResponse.ok) {
+        if (athleteResponse.status === 404) {
+          console.log(`      ℹ️ No athlete resource for player ${playerId} (404)`);
+          return null;
+        }
+        throw new Error(`ESPN athlete API request failed: ${athleteResponse.status}`);
+      }
+
+      const athleteData = await athleteResponse.json();
+
+      const statsRef = athleteData.statistics && athleteData.statistics.$ref;
+      if (!statsRef) {
+        console.log(`      ℹ️ No stats reference found for player ${playerId}`);
+        return null;
+      }
+
+      // 2) Follow the statistics.$ref URL, which includes the correct /types/{id}/athletes/{playerId}/statistics path
+      console.log(`      📡 Fetching stats from ESPN: ${statsRef}`);
+      const statsResponse = await fetch(statsRef);
+
+      if (!statsResponse.ok) {
+        if (statsResponse.status === 404) {
           console.log(`      ℹ️ No stats available for player ${playerId} (404)`);
           return null;
         }
-        throw new Error(`ESPN stats API request failed: ${response.status}`);
+        throw new Error(`ESPN stats API request failed: ${statsResponse.status}`);
       }
 
-      const data = await response.json();
-      
+      let statsData = await statsResponse.json();
+
+      // Some ESPN stats resources expose splits via a nested $ref; follow it if present
+      if (statsData && statsData.splits && statsData.splits.$ref) {
+        const splitsUrl = statsData.splits.$ref;
+        console.log(`      📡 Fetching stats splits from ESPN: ${splitsUrl}`);
+        const splitsResponse = await fetch(splitsUrl);
+        if (splitsResponse.ok) {
+          const splitsData = await splitsResponse.json();
+          // Prefer the splits array from this payload
+          if (Array.isArray(splitsData.splits)) {
+            statsData = splitsData;
+          } else {
+            statsData = { splits: splitsData.splits || splitsData.items || [] };
+          }
+        }
+      }
+
       // Extract meaningful stats based on sport
-      const stats = this.normalizePlayerStats(data, sport);
-      
+      const stats = this.normalizePlayerStats(statsData, sport);
+
       return stats;
 
     } catch (error) {
@@ -169,7 +203,7 @@ class ESPNPlayerStatsSync {
     const stats = {
       last_updated: new Date().toISOString(),
       api_source: 'espn',
-      season: this.sports[sport].currentSeason
+      season: this.sports[sport]?.currentSeason || null
     };
 
     try {
@@ -177,11 +211,27 @@ class ESPNPlayerStatsSync {
         return stats;
       }
 
+      // Normalize splits structure (can be array or nested under another object)
+      let splitsArray = apiData.splits;
+      if (!Array.isArray(splitsArray)) {
+        if (Array.isArray(splitsArray.splits)) {
+          splitsArray = splitsArray.splits;
+        } else if (Array.isArray(splitsArray.items)) {
+          splitsArray = splitsArray.items;
+        }
+      }
+
+      if (!Array.isArray(splitsArray) || splitsArray.length === 0) {
+        return stats;
+      }
+
       // Look for season stats in the splits
-      const seasonStats = apiData.splits.find(split => 
+      const currentSeason = this.sports[sport]?.currentSeason;
+      const seasonLabel = currentSeason ? String(currentSeason) : '';
+      const seasonStats = splitsArray.find(split => 
         split.name === 'Total' || 
         split.name === 'Regular Season' ||
-        split.name === '2024'
+        (seasonLabel && String(split.name).includes(seasonLabel))
       );
 
       if (!seasonStats || !seasonStats.stats) {
@@ -324,14 +374,14 @@ class ESPNPlayerStatsSync {
       const { data: players, error } = await this.supabase
         .from('players')
         .select('sport, name, provider_ids')
-        .in('sport', ['nfl', 'nba', 'mlb'])
+        .in('sport', ['nfl', 'nba'])
         .limit(100);
 
       if (error) throw error;
 
       const summary = {
         players_with_stats: 0,
-        by_sport: { nfl: 0, nba: 0, mlb: 0 },
+        by_sport: { nfl: 0, nba: 0 },
         sample_stats: []
       };
 
@@ -380,7 +430,7 @@ async function main() {
     const currentSummary = await statsSync.getStatsSummary();
     if (currentSummary) {
       console.log(`  Players with stats: ${currentSummary.players_with_stats}`);
-      console.log(`  NFL: ${currentSummary.by_sport.nfl} | NBA: ${currentSummary.by_sport.nba} | MLB: ${currentSummary.by_sport.mlb}\n`);
+      console.log(`  NFL: ${currentSummary.by_sport.nfl} | NBA: ${currentSummary.by_sport.nba}\n`);
     }
     
     // Sync player stats

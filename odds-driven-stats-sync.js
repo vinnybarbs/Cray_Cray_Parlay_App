@@ -11,11 +11,10 @@ class OddsDrivenStatsSync {
     this.oddsApiKey = process.env.ODDS_API_KEY;
     this.baseOddsUrl = 'https://api.the-odds-api.com/v4';
     
-    // Sports with player props
+    // Sports with player props (current focus: NFL & NBA, 2025 season)
     this.sportsMap = {
-      'americanfootball_nfl': { name: 'NFL', espnPath: 'football/nfl' },
-      'basketball_nba': { name: 'NBA', espnPath: 'basketball/nba' },
-      'baseball_mlb': { name: 'MLB', espnPath: 'baseball/mlb' }
+      'americanfootball_nfl': { name: 'NFL', espnPath: 'football/nfl', season: 2025 },
+      'basketball_nba': { name: 'NBA', espnPath: 'basketball/nba', season: 2025 }
     };
   }
 
@@ -280,22 +279,60 @@ class OddsDrivenStatsSync {
    */
   async fetchESPNPlayerStats(playerId, sportConfig) {
     try {
-      const statsUrl = `https://sports.core.api.espn.com/v2/sports/${sportConfig.espnPath.split('/')[0]}/leagues/${sportConfig.espnPath.split('/')[1]}/seasons/2024/athletes/${playerId}/statistics`;
-      
-      const response = await fetch(statsUrl);
-      
-      if (!response.ok) {
-        if (response.status === 404) return null;
-        throw new Error(`ESPN API failed: ${response.status}`);
+      const sportKey = sportConfig.espnPath.split('/')[0];
+      const leagueKey = sportConfig.espnPath.split('/')[1];
+      const season = sportConfig.season;
+
+      // 1) Fetch the season-specific athlete resource to discover the stats URL
+      const athleteUrl = `https://sports.core.api.espn.com/v2/sports/${sportKey}/leagues/${leagueKey}/seasons/${season}/athletes/${playerId}`;
+      console.log(`      📡 Fetching athlete from ESPN: ${athleteUrl}`);
+
+      const athleteResponse = await fetch(athleteUrl);
+
+      if (!athleteResponse.ok) {
+        if (athleteResponse.status === 404) return null;
+        throw new Error(`ESPN athlete API failed: ${athleteResponse.status}`);
       }
 
-      const data = await response.json();
-      
+      const athleteData = await athleteResponse.json();
+      const statsRef = athleteData.statistics && athleteData.statistics.$ref;
+
+      if (!statsRef) {
+        console.log(`      ℹ️ No stats reference found for player ${playerId}`);
+        return null;
+      }
+
+      // 2) Follow statistics.$ref to get stats resource
+      console.log(`      📡 Fetching stats from ESPN: ${statsRef}`);
+      const statsResponse = await fetch(statsRef);
+
+      if (!statsResponse.ok) {
+        if (statsResponse.status === 404) return null;
+        throw new Error(`ESPN stats API failed: ${statsResponse.status}`);
+      }
+
+      let statsData = await statsResponse.json();
+
+      // 3) Some stats resources expose splits via a nested $ref; follow it if present
+      if (statsData && statsData.splits && statsData.splits.$ref) {
+        const splitsUrl = statsData.splits.$ref;
+        console.log(`      📡 Fetching stats splits from ESPN: ${splitsUrl}`);
+        const splitsResponse = await fetch(splitsUrl);
+        if (splitsResponse.ok) {
+          const splitsData = await splitsResponse.json();
+          if (Array.isArray(splitsData.splits)) {
+            statsData = splitsData;
+          } else if (Array.isArray(splitsData.items)) {
+            statsData = { splits: splitsData.items };
+          }
+        }
+      }
+
       return {
         last_updated: new Date().toISOString(),
         api_source: 'espn',
-        raw_stats: data,
-        prop_relevant_stats: this.extractPropRelevantStats(data, sportConfig.name)
+        raw_stats: statsData,
+        prop_relevant_stats: this.extractPropRelevantStats(statsData, sportConfig.name)
       };
 
     } catch (error) {

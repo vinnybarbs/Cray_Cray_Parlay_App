@@ -4,7 +4,7 @@ const { supabase } = require('../lib/middleware/supabaseAuth.js');
 const { toMountainTime, formatGameTime, getCurrentMountainTime } = require('../lib/timezone-utils.js');
 
 // Generate player prop suggestions using cached odds from Supabase
-async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions, sportsbook, playerData, supabase, coordinator }) {
+async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions, sportsbook, playerData, supabase, coordinator, selectedBetTypes }) {
   try {
     console.log('🏈 Generating player prop suggestions from Supabase cache...');
     
@@ -64,9 +64,38 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
         message: "No player prop odds currently available in cache. Check back after the next odds refresh."
       };
     }
+
+    // If user specifically requested only TD Props (without general Player Props),
+    // narrow the markets to TD-related ones.
+    const wantsTDOnly = Array.isArray(selectedBetTypes)
+      && selectedBetTypes.includes('TD Props')
+      && !selectedBetTypes.includes('Player Props');
+
+    let filteredPropOdds = propOdds;
+    if (wantsTDOnly) {
+      const tdMarkets = [
+        'player_anytime_td',
+        'player_pass_tds',
+        'player_rush_tds',
+        'player_reception_tds',
+        'player_first_td',
+        'player_last_td'
+      ];
+      const tdSet = new Set(tdMarkets);
+      filteredPropOdds = propOdds.filter(o => tdSet.has(o.market_type));
+      console.log(`🎯 TD Props mode: filtered to ${filteredPropOdds.length} TD markets from ${propOdds.length} total player markets`);
+
+      if (filteredPropOdds.length === 0) {
+        console.log('⚠️ No TD prop odds found in cache, returning empty suggestions');
+        return {
+          suggestions: [],
+          message: 'No TD prop odds currently available in cache. Check back after the next odds refresh.'
+        };
+      }
+    }
     
     // Convert cached odds to suggestions format
-    const suggestions = await convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel);
+    const suggestions = await convertPropOddsToSuggestions(filteredPropOdds, playerData, numSuggestions, riskLevel);
     
     return { suggestions };
     
@@ -84,6 +113,15 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
 async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel) {
   const suggestions = [];
   const processedPlayers = new Set();
+  const playerStatsIndex = new Map();
+
+  if (Array.isArray(playerData)) {
+    playerData.forEach(p => {
+      if (p && p.name && p.seasonStats) {
+        playerStatsIndex.set(p.name.toLowerCase(), p.seasonStats);
+      }
+    });
+  }
   
   // Group by game and market type for better selection
   const gameGroups = propOdds.reduce((groups, odds) => {
@@ -119,6 +157,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     
     const playerName = bestOutcome.description || bestOutcome.name;
     processedPlayers.add(playerName);
+    const seasonStats = playerStatsIndex.get(playerName.toLowerCase());
     
     // Create suggestion with UTC date handling from base table
     let gameDate = new Date().toISOString().split('T')[0]; // Safe fallback
@@ -159,7 +198,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       odds: formatOdds(bestOutcome.price),
   // spread field removed for player props
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
-      reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds),
+      reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats),
       researchSummary: "",
       edgeType: "player_performance",
       contraryEvidence: generateContraryEvidence(playerName, odds.market_type),
@@ -246,9 +285,60 @@ function calculateConfidence(price, riskLevel) {
   return 5;
 }
 
-function generatePropReasoning(playerName, marketType, outcome, odds) {
+function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats) {
   const propType = formatPlayerPropPick(playerName, marketType, outcome);
-  return `${propType} odds at ${formatOdds(outcome.price)} for the ${odds.away_team} @ ${odds.home_team} matchup. Recent performance metrics and matchup analysis suggest this represents good value.`;
+  let baseText = `${propType} odds at ${formatOdds(outcome.price)} for the ${odds.away_team} @ ${odds.home_team} matchup. Recent performance metrics and matchup analysis suggest this represents good value.`;
+
+  let statSnippet = '';
+
+  try {
+    if (seasonStats && typeof seasonStats === 'object') {
+      if (seasonStats.nfl) {
+        const s = seasonStats.nfl;
+        const games = s.games_played || 0;
+
+        if (games > 0) {
+          if (marketType === 'player_pass_yds' && (s.passing_yards || s.passing_touchdowns)) {
+            statSnippet = `${playerName} has ${s.passing_yards || 0} passing yards and ${s.passing_touchdowns || 0} TDs through ${games} games this season.`;
+          } else if (marketType === 'player_rush_yds' && (s.rushing_yards || s.rushing_attempts)) {
+            statSnippet = `${playerName} has ${s.rushing_yards || 0} rushing yards on ${s.rushing_attempts || 0} carries through ${games} games this season.`;
+          } else if (marketType === 'player_receptions' && (s.receptions || s.receiving_yards)) {
+            statSnippet = `${playerName} has ${s.receptions || 0} receptions for ${s.receiving_yards || 0} yards in ${games} games this season.`;
+          } else if (marketType === 'player_anytime_td' && (s.receiving_touchdowns || s.rushing_touchdowns)) {
+            const tds = (s.receiving_touchdowns || 0) + (s.rushing_touchdowns || 0);
+            statSnippet = `${playerName} has scored ${tds} TDs across ${games} games this season.`;
+          }
+        }
+
+      } else if (seasonStats.nba) {
+        const s = seasonStats.nba;
+        const games = s.games_played || 0;
+
+        if (games > 0) {
+          if (marketType === 'player_points' && (s.points_per_game || s.points)) {
+            const ppg = s.points_per_game || (s.points && games ? (s.points / games) : 0);
+            statSnippet = `${playerName} is averaging ${ppg.toFixed ? ppg.toFixed(1) : ppg} points over ${games} games this season.`;
+          } else if (marketType === 'player_assists' && (s.assists_per_game || s.assists)) {
+            const apg = s.assists_per_game || (s.assists && games ? (s.assists / games) : 0);
+            statSnippet = `${playerName} is averaging ${apg.toFixed ? apg.toFixed(1) : apg} assists over ${games} games this season.`;
+          } else if (marketType === 'player_rebounds' && (s.rebounds_per_game || s.rebounds)) {
+            const rpg = s.rebounds_per_game || (s.rebounds && games ? (s.rebounds / games) : 0);
+            statSnippet = `${playerName} is averaging ${rpg.toFixed ? rpg.toFixed(1) : rpg} rebounds over ${games} games this season.`;
+          } else if (!statSnippet && (s.points || s.rebounds || s.assists)) {
+            statSnippet = `${playerName} has ${s.points || 0} points, ${s.rebounds || 0} rebounds, and ${s.assists || 0} assists so far this season.`;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // If stats parsing fails, fall back to base text
+  }
+
+  if (statSnippet) {
+    return `${baseText} ${statSnippet}`;
+  }
+
+  return baseText;
 }
 
 function generateContraryEvidence(playerName, marketType) {
@@ -276,6 +366,7 @@ async function getPlayerDataForProps(sports) {
         try {
           const providerIds = JSON.parse(player.provider_ids || '{}');
           const teamName = providerIds.team_name;
+          const seasonStats = providerIds.season_stats || null;
           
           if (!teamName) return null; // Skip players without team info
           
@@ -283,7 +374,8 @@ async function getPlayerDataForProps(sports) {
             name: player.name,
             sport: player.sport.toUpperCase(),
             position: player.position,
-            team: teamName
+            team: teamName,
+            seasonStats
           };
         } catch (e) {
           return null; // Skip players with invalid JSON
@@ -368,8 +460,10 @@ async function suggestPicksHandler(req, res) {
     const playerData = await getPlayerDataForProps(selectedSports);
     console.log(`📊 Retrieved ${playerData.length} players for validation`);
 
-    // Check if this is a player props request - use cached odds from Supabase
-    if (selectedBetTypes.includes('Player Props')) {
+    // Check if this is a player/TD props request - use cached odds from Supabase
+    const wantsPropMode = selectedBetTypes.some(bt => bt === 'Player Props' || bt === 'TD Props');
+
+    if (wantsPropMode) {
       const result = await generatePlayerPropSuggestions({
         sports: selectedSports,
         betTypes: selectedBetTypes,
@@ -378,7 +472,8 @@ async function suggestPicksHandler(req, res) {
         sportsbook: req.body.oddsPlatform || 'DraftKings',
         playerData,
         supabase,
-        coordinator
+        coordinator,
+        selectedBetTypes
       });
       
       const duration = Date.now() - startTime;
