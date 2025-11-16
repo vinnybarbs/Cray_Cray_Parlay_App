@@ -2,6 +2,9 @@ const { MultiAgentCoordinator } = require('../lib/agents/coordinator.js');
 const { logger } = require('../shared/logger.js');
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
 const { toMountainTime, formatGameTime, getCurrentMountainTime } = require('../lib/timezone-utils.js');
+const { SportsIntelligenceService } = require('../lib/services/sports-intelligence.js');
+
+const intelligenceService = new SportsIntelligenceService();
 
 // Generate player prop suggestions using cached odds from Supabase
 async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions, sportsbook, playerData, supabase, coordinator, selectedBetTypes }) {
@@ -65,23 +68,28 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       };
     }
 
+    // TD-only vs mixed player-props modes
+    const tdMarkets = [
+      'player_anytime_td',
+      'player_pass_tds',
+      'player_rush_tds',
+      'player_reception_tds',
+      'player_first_td',
+      'player_last_td'
+    ];
+    const tdSet = new Set(tdMarkets);
+
     // If user specifically requested only TD Props (without general Player Props),
     // narrow the markets to TD-related ones.
     const wantsTDOnly = Array.isArray(selectedBetTypes)
       && selectedBetTypes.includes('TD Props')
       && !selectedBetTypes.includes('Player Props');
 
+    const wantsMixedPlayerProps = Array.isArray(selectedBetTypes)
+      && selectedBetTypes.includes('Player Props');
+
     let filteredPropOdds = propOdds;
     if (wantsTDOnly) {
-      const tdMarkets = [
-        'player_anytime_td',
-        'player_pass_tds',
-        'player_rush_tds',
-        'player_reception_tds',
-        'player_first_td',
-        'player_last_td'
-      ];
-      const tdSet = new Set(tdMarkets);
       filteredPropOdds = propOdds.filter(o => tdSet.has(o.market_type));
       console.log(`🎯 TD Props mode: filtered to ${filteredPropOdds.length} TD markets from ${propOdds.length} total player markets`);
 
@@ -92,10 +100,48 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
           message: 'No TD prop odds currently available in cache. Check back after the next odds refresh.'
         };
       }
+    } else if (wantsMixedPlayerProps) {
+      // Player Props mode: intentionally mix yardage/reception props with TD props
+      const yardageProps = propOdds.filter(o => !tdSet.has(o.market_type));
+      const tdProps = propOdds.filter(o => tdSet.has(o.market_type));
+      const mixed = [];
+      const maxLen = Math.max(yardageProps.length, tdProps.length);
+      for (let i = 0; i < maxLen; i++) {
+        if (yardageProps[i]) mixed.push(yardageProps[i]);
+        if (tdProps[i]) mixed.push(tdProps[i]);
+      }
+      filteredPropOdds = mixed;
+      console.log(`🎯 Player Props mode: mixing ${yardageProps.length} yardage markets with ${tdProps.length} TD markets`);
     }
-    
-    // Convert cached odds to suggestions format
-    const suggestions = await convertPropOddsToSuggestions(filteredPropOdds, playerData, numSuggestions, riskLevel);
+
+    // Pre-compute news/intel context per game to enrich reasoning
+    const intelligenceMap = {};
+    const seenGames = new Set();
+    for (const odds of filteredPropOdds) {
+      const gameKey = `${odds.home_team}_${odds.away_team}`;
+      if (seenGames.has(gameKey)) continue;
+      seenGames.add(gameKey);
+
+      const sportCode = odds.sport === 'americanfootball_nfl' ? 'NFL'
+        : odds.sport === 'basketball_nba' ? 'NBA'
+        : (odds.sport || '').toUpperCase();
+
+      try {
+        const intel = await intelligenceService.getAgentContext(sportCode, odds.home_team, odds.away_team);
+        intelligenceMap[gameKey] = intel;
+      } catch (intelError) {
+        console.log('⚠️ Failed to load intelligence for game', gameKey, intelError.message);
+      }
+    }
+
+    // Convert cached odds to suggestions format (with stats + news context)
+    const suggestions = await convertPropOddsToSuggestions(
+      filteredPropOdds,
+      playerData,
+      numSuggestions,
+      riskLevel,
+      intelligenceMap
+    );
     
     return { suggestions };
     
@@ -110,15 +156,15 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
 }
 
 // Convert cached prop odds to suggestion format
-async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel) {
+async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}) {
   const suggestions = [];
   const processedPlayers = new Set();
-  const playerStatsIndex = new Map();
+  const playerIndex = new Map();
 
   if (Array.isArray(playerData)) {
     playerData.forEach(p => {
-      if (p && p.name && p.seasonStats) {
-        playerStatsIndex.set(p.name.toLowerCase(), p.seasonStats);
+      if (p && p.name) {
+        playerIndex.set(p.name.toLowerCase(), p);
       }
     });
   }
@@ -142,8 +188,24 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     // Find best value props (players with good odds that haven't been used)
     const validOutcomes = outcomes.filter(outcome => {
       const playerName = outcome.description || outcome.name;
-      return playerName && !processedPlayers.has(playerName) && 
-             Math.abs(outcome.price) < 300; // Reasonable odds range
+      if (!playerName || processedPlayers.has(playerName)) return false;
+      if (Math.abs(outcome.price) >= 300) return false; // Reasonable odds range
+
+      // Roster verification: ensure player is actually on one of the matchup teams when we
+      // have cached roster data for them.
+      const playerInfo = playerIndex.get(playerName.toLowerCase());
+      if (playerInfo && playerInfo.team) {
+        const isOnMatchupTeam = isPlayerOnTeams(
+          playerInfo.team,
+          odds.home_team,
+          odds.away_team
+        );
+        if (!isOnMatchupTeam) {
+          return false;
+        }
+      }
+
+      return true;
     });
     
     if (validOutcomes.length === 0) continue;
@@ -157,7 +219,8 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     
     const playerName = bestOutcome.description || bestOutcome.name;
     processedPlayers.add(playerName);
-    const seasonStats = playerStatsIndex.get(playerName.toLowerCase());
+    const playerInfo = playerIndex.get(playerName.toLowerCase());
+    const seasonStats = playerInfo?.seasonStats;
     
     // Create suggestion with UTC date handling from base table
     let gameDate = new Date().toISOString().split('T')[0]; // Safe fallback
@@ -185,6 +248,9 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       'player_last_td'
     ];
     const betType = tdMarkets.includes(odds.market_type) ? 'TD' : 'Player Props';
+
+    const intelKey = `${odds.home_team}_${odds.away_team}`;
+    const intelContext = intelligenceMap[intelKey];
     suggestions.push({
       id: `prop_${suggestionId.toString().padStart(3, '0')}`,
       gameDate,
@@ -198,8 +264,8 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       odds: formatOdds(bestOutcome.price),
   // spread field removed for player props
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
-      reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats),
-      researchSummary: "",
+      reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, intelContext),
+      researchSummary: intelContext && intelContext.context ? intelContext.context : "",
       edgeType: "player_performance",
       contraryEvidence: generateContraryEvidence(playerName, odds.market_type),
       analyticalSummary: "Analyzed cached player prop odds and recent performance metrics to identify value opportunities."
@@ -285,9 +351,10 @@ function calculateConfidence(price, riskLevel) {
   return 5;
 }
 
-function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats) {
+function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats, intelContext) {
   const propType = formatPlayerPropPick(playerName, marketType, outcome);
-  let baseText = `${propType} odds at ${formatOdds(outcome.price)} for the ${odds.away_team} @ ${odds.home_team} matchup. Recent performance metrics and matchup analysis suggest this represents good value.`;
+  const priceText = formatOdds(outcome.price);
+  const matchupText = `${odds.away_team} @ ${odds.home_team}`;
 
   let statSnippet = '';
 
@@ -334,15 +401,52 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     // If stats parsing fails, fall back to base text
   }
 
-  if (statSnippet) {
-    return `${baseText} ${statSnippet}`;
+  // Pull a concise news/intel line, if available
+  let intelSnippet = '';
+  if (intelContext && intelContext.context) {
+    const firstLine = intelContext.context.split('\n')[0];
+    if (firstLine) {
+      intelSnippet = firstLine;
+    }
   }
 
-  return baseText;
+  const parts = [];
+  parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup.`);
+  if (statSnippet) parts.push(statSnippet);
+  if (intelSnippet) parts.push(intelSnippet);
+  parts.push('Taken together, this combination of recent production and matchup context suggests this prop offers solid value at the current number.');
+
+  return parts.join(' ');
 }
 
 function generateContraryEvidence(playerName, marketType) {
   return `Player performance can be inconsistent, and ${marketType.replace('player_', '')} props are subject to game script and injury concerns.`;
+}
+
+// Helper: normalize team names for rough matching (handles city vs nickname differences)
+function normalizeTeamName(name) {
+  if (!name) return '';
+  return name
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Helper: verify that a player's team matches either the home or away team for a game
+function isPlayerOnTeams(playerTeamName, homeTeam, awayTeam) {
+  const playerNorm = normalizeTeamName(playerTeamName);
+  const homeNorm = normalizeTeamName(homeTeam);
+  const awayNorm = normalizeTeamName(awayTeam);
+
+  if (!playerNorm) return false;
+  if (!homeNorm && !awayNorm) return true;
+
+  const matchesHome = homeNorm && (playerNorm.includes(homeNorm) || homeNorm.includes(playerNorm));
+  const matchesAway = awayNorm && (playerNorm.includes(awayNorm) || awayNorm.includes(playerNorm));
+
+  return !!(matchesHome || matchesAway);
 }
 
 /**
