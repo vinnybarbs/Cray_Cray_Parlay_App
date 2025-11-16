@@ -74,7 +74,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       'player_pass_tds',
       'player_rush_tds',
       'player_reception_tds',
-      'player_first_td',
+      'player_1st_td',
       'player_last_td'
     ];
     const tdSet = new Set(tdMarkets);
@@ -135,14 +135,30 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     }
 
     // Convert cached odds to suggestions format (with stats + news context)
-    const suggestions = await convertPropOddsToSuggestions(
+    let suggestions = await convertPropOddsToSuggestions(
       filteredPropOdds,
       playerData,
       numSuggestions,
       riskLevel,
-      intelligenceMap
+      intelligenceMap,
+      { disableRosterCheck: false }
     );
-    
+
+    // Safety net: if roster verification was too strict and we ended up with zero
+    // suggestions, retry once without enforcing the roster check so the user still
+    // sees actionable props.
+    if (!suggestions || suggestions.length === 0) {
+      console.log('⚠️ No suggestions after roster verification; retrying without roster check.');
+      suggestions = await convertPropOddsToSuggestions(
+        filteredPropOdds,
+        playerData,
+        numSuggestions,
+        riskLevel,
+        intelligenceMap,
+        { disableRosterCheck: true }
+      );
+    }
+
     return { suggestions };
     
   } catch (error) {
@@ -156,10 +172,11 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
 }
 
 // Convert cached prop odds to suggestion format
-async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}) {
+async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}, options = {}) {
   const suggestions = [];
   const processedPlayers = new Set();
   const playerIndex = new Map();
+  const { disableRosterCheck = false } = options || {};
 
   if (Array.isArray(playerData)) {
     playerData.forEach(p => {
@@ -191,17 +208,19 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       if (!playerName || processedPlayers.has(playerName)) return false;
       if (Math.abs(outcome.price) >= 300) return false; // Reasonable odds range
 
-      // Roster verification: ensure player is actually on one of the matchup teams when we
-      // have cached roster data for them.
-      const playerInfo = playerIndex.get(playerName.toLowerCase());
-      if (playerInfo && playerInfo.team) {
-        const isOnMatchupTeam = isPlayerOnTeams(
-          playerInfo.team,
-          odds.home_team,
-          odds.away_team
-        );
-        if (!isOnMatchupTeam) {
-          return false;
+      if (!disableRosterCheck) {
+        // Roster verification: ensure player is actually on one of the matchup teams when we
+        // have cached roster data for them.
+        const playerInfo = playerIndex.get(playerName.toLowerCase());
+        if (playerInfo && playerInfo.team) {
+          const isOnMatchupTeam = isPlayerOnTeams(
+            playerInfo.team,
+            odds.home_team,
+            odds.away_team
+          );
+          if (!isOnMatchupTeam) {
+            return false;
+          }
         }
       }
 
@@ -243,8 +262,8 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       'player_anytime_td',
       'player_pass_tds',
       'player_rush_tds',
-      'player_receiving_tds',
-      'player_first_td',
+      'player_reception_tds',
+      'player_1st_td',
       'player_last_td'
     ];
     const betType = tdMarkets.includes(odds.market_type) ? 'TD' : 'Player Props';
