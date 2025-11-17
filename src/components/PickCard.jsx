@@ -90,7 +90,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
   const [showFullAnalysis, setShowFullAnalysis] = useState(false)
   const formatDate = (dateString) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' })
   }
 
   const getConfidenceColor = (confidence) => {

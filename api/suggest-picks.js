@@ -21,13 +21,18 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     });
     
     // Fetch player prop odds from Supabase base table (single source of truth)
-    // Use the same query pattern as working test endpoint
+    // Only include FUTURE games and reasonably fresh odds
+    const nowIso = new Date().toISOString();
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
     const { data: propOdds, error } = await supabase
       .from('odds_cache')
       .select('*')
       .eq('sport', sportKeys[0]) // Use first sport with .eq() like test endpoint
       .ilike('market_type', 'player_%')
-      .order('commence_time', { ascending: false })
+      .gt('commence_time', nowIso) // exclude past games
+      .gte('last_updated', oneDayAgo) // avoid very stale data
+      .order('commence_time', { ascending: true })
       .limit(50);
       
     if (error) throw error;
@@ -241,21 +246,8 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerInfo = playerIndex.get(playerName.toLowerCase());
     const seasonStats = playerInfo?.seasonStats;
     
-    // Create suggestion with UTC date handling from base table
-    let gameDate = new Date().toISOString().split('T')[0]; // Safe fallback
-    
-    try {
-      // Use commence_time from base odds_cache table (UTC from Odds API)
-      if (odds.commence_time) {
-        const dateStr = odds.commence_time.split('T')[0]; // Get "2025-11-11" from ISO format
-        if (dateStr && dateStr.includes('-') && dateStr.length >= 10) {
-          gameDate = dateStr;
-        }
-      }
-    } catch (dateError) {
-      console.log(`Date extraction error:`, dateError);
-      // gameDate already set to safe fallback
-    }
+    // Create suggestion with raw UTC commence_time so frontend can format consistently
+    const gameDate = odds.commence_time || new Date().toISOString();
       
     // Group TD-related props under 'TD', others under 'Player Props'
     const tdMarkets = [

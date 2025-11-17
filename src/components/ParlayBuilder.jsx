@@ -20,7 +20,7 @@ export default function ParlayBuilder({ selectedPicks, onRemove, onLockBuild, is
 
   const formatDate = (dateString) => {
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' })
   }
 
   return (

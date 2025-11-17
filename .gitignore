@@ -42,3 +42,10 @@ yarn-error.log*
 # Vite
 .vite
 
+
+# Local payloads saved by one-off roster script
+# Directory used by scripts/populate-rosters-oneoff.js when --save-payloads is passed
+tmp/roster_payloads/
+# Alternate save location used in examples
+data/rosters/
+
