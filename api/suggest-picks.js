@@ -25,7 +25,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     const nowIso = new Date().toISOString();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: propOdds, error } = await supabase
+    const { data: initialPropOdds, error } = await supabase
       .from('odds_cache')
       .select('*')
       .eq('sport', sportKeys[0]) // Use first sport with .eq() like test endpoint
@@ -37,7 +37,29 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       
     if (error) throw error;
     
-    console.log(`📊 Found ${propOdds.length} player prop markets in cache`);
+    let propOdds = initialPropOdds || [];
+
+    // If nothing matched the 24h freshness filter but we know props exist in the cache,
+    // retry without the last_updated constraint so manual refreshes remain usable.
+    if (!propOdds.length) {
+      console.log('⚠️ No fresh player prop odds found (last 24h). Retrying without last_updated filter...');
+
+      const { data: fallbackOdds, error: fallbackError } = await supabase
+        .from('odds_cache')
+        .select('*')
+        .eq('sport', sportKeys[0])
+        .ilike('market_type', 'player_%')
+        .gt('commence_time', nowIso)
+        .order('commence_time', { ascending: true })
+        .limit(50);
+
+      if (fallbackError) throw fallbackError;
+
+      propOdds = fallbackOdds || [];
+      console.log(`🔁 Fallback prop odds query (no last_updated filter) found ${propOdds.length} markets`);
+    }
+
+    console.log(`📊 Using ${propOdds.length} player prop markets from cache`);
     
     // Debug: Test the exact same query as working test endpoint
     const { data: testQuery, error: testError } = await supabase
@@ -207,8 +229,10 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const odds = gameOdds[0]; // Take first bookmaker for this game/market
     const outcomes = typeof odds.outcomes === 'string' ? JSON.parse(odds.outcomes) : odds.outcomes;
     
+    if (!Array.isArray(outcomes) || outcomes.length === 0) continue;
+
     // Find best value props (players with good odds that haven't been used)
-    const validOutcomes = outcomes.filter(outcome => {
+    let validOutcomes = outcomes.filter(outcome => {
       const playerName = outcome.description || outcome.name;
       if (!playerName || processedPlayers.has(playerName)) return false;
       if (Math.abs(outcome.price) >= 300) return false; // Reasonable odds range
@@ -231,7 +255,19 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
 
       return true;
     });
-    
+
+    // If strict filtering (including roster check) yielded nothing and we're in
+    // the relaxed pass (disableRosterCheck=true), fall back to any reasonably
+    // priced unseen players so we still surface actionable props from the cache.
+    if (validOutcomes.length === 0 && disableRosterCheck) {
+      validOutcomes = outcomes.filter(outcome => {
+        const playerName = outcome.description || outcome.name;
+        if (!playerName || processedPlayers.has(playerName)) return false;
+        if (Math.abs(outcome.price) >= 600) return false; // allow longer shots in fallback
+        return true;
+      });
+    }
+
     if (validOutcomes.length === 0) continue;
     
     // Select best outcome (closest to even odds for medium risk)
@@ -575,7 +611,8 @@ async function suggestPicksHandler(req, res) {
     const playerData = await getPlayerDataForProps(selectedSports);
     console.log(`📊 Retrieved ${playerData.length} players for validation`);
 
-    // Check if this is a player/TD props request - use cached odds from Supabase
+    // Check if this is a player/TD props request - prefer cached props from Supabase,
+    // but fall back to regular odds flow if we can't generate any prop suggestions.
     const wantsPropMode = selectedBetTypes.some(bt => bt === 'Player Props' || bt === 'TD Props');
 
     if (wantsPropMode) {
@@ -592,29 +629,39 @@ async function suggestPicksHandler(req, res) {
       });
       
       const duration = Date.now() - startTime;
-      
-      return res.json({
-        success: true,
-        suggestions: result.suggestions,
-        metadata: {
-          requestedSuggestions: numSuggestions,
-          returnedSuggestions: result.suggestions?.length || 0,
-          sports: selectedSports,
-          betTypes: selectedBetTypes,
-          riskLevel,
-          generatedAt: new Date().toISOString(),
-          generatedAtMT: getCurrentMountainTime(),
-          duration: `${duration}ms`,
-          playerDataStats: {
-            totalPlayers: playerData.length,
-            playersBySport: playerData.reduce((acc, p) => {
-              acc[p.sport] = (acc[p.sport] || 0) + 1;
-              return acc;
-            }, {}),
-            dataSource: "Supabase Cache + ESPN API"
+
+      if (result.suggestions && result.suggestions.length > 0) {
+        return res.json({
+          success: true,
+          suggestions: result.suggestions,
+          metadata: {
+            requestedSuggestions: numSuggestions,
+            returnedSuggestions: result.suggestions.length,
+            sports: selectedSports,
+            betTypes: selectedBetTypes,
+            riskLevel,
+            generatedAt: new Date().toISOString(),
+            generatedAtMT: getCurrentMountainTime(),
+            duration: `${duration}ms`,
+            playerDataStats: {
+              totalPlayers: playerData.length,
+              playersBySport: playerData.reduce((acc, p) => {
+                acc[p.sport] = (acc[p.sport] || 0) + 1;
+                return acc;
+              }, {}),
+              dataSource: "Supabase Cache + ESPN API"
+            }
           }
-        }
+        });
+      }
+
+      logger.warn('No player prop suggestions generated; falling back to core odds flow', {
+        selectedSports,
+        selectedBetTypes,
+        riskLevel,
+        numSuggestions
       });
+      // Fall through to regular coordinator-based suggestion generation below
     }
 
     // Generate regular suggestions for non-player props

@@ -166,7 +166,6 @@ async function fetchPlayerProps(
   
   return { props, rateLimit };
 }
-
 async function refreshOdds(req: Request): Promise<Response> {
   try {
     const oddsApiKey = Deno.env.get("ODDS_API_KEY");
@@ -188,121 +187,183 @@ async function refreshOdds(req: Request): Promise<Response> {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    console.log("🚀 Starting odds cache refresh via Edge Function");
+    console.log("🚀 Starting quick odds refresh for NFL & NBA via Edge Function...");
     const startTime = Date.now();
-    
-    // Check available sports
-    const availableSports = await checkAvailableSports(oddsApiKey);
-    await delay(DELAYS.afterAvailability);
-    
-    // Filter to configured sports that are available
-    const sportsToFetch = SPORTS.filter(s => availableSports.includes(s));
-    console.log(`📋 Sports to fetch: ${sportsToFetch.join(", ")}`);
-    
+
+    // Mirror scripts/quick-odds-refresh.js:
+    //   - Only refresh NFL & NBA
+    //   - Fetch core markets, clear old rows for those sports, insert fresh data
+    //   - Then fetch per-event player props and insert those as well.
+
+    const SPORTS_TO_REFRESH = ["americanfootball_nfl", "basketball_nba"];
+    const allSportGames: Array<{ sport: string; games: any[] }> = [];
+
+    // 1) Fetch core odds for NFL & NBA
+    for (const sport of SPORTS_TO_REFRESH) {
+      try {
+        const params = new URLSearchParams({
+          apiKey: oddsApiKey,
+          regions: REGIONS,
+          markets: CORE_MARKETS,
+          oddsFormat: ODDS_FORMAT,
+          bookmakers: BOOKMAKERS
+        });
+
+        const url = `https://api.the-odds-api.com/v4/sports/${sport}/odds/?${params.toString()}`;
+        console.log(`📥 Fetching ${sport} core odds...`);
+
+        const response = await fetchWithRetry(url);
+        if (!response.ok) {
+          console.log(`⚠️ Core odds request failed for ${sport}: ${response.status}`);
+          continue;
+        }
+
+        const games = await response.json() as any[];
+        console.log(`✅ Fetched ${games.length} games for ${sport}`);
+        allSportGames.push({ sport, games });
+      } catch (err) {
+        console.error(`❌ Error fetching core odds for ${sport}:`, err);
+      }
+    }
+
+    // 2) Clear old odds data only for NFL & NBA, then insert fresh data
+    console.log("🗑️ Clearing old NFL & NBA odds data...");
+    const { error: deleteError } = await supabase
+      .from("odds_cache")
+      .delete()
+      .in("sport", SPORTS_TO_REFRESH);
+
+    if (deleteError) {
+      console.error("⚠️ Error clearing old odds:", deleteError);
+    }
+
+    console.log("💾 Inserting fresh core odds data...");
     let totalGames = 0;
     let totalOddsInserted = 0;
-    const allGameIds: Array<{ sport: string; id: string }> = [];
-    
-    // Fetch core markets for each sport
-    for (const sport of sportsToFetch) {
-      try {
-        if (sportsToFetch.indexOf(sport) > 0) {
-          await delay(DELAYS.betweenSports);
+
+    for (const { sport, games } of allSportGames) {
+      totalGames += games.length;
+
+      for (const game of games) {
+        for (const bookmaker of (game.bookmakers || [])) {
+          for (const market of (bookmaker.markets || [])) {
+            const record = {
+              sport,
+              external_game_id: game.id,
+              commence_time: game.commence_time,
+              home_team: game.home_team,
+              away_team: game.away_team,
+              bookmaker: bookmaker.key,
+              market_type: market.key,
+              outcomes: market.outcomes,
+              last_updated: new Date().toISOString()
+            };
+
+            const { error } = await supabase
+              .from("odds_cache")
+              .upsert(record, {
+                onConflict: "external_game_id,bookmaker,market_type"
+              });
+
+            if (error) {
+              console.log("⚠️ Error upserting core odds:", error.message || error);
+            } else {
+              totalOddsInserted++;
+            }
+          }
         }
-        
-        const { games, rateLimit } = await fetchCoreMarkets(sport, oddsApiKey);
-        totalGames += games.length;
-        
-        // Collect game IDs for props fetch (NFL, NBA only)
-        if (PROP_SPORTS.includes(sport)) {
-          games.forEach((game: any) => {
-            allGameIds.push({ sport, id: game.id });
+      }
+    }
+
+    // 3) Fetch and insert player props via per-event endpoint for NFL & NBA
+    console.log("🎯 Fetching player props for NFL & NBA games...");
+
+    for (const { sport, games } of allSportGames) {
+      const propList = PROP_MARKETS[sport as keyof typeof PROP_MARKETS];
+      if (!propList || propList.length === 0) continue;
+
+      const propMarketsParam = propList.join(",");
+
+      for (const game of games) {
+        try {
+          const eventId = game.id;
+          const params = new URLSearchParams({
+            apiKey: oddsApiKey,
+            regions: REGIONS,
+            markets: propMarketsParam,
+            oddsFormat: ODDS_FORMAT,
+            bookmakers: BOOKMAKERS
           });
-        }
-        
-        // Store in odds_cache via Supabase
-        // Note: Your existing schema should handle this
-        for (const game of games) {
-          for (const bookmaker of (game as any).bookmakers || []) {
-            for (const market of bookmaker.markets || []) {
-              const cacheEntry = {
-                sport: sport,
-                game_id: (game as any).id,
-                external_game_id: (game as any).id,
-                commence_time: (game as any).commence_time,
-                home_team: (game as any).home_team,
-                away_team: (game as any).away_team,
-                bookmaker: bookmaker.key,
-                market_type: market.key,
-                outcomes: market.outcomes,
-                last_updated: new Date().toISOString()
-              };
-              
-              const { error } = await supabase
-                .from("odds_cache")
-                .upsert([cacheEntry], { onConflict: "external_game_id,bookmaker,market_type" });
-              
-              if (error) {
-                console.error("Error upserting odds:", error);
-              } else {
-                totalOddsInserted++;
+
+          const propsUrl = `https://api.the-odds-api.com/v4/sports/${sport}/events/${eventId}/odds/?${params.toString()}`;
+          const propsResponse = await fetchWithRetry(propsUrl);
+
+          if (!propsResponse.ok) {
+            console.log(`⚠️ Props request failed for ${sport} event ${eventId}: ${propsResponse.status}`);
+            continue;
+          }
+
+          const propsData = await propsResponse.json();
+          const events = Array.isArray(propsData) ? propsData : [propsData];
+
+          if (!events || events.length === 0) {
+            console.log(`ℹ️ No props returned for ${sport} event ${eventId}`);
+            continue;
+          }
+
+          for (const event of events) {
+            if (!event.bookmakers || event.bookmakers.length === 0) continue;
+
+            for (const bookmaker of event.bookmakers) {
+              if (!bookmaker.markets || bookmaker.markets.length === 0) continue;
+
+              for (const market of bookmaker.markets) {
+                if (!market.outcomes || market.outcomes.length === 0) continue;
+
+                const record = {
+                  sport,
+                  external_game_id: game.id,
+                  commence_time: game.commence_time,
+                  home_team: game.home_team,
+                  away_team: game.away_team,
+                  bookmaker: bookmaker.key,
+                  market_type: market.key,
+                  outcomes: market.outcomes,
+                  last_updated: new Date().toISOString()
+                };
+
+                const { error } = await supabase
+                  .from("odds_cache")
+                  .upsert(record, {
+                    onConflict: "external_game_id,bookmaker,market_type"
+                  });
+
+                if (error) {
+                  console.log("⚠️ Error upserting props odds:", error.message || error);
+                } else {
+                  totalOddsInserted++;
+                }
               }
             }
           }
+        } catch (e) {
+          console.log(`⚠️ Error fetching props for ${sport} game ${game.id}:`, (e as Error).message);
         }
-        
-      } catch (error) {
-        console.error(`Error fetching ${sport}:`, error);
+
+        // Small delay between prop requests to avoid hitting rate limits too fast
+        await delay(DELAYS.betweenProps);
       }
     }
-    
-    // Fetch player props for NFL/NBA
-    console.log(`\n🎯 Fetching player props for ${allGameIds.length} games...`);
-    for (let i = 0; i < allGameIds.length && i < 20; i++) {
-      try {
-        if (i > 0) await delay(DELAYS.betweenProps);
-        
-        const { sport, id } = allGameIds[i];
-        const { props } = await fetchPlayerProps(sport, id, oddsApiKey);
-        
-        if (props) {
-          // Store player props similar to core markets
-          // (Your schema may need adjustment for player_props table if separate)
-          for (const bookmaker of (props as any).bookmakers || []) {
-            for (const market of bookmaker.markets || []) {
-              const propEntry = {
-                sport: sport,
-                game_id: id,
-                external_game_id: id,
-                bookmaker: bookmaker.key,
-                market_type: market.key,
-                outcomes: market.outcomes,
-                last_updated: new Date().toISOString()
-              };
-              
-              const { error } = await supabase
-                .from("odds_cache")
-                .upsert([propEntry], { onConflict: "external_game_id,bookmaker,market_type" });
-              
-              if (error) {
-                console.error("Error upserting props:", error);
-              } else {
-                totalOddsInserted++;
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error fetching props:`, error);
-      }
-    }
-    
+
     const duration = Date.now() - startTime;
-    console.log(`\n✅ Refresh complete: ${totalGames} games, ${totalOddsInserted} odds entries in ${duration}ms`);
-    
+    const totalGamesProcessed = allSportGames.reduce((sum, sg) => sum + sg.games.length, 0);
+
+    console.log("✅ Quick refresh complete!");
+    console.log(`📊 Processed ${totalGamesProcessed} games across NFL & NBA`);
+
     return new Response(JSON.stringify({
       status: "success",
-      totalGames,
+      totalGames: totalGamesProcessed,
       totalOddsInserted,
       duration
     }), {
@@ -312,7 +373,7 @@ async function refreshOdds(req: Request): Promise<Response> {
     
   } catch (error) {
     console.error("Edge Function error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { "Content-Type": "application/json" }
     });

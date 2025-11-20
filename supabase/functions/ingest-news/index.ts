@@ -7,8 +7,12 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || '';
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured. Function will still parse feeds but cannot write to DB.');
+const DB_ENABLED = !!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+
+if (!DB_ENABLED) {
+  console.warn('[ingest-news] DB writes DISABLED: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing in Edge env');
+} else {
+  console.log('[ingest-news] DB writes ENABLED: using SUPABASE_URL from env');
 }
 
 // Feeds to ingest (ESPN + CBSSports as provided)
@@ -38,9 +42,25 @@ const FEEDS: { name: string; url: string }[] = [
   { name: 'cbssports-betting', url: 'https://www.cbssports.com/rss/headlines/betting/' }
 ];
 
-// Helper: supabase REST helper
+// To avoid hitting Edge Function timeouts, cap work per invocation
+const MAX_FEEDS_PER_RUN = 1;          // process only first N feeds each run (small test slice)
+const MAX_ITEMS_PER_FEED = 5;         // limit number of articles per feed (small test slice)
+
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 5000): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...(init || {}), signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 async function supabaseGet(path: string) {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  if (!DB_ENABLED) {
+    console.warn('[ingest-news] Skipping Supabase GET, DB_DISABLED, path=', path);
+    return null;
+  }
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   const res = await fetch(url, {
     headers: {
@@ -54,7 +74,10 @@ async function supabaseGet(path: string) {
 }
 
 async function supabasePost(path: string, body: any) {
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  if (!DB_ENABLED) {
+    console.warn('[ingest-news] Skipping Supabase POST, DB_DISABLED, path=', path);
+    return null;
+  }
   const url = `${SUPABASE_URL}/rest/v1/${path}`;
   const res = await fetch(url, {
     method: 'POST',
@@ -73,23 +96,9 @@ async function supabasePost(path: string, body: any) {
   return res.json();
 }
 
-// OpenAI embeddings helper (if configured)
+// OpenAI embeddings helper (currently disabled to keep runtime small)
 async function getEmbedding(text: string) {
-  if (!OPENAI_API_KEY) return null;
-  const resp = await fetch('https://api.openai.com/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({ model: 'text-embedding-3-small', input: text })
-  });
-  if (!resp.ok) {
-    console.warn('OpenAI embedding request failed', resp.status);
-    return null;
-  }
-  const j = await resp.json();
-  return j?.data?.[0]?.embedding ?? null;
+  return null;
 }
 
 // Parse RSS/XML using DOMParser available in Deno runtime
@@ -114,8 +123,10 @@ export default async function handler(req: Request) {
   const runLog: any = { job_name: jobName, started_at: runStarted, status: 'started' };
 
   try {
-    // For each feed: ensure source exists and ingest items
-    for (const feed of FEEDS) {
+    // For each feed: ensure source exists and ingest items (limited per run)
+    const feedsToProcess = FEEDS.slice(0, MAX_FEEDS_PER_RUN);
+
+    for (const feed of feedsToProcess) {
       try {
         // Ensure source exists
         let sources = await supabaseGet(`news_sources?feed_url=eq.${encodeURIComponent(feed.url)}&select=*`);
@@ -127,11 +138,11 @@ export default async function handler(req: Request) {
           sourceId = created?.[0]?.id ?? null;
         }
 
-        // Fetch feed
-        const resp = await fetch(feed.url, { headers: { 'User-Agent': 'Cray_Cray_Ingest/1.0' } });
+        // Fetch feed with timeout to avoid hanging on slow endpoints
+        const resp = await fetchWithTimeout(feed.url, { headers: { 'User-Agent': 'Cray_Cray_Ingest/1.0' } });
         if (!resp.ok) { console.warn(`Feed ${feed.url} returned ${resp.status}`); continue; }
         const text = await resp.text();
-        const items = parseRss(text);
+        const items = parseRss(text).slice(0, MAX_ITEMS_PER_FEED);
 
         for (const item of items) {
           const dedupeKey = item.guid || item.link || item.title;
@@ -153,19 +164,7 @@ export default async function handler(req: Request) {
           };
           const inserted = await supabasePost('news_articles', payload);
           const articleId = inserted?.[0]?.id ?? null;
-
-          // If configured, compute embedding and store embedding_json
-          if (articleId && OPENAI_API_KEY) {
-            try {
-              const textForEmbedding = (item.title || '') + '\n' + (item.description || '');
-              const emb = await getEmbedding(textForEmbedding);
-              if (emb) {
-                await supabasePost('news_embeddings', { article_id: articleId, model: 'openai-text-embed-3-small', embedding_json: emb });
-              }
-            } catch (e) {
-              console.warn('Embedding failed for article', articleId, e.message || e);
-            }
-          }
+          // Embeddings disabled for now to keep function runtime within limits
         }
       } catch (feedErr) {
         console.warn('Feed error', feed.url, feedErr?.message || feedErr);

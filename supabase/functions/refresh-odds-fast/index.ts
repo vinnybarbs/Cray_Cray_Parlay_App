@@ -226,30 +226,69 @@ async function refreshOddsFast(req: Request): Promise<Response> {
           }
         }
         
-        // Add delay before fetching prop markets
-        await delay(DELAYS.betweenProps);
-        
-        // Fetch player prop markets
-        const { games: propGames, rateLimit: propRate } = await fetchPropMarkets(sport, oddsApiKey);
-        
-        // Process prop market games (separate from core to avoid duplication)
-        for (const game of propGames) {
-          for (const bookmaker of game.bookmakers || []) {
-            for (const market of bookmaker.markets || []) {
-              const cacheEntry = {
-                sport: sport,
-                external_game_id: game.id,
-                commence_time: game.commence_time,
-                home_team: game.home_team,
-                away_team: game.away_team,
-                bookmaker: bookmaker.key,
-                market_type: market.key,
-                outcomes: market.outcomes,
-                last_updated: new Date().toISOString()
-              };
-              
-              allOddsEntries.push(cacheEntry);
+        // Fetch player props via per-event endpoint (reliable for props)
+        const propList = PROP_MARKETS[sport as keyof typeof PROP_MARKETS];
+        if (propList && propList.length > 0 && PROP_SPORTS.includes(sport)) {
+          const propMarketsParam = propList.join(',');
+
+          for (const game of coreGames) {
+            try {
+              const params = new URLSearchParams({
+                apiKey: oddsApiKey,
+                regions: REGIONS,
+                markets: propMarketsParam,
+                oddsFormat: ODDS_FORMAT,
+                bookmakers: BOOKMAKERS
+              });
+
+              const propsUrl = `https://api.the-odds-api.com/v4/sports/${sport}/events/${game.id}/odds/?${params.toString()}`;
+              const propsResponse = await fetchWithRetry(propsUrl);
+
+              if (!propsResponse.ok) {
+                console.log(`⚠️ Props request failed for ${sport} event ${game.id}: ${propsResponse.status}`);
+                continue;
+              }
+
+              const propsData = await propsResponse.json();
+              const events = Array.isArray(propsData) ? propsData : [propsData];
+
+              if (!events || events.length === 0) {
+                console.log(`ℹ️ No props returned for ${sport} event ${game.id}`);
+                continue;
+              }
+
+              for (const event of events) {
+                if (!event.bookmakers || event.bookmakers.length === 0) continue;
+
+                for (const bookmaker of event.bookmakers) {
+                  if (!bookmaker.markets || bookmaker.markets.length === 0) continue;
+
+                  for (const market of bookmaker.markets) {
+                    if (!market.outcomes || market.outcomes.length === 0) continue;
+
+                    const cacheEntry = {
+                      sport: sport,
+                      external_game_id: game.id,
+                      commence_time: game.commence_time,
+                      home_team: game.home_team,
+                      away_team: game.away_team,
+                      bookmaker: bookmaker.key,
+                      market_type: market.key,
+                      outcomes: market.outcomes,
+                      last_updated: new Date().toISOString()
+                    };
+
+                    allOddsEntries.push(cacheEntry);
+                  }
+                }
+              }
+
+            } catch (err) {
+              console.log(`⚠️ Error fetching props for ${sport} game ${game.id}:`, (err as Error).message);
             }
+
+            // Small delay between prop requests to avoid hitting rate limits too fast
+            await delay(DELAYS.betweenProps);
           }
         }
         
@@ -264,33 +303,6 @@ async function refreshOddsFast(req: Request): Promise<Response> {
     // STEP 1: Get unique game IDs from fresh API data
     const freshGameIds = [...new Set(allOddsEntries.map(entry => entry.external_game_id))];
     console.log(`🎯 Fresh games from API: ${freshGameIds.length} games`);
-
-    // STEP 1.5: Upsert games before inserting odds
-    const gameRecords = allOddsEntries.map(entry => ({
-      game_id: entry.external_game_id,
-      commence_time: entry.commence_time,
-      home_team: entry.home_team,
-      away_team: entry.away_team,
-      sport: entry.sport
-    }));
-    // Remove duplicates by game_id
-    const uniqueGames = Object.values(
-      gameRecords.reduce((acc, game) => {
-        acc[game.game_id] = game;
-        return acc;
-      }, {})
-    );
-    if (uniqueGames.length > 0) {
-      console.log(`💾 Upserting ${uniqueGames.length} games into games table...`);
-      const { error: gameUpsertError } = await supabase
-        .from('games')
-        .upsert(uniqueGames, { onConflict: ['game_id'] });
-      if (gameUpsertError) {
-        console.error('Error upserting games:', gameUpsertError);
-        throw new Error(`Game upsert failed: ${gameUpsertError.message}`);
-      }
-      console.log(`✅ Upserted ${uniqueGames.length} games`);
-    }
 
     // STEP 2: Delete ONLY the games we have fresh data for (preserves other games)
     if (freshGameIds.length > 0) {

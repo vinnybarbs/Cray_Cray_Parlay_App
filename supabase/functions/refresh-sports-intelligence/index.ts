@@ -395,19 +395,32 @@ async function performSearch(
     const config = INTELLIGENCE_CONFIG.searchCategories[category as keyof typeof INTELLIGENCE_CONFIG.searchCategories];
     expiresAt.setHours(expiresAt.getHours() + config.expiresHours);
 
-    await supabase
+    const searchType = mapCategoryToSearchType(category);
+
+    const { error } = await supabase
       .from('news_cache')
       .upsert({
         sport,
-        search_type: category,
+        search_type: searchType,
         team_name: team || null,
         search_query: query,
         articles: JSON.stringify(articles),
         summary,
-        expires_at: expiresAt.toISOString()
+        expires_at: expiresAt.toISOString(),
+        last_updated: new Date().toISOString()
       }, {
         onConflict: 'sport,search_type,team_name'
       });
+
+    if (error) {
+      console.error('Failed to upsert news_cache row', {
+        sport,
+        category,
+        team,
+        error: (error as any).message || error
+      });
+      return null;
+    }
 
     return { 
       articleCount: articles.length, 
@@ -417,6 +430,24 @@ async function performSearch(
   } catch (error) {
     console.error(`Search failed for "${query}":`, error);
     return null;
+  }
+}
+
+function mapCategoryToSearchType(category: string): string {
+  switch (category) {
+    case 'injuries':
+      return 'injuries';
+    case 'expert_analysis':
+      return 'analyst_picks';
+    case 'market_intelligence':
+      return 'betting_trends';
+    case 'situational_edges':
+    case 'insider_intelligence':
+    case 'historical_context':
+    case 'breaking_news':
+      return 'team_news';
+    default:
+      return category;
   }
 }
 
