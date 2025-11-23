@@ -86,8 +86,34 @@ const getDetailedAnalysis = (pick) => {
   }
 }
 
+// Helper to parse player prop pick strings like:
+// "Lamar Jackson Over 208.5 Pass Yards" -> { direction: 'Over', coreText: 'Lamar Jackson +208.5 Pass Yards' }
+const parsePlayerPropPick = (pick) => {
+  if (!pick || !pick.pick) return null;
+  const betType = pick.betType || '';
+  if (betType !== 'Player Props' && betType !== 'TD') return null;
+
+  const raw = pick.pick;
+  const match = raw.match(/^(.+?)\s+(Over|Under)\s+([\d.]+)\s+(.+)$/i);
+  if (!match) return null;
+
+  const playerName = match[1].trim();
+  const directionRaw = match[2];
+  const lineNumber = parseFloat(match[3]);
+  const marketLabel = match[4].trim();
+
+  if (!playerName || !directionRaw || Number.isNaN(lineNumber) || !marketLabel) return null;
+
+  const direction = directionRaw.charAt(0).toUpperCase() + directionRaw.slice(1).toLowerCase();
+  const lineText = `${lineNumber > 0 ? '+' : ''}${lineNumber}`;
+  const coreText = `${playerName} ${lineText} ${marketLabel}`;
+
+  return { direction, coreText };
+}
+
 export default function PickCard({ pick, onAdd, isAdded }) {
   const [showFullAnalysis, setShowFullAnalysis] = useState(false)
+  const propMeta = parsePlayerPropPick(pick)
   const formatDate = (dateString) => {
     const date = new Date(dateString)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' })
@@ -127,7 +153,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         <div className="flex justify-between items-center mb-2">
           <div>
             <div className="text-xs text-gray-400">{pick.betType}</div>
-            <div className="text-base font-bold text-white">{pick.pick}</div>
+            <div className="text-base font-bold text-white">{propMeta ? propMeta.coreText : pick.pick}</div>
           </div>
           <div className={`text-xl font-bold ${getOddsColor(pick.odds)}`}>
             {pick.odds}
@@ -141,8 +167,15 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           </div>
         )}
         
-        {/* Show other bet details for non-spread bets */}
-        {pick.betType !== 'Spread' && pick.point !== undefined && pick.point !== null && (
+        {/* Special formatting for player props: explicit Over/Under + human line */}
+        {propMeta && (
+          <div className="text-xs text-green-400 mt-1 font-medium">
+            Betting: {propMeta.direction} - {propMeta.coreText}
+          </div>
+        )}
+
+        {/* Show other bet details for non-spread, non-prop bets when a point is present */}
+        {!propMeta && pick.betType !== 'Spread' && pick.point !== undefined && pick.point !== null && (
           <div className="text-xs text-green-400 mt-1 font-medium">
             {pick.betType === 'Moneyline' ? 'Betting:' : 'Line:'} {pick.pick} {pick.betType !== 'Moneyline' && (pick.point > 0 ? '+' : '')}{pick.betType !== 'Moneyline' ? pick.point : ''}
           </div>

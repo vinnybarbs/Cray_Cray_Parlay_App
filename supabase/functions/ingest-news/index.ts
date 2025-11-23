@@ -126,6 +126,10 @@ export default async function handler(req: Request) {
     // For each feed: ensure source exists and ingest items (limited per run)
     const feedsToProcess = FEEDS.slice(0, MAX_FEEDS_PER_RUN);
 
+    // Simple counters so we can see in the response/logs whether writes succeeded
+    let sourcesCreated = 0;
+    let articlesInserted = 0;
+
     for (const feed of feedsToProcess) {
       try {
         // Ensure source exists
@@ -136,6 +140,9 @@ export default async function handler(req: Request) {
         } else {
           const created = await supabasePost('news_sources', { name: feed.name, feed_url: feed.url });
           sourceId = created?.[0]?.id ?? null;
+          if (sourceId) {
+            sourcesCreated += 1;
+          }
         }
 
         // Fetch feed with timeout to avoid hanging on slow endpoints
@@ -163,7 +170,9 @@ export default async function handler(req: Request) {
             raw_json: { parsed_from: 'rss' },
           };
           const inserted = await supabasePost('news_articles', payload);
-          const articleId = inserted?.[0]?.id ?? null;
+          if (inserted && Array.isArray(inserted) && inserted.length > 0) {
+            articlesInserted += inserted.length;
+          }
           // Embeddings disabled for now to keep function runtime within limits
         }
       } catch (feedErr) {
@@ -174,8 +183,21 @@ export default async function handler(req: Request) {
     // Update run log success
     runLog.status = 'success';
     runLog.finished_at = new Date().toISOString();
+    (runLog as any).sources_created = sourcesCreated;
+    (runLog as any).articles_inserted = articlesInserted;
+
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-      await supabasePost('cron_job_logs', { job_name: jobName, started_at: runStarted, finished_at: runLog.finished_at, status: 'success', detail: {} });
+      // cron_job_logs schema: job_name, status, details, created_at
+      const details = {
+        sources_created: sourcesCreated,
+        articles_inserted: articlesInserted,
+        feeds_processed: feedsToProcess.length,
+      };
+      await supabasePost('cron_job_logs', {
+        job_name: jobName,
+        status: 'completed',
+        details: JSON.stringify(details),
+      });
     }
 
     return new Response(JSON.stringify({ status: 'ok', run: runLog }), { status: 200 });
@@ -183,9 +205,20 @@ export default async function handler(req: Request) {
     runLog.status = 'failed';
     runLog.finished_at = new Date().toISOString();
     runLog.detail = { message: err?.message || String(err) };
+
     if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
-      try { await supabasePost('cron_job_logs', { job_name: jobName, started_at: runStarted, finished_at: runLog.finished_at, status: 'failed', detail: runLog.detail }); } catch (_) {}
+      const errorDetails = {
+        error: runLog.detail,
+      };
+      try {
+        await supabasePost('cron_job_logs', {
+          job_name: jobName,
+          status: 'failed',
+          details: JSON.stringify(errorDetails),
+        });
+      } catch (_) {}
     }
+
     return new Response(JSON.stringify({ status: 'error', error: runLog }), { status: 500 });
   }
 }

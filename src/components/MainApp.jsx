@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Auth from './Auth'
 import Dashboard from './Dashboard'
@@ -260,6 +260,9 @@ export default function MainApp() {
   const [showAuth, setShowAuth] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
+  const [showNavMenu, setShowNavMenu] = useState(false);
+  const [showHowItWorks, setShowHowItWorks] = useState(false);
+  const [showWeeklySuggestions, setShowWeeklySuggestions] = useState(false);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...",
@@ -283,6 +286,7 @@ export default function MainApp() {
   const [selectedSports, setSelectedSports] = useState([])
   const [selectedBetTypes, setSelectedBetTypes] = useState([])
   const [numLegs, setNumLegs] = useState(3)
+  const [generationMode, setGenerationMode] = useState('AI Edge Advantages')
   const [riskLevel, setRiskLevel] = useState('Medium')
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings')
   const [dateRange, setDateRange] = useState(1)
@@ -299,13 +303,56 @@ export default function MainApp() {
 
   // Builder state
   const [selectedPicks, setSelectedPicks] = useState([])
+  const [userWinRate, setUserWinRate] = useState(null)
+  const [modelSuccessRate, setModelSuccessRate] = useState(null)
+  const [improvementAdvice, setImprovementAdvice] = useState('')
 
   const sports = ['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']
   const betTypes = ['Moneyline/Spread', 'Player Props', 'TD Props', 'Totals (O/U)', 'Team Props']
   // Use bookmaker names that match server validation (MGM expected, not 'BetMGM')
   // Limit sportsbook choices to DraftKings and FanDuel only
   const sportsbooks = ['DraftKings', 'FanDuel']
-  const riskLevels = ['Low', 'Medium', 'High']
+  const generationModes = ['Heavy Favorites', 'AI Edge Advantages', 'Top Picks of the Day']
+
+  // Keep internal riskLevel mapped from the selected generation mode so existing
+  // backend/DB behavior continues to work without exposing Low/Medium/High directly.
+  useEffect(() => {
+    if (generationMode === 'Heavy Favorites') {
+      setRiskLevel('Low');
+    } else if (generationMode === 'AI Edge Advantages') {
+      setRiskLevel('Medium');
+    } else if (generationMode === 'Top Picks of the Day') {
+      setRiskLevel('Medium');
+    }
+  }, [generationMode]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !user || !supabase) return;
+    let cancelled = false;
+    const loadStats = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('parlays')
+          .select('final_outcome')
+          .eq('user_id', user.id);
+        if (error || !data || cancelled) return;
+        const wins = data.filter(p => p.final_outcome && ['win', 'won'].includes(p.final_outcome.toLowerCase())).length;
+        const losses = data.filter(p => p.final_outcome && ['loss', 'lost'].includes(p.final_outcome.toLowerCase())).length;
+        const decided = wins + losses;
+        if (decided > 0) {
+          const rate = ((wins / decided) * 100).toFixed(1);
+          setUserWinRate(rate);
+        } else {
+          setUserWinRate(null);
+        }
+      } catch (e) {
+      }
+    };
+    loadStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, user]);
 
   const toggleSport = (sport) => {
     setSelectedSports(prev =>
@@ -399,6 +446,23 @@ export default function MainApp() {
     }
   }
 
+  const handleAskModelImprove = () => {
+    if (userWinRate == null) {
+      setImprovementAdvice('Once we have enough completed parlays, this will give tailored advice on how to adjust leg count, odds profile, and bet types.');
+      return;
+    }
+    const rate = parseFloat(userWinRate);
+    if (Number.isNaN(rate)) {
+      setImprovementAdvice('We need more completed bets before giving meaningful advice.');
+    } else if (rate < 30) {
+      setImprovementAdvice('Your hit rate is low. Consider fewer legs per parlay, prioritizing heavy favorites and limiting long-shot props. Use Heavy Favorites mode for a while and keep unit size consistent.');
+    } else if (rate < 50) {
+      setImprovementAdvice('You are hitting some builds but leaving value on the table. Try mixing Heavy Favorites with a few AI Edge Advantages, and avoid stacking too many correlated legs in one ticket.');
+    } else {
+      setImprovementAdvice('Your builds are performing well. Focus on consistency: keep unit sizes steady, avoid chasing losses, and use Top Picks of the Day only when the reasoning is very strong.');
+    }
+  };
+
   const togglePickSelection = (pick) => {
     setSelectedPicks(prev => {
       const isSelected = prev.find(p => p.id === pick.id)
@@ -489,10 +553,65 @@ export default function MainApp() {
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
       {/* Header */}
       <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl relative">
+        <div className="absolute top-4 left-4">
+          <div className="relative">
+            <button
+              onClick={() => setShowNavMenu(!showNavMenu)}
+              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded-lg border border-gray-600 text-gray-200"
+            >
+              Menu ▾
+            </button>
+            {showNavMenu && (
+              <div className="absolute mt-2 w-44 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20">
+                <button
+                  onClick={() => { setShowDashboard(true); setShowNavMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => { setShowHowItWorks(true); setShowNavMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                >
+                  How It Works
+                </button>
+                <button
+                  onClick={() => { setShowWeeklySuggestions(true); setShowNavMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                >
+                  Suggestions This Week
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
         <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">
           Cray Cray
         </h1>
         <p className="text-xl font-medium text-gray-300">for Parlays</p>
+        <div className="mt-4 flex flex-col items-center space-y-3">
+          <div className="flex space-x-4">
+            <div className="w-24 h-24 rounded-full border-2 border-yellow-400 flex flex-col items-center justify-center text-xs">
+              <span className="text-gray-400">Model</span>
+              <span className="text-lg font-bold text-yellow-400">{modelSuccessRate != null ? `${modelSuccessRate}%` : '--'}</span>
+              <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
+            </div>
+            <div className="w-24 h-24 rounded-full border-2 border-green-400 flex flex-col items-center justify-center text-xs">
+              <span className="text-gray-400">Your Builds</span>
+              <span className="text-lg font-bold text-green-400">{userWinRate != null ? `${userWinRate}%` : '--'}</span>
+              <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
+            </div>
+          </div>
+          <button
+            onClick={handleAskModelImprove}
+            className="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-md"
+          >
+            Ask the model how to improve?
+          </button>
+          {improvementAdvice && (
+            <p className="max-w-md text-xs text-gray-300 text-center px-4">{improvementAdvice}</p>
+          )}
+        </div>
 
         {/* User menu */}
         <div className="absolute top-4 right-4 flex items-center gap-3">
@@ -577,19 +696,19 @@ export default function MainApp() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="text-gray-200 text-sm font-semibold block mb-3">5. Risk Level</label>
+            <label className="text-gray-200 text-sm font-semibold block mb-3">5. Generate Mode</label>
             <div className="flex gap-2">
-              {riskLevels.map(level => (
+              {generationModes.map(mode => (
                 <button
-                  key={level}
-                  onClick={() => setRiskLevel(level)}
+                  key={mode}
+                  onClick={() => setGenerationMode(mode)}
                   className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                    riskLevel === level
+                    generationMode === mode
                       ? 'bg-yellow-500 text-gray-900'
                       : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                   }`}
                 >
-                  {level}
+                  {mode}
                 </button>
               ))}
             </div>
@@ -781,6 +900,45 @@ export default function MainApp() {
 
       {/* Dashboard Modal */}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
+
+      {showHowItWorks && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-gray-700 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-yellow-400">How It Works</h2>
+              <button
+                onClick={() => setShowHowItWorks(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            <AIAgentsWorkflow />
+          </div>
+        </div>
+      )}
+
+      {showWeeklySuggestions && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto border border-gray-700 p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-yellow-400">Suggestions This Week</h2>
+              <button
+                onClick={() => setShowWeeklySuggestions(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-gray-300 mb-2">
+              This view will highlight recent locked parlays and their outcomes once more results have been reconciled.
+            </p>
+            <p className="text-sm text-gray-400">
+              For now, use the Dashboard to review your history and see how your builds are performing over time.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
