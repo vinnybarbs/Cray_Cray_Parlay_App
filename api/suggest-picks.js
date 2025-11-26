@@ -563,16 +563,19 @@ async function suggestPicksHandler(req, res) {
       selectedBetTypes = ['Moneyline/Spread'],
       riskLevel = 'Medium',
       dateRange = 2, // Default to 2 days to capture upcoming NFL games
-      numLegs = 3 // Used to determine how many suggestions to return
+      suggestionCount
     } = req.body;
 
-    // Determine number of suggestions based on numLegs
-    let numSuggestions = numLegs <= 3 ? 10 : Math.min(30, numLegs * 5);
+    // Determine number of suggestions with sane defaults/limits
+    let numSuggestions = Number.isFinite(Number(suggestionCount))
+      ? Number(suggestionCount)
+      : 12;
+    numSuggestions = Math.max(8, Math.min(30, Math.round(numSuggestions)));
     
     // Production optimization: reduce scope for faster responses
     const isProduction = process.env.NODE_ENV === 'production';
     if (isProduction) {
-      numSuggestions = Math.min(numSuggestions, 8); // Limit to 8 games max in production
+      numSuggestions = Math.min(numSuggestions, 12);
     }
 
     logger.info('Generating pick suggestions', {

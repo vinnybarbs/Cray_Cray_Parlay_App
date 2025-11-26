@@ -8,6 +8,7 @@ import { calculateParlay } from '../utils/oddsCalculations'
 
 // API_BASE defaults to Railway production URL; override with VITE_API_BASE_URL env var
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
+const DEFAULT_SUGGESTION_COUNT = 12
 
 // CheckboxGroup component for sport/bet type selection
 const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -285,7 +286,6 @@ export default function MainApp() {
   // Form state
   const [selectedSports, setSelectedSports] = useState([])
   const [selectedBetTypes, setSelectedBetTypes] = useState([])
-  const [numLegs, setNumLegs] = useState(3)
   const [generationMode, setGenerationMode] = useState('AI Edge Advantages')
   const [riskLevel, setRiskLevel] = useState('Medium')
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings')
@@ -398,7 +398,7 @@ export default function MainApp() {
         body: JSON.stringify({
           selectedSports,
           selectedBetTypes,
-          numLegs,
+          suggestionCount: DEFAULT_SUGGESTION_COUNT,
           riskLevel,
           oddsPlatform,
           dateRange
@@ -676,27 +676,9 @@ export default function MainApp() {
           </div>
         </div>
 
-        <div>
-          <label className="text-gray-200 text-sm font-semibold block mb-3">
-            4. Number of Legs: <span className="text-yellow-400 text-lg font-bold">{numLegs}</span>
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={numLegs}
-            onChange={(e) => setNumLegs(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>1 Leg</span>
-            <span>10 Legs</span>
-          </div>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="text-gray-200 text-sm font-semibold block mb-3">5. Generate Mode</label>
+            <label className="text-gray-200 text-sm font-semibold block mb-3">4. Generate Mode</label>
             <div className="flex gap-2">
               {generationModes.map(mode => (
                 <button
@@ -715,7 +697,7 @@ export default function MainApp() {
           </div>
 
           <div>
-            <label className="text-gray-200 text-sm font-semibold block mb-3">6. Sportsbook</label>
+            <label className="text-gray-200 text-sm font-semibold block mb-3">5. Sportsbook</label>
             <select
               value={oddsPlatform}
               onChange={(e) => setOddsPlatform(e.target.value)}
@@ -730,7 +712,7 @@ export default function MainApp() {
 
         <div>
           <label className="text-gray-200 text-sm font-semibold block mb-3">
-            7. How big's your unit? <span className="text-green-400 font-bold">${unitSize}</span>
+            6. How big's your unit? <span className="text-green-400 font-bold">${unitSize}</span>
           </label>
           <div className="flex gap-2">
             {[10, 25, 50, 100].map(amount => (

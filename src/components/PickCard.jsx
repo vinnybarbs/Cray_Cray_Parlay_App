@@ -115,8 +115,11 @@ export default function PickCard({ pick, onAdd, isAdded }) {
   const [showFullAnalysis, setShowFullAnalysis] = useState(false)
   const propMeta = parsePlayerPropPick(pick)
   const formatDate = (dateString) => {
+    if (!dateString) return 'TBD'
     const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' })
+    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' })
+    const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Denver' })
+    return `${datePart} • ${timePart}`
   }
 
   const getConfidenceColor = (confidence) => {
@@ -137,7 +140,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
           <div className="text-xs text-gray-400 mb-1">
-            {formatDate(pick.gameDate)} • {pick.sport}
+            {formatDate(pick.commenceTime || pick.gameDate)} • {pick.sport}
           </div>
           <div className="text-sm font-semibold text-gray-200">
             {pick.awayTeam} @ {pick.homeTeam}
@@ -153,7 +156,9 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         <div className="flex justify-between items-center mb-2">
           <div>
             <div className="text-xs text-gray-400">{pick.betType}</div>
-            <div className="text-base font-bold text-white">{propMeta ? propMeta.coreText : pick.pick}</div>
+            <div className="text-base font-bold text-white">
+              {propMeta ? `${propMeta.direction} — ${propMeta.coreText}` : pick.pick}
+            </div>
           </div>
           <div className={`text-xl font-bold ${getOddsColor(pick.odds)}`}>
             {pick.odds}

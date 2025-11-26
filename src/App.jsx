@@ -1,6 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { useParlayHistory } from './hooks/useLocalStorage';
 
+const DEFAULT_SUGGESTION_COUNT = 12;
+
 // Enhanced Phase Progress component with detailed status
 const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
   const phases = [
@@ -276,7 +278,6 @@ const App = () => {
   const [selectedSports, setSelectedSports] = useState(['NFL']);
   const [selectedBetTypes, setSelectedBetTypes] = useState(['Moneyline/Spread']);
   const [riskLevel, setRiskLevel] = useState('Low');
-  const [numLegs, setNumLegs] = useState(3);
   const [oddsPlatform, setOddsPlatform] = useState('DraftKings');
   
   const [dateRange, setDateRange] = useState(1);
@@ -406,7 +407,7 @@ const App = () => {
         body: JSON.stringify({
           selectedSports,
           selectedBetTypes,
-          numLegs,
+          suggestionCount: DEFAULT_SUGGESTION_COUNT,
           oddsPlatform,
           riskLevel,
           dateRange
@@ -438,7 +439,7 @@ const App = () => {
         settings: {
           selectedSports,
           selectedBetTypes,
-          numLegs,
+          suggestionCount: DEFAULT_SUGGESTION_COUNT,
           oddsPlatform,
           riskLevel,
           dateRange
@@ -464,7 +465,7 @@ const App = () => {
     } finally {
       setLoading(false);
     }
-  }, [loading, selectedSports, selectedBetTypes, numLegs, oddsPlatform, riskLevel, dateRange, addToHistory]);
+  }, [loading, selectedSports, selectedBetTypes, oddsPlatform, riskLevel, dateRange, addToHistory]);
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
@@ -507,30 +508,16 @@ const App = () => {
           </div>
         </div>
 
-        <div>
-          <label className="text-gray-200 text-sm font-semibold block mb-3">
-            4. Number of Legs: <span className="text-yellow-400 text-lg font-bold">{numLegs}</span>
-          </label>
-          <input
-            type="range"
-            min="1"
-            max="10"
-            value={numLegs}
-            onChange={(e) => setNumLegs(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
-          />
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Dropdown
-            label="5. Risk Level"
+            label="4. Risk Level"
             value={riskLevel}
             onChange={setRiskLevel}
             options={Object.keys(RISK_LEVEL_DEFINITIONS)}
             description={RISK_LEVEL_DEFINITIONS[riskLevel]}
           />
           <Dropdown
-            label="6. Odds Platform"
+            label="5. Odds Platform"
             value={oddsPlatform}
             onChange={setOddsPlatform}
             options={['DraftKings', 'FanDuel']}
@@ -546,7 +533,7 @@ const App = () => {
               : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
           }`}
         >
-          {loading ? 'Generating Parlays...' : `Generate ${numLegs}-Leg Parlay + Bonus`}
+          {loading ? 'Generating Suggestions...' : 'Generate AI Suggestions'}
         </button>
         
         
