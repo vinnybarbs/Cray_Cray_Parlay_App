@@ -98,6 +98,27 @@ export default function Dashboard({ onClose }) {
     return { direction, coreText }
   }
 
+  const handleDeleteParlay = async (parlayId) => {
+    if (!user || !supabase) return
+    const confirmed = window.confirm('Delete this parlay from your history? This cannot be undone.')
+    if (!confirmed) return
+
+    try {
+      const { error } = await supabase
+        .from('parlays')
+        .delete()
+        .eq('id', parlayId)
+        .eq('user_id', user.id)
+
+      if (error) throw error
+
+      setParlays(prev => prev.filter(p => p.id !== parlayId))
+      await fetchStats()
+    } catch (err) {
+      console.error('Error deleting parlay:', err)
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-700">
@@ -178,6 +199,14 @@ export default function Dashboard({ onClose }) {
                       </span>
                       {parlay.is_lock_bet && (
                         <span className="text-yellow-400 text-xs">🔒 LOCK</span>
+                      )}
+                      {parlay.is_lock_bet && (
+                        <button
+                          onClick={() => handleDeleteParlay(parlay.id)}
+                          className="text-xs text-red-400 hover:text-red-200"
+                        >
+                          🗑 Delete
+                        </button>
                       )}
                     </div>
                   </div>
