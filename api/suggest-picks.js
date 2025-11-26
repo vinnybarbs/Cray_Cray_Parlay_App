@@ -340,6 +340,12 @@ function formatPlayerPropPick(playerName, marketType, outcome) {
   } else if (typeof marketType === 'string' && marketType.includes('over')) direction = 'Over';
   else if (typeof marketType === 'string' && marketType.includes('under')) direction = 'Under';
 
+  if (!direction && outcome && typeof outcome.name === 'string') {
+    const nameLower = outcome.name.toLowerCase();
+    if (nameLower.includes('over')) direction = 'Over';
+    else if (nameLower.includes('under')) direction = 'Under';
+  }
+
   // Build readable market label
   let marketLabel = '';
   switch (marketType) {

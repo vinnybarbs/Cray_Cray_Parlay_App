@@ -75,6 +75,29 @@ export default function Dashboard({ onClose }) {
     return badges[normalizedStatus] || badges.pending
   }
 
+  const parseLockedPlayerProp = (leg) => {
+    if (!leg || !leg.pick) return null
+    const betType = leg.betType || ''
+    if (betType !== 'Player Props' && betType !== 'TD') return null
+
+    const raw = leg.pick
+    const match = raw.match(/^(.+?)\s+(Over|Under)\s+([\d.]+)\s+(.+)$/i)
+    if (!match) return null
+
+    const playerName = match[1].trim()
+    const directionRaw = match[2]
+    const lineNumber = parseFloat(match[3])
+    const marketLabel = match[4].trim()
+
+    if (!playerName || !directionRaw || Number.isNaN(lineNumber) || !marketLabel) return null
+
+    const direction = directionRaw.charAt(0).toUpperCase() + directionRaw.slice(1).toLowerCase()
+    const lineText = `${lineNumber > 0 ? '+' : ''}${lineNumber}`
+    const coreText = `${playerName} ${lineText} ${marketLabel}`
+
+    return { direction, coreText }
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-700">
@@ -187,22 +210,25 @@ export default function Dashboard({ onClose }) {
                     <div className="border-t border-gray-700 pt-3 mt-3">
                       <div className="text-xs text-gray-400 mb-2">Locked Picks:</div>
                       <div className="space-y-1">
-                        {parlay.metadata.locked_picks.map((leg, index) => (
-                          <div key={index} className="flex justify-between items-center text-xs">
-                            <div className="flex-1">
-                              <div className="text-gray-300">
-                                {leg.awayTeam} @ {leg.homeTeam}
+                        {parlay.metadata.locked_picks.map((leg, index) => {
+                          const propMeta = parseLockedPlayerProp(leg)
+                          return (
+                            <div key={index} className="flex justify-between items-center text-xs">
+                              <div className="flex-1">
+                                <div className="text-gray-300">
+                                  {leg.awayTeam} @ {leg.homeTeam}
+                                </div>
+                                <div className="text-gray-400">
+                                  {leg.betType}: {propMeta ? `${propMeta.direction} — ${propMeta.coreText}` : leg.pick}
+                                  {leg.point != null && leg.betType === 'Spread' && (
+                                    <span> {leg.point > 0 ? `+${leg.point}` : leg.point}</span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-gray-400">
-                                {leg.betType}: {leg.pick}
-                                {leg.point != null && leg.betType === 'Spread' && (
-                                  <span> {leg.point > 0 ? `+${leg.point}` : leg.point}</span>
-                                )}
-                              </div>
+                              <div className="text-green-400 font-semibold">{leg.odds}</div>
                             </div>
-                            <div className="text-green-400 font-semibold">{leg.odds}</div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   )}
