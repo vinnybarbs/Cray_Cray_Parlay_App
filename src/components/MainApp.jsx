@@ -823,7 +823,15 @@ export default function MainApp() {
                   <div className="text-xs text-gray-400">Leg {index + 1}</div>
                   <div className="text-sm font-semibold">{pick.pick}</div>
                 </div>
-                <div className="text-lg font-bold text-green-400">{pick.odds}</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-lg font-bold text-green-400">{pick.odds}</div>
+                  <button
+                    onClick={() => togglePickSelection(pick)}
+                    className="text-xs px-2 py-1 rounded bg-red-900/60 text-red-200 hover:bg-red-800 border border-red-700"
+                  >
+                    ✕ Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>

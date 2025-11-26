@@ -262,14 +262,13 @@ export default function PickCard({ pick, onAdd, isAdded }) {
       {/* Add Button */}
       <button
         onClick={() => onAdd(pick)}
-        disabled={isAdded}
         className={`w-full py-2 rounded font-semibold text-sm transition-all ${
           isAdded
-            ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            ? 'bg-gray-800 text-red-300 hover:bg-red-900 border border-red-500'
             : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white'
         }`}
       >
-        {isAdded ? '✓ Added to Parlay' : '+ Add to Parlay'}
+        {isAdded ? 'Remove from Parlay' : '+ Add to Parlay'}
       </button>
     </div>
   )
