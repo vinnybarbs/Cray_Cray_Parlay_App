@@ -499,13 +499,14 @@ export default function MainApp() {
       const americanOdds = selectedPicks.map(p => p.odds)
       const result = calculateParlay(americanOdds, unitSize)
       const preferenceType = selectedBetTypes.join(',').slice(0, 20)
+      const generateMode = generationMode
 
       const { data: parlayData, error: parlayError } = await supabase
         .from('parlays')
         .insert({
           user_id: user.id,
           ai_model: 'gpt-4o-mini',
-          risk_level: riskLevel,
+          generate_mode: generateMode,
           sportsbook: oddsPlatform,
           preference_type: preferenceType,
           total_legs: selectedPicks.length,

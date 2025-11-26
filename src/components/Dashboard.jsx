@@ -174,7 +174,7 @@ export default function Dashboard({ onClose }) {
                     </div>
                     <div>
                       <span className="text-gray-400">Generate Mode:</span>
-                      <span className="text-white ml-2">{parlay.risk_level}</span>
+                      <span className="text-white ml-2">{parlay.generate_mode || parlay.risk_level}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">Book:</span>
