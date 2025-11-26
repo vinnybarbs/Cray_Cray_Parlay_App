@@ -521,30 +521,6 @@ export default function MainApp() {
 
       if (parlayError) throw parlayError
 
-      const legs = selectedPicks.map((pick, index) => ({
-        parlay_id: parlayData.id,
-        leg_number: index + 1,
-        game_date: new Date(pick.gameDate).toISOString().split('T')[0],
-        sport: pick.sport,
-        home_team: pick.homeTeam,
-        away_team: pick.awayTeam,
-        bet_type: pick.betType,
-        bet_details: {
-          pick: pick.pick,
-          point: pick.point,
-          spread: pick.spread
-        },
-        odds: pick.odds,
-        confidence: pick.confidence,
-        reasoning: pick.reasoning
-      }))
-
-      const { error: legsError } = await supabase
-        .from('parlay_legs')
-        .insert(legs)
-
-      if (legsError) throw legsError
-
       setLockMessage('Parlay locked - Build another or request more suggestions!')
       setSelectedPicks([])
     } catch (err) {
