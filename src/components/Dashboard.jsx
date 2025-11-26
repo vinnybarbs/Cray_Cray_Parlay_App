@@ -19,10 +19,7 @@ export default function Dashboard({ onClose }) {
     try {
       const { data, error } = await supabase
         .from('parlays')
-        .select(`
-          *,
-          parlay_legs (*)
-        `)
+        .select('*')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20)
@@ -176,7 +173,7 @@ export default function Dashboard({ onClose }) {
                       <span className="text-green-400 font-semibold ml-2">${parlay.potential_payout}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Risk:</span>
+                      <span className="text-gray-400">Generate Mode:</span>
                       <span className="text-white ml-2">{parlay.risk_level}</span>
                     </div>
                     <div>

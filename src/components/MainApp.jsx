@@ -306,6 +306,7 @@ export default function MainApp() {
   const [userWinRate, setUserWinRate] = useState(null)
   const [modelSuccessRate, setModelSuccessRate] = useState(null)
   const [improvementAdvice, setImprovementAdvice] = useState('')
+  const [lockMessage, setLockMessage] = useState('')
 
   const sports = ['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']
   const betTypes = ['Moneyline/Spread', 'Player Props', 'TD Props', 'Totals (O/U)', 'Team Props']
@@ -379,6 +380,7 @@ export default function MainApp() {
     setAlert(null)
     setLoadingMessage(getRandomLoadingMessage())
     setSelectedPicks([])
+    setLockMessage('')
     setProgressPhase(0)
     setPhaseData(null)
 
@@ -472,6 +474,8 @@ export default function MainApp() {
         return [...prev, pick]
       }
     })
+    // Any change to the current build should clear the previous lock message
+    setLockMessage('')
   }
 
   const calculatePayout = () => {
@@ -494,6 +498,7 @@ export default function MainApp() {
     try {
       const americanOdds = selectedPicks.map(p => p.odds)
       const result = calculateParlay(americanOdds, unitSize)
+      const preferenceType = selectedBetTypes.join(',').slice(0, 20)
 
       const { data: parlayData, error: parlayError } = await supabase
         .from('parlays')
@@ -502,7 +507,7 @@ export default function MainApp() {
           ai_model: 'gpt-4o-mini',
           risk_level: riskLevel,
           sportsbook: oddsPlatform,
-          preference_type: selectedBetTypes.join(','),
+          preference_type: preferenceType,
           total_legs: selectedPicks.length,
           combined_odds: result.combinedOdds,
           potential_payout: result.payout,
@@ -539,9 +544,8 @@ export default function MainApp() {
 
       if (legsError) throw legsError
 
-      alert('✅ Parlay locked and saved!')
+      setLockMessage('Parlay locked - Build another or request more suggestions!')
       setSelectedPicks([])
-      setSuggestions([])
     } catch (err) {
       alert(`Failed to save parlay: ${err.message}`)
     }
@@ -871,6 +875,14 @@ export default function MainApp() {
           >
             🔒 Lock Build {selectedPicks.length > 0 ? `(${selectedPicks.length} picks)` : ''}
           </button>
+        </div>
+      )}
+
+      {lockMessage && (
+        <div className="max-w-2xl mx-auto mt-4 text-center">
+          <div className="inline-block px-4 py-2 rounded-lg bg-green-900/70 border border-green-500 text-sm text-green-100">
+            {lockMessage}
+          </div>
         </div>
       )}
 
