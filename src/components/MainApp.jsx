@@ -491,7 +491,7 @@ export default function MainApp() {
 
   const handleLockBuild = async () => {
     if (!supabase) {
-      alert('Database not configured')
+      window.alert('Database not configured')
       return
     }
 
@@ -547,7 +547,7 @@ export default function MainApp() {
       setLockMessage('Parlay locked - Build another or request more suggestions!')
       setSelectedPicks([])
     } catch (err) {
-      alert(`Failed to save parlay: ${err.message}`)
+      window.alert(`Failed to save parlay: ${err.message}`)
     }
   }
 
