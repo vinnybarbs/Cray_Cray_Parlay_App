@@ -182,98 +182,27 @@ export default function Dashboard({ onClose }) {
                     </div>
                   </div>
 
-                  {/* Enhanced Legs Display */}
-                  {parlay.parlay_legs && parlay.parlay_legs.length > 0 && (
+                  {/* Compact locked picks display (new flow) */}
+                  {parlay.metadata && Array.isArray(parlay.metadata.locked_picks) && parlay.metadata.locked_picks.length > 0 && (
                     <div className="border-t border-gray-700 pt-3 mt-3">
-                      <div className="text-xs text-gray-400 mb-2">Legs:</div>
+                      <div className="text-xs text-gray-400 mb-2">Locked Picks:</div>
                       <div className="space-y-1">
-                        {parlay.parlay_legs.map((leg, index) => {
-                          // Parse bet details to show actual picks with spread context
-                          let betDisplay = leg.bet_type;
-                          let spreadContext = '';
-                          
-                          try {
-                            const betDetails = typeof leg.bet_details === 'string' 
-                              ? JSON.parse(leg.bet_details) 
-                              : leg.bet_details;
-                            
-                            if (betDetails) {
-                              const description = betDetails.description || betDetails.pick || '';
-                              
-                              // Extract spread context from bet details for all bet types
-                              if (betDetails.spread || betDetails.line) {
-                                const spread = betDetails.spread || betDetails.line;
-                                if (typeof spread === 'number') {
-                                  spreadContext = spread > 0 ? ` (+${spread})` : ` (${spread})`;
-                                }
-                              }
-                              
-                              if (leg.bet_type === 'Total' && description) {
-                                // Extract "Over 50.5" or "Under 51.5" 
-                                const totalMatch = description.match(/(Over|Under)\s*([\d.]+)/i);
-                                if (totalMatch) {
-                                  betDisplay = `${totalMatch[1]} ${totalMatch[2]}`;
-                                } else {
-                                  betDisplay = description;
-                                }
-                              } else if (leg.bet_type === 'Spread' && description) {
-                                // Extract team and spread - handle multiple formats
-                                const spreadMatch = description.match(/([^()]+?)\s*\(([+-]?[\d.]+)\)/);
-                                if (spreadMatch) {
-                                  const teamName = spreadMatch[1].trim();
-                                  const spreadValue = parseFloat(spreadMatch[2]);
-                                  const sign = spreadValue >= 0 ? '+' : '';
-                                  betDisplay = `${teamName} (${sign}${spreadValue})`;
-                                } else if (description.includes('+') || description.includes('-')) {
-                                  // Already formatted correctly
-                                  betDisplay = description;
-                                } else {
-                                  // Fallback
-                                  betDisplay = description;
-                                }
-                              } else if (leg.bet_type === 'Moneyline' && description) {
-                                // Show team name for moneyline WITH spread context
-                                betDisplay = `Moneyline: ${description}${spreadContext}`;
-                              } else if (description) {
-                                // Fallback - show description with spread context if available
-                                betDisplay = `${description}${spreadContext}`;
-                              }
-                            }
-                          } catch (e) {
-                            console.warn('Error parsing bet details:', e);
-                          }
-                          
-                          // Determine status icon - NO question marks ever
-                          let statusIcon = '⏳'; // Default pending
-                          
-                          if (leg.game_completed && leg.leg_result) {
-                            // Game processed - show result
-                            statusIcon = leg.leg_result === 'won' ? '✅' : 
-                                        leg.leg_result === 'lost' ? '❌' : '⏳';
-                          } else {
-                            // Game not processed yet - always show hourglass
-                            statusIcon = '⏳';
-                          }
-                          
-                          return (
-                            <div key={leg.id} className="flex justify-between items-center text-xs">
-                              <div className="flex-1">
-                                <span className="text-gray-300">{leg.away_team} @ {leg.home_team}</span>
-                                <span className="text-gray-400 ml-2">
-                                  {new Date(leg.game_date).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    timeZone: 'America/Denver'
-                                  })}
-                                </span>
+                        {parlay.metadata.locked_picks.map((leg, index) => (
+                          <div key={index} className="flex justify-between items-center text-xs">
+                            <div className="flex-1">
+                              <div className="text-gray-300">
+                                {leg.awayTeam} @ {leg.homeTeam}
                               </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-300 font-medium">{betDisplay}</span>
-                                <span className="text-lg">{statusIcon}</span>
+                              <div className="text-gray-400">
+                                {leg.betType}: {leg.pick}
+                                {leg.point != null && leg.betType === 'Spread' && (
+                                  <span> {leg.point > 0 ? `+${leg.point}` : leg.point}</span>
+                                )}
                               </div>
                             </div>
-                          );
-                        })}
+                            <div className="text-green-400 font-semibold">{leg.odds}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   )}

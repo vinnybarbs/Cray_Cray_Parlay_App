@@ -500,6 +500,18 @@ export default function MainApp() {
       const result = calculateParlay(americanOdds, unitSize)
       const preferenceType = selectedBetTypes.join(',').slice(0, 20)
       const generateMode = generationMode
+      const lockedPicks = selectedPicks.map((p, index) => ({
+        leg_number: index + 1,
+        gameDate: p.gameDate,
+        sport: p.sport,
+        homeTeam: p.homeTeam,
+        awayTeam: p.awayTeam,
+        betType: p.betType,
+        pick: p.pick,
+        point: p.point,
+        spread: p.spread,
+        odds: p.odds
+      }))
 
       const { data: parlayData, error: parlayError } = await supabase
         .from('parlays')
@@ -512,6 +524,7 @@ export default function MainApp() {
           total_legs: selectedPicks.length,
           combined_odds: result.combinedOdds,
           potential_payout: result.payout,
+          metadata: { locked_picks: lockedPicks },
           // bet_amount: unitSize, // TODO: Add this after running database migration
           is_lock_bet: true,
           status: 'pending'
@@ -531,7 +544,7 @@ export default function MainApp() {
   const payout = calculatePayout()
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans p-4">
+    <div className="min-h-screen bg-gray-900 text-white font-sans pt-4 px-4 pb-24 md:pb-6">
       {/* Header */}
       <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl relative">
         <div className="absolute top-4 left-4">
@@ -840,25 +853,46 @@ export default function MainApp() {
               </div>
             </div>
           )}
-
-          <button
-            onClick={handleLockBuild}
-            disabled={selectedPicks.length === 0 || !isAuthenticated}
-            className={`w-full py-3 rounded-lg font-bold text-lg shadow-lg transition-all ${
-              selectedPicks.length === 0 || !isAuthenticated
-                ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white'
-            }`}
-          >
-            🔒 Lock Build {selectedPicks.length > 0 ? `(${selectedPicks.length} picks)` : ''}
-          </button>
         </div>
       )}
 
-      {lockMessage && (
-        <div className="max-w-2xl mx-auto mt-4 text-center">
-          <div className="inline-block px-4 py-2 rounded-lg bg-green-900/70 border border-green-500 text-sm text-green-100">
-            {lockMessage}
+      {/* Sticky bottom bar for locking builds and confirmation (mobile-first) */}
+      {(selectedPicks.length > 0 || lockMessage) && (
+        <div className="fixed inset-x-0 bottom-0 z-40">
+          <div className="max-w-2xl mx-auto px-4 pb-3">
+            <div className="bg-gray-900/95 border border-gray-700 rounded-t-2xl shadow-2xl px-3 py-2 space-y-2">
+              {lockMessage && (
+                <div className="w-full text-center text-xs px-2 py-1 rounded-md bg-green-900/80 border border-green-500 text-green-100">
+                  {lockMessage}
+                </div>
+              )}
+              {selectedPicks.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 text-xs text-gray-300">
+                    <div className="font-semibold text-yellow-400">
+                      {selectedPicks.length} pick{selectedPicks.length > 1 ? 's' : ''} parlay
+                    </div>
+                    {payout && (
+                      <div className="flex justify-between text-[11px] text-gray-400 mt-1">
+                        <span>Combined: {payout.combinedOdds}</span>
+                        <span>Payout: ${payout.payout}</span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleLockBuild}
+                    disabled={!isAuthenticated || selectedPicks.length === 0}
+                    className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap ${
+                      !isAuthenticated || selectedPicks.length === 0
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white'
+                    }`}
+                  >
+                    🔒 Lock Build
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
