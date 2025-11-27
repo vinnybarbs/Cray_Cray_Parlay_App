@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import Auth from './Auth'
 import Dashboard from './Dashboard'
 import PickCard from './PickCard'
+import BetslipBuilder from '../pages/BetslipBuilder'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -336,6 +337,7 @@ export default function MainApp() {
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showWeeklySuggestions, setShowWeeklySuggestions] = useState(false);
+  const [showBetslipBuilder, setShowBetslipBuilder] = useState(false);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...",
@@ -646,6 +648,12 @@ export default function MainApp() {
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
                 >
                   Suggestions This Week
+                </button>
+                <button
+                  onClick={() => { setShowBetslipBuilder(true); setShowNavMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
+                >
+                  🔗 Betslip Builder
                 </button>
               </div>
             )}
@@ -1005,7 +1013,7 @@ export default function MainApp() {
 
       {showWeeklySuggestions && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto border border-gray-700 p-6">
+          <div className="bg-gray-800 rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-yellow-400">Suggestions This Week</h2>
               <button
@@ -1015,13 +1023,21 @@ export default function MainApp() {
                 ✕
               </button>
             </div>
-            <p className="text-sm text-gray-300 mb-2">
-              This view will highlight recent locked parlays and their outcomes once more results have been reconciled.
-            </p>
-            <p className="text-sm text-gray-400">
-              For now, use the Dashboard to review your history and see how your builds are performing over time.
-            </p>
+            <p className="text-gray-300">Coming soon: View all suggested picks from the last 7 days.</p>
           </div>
+        </div>
+      )}
+
+      {/* Betslip Builder - Full Screen */}
+      {showBetslipBuilder && (
+        <div className="fixed inset-0 bg-gray-900 z-50">
+          <button
+            onClick={() => setShowBetslipBuilder(false)}
+            className="absolute top-4 right-4 z-50 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-700"
+          >
+            ✕ Close
+          </button>
+          <BetslipBuilder />
         </div>
       )}
     </div>
