@@ -662,11 +662,25 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     if (gamesMatch) gamesAnalyzed = parseInt(gamesMatch[1]);
   }
   
-  // Build reasoning paragraph
+  // Build reasoning paragraph with VARIETY
   const parts = [];
   
-  // Opening: Prop and price
-  parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup.`);
+  // VARY THE OPENING - 4 different styles for creativity
+  const openingStyle = Math.floor(Math.random() * 4);
+  switch(openingStyle) {
+    case 0:
+      parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup.`);
+      break;
+    case 1:
+      parts.push(`Looking at ${propType} at ${priceText} in the ${matchupText} game.`);
+      break;
+    case 2:
+      parts.push(`This ${matchupText} matchup features ${propType} sitting at ${priceText}.`);
+      break;
+    case 3:
+      parts.push(`${propType} catches our eye at ${priceText} for ${matchupText}.`);
+      break;
+  }
   
   // Statistical analysis with comparison to line
   if (playerAvg && line) {
@@ -698,18 +712,44 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     parts.push(`Recent news: ${newsSnippet}`);
   }
   
-  // Value verdict
+  // Value verdict with VARIETY - 3 different phrasings per scenario
   if (playerAvg && line) {
     const diff = direction === 'Over' ? playerAvg - line : line - playerAvg;
+    const verdictStyle = Math.floor(Math.random() * 3);
+    
     if (diff > line * 0.1) {
-      parts.push(`This represents strong value with recent performance significantly favoring the ${direction}.`);
+      // Strong value - 3 ways to say it
+      const strongPhrases = [
+        `This represents strong value with recent performance significantly favoring the ${direction}.`,
+        `The numbers paint a compelling picture for the ${direction}, with production trends well above this mark.`,
+        `Clear value proposition here as ${playerName}'s recent form suggests the ${direction} hits comfortably.`
+      ];
+      parts.push(strongPhrases[verdictStyle]);
     } else if (diff > 0) {
-      parts.push(`The numbers suggest modest value on the ${direction} given current production trends.`);
+      // Modest value - 3 ways to say it
+      const modestPhrases = [
+        `The numbers suggest modest value on the ${direction} given current production trends.`,
+        `Recent form tilts slightly toward the ${direction}, presenting a reasonable value opportunity.`,
+        `${playerName}'s trending performance offers decent support for taking the ${direction} here.`
+      ];
+      parts.push(modestPhrases[verdictStyle]);
     } else {
-      parts.push(`While the stats lean the other way, situational factors and matchup dynamics create an opportunity for the ${direction} to hit.`);
+      // Against the stats - 3 ways to say it
+      const contrarianPhrases = [
+        `While the stats lean the other way, situational factors and matchup dynamics create an opportunity for the ${direction} to hit.`,
+        `The numbers don't fully align, but game environment and matchup specifics could push this ${direction}.`,
+        `Statistical headwinds present, yet matchup context and situational factors make the ${direction} intriguing.`
+      ];
+      parts.push(contrarianPhrases[verdictStyle]);
     }
   } else {
-    parts.push(`The combination of recent form, matchup conditions, and current market pricing presents value on this number.`);
+    // No stats available - vary this too
+    const genericPhrases = [
+      `The combination of recent form, matchup conditions, and current market pricing presents value on this number.`,
+      `Market positioning and matchup dynamics suggest an edge on this prop.`,
+      `Current pricing appears favorable given the game environment and situational context.`
+    ];
+    parts.push(genericPhrases[Math.floor(Math.random() * 3)]);
   }
   
   return parts.join(' ');
@@ -856,17 +896,17 @@ async function suggestPicksHandler(req, res) {
       suggestionCount
     } = req.body;
 
-    // Determine number of suggestions based on bet types selected
-    // More bet types = more suggestions needed
-    const betTypeCount = selectedBetTypes.length;
-    const defaultSuggestions = betTypeCount >= 3 ? 25 : betTypeCount >= 2 ? 20 : 15;
+    // Determine number of suggestions based on target leg count
+    // INCREASED: Show more variety - user wants to see all available options
+    let numSuggestions = suggestionCount || (() => {
+      const legs = parseInt(req.body.targetLegCount) || 3;
+      if (legs <= 3) return 20; // Was 10
+      if (legs <= 5) return 30; // Was 15
+      return Math.min(50, legs * 8); // Was 30 max, now 50 max
+    })();
     
-    let numSuggestions = Number.isFinite(Number(suggestionCount))
-      ? Number(suggestionCount)
-      : defaultSuggestions;
-    
-    // Cap at reasonable max (30 for fast generation, more if needed)
-    numSuggestions = Math.max(10, Math.min(40, Math.round(numSuggestions)));
+    // Cap at reasonable max
+    numSuggestions = Math.max(10, Math.min(50, Math.round(numSuggestions)));
     
     // Production: Allow full range for better user experience
     const isProduction = process.env.NODE_ENV === 'production';
