@@ -160,20 +160,18 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           <div>
             <div className="text-xs text-gray-400">{pick.betType}</div>
             <div className="text-base font-bold text-white">
-              {propMeta ? `${propMeta.direction} — ${propMeta.coreText}` : pick.pick}
+              {propMeta ? `${propMeta.direction} — ${propMeta.coreText}` : 
+               pick.betType === 'Spread' && pick.point !== undefined && pick.point !== null ?
+                 `${pick.pick} ${pick.point > 0 ? '+' : ''}${pick.point}` :
+                 pick.betType === 'Total' && pick.point !== undefined && pick.point !== null ?
+                   `${pick.pick} ${pick.point}` :
+                   pick.pick}
             </div>
           </div>
           <div className={`text-xl font-bold ${getOddsColor(pick.odds)}`}>
             {pick.odds}
           </div>
         </div>
-        
-        {/* Show what you're actually betting - clear and unambiguous */}
-        {pick.betType === 'Spread' && pick.point !== undefined && pick.point !== null && (
-          <div className="text-xs text-green-400 mt-1 font-medium">
-            Betting: {pick.pick} {pick.point > 0 ? '+' : ''}{pick.point}
-          </div>
-        )}
         
         {/* Special formatting for player props: explicit Over/Under + human line */}
         {propMeta && (
