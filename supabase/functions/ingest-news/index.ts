@@ -35,7 +35,6 @@ const FEEDS = [
   { name: 'br-nfl', url: 'https://bleacherreport.com/articles/feed?tag_id=18' },
   { name: 'br-nba', url: 'https://bleacherreport.com/articles/feed?tag_id=20' },
 ];
-const MAX_FEEDS_PER_RUN = 5;
 const MAX_ITEMS_PER_FEED = 10;
 function timeoutAfter(ms) {
   return new Promise((_, reject)=>setTimeout(()=>reject(new Error('timeout')), ms));
@@ -153,7 +152,8 @@ async function processFeeds() {
   console.log('[ingest-news] Background processing started');
   
   try {
-    const feedsToProcess = FEEDS.slice(0, MAX_FEEDS_PER_RUN);
+    // Process ALL feeds, not just first 5 - we want ESPN, CBS, Yahoo, Bleacher Report
+    const feedsToProcess = FEEDS;
     let sourcesCreated = 0;
     let articlesInserted = 0;
     for (const feed of feedsToProcess){
