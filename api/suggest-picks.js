@@ -986,7 +986,17 @@ async function suggestPicksHandler(req, res) {
 
     // Check which bet types are requested
     const wantsPropTypes = selectedBetTypes.filter(bt => bt === 'Player Props' || bt === 'TD Props' || bt === 'Team Props');
-    const wantsTraditionalTypes = selectedBetTypes.filter(bt => bt === 'Moneyline' || bt === 'Spread' || bt === 'Total' || bt === 'Moneyline/Spread');
+    const wantsTraditionalTypes = selectedBetTypes.filter(bt => 
+      bt === 'Moneyline' || 
+      bt === 'Spread' || 
+      bt === 'Total' || 
+      bt === 'Totals (O/U)' || // Handle frontend format
+      bt === 'Moneyline/Spread'
+    );
+    
+    console.log(`📋 Bet type detection:`);
+    console.log(`   Props requested: ${wantsPropTypes.length > 0 ? wantsPropTypes.join(', ') : 'None'}`);
+    console.log(`   Traditional requested: ${wantsTraditionalTypes.length > 0 ? wantsTraditionalTypes.join(', ') : 'None'}`);
     
     let allSuggestions = [];
 
@@ -1016,19 +1026,27 @@ async function suggestPicksHandler(req, res) {
     if (wantsTraditionalTypes.length > 0) {
       console.log(`🎲 Generating traditional bet suggestions for: ${wantsTraditionalTypes.join(', ')}`);
 
-      const traditionalResult = await coordinator.generatePickSuggestions({
-        sports: selectedSports,
-        betTypes: wantsTraditionalTypes, // Only traditional types
-        riskLevel,
-        dateRange,
-        numSuggestions: Math.ceil(numSuggestions / 2), // Split suggestions between props and traditional
-        sportsbook: req.body.oddsPlatform || 'DraftKings',
-        playerContext: playerData
-      });
+      try {
+        const traditionalResult = await coordinator.generatePickSuggestions({
+          sports: selectedSports,
+          betTypes: wantsTraditionalTypes, // Only traditional types
+          riskLevel,
+          dateRange,
+          numSuggestions: Math.ceil(numSuggestions / 2), // Split suggestions between props and traditional
+          sportsbook: req.body.oddsPlatform || 'DraftKings',
+          playerContext: playerData
+        });
 
-      if (traditionalResult.suggestions && traditionalResult.suggestions.length > 0) {
-        allSuggestions = allSuggestions.concat(traditionalResult.suggestions);
-        console.log(`✅ Generated ${traditionalResult.suggestions.length} traditional bet suggestions`);
+        if (traditionalResult.suggestions && traditionalResult.suggestions.length > 0) {
+          allSuggestions = allSuggestions.concat(traditionalResult.suggestions);
+          console.log(`✅ Generated ${traditionalResult.suggestions.length} traditional bet suggestions`);
+        } else {
+          console.log(`⚠️ Coordinator returned 0 traditional suggestions`);
+        }
+      } catch (error) {
+        console.error(`❌ Error generating traditional suggestions:`, error.message);
+        console.error(error.stack);
+        // Continue with props only - don't fail entire request
       }
     }
 
