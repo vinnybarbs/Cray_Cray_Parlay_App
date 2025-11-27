@@ -80,15 +80,31 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     const nowIso = new Date().toISOString();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: initialPropOdds, error } = await supabase
+    // Determine which market types to query based on selected bet types
+    const wantsPlayerProps = selectedBetTypes.some(bt => bt === 'Player Props' || bt === 'TD Props');
+    const wantsTeamProps = selectedBetTypes.some(bt => bt === 'Team Props');
+    
+    // Build market type filter - include player and/or team markets
+    let marketQuery = supabase
       .from('odds_cache')
       .select('*')
-      .eq('sport', sportKeys[0]) // Use first sport with .eq() like test endpoint
-      .ilike('market_type', 'player_%')
-      .gt('commence_time', nowIso) // exclude past games
-      .gte('last_updated', oneDayAgo) // avoid very stale data
+      .eq('sport', sportKeys[0])
+      .gt('commence_time', nowIso)
+      .gte('last_updated', oneDayAgo)
       .order('commence_time', { ascending: true })
-      .limit(50);
+      .limit(100); // Increased limit to accommodate both player and team props
+    
+    // Apply market type filter based on selections
+    if (wantsPlayerProps && wantsTeamProps) {
+      // Want both - use OR condition
+      marketQuery = marketQuery.or('market_type.ilike.player_%,market_type.ilike.team_%');
+    } else if (wantsPlayerProps) {
+      marketQuery = marketQuery.ilike('market_type', 'player_%');
+    } else if (wantsTeamProps) {
+      marketQuery = marketQuery.ilike('market_type', 'team_%');
+    }
+    
+    const { data: initialPropOdds, error } = await marketQuery;
       
     if (error) throw error;
     
@@ -99,14 +115,24 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     if (!propOdds.length) {
       console.log('⚠️ No fresh player prop odds found (last 24h). Retrying without last_updated filter...');
 
-      const { data: fallbackOdds, error: fallbackError } = await supabase
+      // Retry without last_updated filter
+      let fallbackQuery = supabase
         .from('odds_cache')
         .select('*')
         .eq('sport', sportKeys[0])
-        .ilike('market_type', 'player_%')
         .gt('commence_time', nowIso)
         .order('commence_time', { ascending: true })
-        .limit(50);
+        .limit(100);
+      
+      if (wantsPlayerProps && wantsTeamProps) {
+        fallbackQuery = fallbackQuery.or('market_type.ilike.player_%,market_type.ilike.team_%');
+      } else if (wantsPlayerProps) {
+        fallbackQuery = fallbackQuery.ilike('market_type', 'player_%');
+      } else if (wantsTeamProps) {
+        fallbackQuery = fallbackQuery.ilike('market_type', 'team_%');
+      }
+      
+      const { data: fallbackOdds, error: fallbackError } = await fallbackQuery;
 
       if (fallbackError) throw fallbackError;
 
@@ -381,7 +407,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     // Create suggestion with raw UTC commence_time so frontend can format consistently
     const gameDate = odds.commence_time || new Date().toISOString();
       
-    // Group TD-related props under 'TD', others under 'Player Props'
+    // Determine bet type based on market type
     const tdMarkets = [
       'player_anytime_td',
       'player_pass_tds',
@@ -390,10 +416,23 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       'player_1st_td',
       'player_last_td'
     ];
-    const betType = tdMarkets.includes(odds.market_type) ? 'TD' : 'Player Props';
+    
+    // Check if it's a team prop market
+    const isTeamProp = odds.market_type && odds.market_type.startsWith('team_');
+    const betType = isTeamProp ? 'Team Props' : (tdMarkets.includes(odds.market_type) ? 'TD' : 'Player Props');
 
     const intelKey = `${odds.home_team}_${odds.away_team}`;
     const intelContext = intelligenceMap[intelKey];
+    
+    // Format pick and reasoning differently for team vs player props
+    const pick = isTeamProp 
+      ? formatTeamPropPick(odds.market_type, bestOutcome, odds)
+      : formatPlayerPropPick(playerName, odds.market_type, bestOutcome);
+    
+    const reasoning = isTeamProp
+      ? generateTeamPropReasoning(odds.market_type, bestOutcome, odds, intelContext)
+      : generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext);
+    
     suggestions.push({
       id: `prop_${suggestionId.toString().padStart(3, '0')}`,
       gameDate,
@@ -403,14 +442,14 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       homeTeam: odds.home_team,
       awayTeam: odds.away_team,
       betType,
-      pick: formatPlayerPropPick(playerName, odds.market_type, bestOutcome),
+      pick,
       odds: formatOdds(bestOutcome.price),
   // spread field removed for player props
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
-      reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext),
+      reasoning,
       researchSummary: intelContext && intelContext.context ? intelContext.context : "",
-      edgeType: "player_performance",
-      contraryEvidence: generateContraryEvidence(playerName, odds.market_type),
+      edgeType: isTeamProp ? "team_performance" : "player_performance",
+      contraryEvidence: isTeamProp ? "Team totals can be affected by pace, weather, and defensive adjustments." : generateContraryEvidence(playerName, odds.market_type),
       analyticalSummary: "" // Empty - reasoning field has all the content
     });
     
@@ -592,6 +631,47 @@ function generateContraryEvidence(playerName, marketType) {
   return `Player performance can be inconsistent, and ${marketType.replace('player_', '')} props are subject to game script and injury concerns.`;
 }
 
+// Team prop formatting and reasoning
+function formatTeamPropPick(marketType, outcome, odds) {
+  const point = outcome.point;
+  const teamName = outcome.name || outcome.description;
+  
+  // Determine direction (Over/Under)
+  let direction = '';
+  if (outcome.name && outcome.name.toLowerCase().includes('over')) direction = 'Over';
+  else if (outcome.name && outcome.name.toLowerCase().includes('under')) direction = 'Under';
+  
+  // Format based on market type
+  if (marketType === 'team_totals' || marketType === 'team_total') {
+    return `${teamName} ${direction} ${point} Points`;
+  }
+  
+  // Fallback
+  return `${teamName} ${direction} ${point} ${marketType.replace('team_', '').replace('_', ' ')}`;
+}
+
+function generateTeamPropReasoning(marketType, outcome, odds, intelContext) {
+  const propType = formatTeamPropPick(marketType, outcome, odds);
+  const priceText = formatOdds(outcome.price);
+  const matchupText = `${odds.away_team} @ ${odds.home_team}`;
+  
+  // Pull intel context if available
+  let intelSnippet = '';
+  if (intelContext && intelContext.context) {
+    const firstLine = intelContext.context.split('\n')[0];
+    if (firstLine) {
+      intelSnippet = firstLine;
+    }
+  }
+  
+  // Build reasoning
+  if (intelSnippet) {
+    return `${propType} is priced at ${priceText} for the ${matchupText} matchup. ${intelSnippet}`;
+  } else {
+    return `${propType} is priced at ${priceText} for the ${matchupText} matchup.`;
+  }
+}
+
 // Helper: normalize team names for rough matching (handles city vs nickname differences)
 function normalizeTeamName(name) {
   if (!name) return '';
@@ -739,9 +819,9 @@ async function suggestPicksHandler(req, res) {
     const playerData = await getPlayerDataForProps(selectedSports);
     console.log(`📊 Retrieved ${playerData.length} players for validation`);
 
-    // Check if this is a player/TD props request - prefer cached props from Supabase,
+    // Check if this is a player/TD/team props request - prefer cached props from Supabase,
     // but fall back to regular odds flow if we can't generate any prop suggestions.
-    const wantsPropMode = selectedBetTypes.some(bt => bt === 'Player Props' || bt === 'TD Props');
+    const wantsPropMode = selectedBetTypes.some(bt => bt === 'Player Props' || bt === 'TD Props' || bt === 'Team Props');
 
     if (wantsPropMode) {
       const result = await generatePlayerPropSuggestions({
