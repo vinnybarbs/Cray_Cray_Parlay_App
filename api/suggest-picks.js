@@ -6,6 +6,61 @@ const { SportsIntelligenceService } = require('../lib/services/sports-intelligen
 
 const intelligenceService = new SportsIntelligenceService();
 
+/**
+ * Store AI suggestions to database for model performance tracking
+ * @param {Array} suggestions - Array of suggestion objects
+ * @param {Object} options - Metadata (riskLevel, generateMode, userId)
+ * @returns {Promise<string>} Session ID
+ */
+async function storeAISuggestions(suggestions, options = {}) {
+  if (!suggestions || suggestions.length === 0) {
+    return null;
+  }
+
+  try {
+    // Generate unique session ID for this batch
+    const sessionId = `session_${Date.now()}_${options.userId || 'guest'}`;
+    
+    // Prepare suggestions for database
+    const suggestionRecords = suggestions.map(suggestion => ({
+      session_id: sessionId,
+      sport: suggestion.sport || 'NFL',
+      home_team: suggestion.homeTeam,
+      away_team: suggestion.awayTeam,
+      game_date: suggestion.gameDate || suggestion.commence_time,
+      espn_event_id: suggestion.espnEventId || null,
+      bet_type: suggestion.betType,
+      pick: suggestion.pick,
+      odds: suggestion.odds,
+      point: suggestion.point || null,
+      confidence: suggestion.confidence || null,
+      reasoning: suggestion.reasoning || null,
+      risk_level: options.riskLevel,
+      generate_mode: options.generateMode,
+      actual_outcome: 'pending',
+      user_id: options.userId || null
+    }));
+
+    // Insert suggestions into database
+    const { error } = await supabase
+      .from('ai_suggestions')
+      .insert(suggestionRecords);
+
+    if (error) {
+      console.error('❌ Error storing AI suggestions:', error.message);
+      // Don't fail the request if storage fails
+      return sessionId;
+    }
+
+    console.log(`✅ Stored ${suggestionRecords.length} AI suggestions with session ID: ${sessionId}`);
+    return sessionId;
+
+  } catch (error) {
+    console.error('❌ Exception storing AI suggestions:', error.message);
+    return null;
+  }
+}
+
 // Generate player prop suggestions using cached odds from Supabase
 async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions, sportsbook, playerData, supabase, coordinator, selectedBetTypes }) {
   try {
@@ -640,9 +695,17 @@ async function suggestPicksHandler(req, res) {
       const duration = Date.now() - startTime;
 
       if (result.suggestions && result.suggestions.length > 0) {
+        // Store AI suggestions for tracking model performance
+        const sessionId = await storeAISuggestions(result.suggestions, {
+          riskLevel,
+          generateMode: 'player_props',
+          userId: req.user?.id
+        });
+
         return res.json({
           success: true,
           suggestions: result.suggestions,
+          sessionId, // Include session ID for tracking
           metadata: {
             requestedSuggestions: numSuggestions,
             returnedSuggestions: result.suggestions.length,
@@ -691,9 +754,17 @@ async function suggestPicksHandler(req, res) {
       duration: `${duration}ms`
     });
 
+    // Store AI suggestions for tracking model performance
+    const sessionId = await storeAISuggestions(result.suggestions, {
+      riskLevel,
+      generateMode: 'regular',
+      userId: req.user?.id
+    });
+
     res.json({
       success: true,
       suggestions: result.suggestions,
+      sessionId, // Include session ID for tracking
       timings: result.timings,
       phaseData: result.phaseData,
       metadata: {
