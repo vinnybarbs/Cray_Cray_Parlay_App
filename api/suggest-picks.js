@@ -411,7 +411,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       researchSummary: intelContext && intelContext.context ? intelContext.context : "",
       edgeType: "player_performance",
       contraryEvidence: generateContraryEvidence(playerName, odds.market_type),
-      analyticalSummary: "Analyzed cached player prop odds and recent performance metrics to identify value opportunities."
+      analyticalSummary: "" // Empty - reasoning field has all the content
     });
     
     suggestionId++;
@@ -575,13 +575,17 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     }
   }
 
-  const parts = [];
-  parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup.`);
-  if (statSnippet) parts.push(statSnippet);
-  if (intelSnippet) parts.push(intelSnippet);
-  parts.push('Taken together, this combination of recent production and matchup context suggests this prop offers solid value at the current number.');
-
-  return parts.join(' ');
+  // Build data-driven reasoning without generic filler
+  if (statSnippet && statSnippet.length > 0) {
+    // We have recent stats - use them to build specific reasoning
+    return `${propType} is priced at ${priceText}. ${statSnippet}${intelSnippet ? ' ' + intelSnippet : ''}`;
+  } else if (intelSnippet && intelSnippet.length > 0) {
+    // Fall back to intel context
+    return `${propType} is priced at ${priceText}. ${intelSnippet}`;
+  } else {
+    // Last resort: basic reasoning
+    return `${propType} is priced at ${priceText} for the ${matchupText} matchup.`;
+  }
 }
 
 function generateContraryEvidence(playerName, marketType) {

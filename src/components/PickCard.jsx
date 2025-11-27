@@ -81,6 +81,9 @@ const getDetailedAnalysis = (pick) => {
     return `${baseAnalysis} This spread selection leverages advanced point differential modeling, incorporating ${context.pace} and historical performance against similar lines. Critical analysis factors include ${context.efficiency}, late-game execution patterns, and competitive adjustments in key situations. Our algorithm identifies market inefficiency in the current spread pricing relative to true probability estimates based on comprehensive performance metrics and situational analysis.`;
   } else if (pick.betType === 'Total') {
     return `${baseAnalysis} Total analysis evaluates multiple scoring environment variables including weather conditions (where applicable), defensive pressure rates, ${context.pace}, and historical scoring patterns in similar matchups. Key performance indicators include first half trends, ${context.efficiency}, ${context.situational}, and strategic tendencies. Statistical correlation models show strong probability alignment for this total range based on team-specific capabilities and defensive strengths in current context.`;
+  } else if (pick.betType === 'Player Props' || pick.betType === 'TD') {
+    // For player props, just use the backend reasoning - it has the recent stats already
+    return baseAnalysis;
   } else {
     return `${baseAnalysis} Comprehensive multi-factor analysis evaluates this selection through advanced statistical modeling, market positioning assessment, and historical precedent analysis. Performance evaluation includes team form indicators, ${context.advantage}, injury impact analysis, and probability distribution modeling. Our AI framework identifies significant edge opportunity through combination of statistical analysis, market inefficiency detection, and situational performance metrics that suggest favorable outcome probability relative to current market pricing.`;
   }
