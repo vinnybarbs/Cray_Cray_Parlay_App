@@ -222,6 +222,36 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       console.log(`🎯 Player Props mode: mixing ${yardageProps.length} yardage markets with ${tdProps.length} TD markets`);
     }
 
+    // Fetch team records from standings for context (W-L records)
+    const teamRecordsMap = {};
+    try {
+      const { data: teamRecords, error: recordsError } = await supabase
+        .from('team_stats_season')
+        .select('team_id, metrics')
+        .eq('season', new Date().getFullYear());
+      
+      if (!recordsError && teamRecords) {
+        // Also need team names
+        const { data: teams } = await supabase
+          .from('teams')
+          .select('id, name, display_name');
+        
+        const teamNameMap = new Map(teams?.map(t => [t.id, t.display_name || t.name]) || []);
+        
+        teamRecords.forEach(record => {
+          const teamName = teamNameMap.get(record.team_id);
+          if (teamName && record.metrics) {
+            const wins = record.metrics.wins || 0;
+            const losses = record.metrics.losses || 0;
+            teamRecordsMap[teamName] = { wins, losses, record: `${wins}-${losses}` };
+          }
+        });
+        console.log(`📊 Loaded records for ${Object.keys(teamRecordsMap).length} teams`);
+      }
+    } catch (err) {
+      console.log('⚠️ Could not load team records:', err.message);
+    }
+
     // Pre-compute news/intel context per game to enrich reasoning
     const intelligenceMap = {};
     const seenGames = new Set();
@@ -278,7 +308,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       // Continue without stats - don't fail the whole request
     }
 
-    // Convert cached odds to suggestions format (with stats + news context)
+    // Convert cached odds to suggestions format (with stats + news context + team records)
     let suggestions = await convertPropOddsToSuggestions(
       filteredPropOdds,
       playerData,
@@ -286,6 +316,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       riskLevel,
       intelligenceMap,
       playerStatsMap, // PASS STATS TO CONVERTER
+      teamRecordsMap, // PASS TEAM RECORDS FOR CONTEXT
       { disableRosterCheck: false }
     );
 
@@ -301,6 +332,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
         riskLevel,
         intelligenceMap,
         playerStatsMap, // PASS STATS TO RETRY TOO
+        teamRecordsMap, // PASS TEAM RECORDS TO RETRY TOO
         { disableRosterCheck: true }
       );
     }
@@ -318,7 +350,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
 }
 
 // Convert cached prop odds to suggestion format
-async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}, playerStatsMap = {}, options = {}) {
+async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}, playerStatsMap = {}, teamRecordsMap = {}, options = {}) {
   const suggestions = [];
   const processedPlayers = new Set();
   const playerIndex = new Map();
@@ -431,7 +463,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     
     const reasoning = isTeamProp
       ? generateTeamPropReasoning(odds.market_type, bestOutcome, odds, intelContext)
-      : generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext);
+      : generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext, teamRecordsMap);
     
     suggestions.push({
       id: `prop_${suggestionId.toString().padStart(3, '0')}`,
@@ -540,7 +572,7 @@ function calculateConfidence(price, riskLevel) {
   return 5;
 }
 
-function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats, recentStats, intelContext) {
+function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats, recentStats, intelContext, teamRecordsMap = {}) {
   const propType = formatPlayerPropPick(playerName, marketType, outcome);
   const priceText = formatOdds(outcome.price);
   const matchupText = `${odds.away_team} @ ${odds.home_team}`;
@@ -665,20 +697,25 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
   // Build reasoning paragraph with VARIETY
   const parts = [];
   
+  // Get team records for context
+  const awayRecord = teamRecordsMap[odds.away_team]?.record;
+  const homeRecord = teamRecordsMap[odds.home_team]?.record;
+  const hasRecords = awayRecord && homeRecord;
+  
   // VARY THE OPENING - 4 different styles for creativity
   const openingStyle = Math.floor(Math.random() * 4);
   switch(openingStyle) {
     case 0:
-      parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup.`);
+      parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup${hasRecords ? ` (${awayRecord} @ ${homeRecord})` : ''}.`);
       break;
     case 1:
-      parts.push(`Looking at ${propType} at ${priceText} in the ${matchupText} game.`);
+      parts.push(`Looking at ${propType} at ${priceText} in the ${matchupText} game${hasRecords ? ` — ${odds.away_team} (${awayRecord}) visiting ${odds.home_team} (${homeRecord})` : ''}.`);
       break;
     case 2:
-      parts.push(`This ${matchupText} matchup features ${propType} sitting at ${priceText}.`);
+      parts.push(`This ${matchupText} matchup${hasRecords ? ` between ${awayRecord} and ${homeRecord} teams` : ''} features ${propType} sitting at ${priceText}.`);
       break;
     case 3:
-      parts.push(`${propType} catches our eye at ${priceText} for ${matchupText}.`);
+      parts.push(`${propType} catches our eye at ${priceText} for ${matchupText}${hasRecords ? ` with the ${odds.away_team} (${awayRecord}) traveling to face the ${odds.home_team} (${homeRecord})` : ''}.`);
       break;
   }
   
