@@ -447,10 +447,11 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
   // spread field removed for player props
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
       reasoning,
-      researchSummary: intelContext && intelContext.context ? intelContext.context : "",
+      researchSummary: "", // REMOVED: AI-generated context hallucinates defensive rankings/ATS - real news is in reasoning
       edgeType: isTeamProp ? "team_performance" : "player_performance",
       contraryEvidence: isTeamProp ? "Team totals can be affected by pace, weather, and defensive adjustments." : generateContraryEvidence(playerName, odds.market_type),
-      analyticalSummary: "" // Empty - reasoning field has all the content
+      analyticalSummary: "", // Empty - reasoning field has all the content
+      spread: odds.spread || null // Add game spread for UI display
     });
     
     suggestionId++;
@@ -906,11 +907,14 @@ async function suggestPicksHandler(req, res) {
     const playerData = await getPlayerDataForProps(selectedSports);
     console.log(`📊 Retrieved ${playerData.length} players for validation`);
 
-    // Check if this is a player/TD/team props request - prefer cached props from Supabase,
-    // but fall back to regular odds flow if we can't generate any prop suggestions.
-    const wantsPropMode = selectedBetTypes.some(bt => bt === 'Player Props' || bt === 'TD Props' || bt === 'Team Props');
+    // Check which bet types are requested
+    const wantsPropTypes = selectedBetTypes.filter(bt => bt === 'Player Props' || bt === 'TD Props' || bt === 'Team Props');
+    const wantsTraditionalTypes = selectedBetTypes.filter(bt => bt === 'Moneyline' || bt === 'Spread' || bt === 'Total' || bt === 'Moneyline/Spread');
+    
+    let allSuggestions = [];
 
-    if (wantsPropMode) {
+    // Generate props if requested
+    if (wantsPropTypes.length > 0) {
       const result = await generatePlayerPropSuggestions({
         sports: selectedSports,
         betTypes: selectedBetTypes,
@@ -923,84 +927,71 @@ async function suggestPicksHandler(req, res) {
         selectedBetTypes
       });
       
-      const duration = Date.now() - startTime;
-
       if (result.suggestions && result.suggestions.length > 0) {
-        // Store AI suggestions for tracking model performance
-        const sessionId = await storeAISuggestions(result.suggestions, {
-          riskLevel,
-          generateMode: 'player_props',
-          userId: req.user?.id
-        });
-
-        return res.json({
-          success: true,
-          suggestions: result.suggestions,
-          sessionId, // Include session ID for tracking
-          metadata: {
-            requestedSuggestions: numSuggestions,
-            returnedSuggestions: result.suggestions.length,
-            sports: selectedSports,
-            betTypes: selectedBetTypes,
-            riskLevel,
-            generatedAt: new Date().toISOString(),
-            generatedAtMT: getCurrentMountainTime(),
-            duration: `${duration}ms`,
-            playerDataStats: {
-              totalPlayers: playerData.length,
-              playersBySport: playerData.reduce((acc, p) => {
-                acc[p.sport] = (acc[p.sport] || 0) + 1;
-                return acc;
-              }, {}),
-              dataSource: "Supabase Cache + ESPN API"
-            }
-          }
-        });
+        allSuggestions = allSuggestions.concat(result.suggestions);
+        console.log(`✅ Generated ${result.suggestions.length} prop suggestions`);
+      } else {
+        console.log('⚠️ No prop suggestions generated');
       }
-
-      logger.warn('No player prop suggestions generated; falling back to core odds flow', {
-        selectedSports,
-        selectedBetTypes,
-        riskLevel,
-        numSuggestions
-      });
-      // Fall through to regular coordinator-based suggestion generation below
     }
 
-    // Generate regular suggestions for non-player props
-    const result = await coordinator.generatePickSuggestions({
-      sports: selectedSports,
-      betTypes: selectedBetTypes,
-      riskLevel,
-      dateRange,
-      numSuggestions,
-      sportsbook: req.body.oddsPlatform || 'DraftKings',
-      playerContext: playerData // Simple validation data to prevent hallucinations
-    });
+    // Generate traditional bets (Moneyline/Spread/Total) if requested
+    if (wantsTraditionalTypes.length > 0) {
+      console.log(`🎲 Generating traditional bet suggestions for: ${wantsTraditionalTypes.join(', ')}`);
+
+      const traditionalResult = await coordinator.generatePickSuggestions({
+        sports: selectedSports,
+        betTypes: wantsTraditionalTypes, // Only traditional types
+        riskLevel,
+        dateRange,
+        numSuggestions: Math.ceil(numSuggestions / 2), // Split suggestions between props and traditional
+        sportsbook: req.body.oddsPlatform || 'DraftKings',
+        playerContext: playerData
+      });
+
+      if (traditionalResult.suggestions && traditionalResult.suggestions.length > 0) {
+        allSuggestions = allSuggestions.concat(traditionalResult.suggestions);
+        console.log(`✅ Generated ${traditionalResult.suggestions.length} traditional bet suggestions`);
+      }
+    }
 
     const duration = Date.now() - startTime;
     
+    // If no suggestions generated at all, return error
+    if (allSuggestions.length === 0) {
+      logger.warn('No suggestions generated', { selectedSports, selectedBetTypes });
+      return res.status(404).json({
+        success: false,
+        error: 'No betting opportunities found for selected criteria'
+      });
+    }
+
+    // Shuffle for variety (prevents same 12 props every time)
+    const shuffled = allSuggestions.sort(() => Math.random() - 0.5).slice(0, numSuggestions);
+
     logger.info('Pick suggestions generated', {
-      count: result.suggestions?.length || 0,
+      totalGenerated: allSuggestions.length,
+      returnedAfterShuffle: shuffled.length,
       duration: `${duration}ms`
     });
 
     // Store AI suggestions for tracking model performance
-    const sessionId = await storeAISuggestions(result.suggestions, {
+    const sessionId = await storeAISuggestions(shuffled, {
       riskLevel,
-      generateMode: 'regular',
+      generateMode: allSuggestions.some(s => s.betType === 'Player Props') ? 'mixed' : 'traditional',
       userId: req.user?.id
     });
 
     res.json({
       success: true,
-      suggestions: result.suggestions,
+      suggestions: shuffled,
       sessionId, // Include session ID for tracking
-      timings: result.timings,
-      phaseData: result.phaseData,
       metadata: {
         requestedSuggestions: numSuggestions,
-        returnedSuggestions: result.suggestions?.length || 0,
+        returnedSuggestions: shuffled.length,
+        totalGenerated: allSuggestions.length,
+        propSuggestions: allSuggestions.filter(s => s.betType === 'Player Props' || s.betType === 'TD' || s.betType === 'Team Props').length,
+        traditionalSuggestions: allSuggestions.filter(s => s.betType === 'Moneyline' || s.betType === 'Spread' || s.betType === 'Total').length,
         sports: selectedSports,
         betTypes: selectedBetTypes,
         riskLevel,
