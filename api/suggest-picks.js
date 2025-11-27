@@ -216,6 +216,42 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       }
     }
 
+    // PHASE 2: Fetch recent player stats from ESPN box scores
+    const playerStatsMap = {};
+    try {
+      // Extract unique player names from prop odds
+      const uniquePlayers = new Set();
+      filteredPropOdds.forEach(odds => {
+        if (odds.outcomes) {
+          odds.outcomes.forEach(outcome => {
+            const playerName = outcome.description || outcome.name;
+            if (playerName && playerName !== 'Over' && playerName !== 'Under') {
+              uniquePlayers.add(playerName);
+            }
+          });
+        }
+      });
+
+      const playerNames = Array.from(uniquePlayers);
+      console.log(`📊 Phase 2: Fetching stats for ${playerNames.length} players with active props...`);
+
+      if (playerNames.length > 0 && sports.length > 0) {
+        const { ESPNPlayerStatsBoxScore } = require('../lib/services/espn-player-stats-boxscore');
+        const statsService = new ESPNPlayerStatsBoxScore(supabase);
+        
+        // Fetch stats for all players with props
+        const sportCode = sports[0].toUpperCase(); // Use first sport
+        const stats = await statsService.getStatsForPlayers(playerNames, sportCode);
+        
+        // Store in map for easy lookup
+        Object.assign(playerStatsMap, stats);
+        console.log(`✅ Retrieved stats for ${Object.keys(stats).length} players`);
+      }
+    } catch (statsError) {
+      console.error('⚠️ Error fetching player stats:', statsError.message);
+      // Continue without stats - don't fail the whole request
+    }
+
     // Convert cached odds to suggestions format (with stats + news context)
     let suggestions = await convertPropOddsToSuggestions(
       filteredPropOdds,
@@ -223,6 +259,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       numSuggestions,
       riskLevel,
       intelligenceMap,
+      playerStatsMap, // PASS STATS TO CONVERTER
       { disableRosterCheck: false }
     );
 
@@ -237,6 +274,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
         numSuggestions,
         riskLevel,
         intelligenceMap,
+        playerStatsMap, // PASS STATS TO RETRY TOO
         { disableRosterCheck: true }
       );
     }
@@ -254,7 +292,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
 }
 
 // Convert cached prop odds to suggestion format
-async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}, options = {}) {
+async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}, playerStatsMap = {}, options = {}) {
   const suggestions = [];
   const processedPlayers = new Set();
   const playerIndex = new Map();
@@ -337,6 +375,9 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerInfo = playerIndex.get(playerName.toLowerCase());
     const seasonStats = playerInfo?.seasonStats;
     
+    // PHASE 2: Get recent stats from ESPN box scores
+    const recentStats = playerStatsMap[playerName] || null;
+    
     // Create suggestion with raw UTC commence_time so frontend can format consistently
     const gameDate = odds.commence_time || new Date().toISOString();
       
@@ -366,7 +407,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       odds: formatOdds(bestOutcome.price),
   // spread field removed for player props
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
-      reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, intelContext),
+      reasoning: generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext),
       researchSummary: intelContext && intelContext.context ? intelContext.context : "",
       edgeType: "player_performance",
       contraryEvidence: generateContraryEvidence(playerName, odds.market_type),
@@ -459,15 +500,31 @@ function calculateConfidence(price, riskLevel) {
   return 5;
 }
 
-function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats, intelContext) {
+function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats, recentStats, intelContext) {
   const propType = formatPlayerPropPick(playerName, marketType, outcome);
   const priceText = formatOdds(outcome.price);
   const matchupText = `${odds.away_team} @ ${odds.home_team}`;
 
   let statSnippet = '';
 
+  // PHASE 2: Prioritize recent stats from ESPN box scores over season stats
   try {
-    if (seasonStats && typeof seasonStats === 'object') {
+    if (recentStats && typeof recentStats === 'object') {
+      const { ESPNPlayerStatsBoxScore } = require('../lib/services/espn-player-stats-boxscore');
+      const statsService = new ESPNPlayerStatsBoxScore(null);
+      const sport = odds.sport === 'americanfootball_nfl' ? 'NFL' : 
+                    odds.sport === 'basketball_nba' ? 'NBA' : 
+                    odds.sport.toUpperCase();
+      
+      // Get formatted AI-ready stats
+      const aiFormatted = statsService.formatStatsForAI(playerName, recentStats, sport);
+      if (aiFormatted && !aiFormatted.includes('No significant stats')) {
+        statSnippet = aiFormatted;
+      }
+    }
+    
+    // Fallback to season stats if no recent stats
+    if (!statSnippet && seasonStats && typeof seasonStats === 'object') {
       if (seasonStats.nfl) {
         const s = seasonStats.nfl;
         const games = s.games_played || 0;
