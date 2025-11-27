@@ -620,13 +620,44 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
   const line = outcome.point;
   const direction = outcome.name?.toLowerCase().includes('over') ? 'Over' : 'Under';
   
-  // Parse player's average from recent stats
+  // Parse player's average from recent stats - MATCH STAT TYPE TO PROP TYPE
   let playerAvg = null;
   let gamesAnalyzed = null;
+  let statType = '';
+  
   if (statSnippet) {
-    const avgMatch = statSnippet.match(/([\d.]+)\s+(pass yds|rush yds|rec yds|rec)\s*\/game/i);
+    // Determine which stat to extract based on market type
+    let statPattern = null;
+    
+    if (marketType.includes('pass_yds')) {
+      statPattern = /([\d.]+)\s+pass yds\/game/i;
+      statType = 'pass yds';
+    } else if (marketType.includes('pass_tds') || marketType.includes('pass_td')) {
+      statPattern = /([\d.]+)\s+pass TDs?\/game/i;
+      statType = 'pass TDs';
+    } else if (marketType.includes('rush_yds')) {
+      statPattern = /([\d.]+)\s+rush yds\/game/i;
+      statType = 'rush yds';
+    } else if (marketType.includes('rush_tds') || marketType.includes('rush_td')) {
+      statPattern = /([\d.]+)\s+rush TDs?\/game/i;
+      statType = 'rush TDs';
+    } else if (marketType.includes('reception_yds') || marketType.includes('rec_yds')) {
+      statPattern = /([\d.]+)\s+rec yds\/game/i;
+      statType = 'rec yds';
+    } else if (marketType.includes('receptions') || marketType === 'player_receptions') {
+      statPattern = /([\d.]+)\s+rec\/game/i;
+      statType = 'receptions';
+    } else if (marketType.includes('reception_tds') || marketType.includes('rec_td')) {
+      statPattern = /([\d.]+)\s+rec TDs?\/game/i;
+      statType = 'rec TDs';
+    }
+    
+    if (statPattern) {
+      const avgMatch = statSnippet.match(statPattern);
+      if (avgMatch) playerAvg = parseFloat(avgMatch[1]);
+    }
+    
     const gamesMatch = statSnippet.match(/last\s+(\d+)\s+games?/i);
-    if (avgMatch) playerAvg = parseFloat(avgMatch[1]);
     if (gamesMatch) gamesAnalyzed = parseInt(gamesMatch[1]);
   }
   
@@ -641,17 +672,19 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     const diff = playerAvg - line;
     const diffPct = ((Math.abs(diff) / line) * 100).toFixed(1);
     
+    const statLabel = statType || 'per game';
+    
     if (direction === 'Over') {
       if (diff > 0) {
-        parts.push(`${playerName} has been averaging ${playerAvg} per game over ${gamesAnalyzed || 'recent'} games, sitting ${diff.toFixed(1)} above this ${line} line (${diffPct}% cushion). The trend strongly supports an Over play here.`);
+        parts.push(`${playerName} has been averaging ${playerAvg} ${statLabel} over ${gamesAnalyzed || 'recent'} games, sitting ${diff.toFixed(1)} above this ${line} line (${diffPct}% cushion). The trend strongly supports an Over play here.`);
       } else {
-        parts.push(`${playerName} is averaging ${playerAvg} per game recently, which is ${Math.abs(diff).toFixed(1)} below the ${line} line. However, this matchup presents upside potential given the game environment.`);
+        parts.push(`${playerName} is averaging ${playerAvg} ${statLabel} recently, which is ${Math.abs(diff).toFixed(1)} below the ${line} line. However, this matchup presents upside potential given the game environment.`);
       }
     } else {
       if (diff < 0) {
-        parts.push(`${playerName} has averaged just ${playerAvg} per game over ${gamesAnalyzed || 'recent'} games, tracking ${Math.abs(diff).toFixed(1)} under this ${line} number. The recent production profile favors the Under.`);
+        parts.push(`${playerName} has averaged just ${playerAvg} ${statLabel} over ${gamesAnalyzed || 'recent'} games, tracking ${Math.abs(diff).toFixed(1)} under this ${line} number. The recent production profile favors the Under.`);
       } else {
-        parts.push(`While ${playerName} is averaging ${playerAvg} per game, the ${line} line sits below that mark, suggesting the books may be accounting for matchup-specific factors that could suppress production.`);
+        parts.push(`While ${playerName} is averaging ${playerAvg} ${statLabel}, the ${line} line sits below that mark, suggesting the books may be accounting for matchup-specific factors that could suppress production.`);
       }
     }
   } else if (statSnippet) {
