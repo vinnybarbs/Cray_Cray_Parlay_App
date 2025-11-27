@@ -10,30 +10,44 @@ if (!DB_ENABLED) {
   console.log('[ingest-news] DB writes ENABLED: using SUPABASE_URL from env');
 }
 const FEEDS = [
-  // ESPN
+  // ESPN - Pro Sports
   { name: 'espn-news', url: 'https://www.espn.com/espn/rss/news' },
   { name: 'espn-nfl', url: 'https://www.espn.com/espn/rss/nfl/news' },
   { name: 'espn-nba', url: 'https://www.espn.com/espn/rss/nba/news' },
   { name: 'espn-nhl', url: 'https://www.espn.com/espn/rss/nhl/news' },
   { name: 'espn-mlb', url: 'https://www.espn.com/espn/rss/mlb/news' },
   
-  // CBS Sports
+  // ESPN - College Sports
+  { name: 'espn-ncaaf', url: 'https://www.espn.com/espn/rss/ncf/news' },
+  { name: 'espn-ncaab', url: 'https://www.espn.com/espn/rss/ncb/news' },
+  
+  // CBS Sports - Pro
   { name: 'cbs-headlines', url: 'https://www.cbssports.com/rss/headlines/' },
   { name: 'cbs-nfl', url: 'https://www.cbssports.com/rss/headlines/nfl/' },
   { name: 'cbs-nba', url: 'https://www.cbssports.com/rss/headlines/nba/' },
   { name: 'cbs-nhl', url: 'https://www.cbssports.com/rss/headlines/nhl/' },
   { name: 'cbs-mlb', url: 'https://www.cbssports.com/rss/headlines/mlb/' },
   
-  // Yahoo Sports
+  // CBS Sports - College
+  { name: 'cbs-ncaaf', url: 'https://www.cbssports.com/rss/headlines/college-football/' },
+  { name: 'cbs-ncaab', url: 'https://www.cbssports.com/rss/headlines/college-basketball/' },
+  
+  // Yahoo Sports - Pro
   { name: 'yahoo-sports', url: 'https://sports.yahoo.com/rss/' },
   { name: 'yahoo-nfl', url: 'https://sports.yahoo.com/nfl/rss.xml' },
   { name: 'yahoo-nba', url: 'https://sports.yahoo.com/nba/rss.xml' },
   { name: 'yahoo-nhl', url: 'https://sports.yahoo.com/nhl/rss.xml' },
   { name: 'yahoo-mlb', url: 'https://sports.yahoo.com/mlb/rss.xml' },
   
+  // Yahoo Sports - College
+  { name: 'yahoo-ncaaf', url: 'https://sports.yahoo.com/college-football/rss.xml' },
+  { name: 'yahoo-ncaab', url: 'https://sports.yahoo.com/college-basketball/rss.xml' },
+  
   // Bleacher Report
   { name: 'br-nfl', url: 'https://bleacherreport.com/articles/feed?tag_id=18' },
   { name: 'br-nba', url: 'https://bleacherreport.com/articles/feed?tag_id=20' },
+  { name: 'br-ncaaf', url: 'https://bleacherreport.com/articles/feed?tag_id=449' },
+  { name: 'br-ncaab', url: 'https://bleacherreport.com/articles/feed?tag_id=452' },
 ];
 const MAX_ITEMS_PER_FEED = 10;
 function timeoutAfter(ms) {
