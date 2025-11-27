@@ -23,6 +23,26 @@ interface LegUpdate {
   marginOfVictory: number
 }
 
+interface LockedPick {
+  leg_number?: number
+  gameDate?: string
+  game_date?: string
+  sport?: string
+  homeTeam?: string
+  home_team?: string
+  awayTeam?: string
+  away_team?: string
+  betType?: string
+  bet_type?: string
+  pick?: string
+  point?: number | null
+  spread?: number | null
+  odds?: string | number | null
+  result?: 'won' | 'lost' | 'push' | 'pending'
+  actual_value?: number | null
+  margin_of_victory?: number | null
+}
+
 serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -37,13 +57,10 @@ serve(async (req) => {
   try {
     console.log('🔍 Starting parlay outcome check...')
 
-    // Get all pending parlays with their legs
+    // Get all pending parlays
     const { data: pendingParlays, error: fetchError } = await supabase
       .from('parlays')
-      .select(`
-        *,
-        parlay_legs (*)
-      `)
+      .select('*')
       .eq('status', 'pending')
       .order('created_at', { ascending: true })
 
@@ -74,64 +91,133 @@ serve(async (req) => {
 
     for (const parlay of pendingParlays) {
       try {
-        console.log(`Checking parlay ${parlay.id} with ${parlay.parlay_legs.length} legs`)
+        const metadata = (parlay as any).metadata || {}
+        const lockedPicks = Array.isArray(metadata.locked_picks)
+          ? (metadata.locked_picks as LockedPick[])
+          : []
+
+        if (!lockedPicks.length) {
+          console.log(`Parlay ${parlay.id} has no metadata.locked_picks - skipping`)
+          results.push({
+            parlayId: parlay.id,
+            outcome: 'pending',
+            reason: 'No locked_picks metadata'
+          })
+          continue
+        }
+
+        console.log(`Checking parlay ${parlay.id} with ${lockedPicks.length} locked picks`)
 
         let allLegsResolved = true
         let wonLegs = 0
         let lostLegs = 0
         let pushLegs = 0
-        
-        const legUpdates: LegUpdate[] = []
 
-        for (const leg of parlay.parlay_legs) {
-          // Skip legs that are already resolved
-          if (leg.game_completed) {
-            if (leg.leg_result === 'won') wonLegs++
-            else if (leg.leg_result === 'lost') lostLegs++
-            else if (leg.leg_result === 'push') pushLegs++
+        const updatedLockedPicks: LockedPick[] = []
+
+        for (const leg of lockedPicks) {
+          if (leg.result && leg.result !== 'pending') {
+            if (leg.result === 'won') wonLegs++
+            else if (leg.result === 'lost') lostLegs++
+            else if (leg.result === 'push') pushLegs++
+            updatedLockedPicks.push(leg)
             continue
           }
 
-          // Check if the game has completed
-          const gameResult = await getGameResult(leg)
-          
-          if (!gameResult) {
+          const betTypeRaw = (leg.betType || leg.bet_type || '').toString()
+          const betTypeLower = betTypeRaw.toLowerCase()
+
+          if (
+            betTypeLower === 'player props' ||
+            betTypeLower === 'td' ||
+            betTypeLower === 'td props'
+          ) {
             allLegsResolved = false
-            continue // Game not completed yet
+            updatedLockedPicks.push({ ...leg, result: 'pending' })
+            continue
           }
 
-          // Determine leg outcome based on bet type
-          const legOutcome = determineLegOutcome(leg, gameResult)
-          
+          const gameDate = (leg.gameDate || leg.game_date) as string | undefined
+          const sport = (leg.sport as string) || undefined
+          const homeTeam = (leg.homeTeam || leg.home_team) as string | undefined
+          const awayTeam = (leg.awayTeam || leg.away_team) as string | undefined
+
+          if (!gameDate || !sport || !homeTeam || !awayTeam) {
+            allLegsResolved = false
+            updatedLockedPicks.push({ ...leg, result: 'pending' })
+            continue
+          }
+
+          const gameResult = await getGameResult({
+            game_date: gameDate,
+            sport,
+            home_team: homeTeam,
+            away_team: awayTeam
+          } as any)
+
+          if (!gameResult) {
+            allLegsResolved = false
+            updatedLockedPicks.push({ ...leg, result: 'pending' })
+            continue
+          }
+
+          const legOutcome = determineLockedPickOutcome(leg, gameResult)
+
           if (legOutcome) {
-            legUpdates.push({
-              legId: leg.id,
+            const updatedLeg: LockedPick = {
+              ...leg,
               result: legOutcome.result,
-              actualValue: legOutcome.actualValue,
-              marginOfVictory: legOutcome.marginOfVictory
-            })
+              actual_value: legOutcome.actualValue,
+              margin_of_victory: legOutcome.marginOfVictory
+            }
+
+            updatedLockedPicks.push(updatedLeg)
 
             if (legOutcome.result === 'won') wonLegs++
             else if (legOutcome.result === 'lost') lostLegs++
             else if (legOutcome.result === 'push') pushLegs++
           } else {
             allLegsResolved = false
+            updatedLockedPicks.push({ ...leg, result: 'pending' })
           }
         }
 
-        // Update individual legs
-        for (const update of legUpdates) {
-          await updateLegOutcome(update)
+        const updates: any = {
+          metadata: { ...metadata, locked_picks: updatedLockedPicks }
         }
 
-        // If all legs are resolved, update parlay outcome
         if (allLegsResolved) {
-          const parlayOutcome = calculateParlayOutcome(wonLegs, lostLegs, pushLegs)
-          await updateParlayOutcome(parlay.id, parlayOutcome, parlay)
-          
+          const parlayOutcome = calculateParlayOutcomeForLockedPicks(
+            wonLegs,
+            lostLegs,
+            pushLegs,
+            lockedPicks.length
+          )
+
+          const betAmount = (parlay as any).bet_amount || 100
+          let profitLoss = 0
+          if (parlayOutcome.outcome === 'won') {
+            const payout = (parlay as any).potential_payout || 0
+            profitLoss = payout - betAmount
+          } else if (parlayOutcome.outcome === 'lost') {
+            profitLoss = -betAmount
+          }
+
+          updates.status = 'completed'
+          updates.final_outcome = parlayOutcome.outcome
+          updates.hit_percentage = parlayOutcome.hitPercentage
+          updates.profit_loss = profitLoss
+
+          const { error: updateError } = await supabase
+            .from('parlays')
+            .update(updates)
+            .eq('id', parlay.id)
+
+          if (updateError) throw updateError
+
           console.log(`✅ Updated parlay ${parlay.id}: ${parlayOutcome.outcome}`)
           updatedCount++
-          
+
           results.push({
             parlayId: parlay.id,
             outcome: parlayOutcome.outcome,
@@ -140,11 +226,18 @@ serve(async (req) => {
             pushLegs
           })
         } else {
-          console.log(`⏳ Parlay ${parlay.id} still has unresolved games`)
+          const { error: metaError } = await supabase
+            .from('parlays')
+            .update(updates)
+            .eq('id', parlay.id)
+
+          if (metaError) throw metaError
+
+          console.log(`⏳ Parlay ${parlay.id} still has unresolved legs`)
           results.push({
             parlayId: parlay.id,
             outcome: 'pending',
-            reason: 'Games still pending'
+            reason: 'Legs still pending or unsupported bet types'
           })
         }
 
@@ -323,6 +416,125 @@ function determineLegOutcome(leg: any, gameResult: GameResult): any {
   }
 }
 
+function determineLockedPickOutcome(leg: LockedPick, gameResult: GameResult): any {
+  try {
+    const betTypeRaw = (leg.betType || leg.bet_type || '').toString().toLowerCase()
+    const homeScore = gameResult.homeScore
+    const awayScore = gameResult.awayScore
+    const scoreDiff = homeScore - awayScore
+
+    const homeTeam = (leg.homeTeam || leg.home_team || '').toString()
+    const awayTeam = (leg.awayTeam || leg.away_team || '').toString()
+    const pick = (leg.pick || '').toString()
+
+    if (!homeTeam || !awayTeam || !pick) {
+      return null
+    }
+
+    if (betTypeRaw === 'moneyline') {
+      return determineLockedMoneylineOutcome(pick, homeTeam, awayTeam, scoreDiff)
+    }
+
+    if (betTypeRaw === 'spread') {
+      return determineLockedSpreadOutcome(pick, leg.point, homeTeam, awayTeam, scoreDiff)
+    }
+
+    if (betTypeRaw === 'total' || betTypeRaw === 'totals (o/u)') {
+      return determineLockedTotalOutcome(pick, leg.point, homeScore + awayScore)
+    }
+
+    console.warn(`Unknown locked pick bet type: ${betTypeRaw}`)
+    return null
+  } catch (error) {
+    console.error('Error determining locked pick outcome:', error)
+    return null
+  }
+}
+
+function determineLockedMoneylineOutcome(pick: string, homeTeam: string, awayTeam: string, scoreDiff: number): any {
+  let pickedSide: 'home' | 'away' | null = null
+
+  if (teamsMatch(pick, homeTeam)) {
+    pickedSide = 'home'
+  } else if (teamsMatch(pick, awayTeam)) {
+    pickedSide = 'away'
+  } else {
+    return null
+  }
+
+  if (scoreDiff === 0) {
+    return { result: 'push', actualValue: 0, marginOfVictory: 0 }
+  }
+
+  const teamWon = pickedSide === 'home' ? scoreDiff > 0 : scoreDiff < 0
+
+  return {
+    result: teamWon ? 'won' : 'lost',
+    actualValue: scoreDiff,
+    marginOfVictory: Math.abs(scoreDiff)
+  }
+}
+
+function determineLockedSpreadOutcome(
+  pick: string,
+  line: number | null | undefined,
+  homeTeam: string,
+  awayTeam: string,
+  scoreDiff: number
+): any {
+  if (line === null || line === undefined) {
+    return null
+  }
+
+  let pickedSide: 'home' | 'away' | null = null
+
+  if (teamsMatch(pick, homeTeam)) {
+    pickedSide = 'home'
+  } else if (teamsMatch(pick, awayTeam)) {
+    pickedSide = 'away'
+  } else {
+    return null
+  }
+
+  const adjustedDiff = pickedSide === 'home' ? scoreDiff + line : -scoreDiff + line
+
+  if (Math.abs(adjustedDiff) < 1e-6) {
+    return { result: 'push', actualValue: adjustedDiff, marginOfVictory: 0 }
+  }
+
+  return {
+    result: adjustedDiff > 0 ? 'won' : 'lost',
+    actualValue: adjustedDiff,
+    marginOfVictory: Math.abs(adjustedDiff)
+  }
+}
+
+function determineLockedTotalOutcome(
+  pick: string,
+  line: number | null | undefined,
+  totalScore: number
+): any {
+  if (line === null || line === undefined) {
+    return null
+  }
+
+  const lowerPick = pick.toLowerCase()
+  const isOver = lowerPick.includes('over')
+  const diff = totalScore - line
+
+  if (Math.abs(diff) < 1e-6) {
+    return { result: 'push', actualValue: diff, marginOfVictory: 0 }
+  }
+
+  const won = isOver ? diff > 0 : diff < 0
+
+  return {
+    result: won ? 'won' : 'lost',
+    actualValue: diff,
+    marginOfVictory: Math.abs(diff)
+  }
+}
+
 /**
  * Check moneyline bet outcome
  */
@@ -456,6 +668,39 @@ function calculateParlayOutcome(wonLegs: number, lostLegs: number, pushLegs: num
   return {
     outcome: 'pending',
     hitPercentage: 0
+  }
+}
+
+function calculateParlayOutcomeForLockedPicks(
+  wonLegs: number,
+  lostLegs: number,
+  pushLegs: number,
+  totalLegs: number
+): any {
+  if (totalLegs === 0) {
+    return {
+      outcome: 'pending',
+      hitPercentage: 0
+    }
+  }
+
+  if (lostLegs > 0 || pushLegs > 0) {
+    return {
+      outcome: 'lost',
+      hitPercentage: (wonLegs / totalLegs) * 100
+    }
+  }
+
+  if (wonLegs === totalLegs) {
+    return {
+      outcome: 'won',
+      hitPercentage: 100
+    }
+  }
+
+  return {
+    outcome: 'pending',
+    hitPercentage: (wonLegs / totalLegs) * 100
   }
 }
 

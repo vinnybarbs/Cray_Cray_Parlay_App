@@ -162,6 +162,78 @@ const AIAgentsWorkflow = () => {
           </div>
         </div>
 
+        {/* Behind the Scenes Section */}
+        <div className="mt-12 space-y-4">
+          <h3 className="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 text-center mb-6">
+            Behind the Scenes 🎬
+          </h3>
+          
+          <div className="grid md:grid-cols-2 gap-4">
+            {/* Fresh Odds Card */}
+            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">📊</span>
+                <h4 className="font-bold text-yellow-400">Fresh Odds Every Hour</h4>
+              </div>
+              <p className="text-sm text-gray-300">
+                Odd-Job pulls live lines from multiple sportsbooks every hour, so you're always working with the latest odds. No stale data here.
+              </p>
+            </div>
+
+            {/* Real-Time News Card */}
+            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">📰</span>
+                <h4 className="font-bold text-blue-400">Real-Time News</h4>
+              </div>
+              <p className="text-sm text-gray-300">
+                Randy monitors 17 sports news sources (ESPN, CBS, Yahoo, Bleacher Report) every 3 hours. Fresh injury reports, player news, and trends.
+              </p>
+            </div>
+
+            {/* Smart Extraction Card */}
+            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">🤖</span>
+                <h4 className="font-bold text-purple-400">Smart News Extraction</h4>
+              </div>
+              <p className="text-sm text-gray-300">
+                Not just headlines—the system extracts actual facts: "Player X out 4 weeks (ankle)", "Team Y 8-2 ATS". Real intel with timestamps.
+              </p>
+            </div>
+
+            {/* Stats Refresh Card */}
+            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">📈</span>
+                <h4 className="font-bold text-green-400">Stats That Matter</h4>
+              </div>
+              <p className="text-sm text-gray-300">
+                Team records, player stats, and historical trends all cached and ready. Andy uses real numbers, not guesses.
+              </p>
+            </div>
+          </div>
+
+          {/* How Data Flows */}
+          <div className="mt-6 bg-gray-800/40 rounded-lg p-4 border border-gray-700">
+            <h4 className="font-semibold text-yellow-400 mb-3 text-center">⚡ Lightning Fast Data Pipeline</h4>
+            <div className="flex items-center justify-center gap-2 text-xs md:text-sm flex-wrap">
+              <span className="text-blue-400 font-semibold">News Feeds</span>
+              <span className="text-gray-500">→</span>
+              <span className="text-purple-400 font-semibold">Fact Extraction</span>
+              <span className="text-gray-500">→</span>
+              <span className="text-yellow-400 font-semibold">Fresh Odds</span>
+              <span className="text-gray-500">→</span>
+              <span className="text-green-400 font-semibold">AI Analysis</span>
+              <span className="text-gray-500">→</span>
+              <span className="text-red-400 font-semibold">Your Pick</span>
+            </div>
+            <p className="text-xs text-gray-400 text-center mt-3">
+              Everything updates automatically. You just show up and gamble responsibly (or don't, we're not your dad).
+            </p>
+          </div>
+        </div>
+
         {/* Bottom tagline */}
         <div className="mt-8 text-center">
           <p className="text-xs text-gray-500 italic">
@@ -869,7 +941,7 @@ export default function MainApp() {
         <div className="fixed inset-x-0 bottom-0 z-40">
           <div className="max-w-2xl mx-auto px-4 pb-3">
             <div className="bg-gray-900/95 border border-gray-700 rounded-t-2xl shadow-2xl px-3 py-2 space-y-2">
-              {lockMessage && (
+              {lockMessage && selectedPicks.length === 0 && (
                 <div className="w-full text-center text-xs px-2 py-1 rounded-md bg-green-900/80 border border-green-500 text-green-100">
                   {lockMessage}
                 </div>

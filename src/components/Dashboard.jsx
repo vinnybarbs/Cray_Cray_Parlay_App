@@ -119,6 +119,45 @@ export default function Dashboard({ onClose }) {
     }
   }
 
+  const handleCopySummary = (parlay) => {
+    if (!parlay.metadata || !parlay.metadata.locked_picks || parlay.metadata.locked_picks.length === 0) {
+      alert('No picks to copy')
+      return
+    }
+
+    // Build concise summary
+    const picks = parlay.metadata.locked_picks.map((leg, index) => {
+      const propMeta = parseLockedPlayerProp(leg)
+      let pickText = ''
+      
+      if (leg.betType === 'Player Props' || leg.betType === 'TD') {
+        pickText = propMeta 
+          ? `${propMeta.direction} ${propMeta.coreText}`
+          : leg.pick
+      } else {
+        pickText = `${leg.pick}`
+        if (leg.point != null && leg.betType === 'Spread') {
+          pickText += ` ${leg.point > 0 ? '+' : ''}${leg.point}`
+        }
+      }
+
+      return `${index + 1}. ${leg.awayTeam} @ ${leg.homeTeam} - ${leg.betType}: ${pickText} (${leg.odds})`
+    }).join('\n')
+
+    const summary = `${parlay.total_legs}-Leg Parlay\n` +
+      `Odds: ${parlay.combined_odds} | Payout: $${parlay.potential_payout}\n` +
+      `Book: ${parlay.sportsbook}\n\n` +
+      `Picks:\n${picks}`
+
+    // Copy to clipboard
+    navigator.clipboard.writeText(summary).then(() => {
+      alert('✅ Parlay summary copied to clipboard!')
+    }).catch(err => {
+      console.error('Failed to copy:', err)
+      alert('❌ Failed to copy. Please try again.')
+    })
+  }
+
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-700">
@@ -201,12 +240,21 @@ export default function Dashboard({ onClose }) {
                         <span className="text-yellow-400 text-xs">🔒 LOCK</span>
                       )}
                       {parlay.is_lock_bet && (
-                        <button
-                          onClick={() => handleDeleteParlay(parlay.id)}
-                          className="text-xs text-red-400 hover:text-red-200"
-                        >
-                          🗑 Delete
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleCopySummary(parlay)}
+                            className="text-xs text-blue-400 hover:text-blue-200 transition-colors"
+                            title="Copy summary to place bet at sportsbook"
+                          >
+                            📋 Copy
+                          </button>
+                          <button
+                            onClick={() => handleDeleteParlay(parlay.id)}
+                            className="text-xs text-red-400 hover:text-red-200 transition-colors"
+                          >
+                            🗑 Delete
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>

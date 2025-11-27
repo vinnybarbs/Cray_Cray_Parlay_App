@@ -1,3 +1,5 @@
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY') || '';
@@ -8,21 +10,33 @@ if (!DB_ENABLED) {
   console.log('[ingest-news] DB writes ENABLED: using SUPABASE_URL from env');
 }
 const FEEDS = [
-  {
-    name: 'espn-news',
-    url: 'https://www.espn.com/espn/rss/news'
-  },
-  {
-    name: 'espn-nfl',
-    url: 'https://www.espn.com/espn/rss/nfl/news'
-  },
-  {
-    name: 'espn-nba',
-    url: 'https://www.espn.com/espn/rss/nba/news'
-  }
+  // ESPN
+  { name: 'espn-news', url: 'https://www.espn.com/espn/rss/news' },
+  { name: 'espn-nfl', url: 'https://www.espn.com/espn/rss/nfl/news' },
+  { name: 'espn-nba', url: 'https://www.espn.com/espn/rss/nba/news' },
+  { name: 'espn-nhl', url: 'https://www.espn.com/espn/rss/nhl/news' },
+  { name: 'espn-mlb', url: 'https://www.espn.com/espn/rss/mlb/news' },
+  
+  // CBS Sports
+  { name: 'cbs-headlines', url: 'https://www.cbssports.com/rss/headlines/' },
+  { name: 'cbs-nfl', url: 'https://www.cbssports.com/rss/headlines/nfl/' },
+  { name: 'cbs-nba', url: 'https://www.cbssports.com/rss/headlines/nba/' },
+  { name: 'cbs-nhl', url: 'https://www.cbssports.com/rss/headlines/nhl/' },
+  { name: 'cbs-mlb', url: 'https://www.cbssports.com/rss/headlines/mlb/' },
+  
+  // Yahoo Sports
+  { name: 'yahoo-sports', url: 'https://sports.yahoo.com/rss/' },
+  { name: 'yahoo-nfl', url: 'https://sports.yahoo.com/nfl/rss.xml' },
+  { name: 'yahoo-nba', url: 'https://sports.yahoo.com/nba/rss.xml' },
+  { name: 'yahoo-nhl', url: 'https://sports.yahoo.com/nhl/rss.xml' },
+  { name: 'yahoo-mlb', url: 'https://sports.yahoo.com/mlb/rss.xml' },
+  
+  // Bleacher Report
+  { name: 'br-nfl', url: 'https://bleacherreport.com/articles/feed?tag_id=18' },
+  { name: 'br-nba', url: 'https://bleacherreport.com/articles/feed?tag_id=20' },
 ];
-const MAX_FEEDS_PER_RUN = 1;
-const MAX_ITEMS_PER_FEED = 5;
+const MAX_FEEDS_PER_RUN = 5;
+const MAX_ITEMS_PER_FEED = 10;
 function timeoutAfter(ms) {
   return new Promise((_, reject)=>setTimeout(()=>reject(new Error('timeout')), ms));
 }
@@ -91,39 +105,53 @@ async function supabasePost(path, body) {
 }
 function parseRss(xmlText) {
   try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xmlText, 'application/xml');
-    const items = Array.from(doc.querySelectorAll('item'));
-    return items.map((it)=>{
-      const title = it.querySelector('title')?.textContent ?? '';
-      const link = it.querySelector('link')?.textContent ?? '';
-      const guid = it.querySelector('guid')?.textContent ?? '';
-      const pubDate = it.querySelector('pubDate')?.textContent ?? '';
-      const description = it.querySelector('description')?.textContent ?? '';
-      const content = it.querySelector('content\\:encoded')?.textContent ?? '';
-      return {
-        title,
-        link,
-        guid,
-        pubDate,
-        description,
-        content
+    const items = [];
+    // Simple regex-based RSS parser (works reliably in Deno)
+    const itemRegex = /<item[^>]*>([\s\S]*?)<\/item>/gi;
+    const matches = xmlText.matchAll(itemRegex);
+    
+    for (const match of matches) {
+      const itemXml = match[1];
+      const extractTag = (tag: string) => {
+        const tagRegex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
+        const tagMatch = itemXml.match(tagRegex);
+        if (!tagMatch) return '';
+        // Decode HTML entities and strip CDATA
+        let content = tagMatch[1].trim();
+        content = content.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1');
+        content = content
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .replace(/&quot;/g, '"')
+          .replace(/&apos;/g, "'");
+        return content;
       };
-    });
+      
+      items.push({
+        title: extractTag('title'),
+        link: extractTag('link'),
+        guid: extractTag('guid'),
+        pubDate: extractTag('pubDate'),
+        description: extractTag('description'),
+        content: extractTag('content:encoded') || extractTag('content')
+      });
+    }
+    
+    return items;
   } catch (e) {
     console.warn('parseRss error', e?.message || e);
     return [];
   }
 }
-export default async function handler(req) {
+// Background processing function
+async function processFeeds() {
   const runStarted = Date.now();
-  const MAX_TOTAL_RUN_MS = 28000; // keep under ~30s
+  const MAX_TOTAL_RUN_MS = 120000; // 2 minutes max for background job
   const jobName = 'ingest-news';
-  const runLog: any = {
-    job_name: jobName,
-    started_at: new Date(runStarted).toISOString(),
-    status: 'started'
-  };
+  
+  console.log('[ingest-news] Background processing started');
+  
   try {
     const feedsToProcess = FEEDS.slice(0, MAX_FEEDS_PER_RUN);
     let sourcesCreated = 0;
@@ -212,61 +240,62 @@ export default async function handler(req) {
         console.warn('Feed error', feed.url, feedErr?.message || feedErr);
       }
     }
-    runLog.status = 'success';
-    runLog.finished_at = new Date().toISOString();
-    runLog.sources_created = sourcesCreated;
-    runLog.articles_inserted = articlesInserted;
-    const details = {
-      sources_created: sourcesCreated,
-      articles_inserted: articlesInserted,
-      feeds_processed: feedsToProcess.length
-    };
+    console.log('[ingest-news] Background processing complete', { 
+      sourcesCreated, 
+      articlesInserted, 
+      feedsProcessed: feedsToProcess.length 
+    });
+    
     if (DB_ENABLED) {
       try {
         await supabasePost('cron_job_logs', {
           job_name: jobName,
           status: 'completed',
-          details: JSON.stringify(details)
+          details: JSON.stringify({
+            sources_created: sourcesCreated,
+            articles_inserted: articlesInserted,
+            feeds_processed: feedsToProcess.length
+          })
         });
       } catch (e) {
         console.warn('cron log write failed', e instanceof Error ? e.message : String(e));
       }
     }
-    return new Response(JSON.stringify({
-      status: 'ok',
-      run: runLog
-    }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Connection': 'keep-alive'
-      }
-    });
   } catch (err) {
-    runLog.status = 'failed';
-    runLog.finished_at = new Date().toISOString();
     const errMsg = err instanceof Error ? err.message : String(err);
-    runLog.detail = { message: errMsg };
+    console.error('[ingest-news] Background error:', errMsg);
 
-    if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+    if (DB_ENABLED) {
       try {
         await supabasePost('cron_job_logs', {
           job_name: jobName,
           status: 'failed',
-          details: JSON.stringify({ error: runLog.detail })
+          details: JSON.stringify({ error: errMsg })
         });
       } catch (e) {
         console.warn('cron log write failed', e instanceof Error ? e.message : String(e));
       }
     }
-    return new Response(JSON.stringify({
-      status: 'error',
-      error: runLog
-    }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
   }
 }
+
+serve(async (req: Request) => {
+  console.log('[ingest-news] Request received, starting background job');
+  
+  // Return immediately
+  const response = new Response(
+    JSON.stringify({ 
+      status: 'accepted', 
+      message: 'RSS ingestion started in background',
+      timestamp: new Date().toISOString()
+    }),
+    { status: 202, headers: { 'Content-Type': 'application/json' } }
+  );
+  
+  // Process in background (fire and forget)
+  processFeeds().catch(err => {
+    console.error('[ingest-news] Background job failed:', err);
+  });
+  
+  return response;
+});
