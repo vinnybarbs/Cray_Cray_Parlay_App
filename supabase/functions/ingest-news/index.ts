@@ -40,14 +40,12 @@ const FEEDS = [
   { name: 'yahoo-mlb', url: 'https://sports.yahoo.com/mlb/rss.xml' },
   
   // Yahoo Sports - College
-  { name: 'yahoo-ncaaf', url: 'https://sports.yahoo.com/college-football/rss.xml' },
-  { name: 'yahoo-ncaab', url: 'https://sports.yahoo.com/college-basketball/rss.xml' },
+  { name: 'yahoo-ncaaf', url: 'https://sports.yahoo.com/college-football/rss/' },
+  { name: 'yahoo-ncaab', url: 'https://sports.yahoo.com/college-basketball/rss/' },
   
-  // Bleacher Report
+  // Bleacher Report (college feeds not available)
   { name: 'br-nfl', url: 'https://bleacherreport.com/articles/feed?tag_id=18' },
   { name: 'br-nba', url: 'https://bleacherreport.com/articles/feed?tag_id=20' },
-  { name: 'br-ncaaf', url: 'https://bleacherreport.com/articles/feed?tag_id=449' },
-  { name: 'br-ncaab', url: 'https://bleacherreport.com/articles/feed?tag_id=452' },
 ];
 const MAX_ITEMS_PER_FEED = 10;
 function timeoutAfter(ms) {
