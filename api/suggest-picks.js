@@ -627,17 +627,20 @@ async function suggestPicksHandler(req, res) {
       suggestionCount
     } = req.body;
 
-    // Determine number of suggestions with sane defaults/limits
+    // Determine number of suggestions based on bet types selected
+    // More bet types = more suggestions needed
+    const betTypeCount = selectedBetTypes.length;
+    const defaultSuggestions = betTypeCount >= 3 ? 25 : betTypeCount >= 2 ? 20 : 15;
+    
     let numSuggestions = Number.isFinite(Number(suggestionCount))
       ? Number(suggestionCount)
-      : 12;
-    numSuggestions = Math.max(8, Math.min(30, Math.round(numSuggestions)));
+      : defaultSuggestions;
     
-    // Production optimization: reduce scope for faster responses
+    // Cap at reasonable max (30 for fast generation, more if needed)
+    numSuggestions = Math.max(10, Math.min(40, Math.round(numSuggestions)));
+    
+    // Production: Allow full range for better user experience
     const isProduction = process.env.NODE_ENV === 'production';
-    if (isProduction) {
-      numSuggestions = Math.min(numSuggestions, 12);
-    }
 
     logger.info('Generating pick suggestions', {
       selectedSports,
