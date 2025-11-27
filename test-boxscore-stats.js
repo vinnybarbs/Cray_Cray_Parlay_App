@@ -31,6 +31,8 @@ async function testBoxScoreStats() {
   console.log(`📊 Fetching stats for ${testPlayers.length} players with active props...\n`);
   
   try {
+    console.log('📍 Debug: Starting stats fetch...\n');
+    
     // Fetch stats using box score approach
     const playerStats = await statsService.getStatsForPlayers(testPlayers, 'NFL');
     
