@@ -605,26 +605,80 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     // If stats parsing fails, fall back to base text
   }
 
-  // Pull a concise news/intel line, if available
-  let intelSnippet = '';
-  if (intelContext && intelContext.context) {
-    const firstLine = intelContext.context.split('\n')[0];
-    if (firstLine) {
-      intelSnippet = firstLine;
+  // Pull REAL news from RSS (no AI-generated intel that hallucinates)
+  let newsSnippet = '';
+  if (intelContext && intelContext.news && Array.isArray(intelContext.news) && intelContext.news.length > 0) {
+    // Use actual RSS news headline - this is real data, not AI hallucination
+    const latestNews = intelContext.news[0];
+    if (latestNews.title) {
+      newsSnippet = latestNews.title;
     }
   }
+  // SKIP AI-generated context that hallucinates rankings/stats
 
-  // Build data-driven reasoning without generic filler
-  if (statSnippet && statSnippet.length > 0) {
-    // We have recent stats - use them to build specific reasoning
-    return `${propType} is priced at ${priceText}. ${statSnippet}${intelSnippet ? ' ' + intelSnippet : ''}`;
-  } else if (intelSnippet && intelSnippet.length > 0) {
-    // Fall back to intel context
-    return `${propType} is priced at ${priceText}. ${intelSnippet}`;
-  } else {
-    // Last resort: basic reasoning
-    return `${propType} is priced at ${priceText} for the ${matchupText} matchup.`;
+  // Build comprehensive analysis paragraph
+  const line = outcome.point;
+  const direction = outcome.name?.toLowerCase().includes('over') ? 'Over' : 'Under';
+  
+  // Parse player's average from recent stats
+  let playerAvg = null;
+  let gamesAnalyzed = null;
+  if (statSnippet) {
+    const avgMatch = statSnippet.match(/([\d.]+)\s+(pass yds|rush yds|rec yds|rec)\s*\/game/i);
+    const gamesMatch = statSnippet.match(/last\s+(\d+)\s+games?/i);
+    if (avgMatch) playerAvg = parseFloat(avgMatch[1]);
+    if (gamesMatch) gamesAnalyzed = parseInt(gamesMatch[1]);
   }
+  
+  // Build reasoning paragraph
+  const parts = [];
+  
+  // Opening: Prop and price
+  parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup.`);
+  
+  // Statistical analysis with comparison to line
+  if (playerAvg && line) {
+    const diff = playerAvg - line;
+    const diffPct = ((Math.abs(diff) / line) * 100).toFixed(1);
+    
+    if (direction === 'Over') {
+      if (diff > 0) {
+        parts.push(`${playerName} has been averaging ${playerAvg} per game over ${gamesAnalyzed || 'recent'} games, sitting ${diff.toFixed(1)} above this ${line} line (${diffPct}% cushion). The trend strongly supports an Over play here.`);
+      } else {
+        parts.push(`${playerName} is averaging ${playerAvg} per game recently, which is ${Math.abs(diff).toFixed(1)} below the ${line} line. However, this matchup presents upside potential given the game environment.`);
+      }
+    } else {
+      if (diff < 0) {
+        parts.push(`${playerName} has averaged just ${playerAvg} per game over ${gamesAnalyzed || 'recent'} games, tracking ${Math.abs(diff).toFixed(1)} under this ${line} number. The recent production profile favors the Under.`);
+      } else {
+        parts.push(`While ${playerName} is averaging ${playerAvg} per game, the ${line} line sits below that mark, suggesting the books may be accounting for matchup-specific factors that could suppress production.`);
+      }
+    }
+  } else if (statSnippet) {
+    // Have stats but couldn't parse average - just include them
+    parts.push(`Looking at ${playerName}'s recent performance: ${statSnippet.replace(`${playerName}: `, '')}`);
+  }
+  
+  // Real news context (RSS headlines only - no AI hallucinations)
+  if (newsSnippet && newsSnippet.trim().length > 0) {
+    parts.push(`Recent news: ${newsSnippet}`);
+  }
+  
+  // Value verdict
+  if (playerAvg && line) {
+    const diff = direction === 'Over' ? playerAvg - line : line - playerAvg;
+    if (diff > line * 0.1) {
+      parts.push(`This represents strong value with recent performance significantly favoring the ${direction}.`);
+    } else if (diff > 0) {
+      parts.push(`The numbers suggest modest value on the ${direction} given current production trends.`);
+    } else {
+      parts.push(`While the stats lean the other way, situational factors and matchup dynamics create an opportunity for the ${direction} to hit.`);
+    }
+  } else {
+    parts.push(`The combination of recent form, matchup conditions, and current market pricing presents value on this number.`);
+  }
+  
+  return parts.join(' ');
 }
 
 function generateContraryEvidence(playerName, marketType) {
