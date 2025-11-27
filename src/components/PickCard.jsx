@@ -190,9 +190,9 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         )}
         
         {/* Always show game spread for context (for all bet types) */}
-        {(pick.spread !== undefined && pick.spread !== null && pick.spread !== '') && (
-          <div className="text-xs text-gray-500 mt-1">
-            Game Spread: {pick.homeTeam} {pick.spread > 0 ? '+' : ''}{pick.spread}
+        {(pick.spread !== undefined && pick.spread !== null && pick.spread !== '' && pick.spread !== 0) && (
+          <div className="text-xs text-gray-400 mt-1">
+            (Game spread: {pick.homeTeam} {pick.spread > 0 ? '+' : ''}{pick.spread})
           </div>
         )}
       </div>
