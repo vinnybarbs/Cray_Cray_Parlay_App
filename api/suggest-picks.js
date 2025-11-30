@@ -968,31 +968,11 @@ async function suggestPicksHandler(req, res) {
       });
     }
 
-    // Initialize cache service
-    const cache = new SuggestionsCache(supabase);
+    // CACHE DISABLED for game day - odds change too fast
+    // TODO: Re-enable for non-game-day scenarios (tomorrow's games, etc)
+    // const cache = new SuggestionsCache(supabase);
     
-    // Check cache first - avoid regenerating same picks
-    const cached = await cache.getCached({
-      sports: selectedSports,
-      betTypes: selectedBetTypes,
-      riskLevel,
-      dateRange
-    });
-    
-    if (cached) {
-      // Return cached suggestions instantly
-      return res.json({
-        success: true,
-        suggestions: cached.suggestions.slice(0, numSuggestions),
-        totalAvailable: cached.suggestions.length,
-        cached: true,
-        cacheAge: cached.cacheAge,
-        generatedAt: cached.generatedAt,
-        message: `Loaded ${cached.suggestions.length} cached suggestions (${cached.cacheAge}min old)`
-      });
-    }
-    
-    console.log('📭 Cache miss - generating fresh suggestions...');
+    console.log('📭 Generating fresh suggestions (cache disabled for game day)...');
 
     // Initialize coordinator with supabase for odds caching
     const fetcher = global.fetch || require('node-fetch');
@@ -1092,18 +1072,8 @@ async function suggestPicksHandler(req, res) {
       duration: `${duration}ms`
     });
 
-    // Store in cache for future requests
-    await cache.store(
-      {
-        sports: selectedSports,
-        betTypes: selectedBetTypes,
-        riskLevel,
-        dateRange
-      },
-      shuffled,
-      allSuggestions[0]?.analyticalSummary || 'AI-generated suggestions',
-      {} // TODO: Store odds snapshot for staleness detection
-    );
+    // CACHE DISABLED - Don't store (odds change too fast on game day)
+    // await cache.store(...)
     
     // Store AI suggestions for tracking model performance
     const sessionId = await storeAISuggestions(shuffled, {
