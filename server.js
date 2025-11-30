@@ -348,6 +348,10 @@ app.post('/api/check-parlays', checkParlayOutcomes);
 app.patch('/api/parlays/:id/outcome', ...manualParlayUpdate);
 app.get('/api/parlays/pending', ...getPendingParlays);
 
+// Cron endpoint for automated parlay checking
+const cronCheckParlays = require('./api/cron-check-parlays');
+app.post('/api/cron/check-parlays', cronCheckParlays);
+
 // Add learning analysis endpoints
 const { analyzeOutcomes, getLessons, getPerformanceSummary } = require('./api/analyze-outcomes');
 app.post('/api/analyze-outcomes', analyzeOutcomes);
