@@ -29,6 +29,22 @@ All automated tasks for Cray Cray Parlay App using Supabase `pg_cron`.
 
 ---
 
+### 1.5. News Summarization (Background Processing)
+**Runs:** Every day at 7 AM PT (15:00 UTC)  
+**Script:** `supabase/migrations/setup_news_summarization_cron.sql`  
+**Endpoint:** `POST /api/cron/summarize-news`
+
+**What it does:**
+- Fetches unsummarized news from last 24h
+- Uses OpenAI (gpt-4o-mini) to extract betting-relevant insights
+- Stores summaries in `news_articles` table
+- Reduces prompt size from 27k → ~3k tokens
+- AI gets pre-computed insights (not raw HTML)
+
+**API Usage:** ~5-10 OpenAI calls/day (gpt-4o-mini = $0.01-0.02/day)
+
+---
+
 ### 2. Weekly Stats Sync (API-Sports)
 **Runs:** Every Tuesday at 3 AM PT (11:00 UTC)  
 **Script:** `supabase/migrations/setup_weekly_stats_cron.sql`  
