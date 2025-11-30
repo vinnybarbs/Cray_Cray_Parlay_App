@@ -108,8 +108,10 @@ const parsePlayerPropPick = (pick) => {
   if (!playerName || !directionRaw || Number.isNaN(lineNumber) || !marketLabel) return null;
 
   const direction = directionRaw.charAt(0).toUpperCase() + directionRaw.slice(1).toLowerCase();
-  const lineText = `${lineNumber > 0 ? '+' : ''}${lineNumber}`;
-  const coreText = `${playerName} ${lineText} ${marketLabel}`;
+  // For Over/Under props, don't add + sign - it's a threshold, not a spread
+  // Format: "24.5 — Breece Hall reception yds" (direction is added separately in display)
+  const lineText = `${lineNumber}`;
+  const coreText = `${lineText} — ${playerName} ${marketLabel}`;
 
   return { direction, coreText };
 }
