@@ -354,6 +354,11 @@ app.post('/api/analyze-outcomes', analyzeOutcomes);
 app.get('/api/lessons', getLessons);
 app.get('/api/performance-summary', getPerformanceSummary);
 
+// Add API-Sports sync endpoints
+const { syncApiSports, getSyncStatus } = require('./api/sync-apisports');
+app.post('/api/sync-apisports', syncApiSports);
+app.get('/api/sync-apisports/status', getSyncStatus);
+
 // Add user parlay management endpoints
 const { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } = require('./api/user-parlays');
 app.get('/api/user/parlays', getUserParlays);
