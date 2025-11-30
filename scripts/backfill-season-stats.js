@@ -19,14 +19,17 @@ async function backfill() {
 
   const sync = new ApiSportsSync();
   const season = 2025;
-  const currentWeek = 13; // Update this to current NFL week
 
   try {
-    console.log(`📊 Backfilling weeks 1-${currentWeek}...`);
-    console.log('This may take a few minutes...\n');
+    console.log(`📊 Backfilling entire ${season} season...`);
+    console.log('This will:');
+    console.log('- Fetch all season games (1 API call)');
+    console.log('- Sync team stats for each completed game');
+    console.log('- Sync player stats for each completed game');
+    console.log('This may take 5-10 minutes...\n');
 
-    // Sync ALL weeks from 1 to current
-    const stats = await sync.syncRecentGameStats(currentWeek, season, 1);
+    // Sync ALL completed games (onlyNew = false)
+    const stats = await sync.syncRecentGameStats(false, season, 1);
     
     console.log('\n✅ Backfill complete!');
     console.log(`Team game stats: ${stats.teamGames}`);
