@@ -181,12 +181,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           )}
         </div>
         
-        {/* Special formatting for player props: explicit Over/Under + human line */}
-        {propMeta && (
-          <div className="text-xs text-green-400 mt-1 font-medium">
-            Betting: {propMeta.direction} - {propMeta.coreText}
-          </div>
-        )}
+        {/* Player props already show full details above - no need for redundant line */}
 
         {/* Show line for totals when displayed separately */}
         {!propMeta && pick.betType === 'Total' && pick.point !== undefined && pick.point !== null && (
