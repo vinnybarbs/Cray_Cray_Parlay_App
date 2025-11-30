@@ -16,11 +16,20 @@ async function syncApiSports(req, res) {
     logger.info('Starting API-Sports sync...');
     
     const sync = new ApiSportsSync();
-    const results = await sync.dailySync();
+    const { type = 'daily' } = req.query; // 'daily' or 'weekly'
+    
+    let results;
+    if (type === 'weekly') {
+      // Run weekly stats sync
+      results = await sync.weeklySync(null, 1); // 1 = NFL
+    } else {
+      // Run daily sync (default)
+      results = await sync.dailySync();
+    }
     
     res.json({
       success: true,
-      message: 'API-Sports sync completed',
+      message: `API-Sports ${type} sync completed`,
       results: {
         standings: results.standings,
         injuries: results.injuries,

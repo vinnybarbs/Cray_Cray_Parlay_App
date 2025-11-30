@@ -68,7 +68,8 @@ CREATE TABLE IF NOT EXISTS team_stats_detailed (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   team_id UUID REFERENCES teams(id),
   season INTEGER NOT NULL,
-  week INTEGER, -- NULL for season totals
+  week INTEGER, -- Game week number
+  game_id VARCHAR(50), -- API-Sports game ID for game-level stats
   
   -- Offense
   points_per_game DECIMAL(5,2),
