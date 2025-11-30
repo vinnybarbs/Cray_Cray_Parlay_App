@@ -13,19 +13,20 @@ async function populate() {
   console.log('=====================================\n');
 
   const sync = new ApiSportsSync();
+  const season = 2025; // Use 2025 season (current season)
 
   try {
     // Step 1: Sync Teams
     console.log('Step 1: Syncing NFL Teams...');
-    const teams = await sync.syncTeams(1); // 1 = NFL
+    const teams = await sync.syncTeams(season, 1); // season, league (1 = NFL)
     console.log(`✅ Synced ${teams.synced} teams\n`);
 
-    // Step 2: Sync Standings
+    // Step 2: Sync Standings  
     console.log('Step 2: Syncing Current Standings...');
-    const standings = await sync.syncStandings();
+    const standings = await sync.syncStandings(season);
     console.log(`✅ Synced ${standings.synced} team standings\n`);
 
-    // Step 3: Sync Injuries (CRITICAL)
+    // Step 3: Sync Injuries (CRITICAL) - uses current data, no season needed
     console.log('Step 3: Syncing Current Injuries...');
     const injuries = await sync.syncInjuries();
     console.log(`✅ Synced ${injuries.synced} injury reports\n`);

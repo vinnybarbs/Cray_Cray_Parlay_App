@@ -33,6 +33,9 @@ CREATE TABLE IF NOT EXISTS players (
   UNIQUE(apisports_id, league)
 );
 
+-- Add active column if table already existed without it
+ALTER TABLE players ADD COLUMN IF NOT EXISTS active BOOLEAN DEFAULT true;
+
 CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
 CREATE INDEX IF NOT EXISTS idx_players_position ON players(position);
 CREATE INDEX IF NOT EXISTS idx_players_active ON players(active) WHERE active = true;
