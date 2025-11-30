@@ -1,33 +1,46 @@
 /**
- * Cron endpoint to automatically check parlay outcomes
+ * Cron endpoint to automatically check outcomes
  * Called daily by Supabase pg_cron
+ * 
+ * Checks TWO things:
+ * 1. User Parlay Outcomes (parlay_legs table) - for user dashboard
+ * 2. AI Suggestion Outcomes (ai_suggestions table) - for model accuracy tracking
  * 
  * URL: POST /api/cron/check-parlays
  */
 
 const ParlayOutcomeChecker = require('../lib/services/parlay-outcome-checker');
+const AISuggestionOutcomeChecker = require('../lib/services/ai-suggestion-outcome-checker');
 const { logger } = require('../shared/logger');
 
 async function cronCheckParlays(req, res) {
   try {
-    logger.info('🎲 Starting automated parlay outcome check...');
+    logger.info('🎲 Starting automated outcome check...');
     
-    const checker = new ParlayOutcomeChecker();
-    const result = await checker.checkAllPendingParlays();
+    // 1. Check user parlay outcomes
+    const parlayChecker = new ParlayOutcomeChecker();
+    const parlayResult = await parlayChecker.checkAllPendingParlays();
     
-    logger.info(`✅ Parlay check complete: ${result.checked} checked, ${result.updated} updated`);
+    logger.info(`✅ Parlay check complete: ${parlayResult.checked} checked, ${parlayResult.updated} updated`);
+    
+    // 2. Check AI suggestion outcomes (for model accuracy)
+    const suggestionChecker = new AISuggestionOutcomeChecker();
+    const suggestionResult = await suggestionChecker.checkAllPendingSuggestions();
+    
+    logger.info(`✅ AI suggestion check complete: ${suggestionResult.checked} checked, ${suggestionResult.updated} updated`);
     
     res.json({
       success: true,
-      message: `Checked ${result.checked} parlays, updated ${result.updated}`,
+      message: `Checked ${parlayResult.checked} parlays and ${suggestionResult.checked} AI suggestions`,
       timestamp: new Date().toISOString(),
-      ...result
+      parlays: parlayResult,
+      suggestions: suggestionResult
     });
     
   } catch (error) {
-    logger.error('❌ Error in cron parlay check:', error);
+    logger.error('❌ Error in cron outcome check:', error);
     res.status(500).json({ 
-      error: 'Failed to check parlay outcomes',
+      error: 'Failed to check outcomes',
       details: error.message,
       timestamp: new Date().toISOString()
     });
