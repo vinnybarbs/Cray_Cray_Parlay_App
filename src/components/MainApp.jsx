@@ -619,7 +619,6 @@ export default function MainApp() {
         game_date: pick.gameDate,
         bet_type: pick.betType,
         pick: pick.pick,
-        pick_text: pick.pick, // Alias for compatibility
         odds: pick.odds,
         point: pick.point,
         confidence: pick.confidence || 7,

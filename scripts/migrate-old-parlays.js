@@ -79,7 +79,6 @@ async function migrateOldParlays() {
             game_date: gameDate,
             bet_type: betType,
             pick: pick.pick,
-            pick_text: pick.pick,
             odds: pick.odds?.toString() || '+100',
             point: pick.point || pick.spread || null,
             confidence: pick.confidence || 7,
