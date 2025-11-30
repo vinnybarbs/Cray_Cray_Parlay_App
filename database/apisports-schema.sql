@@ -33,9 +33,9 @@ CREATE TABLE IF NOT EXISTS players (
   UNIQUE(apisports_id, league)
 );
 
-CREATE INDEX idx_players_team ON players(team_id);
-CREATE INDEX idx_players_position ON players(position);
-CREATE INDEX idx_players_active ON players(active) WHERE active = true;
+CREATE INDEX IF NOT EXISTS idx_players_team ON players(team_id);
+CREATE INDEX IF NOT EXISTS idx_players_position ON players(position);
+CREATE INDEX IF NOT EXISTS idx_players_active ON players(active) WHERE active = true;
 
 -- ============================================
 -- 3. INJURIES (The Game Changer!)
@@ -53,9 +53,9 @@ CREATE TABLE IF NOT EXISTS injuries (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_injuries_player ON injuries(player_id);
-CREATE INDEX idx_injuries_team ON injuries(team_id);
-CREATE INDEX idx_injuries_current ON injuries(is_current) WHERE is_current = true;
+CREATE INDEX IF NOT EXISTS idx_injuries_player ON injuries(player_id);
+CREATE INDEX IF NOT EXISTS idx_injuries_team ON injuries(team_id);
+CREATE INDEX IF NOT EXISTS idx_injuries_current ON injuries(is_current) WHERE is_current = true;
 
 -- ============================================
 -- 4. TEAM STATS (Season & Game Level)
@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS team_stats_detailed (
   UNIQUE(team_id, season, week)
 );
 
-CREATE INDEX idx_team_stats_season ON team_stats_detailed(team_id, season);
+CREATE INDEX IF NOT EXISTS idx_team_stats_season ON team_stats_detailed(team_id, season);
 
 -- ============================================
 -- 5. PLAYER GAME STATS (Historical Performance)
@@ -127,8 +127,8 @@ CREATE TABLE IF NOT EXISTS player_game_stats (
   UNIQUE(player_id, game_id)
 );
 
-CREATE INDEX idx_player_game_stats_player ON player_game_stats(player_id, game_date DESC);
-CREATE INDEX idx_player_game_stats_game ON player_game_stats(game_id);
+CREATE INDEX IF NOT EXISTS idx_player_game_stats_player ON player_game_stats(player_id, game_date DESC);
+CREATE INDEX IF NOT EXISTS idx_player_game_stats_game ON player_game_stats(game_id);
 
 -- ============================================
 -- 6. PLAYER SEASON STATS (Aggregated)
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
   UNIQUE(player_id, season)
 );
 
-CREATE INDEX idx_player_season_stats ON player_season_stats(player_id, season);
+CREATE INDEX IF NOT EXISTS idx_player_season_stats ON player_season_stats(player_id, season);
 
 -- ============================================
 -- 7. STANDINGS (Current Season)
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS standings (
   UNIQUE(team_id, season)
 );
 
-CREATE INDEX idx_standings_season ON standings(season, conference, division);
+CREATE INDEX IF NOT EXISTS idx_standings_season ON standings(season, conference, division);
 
 -- ============================================
 -- 8. API SYNC LOG (Track Updates)
@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS apisports_sync_log (
   api_calls_used INTEGER DEFAULT 0
 );
 
-CREATE INDEX idx_sync_log_status ON apisports_sync_log(endpoint, status, sync_started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sync_log_status ON apisports_sync_log(endpoint, status, sync_started_at DESC);
 
 -- ============================================
 -- VIEWS FOR EASY QUERYING
