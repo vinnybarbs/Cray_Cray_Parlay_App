@@ -652,6 +652,37 @@ export default function MainApp() {
         // Don't fail the whole lock, but log it
       }
 
+      // CRITICAL: Save individual legs to parlay_legs table for outcome tracking
+      const legsToInsert = selectedPicks.map((pick, index) => ({
+        parlay_id: parlayData.id,
+        leg_number: index + 1,
+        game_date: pick.gameDate,
+        sport: pick.sport,
+        home_team: pick.homeTeam,
+        away_team: pick.awayTeam,
+        bet_type: pick.betType,
+        bet_details: {
+          pick: pick.pick,
+          point: pick.point,
+          spread: pick.spread
+        },
+        odds: pick.odds,
+        confidence: pick.confidence || 7,
+        reasoning: pick.reasoning || '',
+        pick_description: `${pick.betType}: ${pick.pick}`,
+        pick: pick.pick,
+        outcome: 'pending'
+      }))
+
+      const { error: legsError } = await supabase
+        .from('parlay_legs')
+        .insert(legsToInsert)
+
+      if (legsError) {
+        console.error('Error saving parlay legs:', legsError)
+        // Don't fail the whole lock, but log it
+      }
+
       setLockMessage('Parlay locked - Build another or request more suggestions!')
       setSelectedPicks([])
     } catch (err) {
