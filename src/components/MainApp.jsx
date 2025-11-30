@@ -608,6 +608,37 @@ export default function MainApp() {
 
       if (parlayError) throw parlayError
 
+      // CRITICAL FIX: Also save picks to ai_suggestions for settlement tracking
+      const picksToInsert = selectedPicks.map((pick, index) => ({
+        parlay_id: parlayData.id,
+        user_id: user.id,
+        session_id: `parlay_${parlayData.id}`,
+        sport: pick.sport,
+        home_team: pick.homeTeam,
+        away_team: pick.awayTeam,
+        game_date: pick.gameDate,
+        bet_type: pick.betType,
+        pick: pick.pick,
+        pick_text: pick.pick, // Alias for compatibility
+        odds: pick.odds,
+        point: pick.point,
+        confidence: pick.confidence || 7,
+        reasoning: pick.reasoning || '',
+        risk_level: riskLevel,
+        generate_mode: generateMode,
+        actual_outcome: 'pending',
+        was_locked_by_user: true
+      }))
+
+      const { error: picksError } = await supabase
+        .from('ai_suggestions')
+        .insert(picksToInsert)
+
+      if (picksError) {
+        console.error('Error saving picks to ai_suggestions:', picksError)
+        // Don't fail the whole lock, but log it
+      }
+
       setLockMessage('Parlay locked - Build another or request more suggestions!')
       setSelectedPicks([])
     } catch (err) {

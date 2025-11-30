@@ -196,18 +196,53 @@ Response format:
 };
 
 /**
- * Generate deep links with affiliate parameters
+ * Generate deep links with affiliate parameters that PRE-FILL the betslip
+ * 
+ * DraftKings Deep Link Format:
+ * Gateway: https://sportsbook.draftkings.com/gateway?s=SELECTION_ID&wager=AMOUNT
+ * Multiple: https://sportsbook.draftkings.com/gateway?s=ID1&s=ID2&s=ID3&wager=25
+ * 
+ * The Odds API provides these selection IDs in the outcome data
  */
 function generateDeepLinks(picks) {
-  // DraftKings Affiliate Link
-  // Base: https://sportsbook.draftkings.com/r/sb/vinnybarbs/US-CO-SB/US-CO
-  const dkLink = `https://sportsbook.draftkings.com/r/sb/${AFFILIATE_ID}/${STATE}-SB/${STATE}`;
-  
-  // FanDuel Affiliate Link (if you have one)
-  // FanDuel deep links are more complex and require specific market IDs
-  // For now, just link to the main sportsbook with affiliate tracking
-  const fdLink = null; // Add when you have FanDuel affiliate setup
-  
+  if (!picks || picks.length === 0) {
+    return { draftkings: null, fanduel: null };
+  }
+
+  // Extract selection IDs from The Odds API data
+  // These come from the outcome objects in the cached odds
+  const dkSelections = [];
+  const fdSelections = [];
+
+  for (const pick of picks) {
+    // The Odds API includes selection IDs in outcome metadata
+    // We need to parse them from the cached odds data
+    if (pick.draftKingsId) {
+      dkSelections.push(pick.draftKingsId);
+    }
+    if (pick.fanduelId) {
+      fdSelections.push(pick.fanduelId);
+    }
+  }
+
+  // Build DraftKings Gateway Link
+  let dkLink = null;
+  if (dkSelections.length > 0) {
+    const selectionParams = dkSelections.map(id => `s=${id}`).join('&');
+    dkLink = `https://sportsbook.draftkings.com/gateway?${selectionParams}&wager=25&aff=${AFFILIATE_ID}`;
+  } else {
+    // Fallback to affiliate homepage if no selection IDs
+    dkLink = `https://sportsbook.draftkings.com/r/sb/${AFFILIATE_ID}/${STATE}-SB/${STATE}`;
+  }
+
+  // Build FanDuel Link (when available)
+  let fdLink = null;
+  if (fdSelections.length > 0) {
+    // FanDuel uses a different format: /betslip?market=ID&selection=ID
+    // This is simplified - actual implementation depends on FD API structure
+    fdLink = `https://sportsbook.fanduel.com/betslip?${fdSelections.map(id => `selection=${id}`).join('&')}`;
+  }
+
   return {
     draftkings: dkLink,
     fanduel: fdLink
