@@ -18,15 +18,18 @@ async function populate() {
   const season = 2025; // Current season
 
   try {
-    // Sync recent game stats for all NFL teams (last 3 games)
-    console.log('Step 1: Syncing recent game stats (last 3 games per team)...');
-    const stats = await sync.syncRecentGameStats(3, season, 1); // 3 games, season, league
-    console.log(`✅ Synced ${stats.synced} game stats\n`);
+    // Sync recent game stats (last 2 weeks - team + player stats)
+    console.log('Step 1: Syncing recent game stats (last 2 weeks - team + player)...');
+    const stats = await sync.syncRecentGameStats(2, season, 1); // 2 weeks, season, league
+    console.log(`✅ Team game stats: ${stats.teamGames}`);
+    console.log(`✅ Player game stats: ${stats.playerGames}\n`);
 
     // Summary
-    console.log('\n🎉 Team Stats Population Complete!');
+    console.log('\n🎉 Game Stats Population Complete!');
     console.log('================================');
-    console.log(`Teams with stats: ${stats.synced}`);
+    console.log(`Team game stats: ${stats.teamGames}`);
+    console.log(`Player game stats: ${stats.playerGames}`);
+    console.log(`Total: ${stats.teamGames + stats.playerGames} stat records`);
     console.log(`API Calls Used: ${sync.apiClient.callCount}/100`);
     console.log(`Remaining Today: ${sync.apiClient.getRemainingCalls()}`);
     
