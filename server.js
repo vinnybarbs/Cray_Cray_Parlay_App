@@ -377,6 +377,10 @@ app.patch('/api/user/parlays/:id', updateParlayOutcome);
 // const refreshOddsCache = require('./api/refresh-odds');
 // app.post('/cron/refresh-odds', refreshOddsCache);
 
+// Add cron endpoint to refresh AI suggestions cache
+const refreshSuggestionsCache = require('./api/cron/refresh-suggestions-cache');
+app.post('/cron/refresh-suggestions-cache', refreshSuggestionsCache);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 

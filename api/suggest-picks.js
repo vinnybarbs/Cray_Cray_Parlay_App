@@ -3,6 +3,7 @@ const { logger } = require('../shared/logger.js');
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
 const { toMountainTime, formatGameTime, getCurrentMountainTime } = require('../lib/timezone-utils.js');
 const { SportsIntelligenceService } = require('../lib/services/sports-intelligence.js');
+const { SuggestionsCache } = require('../lib/services/suggestions-cache.js');
 
 const intelligenceService = new SportsIntelligenceService();
 
@@ -934,16 +935,11 @@ async function suggestPicksHandler(req, res) {
     } = req.body;
 
     // Determine number of suggestions based on target leg count
-    // INCREASED: Show more variety - user wants to see all available options
-    let numSuggestions = suggestionCount || (() => {
-      const legs = parseInt(req.body.targetLegCount) || 3;
-      if (legs <= 3) return 20; // Was 10
-      if (legs <= 5) return 30; // Was 15
-      return Math.min(50, legs * 8); // Was 30 max, now 50 max
-    })();
+    // CACHE MODE: Generate 20 suggestions always for better caching
+    let numSuggestions = suggestionCount || 20; // Always generate 20 for cache
     
     // Cap at reasonable max
-    numSuggestions = Math.max(10, Math.min(50, Math.round(numSuggestions)));
+    numSuggestions = Math.max(15, Math.min(30, Math.round(numSuggestions)));
     
     // Production: Allow full range for better user experience
     const isProduction = process.env.NODE_ENV === 'production';
@@ -971,6 +967,32 @@ async function suggestPicksHandler(req, res) {
         details: 'Missing required API keys'
       });
     }
+
+    // Initialize cache service
+    const cache = new SuggestionsCache(supabase);
+    
+    // Check cache first - avoid regenerating same picks
+    const cached = await cache.getCached({
+      sports: selectedSports,
+      betTypes: selectedBetTypes,
+      riskLevel,
+      dateRange
+    });
+    
+    if (cached) {
+      // Return cached suggestions instantly
+      return res.json({
+        success: true,
+        suggestions: cached.suggestions.slice(0, numSuggestions),
+        totalAvailable: cached.suggestions.length,
+        cached: true,
+        cacheAge: cached.cacheAge,
+        generatedAt: cached.generatedAt,
+        message: `Loaded ${cached.suggestions.length} cached suggestions (${cached.cacheAge}min old)`
+      });
+    }
+    
+    console.log('📭 Cache miss - generating fresh suggestions...');
 
     // Initialize coordinator with supabase for odds caching
     const fetcher = global.fetch || require('node-fetch');
@@ -1070,6 +1092,19 @@ async function suggestPicksHandler(req, res) {
       duration: `${duration}ms`
     });
 
+    // Store in cache for future requests
+    await cache.store(
+      {
+        sports: selectedSports,
+        betTypes: selectedBetTypes,
+        riskLevel,
+        dateRange
+      },
+      shuffled,
+      allSuggestions[0]?.analyticalSummary || 'AI-generated suggestions',
+      {} // TODO: Store odds snapshot for staleness detection
+    );
+    
     // Store AI suggestions for tracking model performance
     const sessionId = await storeAISuggestions(shuffled, {
       riskLevel,
