@@ -30,7 +30,7 @@ All automated tasks for Cray Cray Parlay App using Supabase `pg_cron`.
 ---
 
 ### 2. Weekly Stats Sync (API-Sports)
-**Runs:** Every Monday at 3 AM PT (11:00 UTC)  
+**Runs:** Every Tuesday at 3 AM PT (11:00 UTC)  
 **Script:** `supabase/migrations/setup_weekly_stats_cron.sql`  
 **Endpoint:** `POST /api/sync-apisports?type=weekly`
 
@@ -199,7 +199,7 @@ SELECT cron.unschedule('your-job-name');
 | Time (PT) | Task | Endpoint |
 |-----------|------|----------|
 | 3:00 AM | Check Parlay Outcomes | `/api/cron/check-parlays` |
-| 3:00 AM Monday | Weekly Stats Sync | `/api/sync-apisports?type=weekly` |
+| 3:00 AM Tuesday | Weekly Stats Sync | `/api/sync-apisports?type=weekly` |
 | 6:00 AM | Daily Data Sync | `/api/sync-apisports?type=daily` |
 
 ---
