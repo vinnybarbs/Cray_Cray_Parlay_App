@@ -1,0 +1,10 @@
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "npm start"
+
+# Daily sync at 6 AM PT (14:00 UTC)
+[[crons]]
+schedule = "0 14 * * *"
+command = "node scripts/populate-apisports.js"
