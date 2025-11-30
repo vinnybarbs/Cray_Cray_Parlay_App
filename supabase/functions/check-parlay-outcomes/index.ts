@@ -91,22 +91,56 @@ serve(async (req) => {
 
     for (const parlay of pendingParlays) {
       try {
+        // UPDATED: Check BOTH metadata.locked_picks (old) AND ai_suggestions (new)
         const metadata = (parlay as any).metadata || {}
-        const lockedPicks = Array.isArray(metadata.locked_picks)
+        let lockedPicks = Array.isArray(metadata.locked_picks)
           ? (metadata.locked_picks as LockedPick[])
           : []
 
+        // If no metadata picks, try ai_suggestions table (NEW parlays)
         if (!lockedPicks.length) {
-          console.log(`Parlay ${parlay.id} has no metadata.locked_picks - skipping`)
+          console.log(`Parlay ${parlay.id} has no metadata.locked_picks, checking ai_suggestions...`)
+          
+          const { data: aiPicks, error: aiError } = await supabase
+            .from('ai_suggestions')
+            .select('*')
+            .eq('parlay_id', parlay.id)
+          
+          if (aiError) {
+            console.error(`Error fetching ai_suggestions for ${parlay.id}:`, aiError)
+          } else if (aiPicks && aiPicks.length > 0) {
+            console.log(`Found ${aiPicks.length} picks in ai_suggestions`)
+            // Convert ai_suggestions to locked_picks format
+            lockedPicks = aiPicks.map((pick: any) => ({
+              leg_number: pick.id,
+              gameDate: pick.game_date,
+              game_date: pick.game_date,
+              sport: pick.sport,
+              homeTeam: pick.home_team,
+              home_team: pick.home_team,
+              awayTeam: pick.away_team,
+              away_team: pick.away_team,
+              betType: pick.bet_type,
+              bet_type: pick.bet_type,
+              pick: pick.pick,
+              point: pick.point,
+              odds: pick.odds,
+              result: pick.actual_outcome === 'pending' ? undefined : pick.actual_outcome
+            }))
+          }
+        }
+
+        if (!lockedPicks.length) {
+          console.log(`Parlay ${parlay.id} has no picks in metadata OR ai_suggestions - skipping`)
           results.push({
             parlayId: parlay.id,
             outcome: 'pending',
-            reason: 'No locked_picks metadata'
+            reason: 'No picks found in metadata or ai_suggestions'
           })
           continue
         }
 
-        console.log(`Checking parlay ${parlay.id} with ${lockedPicks.length} locked picks`)
+        console.log(`Checking parlay ${parlay.id} with ${lockedPicks.length} picks`)
 
         let allLegsResolved = true
         let wonLegs = 0
