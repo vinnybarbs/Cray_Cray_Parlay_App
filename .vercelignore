@@ -1,0 +1,17 @@
+# Ignore backend code - runs on Railway only
+api/
+server.js
+lib/agents/
+lib/services/
+lib/middleware/
+database/
+__tests__/
+
+# Ignore config files
+.env.local
+.env
+nodemon.json
+
+# Ignore development files
+node_modules/
+*.log
