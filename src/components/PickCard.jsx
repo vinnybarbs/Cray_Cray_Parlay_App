@@ -158,21 +158,27 @@ export default function PickCard({ pick, onAdd, isAdded }) {
 
       {/* Pick Details */}
       <div className="mb-3 p-3 bg-gray-900 rounded">
-        <div className="flex justify-between items-center mb-2">
-          <div>
-            <div className="text-xs text-gray-400">{pick.betType}</div>
-            <div className="text-base font-bold text-white">
-              {propMeta ? `${propMeta.direction} — ${propMeta.coreText}` : 
-               pick.betType === 'Spread' && pick.point !== undefined && pick.point !== null ?
-                 `${pick.pick} ${pick.point > 0 ? '+' : ''}${pick.point}` :
-                 pick.betType === 'Total' && pick.point !== undefined && pick.point !== null ?
-                   `${pick.pick} ${pick.point}` :
-                   pick.pick}
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex-1">
+            <div className="text-xs text-gray-400 mb-1">{pick.betType}</div>
+            <div className="text-base font-bold text-white leading-tight">
+              {propMeta ? (
+                <span>{propMeta.direction} — {propMeta.coreText}</span>
+              ) : pick.betType === 'Spread' && pick.point !== undefined && pick.point !== null ? (
+                <span>{pick.pick} {typeof pick.point === 'string' ? pick.point : (pick.point > 0 ? '+' : '')}{typeof pick.point === 'number' ? pick.point : ''} <span className={`${getOddsColor(pick.odds)}`}>{pick.odds}</span></span>
+              ) : pick.betType === 'Total' && pick.point !== undefined && pick.point !== null ? (
+                <span>{pick.pick} {pick.point} <span className={`${getOddsColor(pick.odds)}`}>{pick.odds}</span></span>
+              ) : (
+                <span>{pick.pick}</span>
+              )}
             </div>
           </div>
-          <div className={`text-xl font-bold ${getOddsColor(pick.odds)}`}>
-            {pick.odds}
-          </div>
+          {/* Show odds separately for non-spread/total bets */}
+          {!(pick.betType === 'Spread' && pick.point) && !(pick.betType === 'Total' && pick.point) && (
+            <div className={`text-xl font-bold ml-2 ${getOddsColor(pick.odds)}`}>
+              {pick.odds}
+            </div>
+          )}
         </div>
         
         {/* Special formatting for player props: explicit Over/Under + human line */}
@@ -182,17 +188,10 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           </div>
         )}
 
-        {/* Show other bet details for non-spread, non-prop bets when a point is present */}
-        {!propMeta && pick.betType !== 'Spread' && pick.point !== undefined && pick.point !== null && (
-          <div className="text-xs text-green-400 mt-1 font-medium">
-            {pick.betType === 'Moneyline' ? 'Betting:' : 'Line:'} {pick.pick} {pick.betType !== 'Moneyline' && (pick.point > 0 ? '+' : '')}{pick.betType !== 'Moneyline' ? pick.point : ''}
-          </div>
-        )}
-        
-        {/* Always show game spread for context (for all bet types) */}
-        {(pick.spread !== undefined && pick.spread !== null && pick.spread !== '' && pick.spread !== 0) && (
+        {/* Show line for totals when displayed separately */}
+        {!propMeta && pick.betType === 'Total' && pick.point !== undefined && pick.point !== null && (
           <div className="text-xs text-gray-400 mt-1">
-            (Game spread: {pick.homeTeam} {pick.spread > 0 ? '+' : ''}{pick.spread})
+            Total: {pick.point}
           </div>
         )}
       </div>
