@@ -406,6 +406,7 @@ export default function MainApp() {
     let cancelled = false;
     const loadStats = async () => {
       try {
+        // Load user parlay win rate
         const { data, error } = await supabase
           .from('parlays')
           .select('final_outcome')
@@ -419,6 +420,19 @@ export default function MainApp() {
           setUserWinRate(rate);
         } else {
           setUserWinRate(null);
+        }
+
+        // Load model success rate from ai_suggestions
+        const { data: modelData, error: modelError } = await supabase
+          .from('ai_suggestions')
+          .select('actual_outcome')
+          .in('actual_outcome', ['won', 'lost']);
+        
+        if (!modelError && modelData && modelData.length > 0) {
+          const modelWins = modelData.filter(p => p.actual_outcome === 'won').length;
+          const modelDecided = modelData.length;
+          const modelRate = ((modelWins / modelDecided) * 100).toFixed(1);
+          setModelSuccessRate(modelRate);
         }
       } catch (e) {
       }
