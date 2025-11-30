@@ -20,7 +20,11 @@ async function checkParlayOutcomes(req, res) {
     
   } catch (error) {
     logger.error('Error checking parlay outcomes:', error);
-    res.status(500).json({ error: 'Failed to check parlay outcomes' });
+    res.status(500).json({ 
+      error: 'Failed to check parlay outcomes',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
 
