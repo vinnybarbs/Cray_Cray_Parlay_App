@@ -739,17 +739,10 @@ export default function MainApp() {
         </h1>
         <p className="text-xl font-medium text-gray-300">for Parlays</p>
         <div className="mt-4 flex flex-col items-center space-y-3">
-          <div className="flex space-x-4">
-            <div className="w-24 h-24 rounded-full border-2 border-yellow-400 flex flex-col items-center justify-center text-xs">
-              <span className="text-gray-400">Model</span>
-              <span className="text-lg font-bold text-yellow-400">{modelSuccessRate != null ? `${modelSuccessRate}%` : '--'}</span>
-              <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
-            </div>
-            <div className="w-24 h-24 rounded-full border-2 border-green-400 flex flex-col items-center justify-center text-xs">
-              <span className="text-gray-400">Your Builds</span>
-              <span className="text-lg font-bold text-green-400">{userWinRate != null ? `${userWinRate}%` : '--'}</span>
-              <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
-            </div>
+          <div className="w-24 h-24 rounded-full border-2 border-yellow-400 flex flex-col items-center justify-center text-xs">
+            <span className="text-gray-400">Model</span>
+            <span className="text-lg font-bold text-yellow-400">{modelSuccessRate != null ? `${modelSuccessRate}%` : '--'}</span>
+            <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
           </div>
           <button
             onClick={handleAskModelImprove}
