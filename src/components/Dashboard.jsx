@@ -19,7 +19,21 @@ export default function Dashboard({ onClose }) {
     try {
       const { data, error } = await supabase
         .from('parlays')
-        .select('*')
+        .select(`
+          *,
+          parlay_legs (
+            id,
+            leg_number,
+            game_date,
+            sport,
+            home_team,
+            away_team,
+            bet_type,
+            bet_details,
+            odds,
+            outcome
+          )
+        `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20)
@@ -73,6 +87,31 @@ export default function Dashboard({ onClose }) {
       push: 'bg-gray-700 text-gray-300'
     }
     return badges[normalizedStatus] || badges.pending
+  }
+
+  const deriveParlayOutcome = (parlay) => {
+    if (Array.isArray(parlay.parlay_legs) && parlay.parlay_legs.length > 0) {
+      const outcomes = parlay.parlay_legs
+        .map(l => l.outcome)
+        .filter(Boolean);
+
+      if (outcomes.length === 0) {
+        return parlay.final_outcome || 'pending';
+      }
+
+      const hasPending = outcomes.some(o => o === 'pending');
+      if (hasPending) return 'pending';
+
+      const hasLost = outcomes.some(o => o === 'lost');
+      const hasWon = outcomes.some(o => o === 'won');
+      const allPush = outcomes.every(o => o === 'push');
+
+      if (hasLost) return 'lost';
+      if (allPush) return 'push';
+      if (hasWon) return 'won';
+    }
+
+    return parlay.final_outcome || 'pending';
   }
 
   const parseLockedPlayerProp = (leg) => {
@@ -195,6 +234,9 @@ export default function Dashboard({ onClose }) {
               <div className="text-center">
                 <div className="text-2xl font-bold text-yellow-400">{stats.winRate}%</div>
                 <div className="text-xs text-gray-400">Win Rate</div>
+                <div className="mt-1 text-[10px] text-gray-500 px-2">
+                  Ask the model how to improve <span className="italic">(under construction)</span>
+                </div>
               </div>
             </div>
           </div>
@@ -233,8 +275,8 @@ export default function Dashboard({ onClose }) {
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadge(parlay.final_outcome || 'pending')}`}>
-                        {(parlay.final_outcome || 'pending').toUpperCase()}
+                      <span className={`px-3 py-1 rounded text-xs font-semibold ${getStatusBadge(deriveParlayOutcome(parlay))}`}>
+                        {deriveParlayOutcome(parlay).toUpperCase()}
                       </span>
                       {parlay.is_lock_bet && (
                         <span className="text-yellow-400 text-xs">🔒 LOCK</span>
@@ -282,13 +324,24 @@ export default function Dashboard({ onClose }) {
                     </div>
                   </div>
 
-                  {/* Compact locked picks display (new flow) */}
+                  {/* Compact locked picks display (new flow, with leg outcomes) */}
                   {parlay.metadata && Array.isArray(parlay.metadata.locked_picks) && parlay.metadata.locked_picks.length > 0 && (
                     <div className="border-t border-gray-700 pt-3 mt-3">
                       <div className="text-xs text-gray-400 mb-2">Locked Picks:</div>
                       <div className="space-y-1">
                         {parlay.metadata.locked_picks.map((leg, index) => {
                           const propMeta = parseLockedPlayerProp(leg)
+
+                          // Match this locked leg with its DB-backed parlay_legs row (by leg_number)
+                          const dbLeg = Array.isArray(parlay.parlay_legs)
+                            ? parlay.parlay_legs.find(l => l.leg_number === index + 1)
+                            : null;
+
+                          let statusIcon = '⏳';
+                          if (dbLeg?.outcome === 'won') statusIcon = '✅';
+                          else if (dbLeg?.outcome === 'lost') statusIcon = '❌';
+                          else if (dbLeg?.outcome === 'push') statusIcon = '↔️';
+
                           return (
                             <div key={index} className="flex justify-between items-center text-xs">
                               <div className="flex-1">
@@ -302,7 +355,10 @@ export default function Dashboard({ onClose }) {
                                   )}
                                 </div>
                               </div>
-                              <div className="text-green-400 font-semibold">{leg.odds}</div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-green-400 font-semibold">{leg.odds}</span>
+                                <span className="text-lg">{statusIcon}</span>
+                              </div>
                             </div>
                           )
                         })}

@@ -6,74 +6,29 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-async function checkParlays() {
-  console.log('\n📊 CHECKING PARLAYS STATUS\n');
-  
-  // Check parlays table
-  const { data: parlays, error: parlaysError } = await supabase
+async function check() {
+  console.log('📊 Checking parlays table for final_outcome & status...\n');
+
+  const { data, error } = await supabase
     .from('parlays')
-    .select('*')
+    .select('id, created_at, status, final_outcome, hit_percentage, profit_loss')
     .order('created_at', { ascending: false })
-    .limit(10);
-    
-  if (parlaysError) {
-    console.error('❌ Error fetching parlays:', parlaysError);
+    .limit(5);
+
+  if (error) {
+    console.error('Error:', error.message);
     return;
   }
-  
-  console.log(`\n🎲 RECENT PARLAYS (${parlays.length}):\n`);
-  parlays.forEach((parlay, i) => {
-    console.log(`${i + 1}. ID: ${parlay.id}`);
-    console.log(`   User: ${parlay.user_id}`);
-    console.log(`   Status: ${parlay.status}`);
-    console.log(`   Created: ${parlay.created_at}`);
-    console.log(`   Settled: ${parlay.settled_at || 'Not settled'}`);
-    console.log(`   Wager: $${parlay.wager_amount || 0}`);
-    console.log(`   Potential: $${parlay.potential_payout || 0}`);
-    console.log(`   Actual: $${parlay.actual_payout || 0}`);
+
+  data.forEach(p => {
+    console.log(`Parlay ${p.id}`);
+    console.log(`  created_at:   ${p.created_at}`);
+    console.log(`  status:       ${p.status}`);
+    console.log(`  final_outcome:${p.final_outcome}`);
+    console.log(`  hit%:         ${p.hit_percentage}`);
+    console.log(`  profit_loss:  ${p.profit_loss}`);
     console.log('');
   });
-  
-  // Check parlay_legs for unsettled parlays
-  const unsettledParlays = parlays.filter(p => p.status === 'pending');
-  
-  if (unsettledParlays.length > 0) {
-    console.log(`\n🔍 UNSETTLED PARLAY LEGS:\n`);
-    
-    for (const parlay of unsettledParlays) {
-      const { data: legs, error: legsError } = await supabase
-        .from('parlay_legs')
-        .select('*')
-        .eq('parlay_id', parlay.id);
-        
-      if (!legsError && legs) {
-        console.log(`Parlay ${parlay.id} (${legs.length} legs):`);
-        legs.forEach((leg, i) => {
-          console.log(`  ${i + 1}. ${leg.pick_description}`);
-          console.log(`     Outcome: ${leg.outcome || 'pending'}`);
-          console.log(`     Odds: ${leg.odds}`);
-        });
-        console.log('');
-      }
-    }
-  }
-  
-  // Summary stats
-  const statusCounts = parlays.reduce((acc, p) => {
-    acc[p.status] = (acc[p.status] || 0) + 1;
-    return acc;
-  }, {});
-  
-  console.log(`\n📈 SUMMARY:`);
-  console.log(`   Total parlays: ${parlays.length}`);
-  console.log(`   By status:`, statusCounts);
-  console.log('');
 }
 
-checkParlays().then(() => {
-  console.log('✅ Done!');
-  process.exit(0);
-}).catch(err => {
-  console.error('❌ Error:', err);
-  process.exit(1);
-});
+check().then(() => process.exit(0));

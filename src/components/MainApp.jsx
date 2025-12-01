@@ -379,7 +379,6 @@ export default function MainApp() {
   const [selectedPicks, setSelectedPicks] = useState([])
   const [userWinRate, setUserWinRate] = useState(null)
   const [modelSuccessRate, setModelSuccessRate] = useState(null)
-  const [improvementAdvice, setImprovementAdvice] = useState('')
   const [lockMessage, setLockMessage] = useState('')
 
   const sports = ['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']
@@ -535,23 +534,6 @@ export default function MainApp() {
       setProgressPhase(4) // Mark all complete
     }
   }
-
-  const handleAskModelImprove = () => {
-    if (userWinRate == null) {
-      setImprovementAdvice('Once we have enough completed parlays, this will give tailored advice on how to adjust leg count, odds profile, and bet types.');
-      return;
-    }
-    const rate = parseFloat(userWinRate);
-    if (Number.isNaN(rate)) {
-      setImprovementAdvice('We need more completed bets before giving meaningful advice.');
-    } else if (rate < 30) {
-      setImprovementAdvice('Your hit rate is low. Consider fewer legs per parlay, prioritizing heavy favorites and limiting long-shot props. Use Heavy Favorites mode for a while and keep unit size consistent.');
-    } else if (rate < 50) {
-      setImprovementAdvice('You are hitting some builds but leaving value on the table. Try mixing Heavy Favorites with a few AI Edge Advantages, and avoid stacking too many correlated legs in one ticket.');
-    } else {
-      setImprovementAdvice('Your builds are performing well. Focus on consistency: keep unit sizes steady, avoid chasing losses, and use Top Picks of the Day only when the reasoning is very strong.');
-    }
-  };
 
   const togglePickSelection = (pick) => {
     setSelectedPicks(prev => {
@@ -744,15 +726,6 @@ export default function MainApp() {
             <span className="text-lg font-bold text-yellow-400">{modelSuccessRate != null ? `${modelSuccessRate}%` : '--'}</span>
             <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
           </div>
-          <button
-            onClick={handleAskModelImprove}
-            className="px-4 py-2 text-sm rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-md"
-          >
-            Ask the model how to improve?
-          </button>
-          {improvementAdvice && (
-            <p className="max-w-md text-xs text-gray-300 text-center px-4">{improvementAdvice}</p>
-          )}
         </div>
 
         {/* User menu */}
