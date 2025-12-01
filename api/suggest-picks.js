@@ -223,13 +223,25 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       console.log(`🎯 Player Props mode: mixing ${yardageProps.length} yardage markets with ${tdProps.length} TD markets`);
     }
 
-    // Fetch team records from standings for context (W-L records)
+    // Fetch team records from cached standings for context (W-L records)
     const teamRecordsMap = {};
     try {
+      // Use season logic that matches NFL/NCAAF schedules (Aug-Jan span)
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth(); // 0-based
+      const primarySport = (sports[0] || '').toUpperCase();
+      let seasonFilter = year;
+
+      if (primarySport === 'NFL' || primarySport === 'NCAAF') {
+        // Football season runs Aug-Jan, so Jan-Jul belong to previous season
+        seasonFilter = month >= 7 ? year : year - 1;
+      }
+
       const { data: teamRecords, error: recordsError } = await supabase
         .from('team_stats_season')
         .select('team_id, metrics')
-        .eq('season', new Date().getFullYear());
+        .eq('season', seasonFilter);
       
       if (!recordsError && teamRecords) {
         // Also need team names
@@ -247,7 +259,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
             teamRecordsMap[teamName] = { wins, losses, record: `${wins}-${losses}` };
           }
         });
-        console.log(`📊 Loaded records for ${Object.keys(teamRecordsMap).length} teams`);
+        console.log(`📊 Loaded records for ${Object.keys(teamRecordsMap).length} teams (season=${seasonFilter}, sport=${primarySport})`);
       }
     } catch (err) {
       console.log('⚠️ Could not load team records:', err.message);
@@ -350,6 +362,76 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
   }
 }
 
+async function getApiSportsPlayerAggregates(playerName, playerId = null, maxGames = 5) {
+  try {
+    let query = supabase
+      .from('player_game_stats')
+      .select('*')
+      .order('game_date', { ascending: false })
+      .limit(maxGames);
+
+    if (playerId) {
+      query = query.eq('player_id', playerId);
+    } else if (playerName) {
+      // Fallback name-based lookup if we don't have a player_id
+      query = query.ilike('player_name', `%${playerName}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error || !data || !data.length) {
+      return null;
+    }
+
+    const games = data.length;
+    const first = data[0] || {};
+
+    const pickColumn = (candidates) => {
+      if (!first || typeof first !== 'object') return null;
+      for (const key of candidates) {
+        if (Object.prototype.hasOwnProperty.call(first, key)) return key;
+      }
+      return null;
+    };
+
+    const passYardsCol = pickColumn(['pass_yards', 'passing_yards']);
+    const passTdsCol = pickColumn(['pass_tds', 'passing_touchdowns']);
+    const rushYardsCol = pickColumn(['rush_yards', 'rushing_yards']);
+    const recYardsCol = pickColumn(['rec_yards', 'receiving_yards']);
+    const recTdsCol = pickColumn(['rec_tds', 'receiving_touchdowns']);
+    const recsCol = pickColumn(['receptions']);
+
+    const sum = (arr, key) => key
+      ? arr.reduce((s, g) => s + (g[key] || 0), 0)
+      : 0;
+
+    const passYards = sum(data, passYardsCol);
+    const passTds = sum(data, passTdsCol);
+    const rushYards = sum(data, rushYardsCol);
+    const recYards = sum(data, recYardsCol);
+    const recs = sum(data, recsCol);
+    const recTds = sum(data, recTdsCol);
+
+    return {
+      games,
+      passing: {
+        yardsPerGame: games ? passYards / games : 0,
+        tdsPerGame: games ? passTds / games : 0
+      },
+      rushing: {
+        yardsPerGame: games ? rushYards / games : 0
+      },
+      receiving: {
+        yardsPerGame: games ? recYards / games : 0,
+        receptionsPerGame: games ? recs / games : 0,
+        tdsPerGame: games ? recTds / games : 0
+      }
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
 // Convert cached prop odds to suggestion format
 async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}, playerStatsMap = {}, teamRecordsMap = {}, options = {}) {
   const suggestions = [];
@@ -434,8 +516,12 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const playerInfo = playerIndex.get(playerName.toLowerCase());
     const seasonStats = playerInfo?.seasonStats;
     
-    // PHASE 2: Get recent stats from ESPN box scores
     const recentStats = playerStatsMap[playerName] || null;
+
+    let apiStats = null;
+    if (odds.sport === 'americanfootball_nfl') {
+      apiStats = await getApiSportsPlayerAggregates(playerName);
+    }
     
     // Create suggestion with raw UTC commence_time so frontend can format consistently
     const gameDate = odds.commence_time || new Date().toISOString();
@@ -464,7 +550,19 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     
     const reasoning = isTeamProp
       ? generateTeamPropReasoning(odds.market_type, bestOutcome, odds, intelContext)
-      : generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext, teamRecordsMap);
+      : generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext, teamRecordsMap, apiStats);
+
+    // Basic analytical edge classification for props so UI can show meaningful badges
+    let edgeType = 'value';
+    if (!isTeamProp) {
+      if (tdMarkets.includes(odds.market_type)) {
+        // TD props are often more situational / game-script dependent
+        edgeType = 'situational';
+      } else {
+        // Yardage / receptions props are primarily about line value vs recent production
+        edgeType = 'line_value';
+      }
+    }
     
     suggestions.push({
       id: `prop_${suggestionId.toString().padStart(3, '0')}`,
@@ -480,8 +578,10 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
   // spread field removed for player props
       confidence: calculateConfidence(bestOutcome.price, riskLevel),
       reasoning,
-      researchSummary: "", // REMOVED: AI-generated context hallucinates defensive rankings/ATS - real news is in reasoning
-      edgeType: isTeamProp ? "team_performance" : "player_performance",
+      // For props, reasoning already contains the stat-backed analysis; keep researchSummary
+      // reserved for external news/research to avoid duplication.
+      researchSummary: "",
+      edgeType,
       contraryEvidence: isTeamProp ? "Team totals can be affected by pace, weather, and defensive adjustments." : generateContraryEvidence(playerName, odds.market_type),
       analyticalSummary: "", // Empty - reasoning field has all the content
       spread: odds.spread || null // Add game spread for UI display
@@ -573,16 +673,68 @@ function calculateConfidence(price, riskLevel) {
   return 5;
 }
 
-function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats, recentStats, intelContext, teamRecordsMap = {}) {
+function generatePropReasoning(playerName, marketType, outcome, odds, seasonStats, recentStats, intelContext, teamRecordsMap = {}, apiStats = null) {
   const propType = formatPlayerPropPick(playerName, marketType, outcome);
   const priceText = formatOdds(outcome.price);
   const matchupText = `${odds.away_team} @ ${odds.home_team}`;
 
   let statSnippet = '';
 
-  // PHASE 2: Prioritize recent stats from ESPN box scores over season stats
+  // PHASE 1: Prioritize API-Sports DB stats from player_game_stats (per-game averages, last N games)
   try {
-    if (recentStats && typeof recentStats === 'object') {
+    if (!statSnippet && apiStats && odds.sport === 'americanfootball_nfl') {
+      const games = apiStats.games || 0;
+
+      if (games > 0) {
+        // Normalize marketType to guard against undefined
+        const mt = typeof marketType === 'string' ? marketType : '';
+
+        // Passing yards props
+        if (mt.includes('pass_yds') && apiStats.passing && typeof apiStats.passing.yardsPerGame === 'number' && apiStats.passing.yardsPerGame > 0) {
+          const ypg = apiStats.passing.yardsPerGame;
+          const tds = apiStats.passing.tdsPerGame;
+          statSnippet = `${playerName}: ${ypg.toFixed ? ypg.toFixed(1) : ypg} pass yds/game`;
+          if (typeof tds === 'number' && tds > 0) {
+            const tpg = tds.toFixed ? tds.toFixed(2) : tds;
+            statSnippet += `, ${tpg} pass TDs/game`;
+          }
+          statSnippet += ` (last ${games} games)`;
+
+        // Rushing yards props
+        } else if (mt.includes('rush_yds') && apiStats.rushing && typeof apiStats.rushing.yardsPerGame === 'number' && apiStats.rushing.yardsPerGame > 0) {
+          const ypg = apiStats.rushing.yardsPerGame;
+          statSnippet = `${playerName}: ${ypg.toFixed ? ypg.toFixed(1) : ypg} rush yds/game (last ${games} games)`;
+
+        // Receptions count props
+        } else if ((mt.includes('receptions') || mt === 'player_receptions') && apiStats.receiving && typeof apiStats.receiving.receptionsPerGame === 'number' && apiStats.receiving.receptionsPerGame > 0) {
+          const rpg = apiStats.receiving.receptionsPerGame;
+          statSnippet = `${playerName}: ${rpg.toFixed ? rpg.toFixed(1) : rpg} rec/game`;
+          if (typeof apiStats.receiving.yardsPerGame === 'number' && apiStats.receiving.yardsPerGame > 0) {
+            const ypg = apiStats.receiving.yardsPerGame;
+            statSnippet += `, ${ypg.toFixed ? ypg.toFixed(1) : ypg} rec yds/game`;
+          }
+          statSnippet += ` (last ${games} games)`;
+
+        // Receiving yards props
+        } else if ((mt.includes('reception_yds') || mt.includes('rec_yds')) && apiStats.receiving && typeof apiStats.receiving.yardsPerGame === 'number' && apiStats.receiving.yardsPerGame > 0) {
+          const ypg = apiStats.receiving.yardsPerGame;
+          statSnippet = `${playerName}: ${ypg.toFixed ? ypg.toFixed(1) : ypg} rec yds/game`;
+          if (typeof apiStats.receiving.receptionsPerGame === 'number' && apiStats.receiving.receptionsPerGame > 0) {
+            const rpg = apiStats.receiving.receptionsPerGame;
+            statSnippet += `, ${rpg.toFixed ? rpg.toFixed(1) : rpg} rec/game`;
+          }
+          statSnippet += ` (last ${games} games)`;
+
+        // Anytime TD props - still useful context even if we don't parse an average vs line
+        } else if (mt === 'player_anytime_td' && apiStats.receiving && typeof apiStats.receiving.tdsPerGame === 'number' && apiStats.receiving.tdsPerGame > 0) {
+          const tpg = apiStats.receiving.tdsPerGame;
+          statSnippet = `${playerName}: ${tpg.toFixed ? tpg.toFixed(2) : tpg} rec TDs/game (last ${games} games)`;
+        }
+      }
+    }
+
+    // PHASE 2: ESPN recent box score stats (fallback if no API-Sports snippet)
+    if (!statSnippet && recentStats && typeof recentStats === 'object') {
       const { ESPNPlayerStatsBoxScore } = require('../lib/services/espn-player-stats-boxscore');
       const statsService = new ESPNPlayerStatsBoxScore(null);
       const sport = odds.sport === 'americanfootball_nfl' ? 'NFL' : 
@@ -595,8 +747,7 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
         statSnippet = aiFormatted;
       }
     }
-    
-    // Fallback to season stats if no recent stats
+    // PHASE 3: Season-long stats fallback
     if (!statSnippet && seasonStats && typeof seasonStats === 'object') {
       if (seasonStats.nfl) {
         const s = seasonStats.nfl;
@@ -781,13 +932,18 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
       parts.push(contrarianPhrases[verdictStyle]);
     }
   } else {
-    // No stats available - vary this too
-    const genericPhrases = [
-      `The combination of recent form, matchup conditions, and current market pricing presents value on this number.`,
-      `Market positioning and matchup dynamics suggest an edge on this prop.`,
-      `Current pricing appears favorable given the game environment and situational context.`
-    ];
-    parts.push(genericPhrases[Math.floor(Math.random() * 3)]);
+    // No player-level stats available in cache - still give grounded, honest context
+    const awayRecord = teamRecordsMap[odds.away_team]?.record;
+    const homeRecord = teamRecordsMap[odds.home_team]?.record;
+    const recordContext = awayRecord && homeRecord
+      ? ` ${odds.away_team} are ${awayRecord} while ${odds.home_team} are ${homeRecord}.`
+      : '';
+
+    if (line) {
+      parts.push(`${propType} is lined at ${line} with odds ${priceText} in the ${matchupText} matchup.${recordContext} Detailed recent stat splits for ${playerName} are not available in the cache, so this should be treated as a lighter lean rather than a strongly modeled edge.`);
+    } else {
+      parts.push(`${propType} is priced at ${priceText} in the ${matchupText} matchup.${recordContext} Player-level stat history for ${playerName} isn't present in the cache, so this recommendation leans more on matchup context than hard volume numbers.`);
+    }
   }
   
   return parts.join(' ');
@@ -915,6 +1071,72 @@ async function getPlayerDataForProps(sports) {
   } catch (error) {
     logger.error('Error fetching player data for props', error);
     return [];
+  }
+}
+
+async function buildMatchupSnapshots(suggestions) {
+  try {
+    const nflSuggestions = (suggestions || []).filter(s => (s.sport || '').toUpperCase() === 'NFL');
+    if (!nflSuggestions.length) return {};
+
+    const teamSet = new Set();
+    nflSuggestions.forEach(s => {
+      if (s.homeTeam) teamSet.add(s.homeTeam);
+      if (s.awayTeam) teamSet.add(s.awayTeam);
+    });
+
+    const teamNames = Array.from(teamSet);
+    if (!teamNames.length) return {};
+
+    const { data, error } = await supabase
+      .from('current_standings')
+      .select('team_name, wins, losses, ties, win_percentage, point_differential, streak')
+      .in('team_name', teamNames);
+
+    if (error || !data) {
+      if (error) logger.error('Error fetching matchup standings', error);
+      return {};
+    }
+
+    const standingsMap = new Map();
+    data.forEach(row => {
+      standingsMap.set(row.team_name, row);
+    });
+
+    const snapshots = {};
+
+    const toRow = (row) => {
+      const wins = row.wins ?? 0;
+      const losses = row.losses ?? 0;
+      const ties = row.ties ?? 0;
+      const record = ties ? `${wins}-${losses}-${ties}` : `${wins}-${losses}`;
+      const pct = typeof row.win_percentage === 'number' ? row.win_percentage : null;
+      const diff = typeof row.point_differential === 'number' ? row.point_differential : null;
+      return {
+        team: row.team_name,
+        record,
+        pct,
+        diff,
+        streak: row.streak || null
+      };
+    };
+
+    nflSuggestions.forEach(s => {
+      const homeRow = standingsMap.get(s.homeTeam);
+      const awayRow = standingsMap.get(s.awayTeam);
+      if (!homeRow || !awayRow) return;
+      const key = `${s.awayTeam} @ ${s.homeTeam}`;
+      if (snapshots[key]) return;
+      snapshots[key] = {
+        home: toRow(homeRow),
+        away: toRow(awayRow)
+      };
+    });
+
+    return snapshots;
+  } catch (error) {
+    logger.error('Error building matchup snapshots', error);
+    return {};
   }
 }
 
@@ -1052,8 +1274,6 @@ async function suggestPicksHandler(req, res) {
       }
     }
 
-    const duration = Date.now() - startTime;
-    
     // If no suggestions generated at all, return error
     if (allSuggestions.length === 0) {
       logger.warn('No suggestions generated', { selectedSports, selectedBetTypes });
@@ -1063,8 +1283,17 @@ async function suggestPicksHandler(req, res) {
       });
     }
 
+    const matchupSnapshots = await buildMatchupSnapshots(allSuggestions);
+    const enrichedSuggestions = allSuggestions.map(pick => {
+      const key = `${pick.awayTeam} @ ${pick.homeTeam}`;
+      const snapshot = matchupSnapshots[key];
+      return snapshot ? { ...pick, matchupSnapshot: snapshot } : pick;
+    });
+
+    const duration = Date.now() - startTime;
+
     // Shuffle for variety (prevents same 12 props every time)
-    const shuffled = allSuggestions.sort(() => Math.random() - 0.5).slice(0, numSuggestions);
+    const shuffled = enrichedSuggestions.sort(() => Math.random() - 0.5).slice(0, numSuggestions);
 
     logger.info('Pick suggestions generated', {
       totalGenerated: allSuggestions.length,

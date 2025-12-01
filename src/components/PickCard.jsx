@@ -24,69 +24,10 @@ const getDetailedAnalysis = (pick) => {
   const baseAnalysis = pick.reasoning || '';
   const sport = pick.sport || 'Unknown';
   
-  // Sport-specific terminology and analysis factors
-  const getSportContext = () => {
-    switch (sport) {
-      case 'NFL':
-      case 'NCAAF':
-        return {
-          efficiency: 'red zone efficiency disparities',
-          situational: 'third down efficiency and situational play-calling',
-          advantage: 'home field advantages and coaching adjustments',
-          pace: 'offensive tempo and turnover margin expectations'
-        };
-      case 'NBA':
-        return {
-          efficiency: 'field goal percentage and three-point efficiency',
-          situational: 'clutch performance and fourth quarter execution',
-          advantage: 'home court advantages and matchup mismatches',
-          pace: 'pace of play and possession efficiency metrics'
-        };
-      case 'NHL':
-        return {
-          efficiency: 'power play efficiency and penalty kill success',
-          situational: 'special teams performance and goaltending stability',
-          advantage: 'home ice advantages and line matchups',
-          pace: 'shot generation rates and defensive zone coverage'
-        };
-      case 'MLB':
-        return {
-          efficiency: 'batting average against and pitching effectiveness',
-          situational: 'bullpen performance and late-inning execution',
-          advantage: 'home field advantages and pitcher-batter matchups',
-          pace: 'run production rates and defensive efficiency'
-        };
-      case 'Soccer':
-        return {
-          efficiency: 'shot conversion rates and defensive solidity',
-          situational: 'set piece effectiveness and tactical flexibility',
-          advantage: 'home advantage and formation matchups',
-          pace: 'possession metrics and counter-attack efficiency'
-        };
-      default:
-        return {
-          efficiency: 'performance efficiency metrics',
-          situational: 'situational performance indicators',
-          advantage: 'competitive advantages and strategic factors',
-          pace: 'game flow dynamics and execution patterns'
-        };
-    }
-  };
-  
-  const context = getSportContext();
-  
-  if (pick.betType === 'Moneyline') {
-    return `${baseAnalysis} Our moneyline analysis incorporates team strength ratings, recent form indicators, injury impact assessments, and historical head-to-head performance. Key evaluation metrics include offensive efficiency rankings, defensive unit performance, ${context.advantage}, and coaching tendencies in similar game scripts. Market positioning analysis suggests significant value opportunity with favorable risk-reward ratio. Statistical modeling shows this selection aligns with high-probability outcome scenarios based on current season performance indicators and situational matchup factors.`;
-  } else if (pick.betType === 'Spread') {
-    return `${baseAnalysis} This spread selection leverages advanced point differential modeling, incorporating ${context.pace} and historical performance against similar lines. Critical analysis factors include ${context.efficiency}, late-game execution patterns, and competitive adjustments in key situations. Our algorithm identifies market inefficiency in the current spread pricing relative to true probability estimates based on comprehensive performance metrics and situational analysis.`;
-  } else if (pick.betType === 'Total') {
-    return `${baseAnalysis} Total analysis evaluates multiple scoring environment variables including weather conditions (where applicable), defensive pressure rates, ${context.pace}, and historical scoring patterns in similar matchups. Key performance indicators include first half trends, ${context.efficiency}, ${context.situational}, and strategic tendencies. Statistical correlation models show strong probability alignment for this total range based on team-specific capabilities and defensive strengths in current context.`;
-  } else if (pick.betType === 'Player Props' || pick.betType === 'TD' || pick.betType === 'Team Props') {
-    // For player props, team props, and TD - just use the backend reasoning - it has the data already
-    return baseAnalysis;
-  } else {
-    return `${baseAnalysis} Comprehensive multi-factor analysis evaluates this selection through advanced statistical modeling, market positioning assessment, and historical precedent analysis. Performance evaluation includes team form indicators, ${context.advantage}, injury impact analysis, and probability distribution modeling. Our AI framework identifies significant edge opportunity through combination of statistical analysis, market inefficiency detection, and situational performance metrics that suggest favorable outcome probability relative to current market pricing.`;
-  }
+  // Always trust backend reasoning, which already includes data-backed analysis
+  if (!baseAnalysis) return '';
+
+  return baseAnalysis;
 }
 
 // Helper to parse player prop pick strings like:
@@ -150,6 +91,30 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           <div className="text-sm font-semibold text-gray-200">
             {pick.awayTeam} @ {pick.homeTeam}
           </div>
+          {pick.matchupSnapshot && (
+            <div className="mt-1 text-[11px] text-gray-300 bg-gray-900/60 rounded px-2 py-1 border border-gray-700">
+              <div className="flex justify-between gap-4">
+                <div className="flex-1">
+                  <div className="text-[11px] font-semibold truncate">{pick.matchupSnapshot.away.team}</div>
+                  <div className="text-[10px] text-gray-400">
+                    {pick.matchupSnapshot.away.record}
+                    {pick.matchupSnapshot.away.pct != null && ` • ${(pick.matchupSnapshot.away.pct * 100).toFixed(1)}%`}
+                    {typeof pick.matchupSnapshot.away.diff === 'number' && ` • DIFF ${pick.matchupSnapshot.away.diff > 0 ? '+' : ''}${pick.matchupSnapshot.away.diff}`}
+                    {pick.matchupSnapshot.away.streak && ` • ${pick.matchupSnapshot.away.streak}`}
+                  </div>
+                </div>
+                <div className="flex-1 text-right">
+                  <div className="text-[11px] font-semibold truncate">{pick.matchupSnapshot.home.team}</div>
+                  <div className="text-[10px] text-gray-400">
+                    {pick.matchupSnapshot.home.record}
+                    {pick.matchupSnapshot.home.pct != null && ` • ${(pick.matchupSnapshot.home.pct * 100).toFixed(1)}%`}
+                    {typeof pick.matchupSnapshot.home.diff === 'number' && ` • DIFF ${pick.matchupSnapshot.home.diff > 0 ? '+' : ''}${pick.matchupSnapshot.home.diff}`}
+                    {pick.matchupSnapshot.home.streak && ` • ${pick.matchupSnapshot.home.streak}`}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
         <div className={`text-xs font-bold px-2 py-1 rounded ${getConfidenceColor(pick.confidence)} bg-gray-900`}>
           {pick.confidence}/10
