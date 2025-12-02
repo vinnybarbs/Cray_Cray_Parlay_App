@@ -9,7 +9,7 @@ import { calculateParlay } from '../utils/oddsCalculations'
 
 // API_BASE defaults to Railway production URL; override with VITE_API_BASE_URL env var
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
-const DEFAULT_SUGGESTION_COUNT = 12
+const DEFAULT_SUGGESTION_COUNT = 20
 
 // CheckboxGroup component for sport/bet type selection
 const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
@@ -490,7 +490,8 @@ export default function MainApp() {
           suggestionCount: DEFAULT_SUGGESTION_COUNT,
           riskLevel,
           oddsPlatform,
-          dateRange
+          dateRange,
+          generationMode: generationMode
         }),
         signal: controller.signal
       })

@@ -63,7 +63,7 @@ async function storeAISuggestions(suggestions, options = {}) {
 }
 
 // Generate player prop suggestions using cached odds from Supabase
-async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions, sportsbook, playerData, supabase, coordinator, selectedBetTypes }) {
+async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions, sportsbook, playerData, supabase, coordinator, selectedBetTypes, dateRange = 2 }) {
   try {
     console.log('🏈 Generating player prop suggestions from Supabase cache...');
     
@@ -77,9 +77,10 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     });
     
     // Fetch player prop odds from Supabase base table (single source of truth)
-    // Only include FUTURE games and reasonably fresh odds
+    // Only include FUTURE games within the selected date range and reasonably fresh odds
     const nowIso = new Date().toISOString();
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const endIso = new Date(Date.now() + (dateRange || 2) * 24 * 60 * 60 * 1000).toISOString();
 
     // Determine which market types to query based on selected bet types
     const wantsPlayerProps = selectedBetTypes.some(bt => bt === 'Player Props' || bt === 'TD Props');
@@ -91,6 +92,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       .select('*')
       .eq('sport', sportKeys[0])
       .gt('commence_time', nowIso)
+      .lt('commence_time', endIso)
       .gte('last_updated', oneDayAgo)
       .order('commence_time', { ascending: true })
       .limit(100); // Increased limit to accommodate both player and team props
@@ -122,6 +124,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
         .select('*')
         .eq('sport', sportKeys[0])
         .gt('commence_time', nowIso)
+        .lt('commence_time', endIso)
         .order('commence_time', { ascending: true })
         .limit(100);
       
@@ -435,7 +438,10 @@ async function getApiSportsPlayerAggregates(playerName, playerId = null, maxGame
 // Convert cached prop odds to suggestion format
 async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions, riskLevel, intelligenceMap = {}, playerStatsMap = {}, teamRecordsMap = {}, options = {}) {
   const suggestions = [];
-  const processedPlayers = new Set();
+  // Track which (player, market_type) combos we've already used so that we
+  // only take one direction per player/stat type per pool, but still allow
+  // multiple different prop segments for the same player (e.g., yards AND TDs).
+  const processedProps = new Set(); // key: `${playerName}|${marketType}`
   const playerIndex = new Map();
   const { disableRosterCheck = false } = options || {};
 
@@ -465,10 +471,15 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     
     if (!Array.isArray(outcomes) || outcomes.length === 0) continue;
 
-    // Find best value props (players with good odds that haven't been used)
+    // Find best value props (players with good odds where we haven't already
+    // taken a prop in this same market for that player)
     let validOutcomes = outcomes.filter(outcome => {
       const playerName = outcome.description || outcome.name;
-      if (!playerName || processedPlayers.has(playerName)) return false;
+      if (!playerName) return false;
+
+      const marketType = odds.market_type || '';
+      const propKey = `${playerName}|${marketType}`;
+      if (processedProps.has(propKey)) return false;
       if (Math.abs(outcome.price) >= 300) return false; // Reasonable odds range
 
       if (!disableRosterCheck) {
@@ -496,7 +507,11 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     if (validOutcomes.length === 0 && disableRosterCheck) {
       validOutcomes = outcomes.filter(outcome => {
         const playerName = outcome.description || outcome.name;
-        if (!playerName || processedPlayers.has(playerName)) return false;
+        if (!playerName) return false;
+
+        const marketType = odds.market_type || '';
+        const propKey = `${playerName}|${marketType}`;
+        if (processedProps.has(propKey)) return false;
         if (Math.abs(outcome.price) >= 600) return false; // allow longer shots in fallback
         return true;
       });
@@ -512,7 +527,8 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     });
     
     const playerName = bestOutcome.description || bestOutcome.name;
-    processedPlayers.add(playerName);
+    const propKey = `${playerName}|${odds.market_type || ''}`;
+    processedProps.add(propKey);
     const playerInfo = playerIndex.get(playerName.toLowerCase());
     const seasonStats = playerInfo?.seasonStats;
     
@@ -551,6 +567,12 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
     const reasoning = isTeamProp
       ? generateTeamPropReasoning(odds.market_type, bestOutcome, odds, intelContext)
       : generatePropReasoning(playerName, odds.market_type, bestOutcome, odds, seasonStats, recentStats, intelContext, teamRecordsMap, apiStats);
+
+    // If we could not generate stat-backed reasoning for a player prop,
+    // skip this suggestion entirely rather than hedging on matchup context.
+    if (!reasoning) {
+      continue;
+    }
 
     // Basic analytical edge classification for props so UI can show meaningful badges
     let edgeType = 'value';
@@ -932,18 +954,8 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
       parts.push(contrarianPhrases[verdictStyle]);
     }
   } else {
-    // No player-level stats available in cache - still give grounded, honest context
-    const awayRecord = teamRecordsMap[odds.away_team]?.record;
-    const homeRecord = teamRecordsMap[odds.home_team]?.record;
-    const recordContext = awayRecord && homeRecord
-      ? ` ${odds.away_team} are ${awayRecord} while ${odds.home_team} are ${homeRecord}.`
-      : '';
-
-    if (line) {
-      parts.push(`${propType} is lined at ${line} with odds ${priceText} in the ${matchupText} matchup.${recordContext} Detailed recent stat splits for ${playerName} are not available in the cache, so this should be treated as a lighter lean rather than a strongly modeled edge.`);
-    } else {
-      parts.push(`${propType} is priced at ${priceText} in the ${matchupText} matchup.${recordContext} Player-level stat history for ${playerName} isn't present in the cache, so this recommendation leans more on matchup context than hard volume numbers.`);
-    }
+    // No reliable player-level stats available for this prop -> signal caller to skip it.
+    return null;
   }
   
   return parts.join(' ');
@@ -1140,6 +1152,106 @@ async function buildMatchupSnapshots(suggestions) {
   }
 }
 
+// Prevent logically conflicting traditional picks for the same game while
+// still allowing picks from many different games.
+//
+// Rules enforced per suggestions response:
+function dedupeConflictingGameSuggestions(suggestions) {
+  const result = [];
+  const gameState = new Map(); // key: sport|home|away -> { teamSides, totals }
+
+  for (const s of suggestions || []) {
+    if (!s || !s.homeTeam || !s.awayTeam || !s.betType) {
+      result.push(s);
+      continue;
+    }
+
+    const sport = (s.sport || '').toUpperCase();
+    const gameKey = `${sport}|${s.homeTeam}|${s.awayTeam}`;
+    if (!gameState.has(gameKey)) {
+      gameState.set(gameKey, {
+        teamSides: {},   // teamName -> { moneyline: bool, spread: bool }
+        totals: { over: false, under: false }
+      });
+    }
+    const state = gameState.get(gameKey);
+
+    const betType = s.betType;
+
+    // Moneyline / Spread: enforce "no opposing side" rule
+    if (betType === 'Moneyline' || betType === 'Spread') {
+      const teamName = (s.pick || '').toString();
+      if (!teamName) {
+        result.push(s);
+        continue;
+      }
+
+      const ts = state.teamSides;
+      const existingTeams = Object.keys(ts);
+      let conflict = false;
+
+      // If we already have a pick on the OPPOSING team (ML or Spread), skip
+      for (const otherTeam of existingTeams) {
+        if (otherTeam !== teamName && (ts[otherTeam].moneyline || ts[otherTeam].spread)) {
+          conflict = true;
+          break;
+        }
+      }
+      if (conflict) {
+        continue;
+      }
+
+      // Also avoid stacking ML+Spread on the same team for independent picks
+      if (!ts[teamName]) {
+        ts[teamName] = { moneyline: false, spread: false };
+      }
+      if (ts[teamName].moneyline || ts[teamName].spread) {
+        // Same-team ML/Spread already present -> treat as conflict and skip
+        continue;
+      }
+
+      // Record this side and keep the pick
+      if (betType === 'Moneyline') ts[teamName].moneyline = true;
+      if (betType === 'Spread') ts[teamName].spread = true;
+      result.push(s);
+      continue;
+    }
+
+    // Totals: prevent Over + Under on same game
+    if (betType === 'Total') {
+      const pickName = (s.pick || '').toString().toLowerCase();
+      const isOver = pickName.includes('over');
+      const isUnder = pickName.includes('under');
+
+      if (!isOver && !isUnder) {
+        result.push(s);
+        continue;
+      }
+
+      if (isOver && state.totals.over) {
+        continue; // duplicate Over
+      }
+      if (isUnder && state.totals.under) {
+        continue; // duplicate Under
+      }
+      if ((isOver && state.totals.under) || (isUnder && state.totals.over)) {
+        // Opposing total already present
+        continue;
+      }
+
+      if (isOver) state.totals.over = true;
+      if (isUnder) state.totals.under = true;
+      result.push(s);
+      continue;
+    }
+
+    // Everything else (props, team props, etc.) passes through unchanged
+    result.push(s);
+  }
+
+  return result;
+}
+
 /**
  * Suggest individual picks (not a full parlay)
  * Returns 10-30 independent betting suggestions based on user preferences
@@ -1153,8 +1265,12 @@ async function suggestPicksHandler(req, res) {
       selectedBetTypes = ['Moneyline/Spread'],
       riskLevel = 'Medium',
       dateRange = 2, // Default to 2 days to capture upcoming NFL games
-      suggestionCount
+      suggestionCount,
+      generationMode
     } = req.body;
+
+    // Normalize frontend generationMode label into an internal generateMode string
+    const generateMode = generationMode || 'AI Edge Advantages';
 
     // Determine number of suggestions based on target leg count
     // CACHE MODE: Generate 20 suggestions always for better caching
@@ -1172,6 +1288,7 @@ async function suggestPicksHandler(req, res) {
       riskLevel,
       dateRange,
       numSuggestions,
+      generateMode,
       isProduction
     });
 
@@ -1235,7 +1352,8 @@ async function suggestPicksHandler(req, res) {
         playerData,
         supabase,
         coordinator,
-        selectedBetTypes
+        selectedBetTypes,
+        dateRange
       });
       
       if (result.suggestions && result.suggestions.length > 0) {
@@ -1292,38 +1410,86 @@ async function suggestPicksHandler(req, res) {
 
     const duration = Date.now() - startTime;
 
-    // Shuffle for variety (prevents same 12 props every time)
-    const shuffled = enrichedSuggestions.sort(() => Math.random() - 0.5).slice(0, numSuggestions);
+    // First, drop directly conflicting traditional picks for the same game so
+    // users never see both sides (e.g., both moneylines or both Over and
+    // Under on the same total) in a single suggestions set.
+    let workingSuggestions = dedupeConflictingGameSuggestions(enrichedSuggestions);
+
+    // Apply generateMode-specific post-processing before final selection
+    // Heavy Favorites: prefer strong favorites (more negative odds). If none match,
+    // fall back to the full suggestion set so the user still sees picks.
+    if (generateMode === 'Heavy Favorites') {
+      const heavyOnly = workingSuggestions.filter(s => {
+        if (!s || s.odds == null) return false;
+        const price = parseInt(String(s.odds), 10);
+        return !Number.isNaN(price) && price <= -150;
+      });
+
+      if (heavyOnly.length > 0) {
+        console.log(`🎯 Heavy Favorites mode: filtered to ${heavyOnly.length} strong favorite picks`);
+        workingSuggestions = heavyOnly;
+      } else {
+        console.log('⚠️ Heavy Favorites mode: no strong favorites found, using all suggestions instead');
+      }
+    }
+
+    let finalSuggestions;
+
+    if (generateMode === 'Top Picks of the Day') {
+      // Rank by a simple score using confidence and edge type, then return a
+      // small set of highest-conviction plays.
+      const scored = workingSuggestions.map(s => ({
+        pick: s,
+        score: (s.confidence || 5) + (s.edgeType === 'line_value' ? 1 : 0)
+      }));
+
+      scored.sort((a, b) => b.score - a.score);
+
+      const desired = suggestionCount || 5;
+      const maxCount = Math.min(desired, scored.length || 0);
+      const topCount = Math.max(3, Math.min(10, maxCount));
+
+      finalSuggestions = scored.slice(0, topCount).map(entry => entry.pick);
+      console.log(`🏆 Top Picks mode: selected ${finalSuggestions.length} highest-conviction plays`);
+    } else {
+      // AI Edge / Heavy Favorites: shuffle for variety and trim to requested count
+      finalSuggestions = workingSuggestions
+        .slice()
+        .sort(() => Math.random() - 0.5)
+        .slice(0, numSuggestions);
+    }
 
     logger.info('Pick suggestions generated', {
       totalGenerated: allSuggestions.length,
-      returnedAfterShuffle: shuffled.length,
-      duration: `${duration}ms`
+      returnedAfterShuffle: finalSuggestions.length,
+      duration: `${duration}ms`,
+      generateMode
     });
 
     // CACHE DISABLED - Don't store (odds change too fast on game day)
     // await cache.store(...)
     
     // Store AI suggestions for tracking model performance
-    const sessionId = await storeAISuggestions(shuffled, {
+    const sessionId = await storeAISuggestions(finalSuggestions, {
       riskLevel,
-      generateMode: allSuggestions.some(s => s.betType === 'Player Props') ? 'mixed' : 'traditional',
+      generateMode,
       userId: req.user?.id
     });
 
     res.json({
       success: true,
-      suggestions: shuffled,
+      suggestions: finalSuggestions,
       sessionId, // Include session ID for tracking
       metadata: {
         requestedSuggestions: numSuggestions,
-        returnedSuggestions: shuffled.length,
+        returnedSuggestions: finalSuggestions.length,
         totalGenerated: allSuggestions.length,
         propSuggestions: allSuggestions.filter(s => s.betType === 'Player Props' || s.betType === 'TD' || s.betType === 'Team Props').length,
         traditionalSuggestions: allSuggestions.filter(s => s.betType === 'Moneyline' || s.betType === 'Spread' || s.betType === 'Total').length,
         sports: selectedSports,
         betTypes: selectedBetTypes,
         riskLevel,
+        generateMode,
         generatedAt: new Date().toISOString(),
         generatedAtMT: getCurrentMountainTime(),
         duration: `${duration}ms`,

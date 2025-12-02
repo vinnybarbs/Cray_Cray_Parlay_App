@@ -31,65 +31,186 @@ function normalizeName(name) {
 }
 
 async function syncNFLRosters() {
-  console.log('\n📋 Step 1: Syncing NFL rosters from API-Sports...\n');
+  console.log('🔄 Syncing NFL rosters...');
   
-  // Get all NFL teams
-  const { data: teams, error: teamsError } = await supabase
-    .from('teams')
-    .select('*')
-    .eq('league', 'nfl')
-    .order('name');
+  try {
+    // Get all NFL teams with their API Sports IDs
+    console.log('Fetching NFL teams from database...');
+    const { data: teams, error: teamsError } = await supabase
+      .from('teams')
+      .select('*')
+      .eq('league', 'nfl')
+      .order('name');
 
-  if (teamsError || !teams || teams.length === 0) {
-    console.error('❌ No NFL teams found in database');
-    return { players: 0, teams: 0 };
-  }
+    if (teamsError) {
+      console.error('Error fetching teams:', teamsError);
+      throw teamsError;
+    }
+    
+    if (!teams || teams.length === 0) {
+      console.log('No NFL teams found in database');
+      return { success: false, message: 'No NFL teams found' };
+    }
 
-  console.log(`✅ Found ${teams.length} NFL teams`);
-
-  let totalPlayers = 0;
-  let totalUpdated = 0;
-  let totalInserted = 0;
-
-  for (const team of teams.slice(0, 5)) { // Limit to 5 teams for API quota
-    try {
-      console.log(`\n📡 Fetching roster for ${team.name}...`);
-
-      // Fetch roster from API-Sports
-      const response = await fetch(
-        `https://v1.american-football.api-sports.io/players?team=${team.api_sports_id || team.external_id}&season=2024`,
-        {
+    console.log(`✅ Found ${teams.length} NFL teams`);
+    console.log('Sample team:', JSON.stringify(teams[0], null, 2));
+    
+    let totalPlayers = 0;
+    let totalUpdated = 0;
+    let totalInserted = 0;
+    
+    // Process each team (limit to 2 teams for testing)
+    for (const team of teams.slice(0, 2)) {
+      try {
+        console.log(`\n🔍 Fetching roster for ${team.name} (API ID: ${team.api_sports_id})...`);
+        const url = `https://v1.american-football.api-sports.io/players?team=${team.api_sports_id}&season=2024`;
+        console.log(`   URL: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'GET',
           headers: {
-            'x-apisports-key': API_SPORTS_KEY
+            'x-apisports-key': API_SPORTS_KEY,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.warn(`⚠️  API error for ${team.name}: ${response.status} - ${errorText}`);
+          continue;
+        }
+
+        const responseData = await response.json();
+        console.log('API Response:', JSON.stringify(responseData, null, 2).substring(0, 200) + '...');
+        
+        if (!responseData || !Array.isArray(responseData)) {
+          console.log(`  ⚠️  No roster data returned for ${team.name} or invalid format`);
+          console.log('  Response data:', responseData);
+          continue;
+        }
+
+        const players = responseData;
+        console.log(`  ✅ Fetched ${players.length} players for ${team.name}`);
+
+        // Process each player
+        for (const playerData of players.slice(0, 5)) { // Limit to 5 players per team for testing
+          try {
+            const playerName = playerData.name || `${playerData.firstname || ''} ${playerData.lastname || ''}`.trim();
+            
+            console.log(`  Processing player: ${playerName} (ID: ${playerData.id}, Position: ${playerData.position})`);
+            
+            // Upsert player into players table
+            const { data: existingPlayer, error: lookupError } = await supabase
+              .from('players')
+              .select('id')
+              .eq('api_sports_id', playerData.id)
+              .maybeSingle();
+              
+            if (lookupError) {
+              console.error(`  ❌ Error looking up player ${playerName}:`, lookupError);
+              continue;
+            }
+
+            if (existingPlayer) {
+              // Update existing player
+              const { error: updateError } = await supabase
+                .from('players')
+                .update({
+                  name: playerName,
+                  position: playerData.position,
+                  team_id: team.id,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingPlayer.id);
+
+              if (updateError) throw updateError;
+              totalUpdated++;
+              console.log(`  ✅ Updated player: ${playerName}`);
+            } else {
+              // Insert new player
+              const { error: insertError } = await supabase
+                .from('players')
+                .insert({
+                  name: playerName,
+                  api_sports_id: playerData.id,
+                  position: playerData.position,
+                  team_id: team.id,
+                  league: 'nfl',
+                  sport: 'nfl',
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString()
+                });
+
+              if (insertError) throw insertError;
+              totalInserted++;
+              console.log(`  ✅ Added new player: ${playerName}`);
+            }
+            
+            totalPlayers++;
+          } catch (playerError) {
+            console.error(`  ❌ Error processing player:`, playerError);
           }
         }
-      );
+      } catch (teamError) {
+        console.error(`❌ Error processing team ${team.name}:`, teamError);
+      }
+    }
+    
+    console.log(`\n✅ Roster sync complete:`);
+    console.log(`   Total players processed: ${totalPlayers}`);
+    console.log(`   New players inserted: ${totalInserted}`);
+    console.log(`   Existing players updated: ${totalUpdated}`);
+    
+    return {
+      success: true,
+      players: totalPlayers,
+      inserted: totalInserted,
+      updated: totalUpdated
+    };
+  } catch (error) {
+    console.error('Error in syncNFLRosters:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+      });
 
       if (!response.ok) {
-        console.warn(`⚠️  API error for ${team.name}: ${response.status}`);
+        const errorText = await response.text();
+        console.warn(`⚠️  API error for ${team.name}: ${response.status} - ${errorText}`);
         continue;
       }
 
-      const data = await response.json();
+      const responseData = await response.json();
+      console.log('API Response:', JSON.stringify(responseData, null, 2).substring(0, 500) + '...');
       
-      if (!data.response || data.response.length === 0) {
-        console.log(`  ⚠️  No roster data returned for ${team.name}`);
+      if (!responseData || !Array.isArray(responseData)) {
+        console.log(`  ⚠️  No roster data returned for ${team.name} or invalid format`);
+        console.log('  Response data:', responseData);
         continue;
       }
 
-      console.log(`  ✓ Fetched ${data.response.length} players`);
+      const players = responseData;
+      console.log(`  ✅ Fetched ${players.length} players for ${team.name}`);
 
       // Process each player
-      for (const playerData of data.response) {
-        const player = playerData.player;
-        const playerName = player.name || player.firstname + ' ' + player.lastname;
+      for (const playerData of players) {
+        const playerName = playerData.name || `${playerData.firstname || ''} ${playerData.lastname || ''}`.trim();
+        
+        console.log(`  Processing player: ${playerName} (ID: ${playerData.id}, Position: ${playerData.position})`);
         
         // Upsert player into players table
         const { data: existingPlayer, error: lookupError } = await supabase
           .from('players')
           .select('id')
-          .eq('api_sports_id', player.id)
+          .eq('api_sports_id', playerData.id)
           .maybeSingle();
+          
+        if (lookupError) {
+          console.error(`  ❌ Error looking up player ${playerName}:`, lookupError);
+          continue;
+        }
 
         if (existingPlayer) {
           // Update existing player
@@ -97,7 +218,7 @@ async function syncNFLRosters() {
             .from('players')
             .update({
               name: playerName,
-              position: player.position,
+              position: playerData.position,
               team_id: team.id,
               updated_at: new Date().toISOString()
             })
@@ -110,8 +231,8 @@ async function syncNFLRosters() {
             .from('players')
             .insert({
               name: playerName,
-              api_sports_id: player.id,
-              position: player.position,
+              api_sports_id: playerData.id,
+              position: playerData.position,
               team_id: team.id,
               league: 'nfl',
               sport: 'nfl'
@@ -139,16 +260,26 @@ async function syncNFLRosters() {
   console.log(`   Updated: ${totalUpdated}`);
 
   return { players: totalPlayers, inserted: totalInserted, updated: totalUpdated };
+  } catch (error) {
+    console.error('Error processing teams:', error);
+  }
 }
 
 async function matchPlayerStatsToPlayers() {
   console.log('\n📊 Step 2: Matching player_game_stats to players table...\n');
 
-  // Get all player_game_stats records with null or invalid player_id
-  const { data: stats, error: statsError } = await supabase
-    .from('player_game_stats')
-    .select('*')
-    .limit(100);
+  try {
+    // Get all player_game_stats records with null or invalid player_id
+    const { data: stats, error: statsError } = await supabase
+      .from('player_game_stats')
+      .select('*')
+      .limit(100);
+
+    if (statsError) throw statsError;
+    if (!stats || stats.length === 0) {
+      console.log('No player game stats found to process');
+      return { matched: 0, unmatched: 0 };
+    }
 
   if (statsError || !stats || stats.length === 0) {
     console.log('⚠️  No player_game_stats records found');
@@ -186,16 +317,12 @@ async function matchPlayerStatsToPlayers() {
     
     // For now, log what we have
     console.log(`  Record: game_date=${stat.game_date}, player_id=${stat.player_id}`);
-    
-    // You'd match here by looking up the player_id in your mapping
-    // This is a placeholder - actual logic depends on your data structure
+
+    return { matched: matchedCount, unmatched: unmatchedCount };
+  } catch (error) {
+    console.error('Error in matchPlayerStatsToPlayers:', error);
+    return { matched: 0, unmatched: 0, error: error.message };
   }
-
-  console.log(`\n✅ Matching complete:`);
-  console.log(`   Matched: ${matched}`);
-  console.log(`   Unmatched: ${unmatched}`);
-
-  return { matched, unmatched };
 }
 
 async function main() {
