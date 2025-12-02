@@ -1,7 +1,6 @@
 {
   "name": "craycrayapp",
   "private": true,
-  "type": "module",
   "version": "0.0.0",
   "engines": {
     "node": ">=20.19.0",
@@ -57,7 +56,7 @@
     "vite": "^7.1.8"
   },
   "description": "This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.",
-  "main": "eslint.config.js",
+  "main": "server.js",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/vinnybarbs/Cray_Cray_Parlay_App.git"
