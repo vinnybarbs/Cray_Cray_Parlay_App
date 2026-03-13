@@ -1,16 +1,12 @@
-/**
- * CRON JOB: Pre-Analyze Upcoming Games
- * Runs 2-3x daily to generate AI analysis snippets per game using GPT-4o-mini
- * Stores results in game_analysis table for cheap/fast pick generation
- *
- * Schedule: Every 4 hours (0 */4 * * *)
- * Endpoint: POST /cron/pre-analyze-games
- */
+// CRON JOB: Pre-Analyze Upcoming Games
+// Runs 2-3x daily to generate AI analysis snippets per game using GPT-4o-mini
+// Stores results in game_analysis table for cheap/fast pick generation
+// Schedule: Every 4 hours
+// Endpoint: POST /cron/pre-analyze-games
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
-const OpenAI = require('openai');
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
 /**
  * Build a game_key from team names + date
@@ -274,15 +270,30 @@ Respond in EXACTLY this JSON format (no markdown):
 edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Be data-driven and concise.`;
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-      max_tokens: 300
+    const response = await fetch(OPENAI_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.3,
+        max_tokens: 300
+      })
     });
 
-    const content = response.choices[0]?.message?.content?.trim();
-    const usage = response.usage;
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`OpenAI ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content?.trim();
+    const usage = data.usage;
+
+    if (!content) throw new Error('Empty response from OpenAI');
 
     // Parse JSON (strip markdown fences if present)
     const jsonStr = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
