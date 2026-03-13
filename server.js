@@ -385,6 +385,14 @@ app.post('/cron/refresh-suggestions-cache', refreshSuggestionsCache);
 const syncNCAABData = require('./api/cron/sync-ncaab-data');
 app.post('/cron/sync-ncaab-data', syncNCAABData);
 
+// Add cron endpoint to backfill historical game results from ESPN
+const backfillGameResults = require('./api/cron/backfill-game-results');
+app.post('/cron/backfill-game-results', backfillGameResults);
+
+// Add cron endpoint to pre-analyze upcoming games with GPT-4o-mini
+const preAnalyzeGames = require('./api/cron/pre-analyze-games');
+app.post('/cron/pre-analyze-games', preAnalyzeGames);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 
