@@ -56,9 +56,16 @@ async function fetchScoreboard(sport, sportPath, dateStr) {
       const eventDate = new Date(event.date);
       const dateOnly = formatDateISO(eventDate);
 
+      // Derive season from date (e.g., NCAAB 2025-26 season, NBA 2025-26)
+      const year = eventDate.getFullYear();
+      const month = eventDate.getMonth() + 1;
+      const season = month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+
       games.push({
         espn_event_id: event.id,
+        game_id: parseInt(event.id, 10) || Math.floor(Math.random() * 900000000) + 100000000,
         sport,
+        season,
         date: dateOnly,
         home_team_id: home.team.id ? parseInt(home.team.id, 10) : null,
         home_team_name: home.team.displayName,

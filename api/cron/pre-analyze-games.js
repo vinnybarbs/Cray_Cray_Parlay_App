@@ -5,8 +5,19 @@
 // Endpoint: POST /cron/pre-analyze-games
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
+const { ApiSportsMulti } = require('../../lib/services/apisports-multi.js');
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+
+// Map odds_cache sport slugs to display sport names
+const SLUG_TO_SPORT = {
+  americanfootball_nfl: 'NFL',
+  americanfootball_ncaaf: 'NCAAF',
+  basketball_nba: 'NBA',
+  basketball_ncaab: 'NCAAB',
+  icehockey_nhl: 'NHL',
+  baseball_mlb: 'MLB'
+};
 
 /**
  * Build a game_key from team names + date
@@ -229,12 +240,149 @@ async function getPastAccuracy(sport) {
 }
 
 /**
+ * Get API-Sports enrichment (standings, season stats, H2H) for NFL/NBA/NHL/MLB
+ * NCAAB uses ESPN instead (no API-Sports basketball college endpoint)
+ */
+async function getApiSportsContext(homeTeam, awayTeam, sportSlug) {
+  const sportName = SLUG_TO_SPORT[sportSlug];
+  if (!sportName || sportName === 'NCAAB') return null; // NCAAB uses ESPN
+
+  const apiClient = new ApiSportsMulti();
+  if (!apiClient.apiKey) return null;
+
+  try {
+    const parts = [];
+
+    // 1. Standings — get W-L, conference rank, points differential
+    const standingsData = await apiClient.getStandings(sportName);
+    if (standingsData?.response?.length > 0) {
+      const homeMascot = homeTeam.split(' ').slice(-1)[0].toLowerCase();
+      const awayMascot = awayTeam.split(' ').slice(-1)[0].toLowerCase();
+
+      for (const s of standingsData.response) {
+        const teamName = (s.team?.name || '').toLowerCase();
+        const isHome = teamName.includes(homeMascot);
+        const isAway = teamName.includes(awayMascot);
+
+        if (isHome || isAway) {
+          const label = isHome ? homeTeam : awayTeam;
+          const w = s.won || s.win?.total || 0;
+          const l = s.lost || s.loss?.total || 0;
+          const ptsFor = s.points?.for || 0;
+          const ptsAgainst = s.points?.against || 0;
+          const diff = ptsFor - ptsAgainst;
+          const conf = s.conference?.name || s.group?.name || '';
+          const streak = s.streak ? ` (streak: ${s.streak})` : '';
+
+          parts.push(`[API-Sports] ${label}: ${w}-${l} ${conf}${streak}, PF/PA: ${ptsFor}/${ptsAgainst} (${diff >= 0 ? '+' : ''}${diff})`);
+        }
+      }
+    }
+
+    // 2. Today's games — check if there's a live/upcoming entry with odds
+    if (sportName === 'NFL') {
+      // NFL has odds endpoint on API-Sports (DraftKings/FanDuel via their feed)
+      const today = new Date().toISOString().split('T')[0];
+      const gamesData = await apiClient.getGamesByDate(sportName, today);
+      if (gamesData?.response?.length > 0) {
+        const homeMascot = homeTeam.split(' ').slice(-1)[0].toLowerCase();
+        for (const g of gamesData.response) {
+          const hName = (g.teams?.home?.name || '').toLowerCase();
+          if (hName.includes(homeMascot)) {
+            const venue = g.game?.venue?.name || '';
+            const weather = g.game?.weather?.description || '';
+            if (venue) parts.push(`[API-Sports] Venue: ${venue}`);
+            if (weather) parts.push(`[API-Sports] Weather: ${weather}`);
+            break;
+          }
+        }
+      }
+    }
+
+    return parts.length > 0 ? parts.join('\n') : null;
+  } catch (err) {
+    console.warn(`API-Sports enrichment failed for ${sportSlug}:`, err.message);
+    return null;
+  }
+}
+
+/**
+ * Get Supabase DB stats: player_game_stats season averages for key players
+ */
+async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
+  const sportName = SLUG_TO_SPORT[sportSlug];
+  if (!sportName) return null;
+
+  try {
+    // Get top players by game count for each team from player_game_stats
+    const homeMascot = homeTeam.split(' ').slice(-1)[0];
+    const awayMascot = awayTeam.split(' ').slice(-1)[0];
+
+    const { data } = await supabase.rpc('resolve_team', { search_term: homeMascot, search_sport: sportName });
+    if (!data || data.length === 0) return null;
+
+    const teamId = data[0].id;
+
+    // Get top 3 players by most recent stats for this team
+    const { data: players } = await supabase
+      .from('players')
+      .select('id, name, position')
+      .eq('team_id', teamId)
+      .eq('sport', sportName)
+      .limit(50);
+
+    if (!players || players.length === 0) return null;
+
+    const playerIds = players.map(p => p.id);
+
+    // Get recent game stats averages
+    const { data: stats } = await supabase
+      .from('player_game_stats')
+      .select('player_id, passing_yards, passing_touchdowns, rushing_yards, rushing_touchdowns, receptions, receiving_yards')
+      .in('player_id', playerIds.slice(0, 20))
+      .order('game_date', { ascending: false })
+      .limit(100);
+
+    if (!stats || stats.length === 0) return null;
+
+    // Aggregate per player
+    const playerMap = {};
+    for (const p of players) playerMap[p.id] = p;
+
+    const agg = {};
+    for (const s of stats) {
+      if (!agg[s.player_id]) agg[s.player_id] = { games: 0, passYds: 0, passTDs: 0, rushYds: 0, rushTDs: 0, recYds: 0, recs: 0 };
+      const a = agg[s.player_id];
+      a.games++;
+      if (s.passing_yards) { a.passYds += s.passing_yards; a.passTDs += (s.passing_touchdowns || 0); }
+      if (s.rushing_yards) { a.rushYds += s.rushing_yards; a.rushTDs += (s.rushing_touchdowns || 0); }
+      if (s.receiving_yards) { a.recYds += s.receiving_yards; a.recs += (s.receptions || 0); }
+    }
+
+    // Format top performers
+    const lines = [];
+    for (const [pid, a] of Object.entries(agg)) {
+      if (a.games < 2) continue;
+      const p = playerMap[pid];
+      if (!p) continue;
+      const parts = [];
+      if (a.passYds > 0) parts.push(`${(a.passYds / a.games).toFixed(0)} pass yds, ${(a.passTDs / a.games).toFixed(1)} TDs`);
+      if (a.rushYds > 100) parts.push(`${(a.rushYds / a.games).toFixed(0)} rush yds`);
+      if (a.recYds > 50) parts.push(`${(a.recYds / a.games).toFixed(0)} rec yds, ${(a.recs / a.games).toFixed(1)} rec`);
+      if (parts.length > 0) lines.push(`${p.name} (${p.position || '?'}): ${parts.join(', ')} [${a.games}g avg]`);
+    }
+
+    return lines.length > 0 ? lines.slice(0, 5).join('\n') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Generate AI analysis for a single game using GPT-4o-mini
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy) {
-  const sportDisplay = game.sport
-    .replace('americanfootball_', '').replace('basketball_', '').replace('icehockey_', '')
-    .toUpperCase();
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx) {
+  const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
   let contextParts = [];
   contextParts.push(`Sport: ${sportDisplay}`);
@@ -250,6 +398,8 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (homeTrend) contextParts.push(`${game.home_team} last ${homeTrend.games.length}: ${homeTrend.record} — ${homeTrend.games.join('; ')}`);
   if (awayTrend) contextParts.push(`${game.away_team} last ${awayTrend.games.length}: ${awayTrend.record} — ${awayTrend.games.join('; ')}`);
 
+  if (apiSportsCtx) contextParts.push(`Standings/Stats:\n${apiSportsCtx}`);
+  if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
   if (accuracy) contextParts.push(`Past accuracy: ${accuracy}`);
@@ -373,17 +523,19 @@ async function preAnalyzeGames(req, res) {
         const oddsCtx = extractOddsContext(game);
         const sportDisplay = game.sport.replace('americanfootball_', '').replace('basketball_', '').replace('icehockey_', '').toUpperCase();
 
-        // Fetch context in parallel
-        const [newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy] = await Promise.all([
+        // Fetch context in parallel — DB queries + API-Sports + news
+        const [newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
           getInjuryContext(game.home_team, game.away_team),
           getRankingsContext(game.home_team, game.away_team),
           getRecentResults(game.home_team, game.sport),
           getRecentResults(game.away_team, game.sport),
-          getPastAccuracy(game.sport)
+          getPastAccuracy(game.sport),
+          getApiSportsContext(game.home_team, game.away_team, game.sport),
+          getPlayerStatsContext(game.home_team, game.away_team, game.sport)
         ]);
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy);
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx);
 
         if (result) {
           const record = {

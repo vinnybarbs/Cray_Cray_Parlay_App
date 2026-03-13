@@ -63,9 +63,15 @@ async function syncNCAABData(req, res) {
           const eventDate = new Date(event.date);
           const dateOnly = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}-${String(eventDate.getDate()).padStart(2, '0')}`;
 
+          const yr = eventDate.getFullYear();
+          const mo = eventDate.getMonth() + 1;
+          const season = mo >= 9 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
+
           games.push({
             espn_event_id: event.id,
+            game_id: parseInt(event.id, 10) || Math.floor(Math.random() * 900000000) + 100000000,
             sport: 'NCAAB',
+            season,
             date: dateOnly,
             home_team_id: home.team.id ? parseInt(home.team.id, 10) : null,
             home_team_name: home.team.displayName,
