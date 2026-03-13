@@ -246,87 +246,154 @@ const AIAgentsWorkflow = () => {
   )
 }
 
-const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
-  const phases = [
-    { key: 'odds', label: 'Odds', icon: '📊' },
-    { key: 'research', label: 'Research', icon: '🔍' },
-    { key: 'analysis', label: 'Analysis', icon: '🧠' },
-    { key: 'post', label: 'Post', icon: '✨' }
+const AnalysisLoadingScreen = ({ sports, betTypes, elapsed }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [logLines, setLogLines] = useState([]);
+  const [funFact, setFunFact] = useState(0);
+
+  const steps = [
+    { icon: '📡', label: 'Connecting to live odds feeds', duration: 3 },
+    { icon: '📊', label: 'Scanning markets across sportsbooks', duration: 5 },
+    { icon: '🗞️', label: 'Pulling latest injury reports & news', duration: 8 },
+    { icon: '🧠', label: 'Loading pre-computed game analysis', duration: 11 },
+    { icon: '📈', label: 'Crunching player stats & trends', duration: 15 },
+    { icon: '🔬', label: 'Running edge detection algorithms', duration: 20 },
+    { icon: '🤖', label: 'AI ranking picks by confidence', duration: 28 },
+    { icon: '✅', label: 'Validating picks & building suggestions', duration: 35 },
   ];
-  
+
+  const funFacts = [
+    { icon: '🎯', text: 'Our AI analyzes 50+ data points per game before making a pick' },
+    { icon: '📰', text: 'News from 20+ RSS feeds is scanned for injury & lineup impacts' },
+    { icon: '🧪', text: 'Each game gets a pre-computed edge score from 1-10' },
+    { icon: '📊', text: 'Player props are compared against recent box score averages' },
+    { icon: '🏀', text: 'Team records, rankings, and head-to-head history all factor in' },
+    { icon: '💡', text: 'The AI looks at both sides of every bet before picking the best value' },
+    { icon: '🔄', text: 'Game analysis refreshes every 4 hours for the freshest insights' },
+    { icon: '📉', text: 'Line movement and closing line value help identify sharp edges' },
+  ];
+
+  const logMessages = {
+    3: [`Fetching ${sports.join(', ')} odds...`, 'Connected to DraftKings, FanDuel, BetMGM'],
+    5: [`Found games with ${betTypes.join(', ')} markets`, 'Comparing lines across books...'],
+    8: ['Scanning 5,000+ articles for relevant news...', 'Checking injury reports & lineup changes...'],
+    11: ['Loading pre-analyzed matchup intelligence...', 'Edge scores computed for upcoming games'],
+    15: ['Pulling ESPN box scores for player averages...', 'Cross-referencing props vs recent stats...'],
+    20: ['Identifying value discrepancies in lines...', 'Checking key factors: pace, rest, travel...'],
+    28: ['GPT-4o ranking picks by expected value...', 'Filtering for highest-conviction plays...'],
+    35: ['Deduplicating conflicting picks...', 'Final validation complete!'],
+  };
+
+  useEffect(() => {
+    const stepIdx = steps.findIndex(s => elapsed < s.duration);
+    setCurrentStep(stepIdx === -1 ? steps.length - 1 : stepIdx);
+  }, [elapsed]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFunFact(prev => (prev + 1) % funFacts.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const threshold = steps[currentStep]?.duration;
+    if (threshold && logMessages[threshold]) {
+      const msgs = logMessages[threshold];
+      const newLines = msgs.map(m => ({ text: m, time: elapsed }));
+      setLogLines(prev => [...prev.slice(-6), ...newLines]);
+    }
+  }, [currentStep]);
+
+  const progressPct = Math.min(95, (elapsed / 40) * 100);
+
   return (
-    <div className="p-3 rounded-lg bg-black bg-opacity-30 border border-gray-700">
-      <div className="text-xs font-semibold text-gray-300 mb-2 text-center">Building Your Parlay</div>
-      
-      {/* Phase indicators */}
-      <div className="flex items-center justify-between mb-2">
-        {phases.map((phase, idx) => {
-          const isActive = loading && progress === idx;
-          const isDone = phaseData?.[phase.key]?.complete || (!loading && timings);
-          
-          return (
-            <div key={phase.key} className="flex flex-col items-center space-y-1 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-base transition-all ${
-                isDone ? 'bg-green-600' : isActive ? 'bg-yellow-400 animate-pulse' : 'bg-gray-700'
-              }`}>
-                {isDone ? '✓' : phase.icon}
+    <div className="max-w-2xl mx-auto mt-6 space-y-4">
+      {/* Main card */}
+      <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 overflow-hidden shadow-2xl">
+        {/* Header with animated gradient bar */}
+        <div className="relative h-1.5 bg-gray-700 overflow-hidden">
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-yellow-500 via-green-400 to-yellow-500 transition-all duration-1000 ease-out"
+            style={{ width: `${progressPct}%` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+        </div>
+
+        <div className="p-5">
+          {/* Title */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              <span className="text-sm font-bold text-gray-200 tracking-wide uppercase">AI Analysis Engine</span>
+            </div>
+            <span className="text-xs font-mono text-gray-500">{elapsed}s</span>
+          </div>
+
+          {/* Step list */}
+          <div className="space-y-2 mb-4">
+            {steps.map((step, idx) => {
+              const isDone = currentStep > idx;
+              const isActive = currentStep === idx;
+
+              return (
+                <div
+                  key={idx}
+                  className={`flex items-center gap-3 py-1.5 px-3 rounded-lg transition-all duration-500 ${
+                    isActive ? 'bg-yellow-500/10 border border-yellow-500/30' :
+                    isDone ? 'opacity-60' : 'opacity-30'
+                  }`}
+                >
+                  <span className="text-base w-6 text-center">
+                    {isDone ? <span className="text-green-400">&#10003;</span> : step.icon}
+                  </span>
+                  <span className={`text-sm flex-1 ${isActive ? 'text-yellow-300 font-medium' : isDone ? 'text-gray-400' : 'text-gray-600'}`}>
+                    {step.label}
+                  </span>
+                  {isActive && (
+                    <div className="flex gap-0.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  )}
+                  {isDone && <span className="text-xs text-green-500 font-mono">{step.duration}s</span>}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Live log terminal */}
+          {logLines.length > 0 && (
+            <div className="bg-black/50 rounded-lg p-3 mb-4 border border-gray-700/50 font-mono text-xs max-h-24 overflow-hidden">
+              {logLines.slice(-4).map((line, i) => (
+                <div key={i} className="text-green-400/80 leading-relaxed">
+                  <span className="text-gray-600 mr-2">&gt;</span>{line.text}
+                </div>
+              ))}
+              <div className="text-green-400 animate-pulse mt-0.5">
+                <span className="text-gray-600 mr-2">&gt;</span>
+                <span className="inline-block w-2 h-3 bg-green-400/60 animate-pulse" />
               </div>
-              <span className={`text-xs ${isDone || isActive ? 'text-gray-300' : 'text-gray-500'}`}>
-                {phase.label}
-              </span>
-              {isActive && (
-                <span className="text-xs text-yellow-400 animate-pulse">Active</span>
-              )}
             </div>
-          );
-        })}
+          )}
+
+          {/* Fun fact rotator */}
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+            <span className="text-base mt-0.5">{funFacts[funFact].icon}</span>
+            <div>
+              <div className="text-xs text-blue-300/60 font-semibold uppercase tracking-wider mb-0.5">Did you know?</div>
+              <div className="text-sm text-gray-300 leading-snug">{funFacts[funFact].text}</div>
+            </div>
+          </div>
+        </div>
       </div>
-      
-      {/* Detailed phase information */}
-      {phaseData && !loading && (
-        <div className="mt-2 pt-2 border-t border-gray-600 grid grid-cols-2 gap-1 text-xs">
-          {phaseData.odds && (
-            <div className="text-gray-300">
-              📊 {phaseData.odds.games} games ({phaseData.odds.quality}%)
-            </div>
-          )}
-          {phaseData.research && (
-            <div className="text-gray-300">
-              🔍 {phaseData.research.researched}/{phaseData.research.total} researched
-            </div>
-          )}
-          {phaseData.analysis && (
-            <div className="text-gray-300">
-              🧠 {phaseData.analysis.model}
-            </div>
-          )}
-          {phaseData.postProcessing && (
-            <div className="text-gray-300">
-              ✨ Validated
-            </div>
-          )}
-        </div>
-      )}
-      
-      {/* Timing details */}
-      {timings && (
-        <div className="mt-2 pt-2 border-t border-gray-600 text-xs text-gray-300">
-          <div className="flex justify-between items-center">
-            <span>⏱️ Total Time:</span>
-            <span className="font-semibold text-green-400">
-              {(timings.totalMs / 1000).toFixed(1)}s
-            </span>
-          </div>
-          <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-gray-400">
-            <div>Odds: {(timings.oddsMs / 1000).toFixed(1)}s</div>
-            <div>Research: {(timings.researchMs / 1000).toFixed(1)}s</div>
-            <div>Analysis: {(timings.analysisMs / 1000).toFixed(1)}s</div>
-            <div>Post: {(timings.postProcessingMs / 1000).toFixed(1)}s</div>
-          </div>
-        </div>
-      )}
     </div>
   );
+}
+
+const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
+  return null;
 };
 
 export default function MainApp() {
@@ -374,6 +441,7 @@ export default function MainApp() {
   const [progressPhase, setProgressPhase] = useState(0)
   const [phaseData, setPhaseData] = useState(null)
   const [timings, setTimings] = useState(null)
+  const [elapsed, setElapsed] = useState(0)
 
   // Builder state
   const [selectedPicks, setSelectedPicks] = useState([])
@@ -470,6 +538,12 @@ export default function MainApp() {
     setLockMessage('')
     setProgressPhase(0)
     setPhaseData(null)
+    setElapsed(0)
+
+    // Elapsed second counter for loading screen
+    const elapsedInterval = setInterval(() => {
+      setElapsed(prev => prev + 1)
+    }, 1000)
 
     // Simulate progress through phases
     const progressInterval = setInterval(() => {
@@ -531,6 +605,7 @@ export default function MainApp() {
       }
     } finally {
       clearInterval(progressInterval)
+      clearInterval(elapsedInterval)
       setLoading(false)
       setProgressPhase(4) // Mark all complete
     }
@@ -854,12 +929,22 @@ export default function MainApp() {
           onClick={fetchSuggestions}
           disabled={loading || selectedSports.length === 0 || selectedBetTypes.length === 0}
           className={`w-full py-4 mt-4 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95 ${
-            loading || selectedSports.length === 0 || selectedBetTypes.length === 0
-              ? 'bg-gray-500 cursor-not-allowed'
-              : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
+            loading
+              ? 'bg-gradient-to-r from-gray-600 to-gray-700 cursor-not-allowed animate-pulse'
+              : selectedSports.length === 0 || selectedBetTypes.length === 0
+                ? 'bg-gray-500 cursor-not-allowed'
+                : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
           }`}
         >
-          {loading ? loadingMessage : 'Get AI Suggestions'}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-gray-300">Analyzing... {elapsed}s</span>
+            </span>
+          ) : 'Get AI Suggestions'}
         </button>
 
         {selectedSports.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>}
@@ -868,9 +953,7 @@ export default function MainApp() {
 
       {/* Progress Display */}
       {loading && (
-        <div className="max-w-2xl mx-auto mt-6">
-          <PhaseProgress loading={loading} progress={progressPhase} timings={timings} phaseData={phaseData} />
-        </div>
+        <AnalysisLoadingScreen sports={selectedSports} betTypes={selectedBetTypes} elapsed={elapsed} />
       )}
 
       {/* Error Display */}
