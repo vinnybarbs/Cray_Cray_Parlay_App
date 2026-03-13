@@ -1457,20 +1457,44 @@ async function suggestPicksHandler(req, res) {
     let workingSuggestions = dedupeConflictingGameSuggestions(enrichedSuggestions);
 
     // Apply generateMode-specific post-processing before final selection
-    // Heavy Favorites: prefer strong favorites (more negative odds). If none match,
-    // fall back to the full suggestion set so the user still sees picks.
-    if (generateMode === 'Heavy Favorites') {
-      const heavyOnly = workingSuggestions.filter(s => {
-        if (!s || s.odds == null) return false;
-        const price = parseInt(String(s.odds), 10);
-        return !Number.isNaN(price) && price <= -150;
+    // Easy Money: Moneyline favorites ONLY — high win-rate, lower payouts.
+    // Filter to moneyline bets with negative odds (favorites), sorted by
+    // strongest favorite first. Falls back to all ML if strict filter is empty.
+    if (generateMode === 'Easy Money' || generateMode === 'Heavy Favorites') {
+      // Step 1: Keep only moneyline picks
+      const mlOnly = workingSuggestions.filter(s => {
+        if (!s) return false;
+        const bt = (s.betType || '').toLowerCase();
+        return bt === 'moneyline' || bt === 'moneyline/spread' || bt.includes('moneyline');
       });
 
-      if (heavyOnly.length > 0) {
-        console.log(`🎯 Heavy Favorites mode: filtered to ${heavyOnly.length} strong favorite picks`);
-        workingSuggestions = heavyOnly;
+      // Step 2: From moneyline picks, keep only favorites (negative odds)
+      const mlFavorites = mlOnly.filter(s => {
+        const price = parseInt(String(s.odds), 10);
+        return !Number.isNaN(price) && price < 0;
+      });
+
+      // Step 3: Sort by strongest favorite (most negative odds = highest probability)
+      mlFavorites.sort((a, b) => parseInt(String(a.odds)) - parseInt(String(b.odds)));
+
+      if (mlFavorites.length > 0) {
+        console.log(`💰 Easy Money mode: ${mlFavorites.length} ML favorites (from ${workingSuggestions.length} total)`);
+        workingSuggestions = mlFavorites;
+      } else if (mlOnly.length > 0) {
+        console.log(`💰 Easy Money mode: no ML favorites found, using ${mlOnly.length} ML picks`);
+        workingSuggestions = mlOnly;
       } else {
-        console.log('⚠️ Heavy Favorites mode: no strong favorites found, using all suggestions instead');
+        // Last resort: filter any negative-odds pick
+        const anyFavorites = workingSuggestions.filter(s => {
+          const price = parseInt(String(s.odds), 10);
+          return !Number.isNaN(price) && price < 0;
+        });
+        if (anyFavorites.length > 0) {
+          console.log(`💰 Easy Money mode: no ML picks, using ${anyFavorites.length} favorite picks`);
+          workingSuggestions = anyFavorites;
+        } else {
+          console.log('⚠️ Easy Money mode: no favorites found at all, using full set');
+        }
       }
     }
 
@@ -1493,7 +1517,7 @@ async function suggestPicksHandler(req, res) {
       finalSuggestions = scored.slice(0, topCount).map(entry => entry.pick);
       console.log(`🏆 Top Picks mode: selected ${finalSuggestions.length} highest-conviction plays`);
     } else {
-      // AI Edge / Heavy Favorites: shuffle for variety and trim to requested count
+      // AI Edge / Easy Money: shuffle for variety and trim to requested count
       finalSuggestions = workingSuggestions
         .slice()
         .sort(() => Math.random() - 0.5)

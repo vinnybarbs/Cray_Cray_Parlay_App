@@ -61,7 +61,7 @@ const BOOKMAKER_MAPPING = {
 };
 
 const RISK_LEVEL_DEFINITIONS = {
-  Low: "High probability to hit, heavy favorites, +200 to +400 odds.",
+  Low: "Easy Money — moneyline favorites only. Lower payouts, higher win rate.",
   Medium: "Balanced value favorites with moderate props, +400 to +600 odds.",
   High: "Value underdogs and high-variance outcomes, +600+ odds.",
 };
