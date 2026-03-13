@@ -156,22 +156,43 @@ async function getInjuryContext(homeTeam, awayTeam) {
  */
 async function getRankingsContext(homeTeam, awayTeam) {
   try {
+    // rankings_cache stores mascot-only names (e.g., 'Crimson Tide', 'Blue Devils')
+    // Extract possible mascot variations to match against
+    const homeWords = homeTeam.split(' ');
+    const awayWords = awayTeam.split(' ');
+    
+    // Try last word, last 2 words, and last 3 words as mascot
+    const homeMascots = [
+      homeWords.slice(-1).join(' '),
+      homeWords.slice(-2).join(' '),
+      homeWords.slice(-3).join(' ')
+    ];
+    const awayMascots = [
+      awayWords.slice(-1).join(' '),
+      awayWords.slice(-2).join(' '),
+      awayWords.slice(-3).join(' ')
+    ];
+    
+    // Use ilike for flexible matching
+    const allMascots = [...new Set([...homeMascots, ...awayMascots])];
+    const orFilter = allMascots.map(m => `team_name.ilike.%${m}%`).join(',');
+    
     const { data } = await supabase
       .from('rankings_cache')
       .select('team_name, rank, record')
-      .in('team_name', [
-        homeTeam.split(' ').slice(-1)[0],
-        awayTeam.split(' ').slice(-1)[0]
-      ]);
+      .or(orFilter);
 
     const result = { home_rank: null, away_rank: null, home_record: null, away_record: null };
 
     for (const r of (data || [])) {
-      if (homeTeam.toLowerCase().includes(r.team_name.toLowerCase())) {
+      const rName = r.team_name.toLowerCase();
+      // Check if any home mascot variant matches
+      if (homeMascots.some(m => rName.includes(m.toLowerCase()) || m.toLowerCase().includes(rName))) {
         result.home_rank = r.rank;
         result.home_record = r.record;
       }
-      if (awayTeam.toLowerCase().includes(r.team_name.toLowerCase())) {
+      // Check if any away mascot variant matches
+      if (awayMascots.some(m => rName.includes(m.toLowerCase()) || m.toLowerCase().includes(rName))) {
         result.away_rank = r.rank;
         result.away_record = r.record;
       }
@@ -186,16 +207,26 @@ async function getRankingsContext(homeTeam, awayTeam) {
 /**
  * Get recent game results for trend context
  */
-async function getRecentResults(teamName, sport, limit = 5) {
+async function getRecentResults(teamName, sportSlug, limit = 5) {
   try {
     const mascot = teamName.split(' ').slice(-1)[0];
-    const { data } = await supabase
+    // Map odds API slugs to game_results sport values
+    const sportName = SLUG_TO_SPORT[sportSlug] || sportSlug;
+    
+    let query = supabase
       .from('game_results')
       .select('home_team_name, away_team_name, home_score, away_score, date, metadata')
       .eq('status', 'final')
       .or(`home_team_name.ilike.%${mascot}%,away_team_name.ilike.%${mascot}%`)
       .order('date', { ascending: false })
       .limit(limit);
+    
+    // Filter by sport if we have a valid mapping
+    if (sportName) {
+      query = query.eq('sport', sportName);
+    }
+    
+    const { data } = await query;
 
     if (!data || data.length === 0) return null;
 
@@ -404,20 +435,31 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
   if (accuracy) contextParts.push(`Past accuracy: ${accuracy}`);
 
-  const prompt = `You are a sharp sports betting analyst. Analyze this game and provide a concise betting recommendation.
+  const prompt = `You are a sharp sports betting analyst writing for a premium picks service. Analyze this game and provide a detailed, data-backed betting recommendation.
 
 ${contextParts.join('\n')}
 
+CRITICAL RULES:
+- CITE SPECIFIC NUMBERS: W-L records, point differentials, recent scores, rankings
+- Reference the ACTUAL recent game results if provided (e.g., "W 96-84 vs Auburn")
+- Mention rankings if available (e.g., "#4 Florida hosts #15 Alabama")
+- Your analysis should read like an expert handicapper, not a generic preview
+- If a team's recent results show a trend (3 straight wins, blowout losses), highlight it
+- Compare the spread/total to the actual scoring data when available
+
+BAD example: "Alabama has strong offensive performance and home advantage"
+GOOD example: "Alabama (23-8, #15) beat Auburn 96-84 and Tennessee 71-69 in their last two, averaging 83.5 PPG. Florida (25-6, #4) is dominant at home but the 11.5-point spread is steep given Bama's recent form."
+
 Respond in EXACTLY this JSON format (no markdown):
 {
-  "analysis": "2-3 sentence analysis covering key factors",
+  "analysis": "3-5 sentence analysis citing specific records, scores, and matchup factors",
   "edge_score": 7.5,
   "recommended_pick": "Kansas -7.5",
   "recommended_side": "home_spread",
-  "key_factors": ["factor1", "factor2", "factor3"]
+  "key_factors": ["factor1 with numbers", "factor2 with numbers", "factor3 with numbers"]
 }
 
-edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Be data-driven and concise.`;
+edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Key factors MUST include specific numbers/records.`;
 
   try {
     const response = await fetch(OPENAI_URL, {
@@ -430,7 +472,7 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
-        max_tokens: 300
+        max_tokens: 500
       })
     });
 
