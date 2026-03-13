@@ -111,9 +111,13 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
     
     const { data: initialPropOdds, error } = await marketQuery;
       
-    if (error) throw error;
+    if (error) {
+      console.log(`❌ Prop odds query error: ${error.message}`);
+      throw error;
+    }
     
     let propOdds = initialPropOdds || [];
+    console.log(`🔍 Initial prop odds query: ${propOdds.length} rows (sport=${sportKeys[0]}, nowIso=${nowIso}, endIso=${endIso})`);
 
     // If nothing matched the 24h freshness filter but we know props exist in the cache,
     // retry without the last_updated constraint so manual refreshes remain usable.
@@ -328,6 +332,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       // Continue without stats - don't fail the whole request
     }
 
+    console.log(`🔍 Pre-conversion: ${filteredPropOdds.length} filtered prop odds, ${playerData?.length || 0} players, numSuggestions=${numSuggestions}`);
     // Convert cached odds to suggestions format (with stats + news context + team records)
     let suggestions = await convertPropOddsToSuggestions(
       filteredPropOdds,
@@ -339,6 +344,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       teamRecordsMap, // PASS TEAM RECORDS FOR CONTEXT
       { disableRosterCheck: false }
     );
+    console.log(`🔍 Post-conversion: ${suggestions?.length || 0} suggestions (roster check ON)`);
 
     // Safety net: if roster verification was too strict and we ended up with zero
     // suggestions, retry once without enforcing the roster check so the user still
@@ -355,8 +361,10 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
         teamRecordsMap, // PASS TEAM RECORDS TO RETRY TOO
         { disableRosterCheck: true }
       );
+      console.log(`🔍 Post-conversion retry: ${suggestions?.length || 0} suggestions (roster check OFF)`);
     }
 
+    console.log(`🏁 generatePlayerPropSuggestions returning ${suggestions?.length || 0} suggestions`);
     return { suggestions };
     
   } catch (error) {
@@ -1369,6 +1377,8 @@ async function suggestPicksHandler(req, res) {
         console.log(`✅ Generated ${result.suggestions.length} prop suggestions`);
       } else {
         console.log('⚠️ No prop suggestions generated');
+        if (result.error) console.log(`   Prop error: ${result.error}`);
+        if (result.message) console.log(`   Prop message: ${result.message}`);
       }
     }
 
