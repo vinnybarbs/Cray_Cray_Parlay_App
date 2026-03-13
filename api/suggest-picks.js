@@ -873,6 +873,25 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     } else if (marketType.includes('reception_tds') || marketType.includes('rec_td')) {
       statPattern = /([\d.]+)\s+rec TDs?\/game/i;
       statType = 'rec TDs';
+    // NBA stat types — ESPN format: "X pts, Y reb, Z ast/game"
+    } else if (marketType === 'player_points') {
+      statPattern = /([\d.]+)\s+(?:points?|pts)/i;
+      statType = 'points';
+    } else if (marketType === 'player_assists') {
+      statPattern = /([\d.]+)\s+(?:assists?|ast)/i;
+      statType = 'assists';
+    } else if (marketType === 'player_rebounds') {
+      statPattern = /([\d.]+)\s+(?:rebounds?|reb)/i;
+      statType = 'rebounds';
+    } else if (marketType === 'player_threes') {
+      statPattern = /([\d.]+)\s+(?:threes?|3pt|3-?pointers?)/i;
+      statType = 'threes';
+    } else if (marketType === 'player_blocks') {
+      statPattern = /([\d.]+)\s+(?:blocks?|blk)/i;
+      statType = 'blocks';
+    } else if (marketType === 'player_steals') {
+      statPattern = /([\d.]+)\s+(?:steals?|stl)/i;
+      statType = 'steals';
     }
     
     if (statPattern) {
@@ -969,9 +988,13 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
       ];
       parts.push(contrarianPhrases[verdictStyle]);
     }
+  } else if (statSnippet) {
+    // Have stats text but couldn't extract a numeric average — still use the stats
+    parts.push(`Based on recent performance data for ${playerName}: ${statSnippet.replace(playerName + ': ', '')}`);
+    parts.push(`The ${direction} at ${line} presents a reasonable opportunity given the matchup dynamics.`);
   } else {
-    // No reliable player-level stats available for this prop -> signal caller to skip it.
-    return null;
+    // No stats at all — generate reasoning from matchup context only
+    parts.push(`${playerName}'s ${direction} ${line} line at ${priceText} is worth considering given the ${matchupText} matchup dynamics.`);
   }
   
   return parts.join(' ');
