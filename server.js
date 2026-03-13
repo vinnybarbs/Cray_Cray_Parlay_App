@@ -381,6 +381,10 @@ app.patch('/api/user/parlays/:id', updateParlayOutcome);
 const refreshSuggestionsCache = require('./api/cron/refresh-suggestions-cache');
 app.post('/cron/refresh-suggestions-cache', refreshSuggestionsCache);
 
+// Add cron endpoint to sync NCAAB data (scores, rankings, team records)
+const syncNCAABData = require('./api/cron/sync-ncaab-data');
+app.post('/cron/sync-ncaab-data', syncNCAABData);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 

@@ -6,6 +6,7 @@
 const SPORT_SLUGS = {
   NFL: 'americanfootball_nfl',
   NBA: 'basketball_nba',
+  NCAAB: 'basketball_ncaab',
   MLB: 'baseball_mlb',
   NHL: 'icehockey_nhl',
   Soccer: 'soccer_epl',

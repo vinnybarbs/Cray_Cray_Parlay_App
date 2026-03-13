@@ -7,11 +7,12 @@ const SPORTS = [
   "americanfootball_nfl",
   "americanfootball_ncaaf",
   "basketball_nba",
+  "basketball_ncaab",
   "icehockey_nhl",
   "soccer_epl"
 ];
 
-const PROP_SPORTS = ["americanfootball_nfl", "basketball_nba"];
+const PROP_SPORTS = ["americanfootball_nfl", "basketball_nba", "basketball_ncaab"];
 
 const CORE_MARKETS = "h2h,spreads,totals";
 
@@ -32,6 +33,12 @@ const PROP_MARKETS = {
     "player_threes",
     "player_steals",
     "player_blocks"
+  ],
+  basketball_ncaab: [
+    "player_points",
+    "player_rebounds",
+    "player_assists",
+    "player_threes"
   ]
 };
 
@@ -187,15 +194,15 @@ async function refreshOdds(req: Request): Promise<Response> {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    console.log("🚀 Starting quick odds refresh for NFL & NBA via Edge Function...");
+    console.log("🚀 Starting quick odds refresh for NFL, NBA & NCAAB via Edge Function...");
     const startTime = Date.now();
 
     // Mirror scripts/quick-odds-refresh.js:
-    //   - Only refresh NFL & NBA
+    //   - Refresh NFL, NBA & NCAAB
     //   - Fetch core markets, clear old rows for those sports, insert fresh data
     //   - Then fetch per-event player props and insert those as well.
 
-    const SPORTS_TO_REFRESH = ["americanfootball_nfl", "basketball_nba"];
+    const SPORTS_TO_REFRESH = ["americanfootball_nfl", "basketball_nba", "basketball_ncaab"];
     const allSportGames: Array<{ sport: string; games: any[] }> = [];
 
     // 1) Fetch core odds for NFL & NBA

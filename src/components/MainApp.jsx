@@ -381,7 +381,7 @@ export default function MainApp() {
   const [modelSuccessRate, setModelSuccessRate] = useState(null)
   const [lockMessage, setLockMessage] = useState('')
 
-  const sports = ['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']
+  const sports = ['NFL', 'NCAAF', 'NBA', 'NCAAB', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']
   const betTypes = ['Moneyline/Spread', 'Player Props', 'TD Props', 'Totals (O/U)', 'Team Props']
   // Use bookmaker names that match server validation (MGM expected, not 'BetMGM')
   // Limit sportsbook choices to DraftKings and FanDuel only
@@ -647,8 +647,11 @@ export default function MainApp() {
         bet_details: {
           pick: pick.pick,
           point: pick.point,
-          spread: pick.spread
+          spread: pick.spread,
+          locked_odds: pick.odds,
+          locked_at: new Date().toISOString()
         },
+        point: pick.point,
         odds: pick.odds,
         confidence: pick.confidence || 7,
         reasoning: pick.reasoning || '',

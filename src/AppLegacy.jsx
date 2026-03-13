@@ -478,7 +478,7 @@ const App = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <CheckboxGroup
             label="1. Sport (Or Multiple)"
-            options={['NFL', 'NCAAF', 'NBA', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']}
+            options={['NFL', 'NCAAF', 'NBA', 'NCAAB', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']}
             selectedOptions={selectedSports}
             onToggle={toggleSport}
           />

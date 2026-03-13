@@ -72,6 +72,8 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
       const sportUpper = sport.toUpperCase();
       return sportUpper === 'NFL' ? 'americanfootball_nfl' : 
              sportUpper === 'NBA' ? 'basketball_nba' : 
+             sportUpper === 'NCAAB' ? 'basketball_ncaab' :
+             sportUpper === 'NCAAF' ? 'americanfootball_ncaaf' :
              sportUpper === 'MLB' ? 'baseball_mlb' : 
              sportUpper === 'NHL' ? 'icehockey_nhl' : sport.toLowerCase();
     });
@@ -278,6 +280,8 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
 
       const sportCode = odds.sport === 'americanfootball_nfl' ? 'NFL'
         : odds.sport === 'basketball_nba' ? 'NBA'
+        : odds.sport === 'basketball_ncaab' ? 'NCAAB'
+        : odds.sport === 'americanfootball_ncaaf' ? 'NCAAF'
         : (odds.sport || '').toUpperCase();
 
       try {
@@ -591,6 +595,8 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
       gameDate,
       sport: odds.sport === 'americanfootball_nfl' ? 'NFL' : 
              odds.sport === 'basketball_nba' ? 'NBA' : 
+             odds.sport === 'basketball_ncaab' ? 'NCAAB' :
+             odds.sport === 'americanfootball_ncaaf' ? 'NCAAF' :
              odds.sport.toUpperCase(),
       homeTeam: odds.home_team,
       awayTeam: odds.away_team,
@@ -761,6 +767,8 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
       const statsService = new ESPNPlayerStatsBoxScore(null);
       const sport = odds.sport === 'americanfootball_nfl' ? 'NFL' : 
                     odds.sport === 'basketball_nba' ? 'NBA' : 
+                    odds.sport === 'basketball_ncaab' ? 'NCAAB' :
+                    odds.sport === 'americanfootball_ncaaf' ? 'NCAAF' :
                     odds.sport.toUpperCase();
       
       // Get formatted AI-ready stats
