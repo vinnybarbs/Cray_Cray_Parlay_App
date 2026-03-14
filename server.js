@@ -95,7 +95,15 @@ app.get('/api/dashboard-status', getDashboardStatus);
 
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
-app.use(express.static(distPath));
+app.use(express.static(distPath, {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res, path) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // SPA fallback: use a middleware to avoid registering a route pattern that
 // older router/path-to-regexp combinations may choke on.
