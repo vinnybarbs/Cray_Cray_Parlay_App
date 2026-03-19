@@ -326,6 +326,10 @@ app.post('/api/generate-parlay',
   generateParlayHandler
 );
 
+// Chat-based AI pick generator
+const { chatPicksHandler } = require('./api/chat-picks');
+app.post('/api/chat-picks', generalRateLimiter.middleware(), chatPicksHandler);
+
 // Add suggest-picks endpoint for pick builder
 app.post('/api/suggest-picks',
   parlayRateLimiter.middleware(),

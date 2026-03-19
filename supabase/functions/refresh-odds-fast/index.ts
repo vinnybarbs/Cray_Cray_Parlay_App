@@ -5,13 +5,14 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const SPORTS = [
   "americanfootball_nfl",
-  "americanfootball_ncaaf", 
+  "americanfootball_ncaaf",
   "basketball_nba",
+  "basketball_ncaab",
   "icehockey_nhl",
   "soccer_epl"
 ];
 
-const PROP_SPORTS = ["americanfootball_nfl", "basketball_nba"];
+const PROP_SPORTS = ["americanfootball_nfl", "basketball_nba", "basketball_ncaab"];
 
 const CORE_MARKETS = "h2h,spreads,totals";
 
@@ -26,9 +27,14 @@ const PROP_MARKETS = {
   ],
   basketball_nba: [
     "player_points",
-    "player_rebounds", 
+    "player_rebounds",
     "player_assists",
     "player_threes"
+  ],
+  basketball_ncaab: [
+    "player_points",
+    "player_rebounds",
+    "player_assists"
   ]
 };
 

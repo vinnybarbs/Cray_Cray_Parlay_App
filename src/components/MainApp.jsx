@@ -4,6 +4,8 @@ import Auth from './Auth'
 import Dashboard from './Dashboard'
 import PickCard from './PickCard'
 import BetslipBuilder from '../pages/BetslipBuilder'
+import ChatPicks from '../pages/ChatPicks'
+import ResultsPage from '../pages/ResultsPage'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -405,6 +407,8 @@ export default function MainApp() {
   const [showHowItWorks, setShowHowItWorks] = useState(false);
   const [showWeeklySuggestions, setShowWeeklySuggestions] = useState(false);
   const [showBetslipBuilder, setShowBetslipBuilder] = useState(false);
+  const [showChatPicks, setShowChatPicks] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...",
@@ -448,6 +452,7 @@ export default function MainApp() {
   const [userWinRate, setUserWinRate] = useState(null)
   const [modelSuccessRate, setModelSuccessRate] = useState(null)
   const [lockMessage, setLockMessage] = useState('')
+  const [locking, setLocking] = useState(false)
 
   const sports = ['NFL', 'NCAAF', 'NBA', 'NCAAB', 'MLB', 'NHL', 'Soccer', 'PGA/Golf', 'Tennis', 'UFC']
   const betTypes = ['Moneyline/Spread', 'Player Props', 'TD Props', 'Totals (O/U)', 'Team Props']
@@ -640,6 +645,9 @@ export default function MainApp() {
       window.alert('Database not configured')
       return
     }
+    if (locking) return
+    setLocking(true)
+    setLockMessage('')
 
     try {
       const americanOdds = selectedPicks.map(p => p.odds)
@@ -714,7 +722,7 @@ export default function MainApp() {
       const legsToInsert = selectedPicks.map((pick, index) => ({
         parlay_id: parlayData.id,
         leg_number: index + 1,
-        game_date: pick.gameDate,
+        game_date: pick.gameDate ? pick.gameDate.split('T')[0] : new Date().toISOString().split('T')[0],
         sport: pick.sport,
         home_team: pick.homeTeam,
         away_team: pick.awayTeam,
@@ -726,9 +734,8 @@ export default function MainApp() {
           locked_odds: pick.odds,
           locked_at: new Date().toISOString()
         },
-        point: pick.point,
-        odds: pick.odds,
-        confidence: pick.confidence || 7,
+        odds: String(pick.odds),
+        confidence: pick.confidence ? Math.round(pick.confidence) : 7,
         reasoning: pick.reasoning || '',
         pick_description: `${pick.betType}: ${pick.pick}`,
         pick: pick.pick,
@@ -740,14 +747,15 @@ export default function MainApp() {
         .insert(legsToInsert)
 
       if (legsError) {
-        console.error('Error saving parlay legs:', legsError)
-        // Don't fail the whole lock, but log it
+        console.error('Error saving parlay legs:', legsError.message, legsError.details)
       }
 
-      setLockMessage('Parlay locked - Build another or request more suggestions!')
+      setLockMessage('Parlay locked! Build another or request more suggestions.')
       setSelectedPicks([])
     } catch (err) {
-      window.alert(`Failed to save parlay: ${err.message}`)
+      setLockMessage(`Failed to save parlay: ${err.message}`)
+    } finally {
+      setLocking(false)
     }
   }
 
@@ -784,6 +792,18 @@ export default function MainApp() {
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
                 >
                   Suggestions This Week
+                </button>
+                <button
+                  onClick={() => { setShowChatPicks(true); setShowNavMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
+                >
+                  🤖 Ask the Degen AI
+                </button>
+                <button
+                  onClick={() => { setShowResults(true); setShowNavMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                >
+                  📊 Results & Performance
                 </button>
                 <button
                   onClick={() => { setShowBetslipBuilder(true); setShowNavMenu(false); }}
@@ -834,6 +854,17 @@ export default function MainApp() {
           )}
         </div>
       </header>
+
+      {/* Ask the Degen AI - Prominent CTA */}
+      <div className="max-w-2xl mx-auto mb-6">
+        <button
+          onClick={() => setShowChatPicks(true)}
+          className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 rounded-xl font-bold text-lg text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
+        >
+          🤖 Ask the Degen AI — Tell Me What You Want
+        </button>
+        <p className="text-center text-gray-500 text-xs mt-1">Chat with AI to get personalized picks based on real data</p>
+      </div>
 
       {/* Configuration */}
       <div className="space-y-6 max-w-2xl mx-auto">
@@ -1097,14 +1128,14 @@ export default function MainApp() {
                   </div>
                   <button
                     onClick={handleLockBuild}
-                    disabled={!isAuthenticated || selectedPicks.length === 0}
+                    disabled={!isAuthenticated || selectedPicks.length === 0 || locking}
                     className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap ${
-                      !isAuthenticated || selectedPicks.length === 0
+                      !isAuthenticated || selectedPicks.length === 0 || locking
                         ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
                         : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white'
                     }`}
                   >
-                    🔒 Lock Build
+                    {locking ? 'Locking...' : '🔒 Lock Build'}
                   </button>
                 </div>
               )}
@@ -1166,6 +1197,20 @@ export default function MainApp() {
             ✕ Close
           </button>
           <BetslipBuilder />
+        </div>
+      )}
+
+      {/* Chat Picks - Full Screen */}
+      {showChatPicks && (
+        <div className="fixed inset-0 bg-gray-900 z-50 overflow-hidden">
+          <ChatPicks onBack={() => setShowChatPicks(false)} />
+        </div>
+      )}
+
+      {/* Results Page - Full Screen */}
+      {showResults && (
+        <div className="fixed inset-0 bg-gray-900 z-50 overflow-auto">
+          <ResultsPage onBack={() => setShowResults(false)} />
         </div>
       )}
     </div>
