@@ -1,0 +1,100 @@
+{
+  "sessionDate": "2026-03-19",
+  "sessionDuration": "Several hours",
+  "mainObjective": "Debug 404 errors in Cray Cray for Parlays app, specifically NCAAB Easy Money mode failing while AI Edge works",
+  "environment": {
+    "frontend": "Vite/React deployed on Vercel",
+    "backend": "Express/Node.js deployed on Railway",
+    "database": "Supabase PostgreSQL",
+    "repo": "https://github.com/vinnybarbs/Cray_Cray_Parlay_App"
+  },
+  "keyIssuesIdentified": {
+    "primaryIssue": "Easy Money mode returns 404-like errors while AI Edge works for NCAAB",
+    "rootCause": "Parameter mismatch - frontend sends 'sport' (singular) but backend expects 'selectedSports' (plural array)",
+    "secondaryIssue": "Easy Money mode filters for moneyline favorites with negative odds, but NCAAB data primarily has spreads with -110 juice odds",
+    "technicalDebt": "Default fallback to NFL when sport parameter not properly mapped"
+  },
+  "investigationProcess": [
+    "Initial assumption: Vercel configuration issue",
+    "Discovery: Issue actually in Railway backend",
+    "Deep dive: ErrorContext ReferenceError in suggest-picks.js",
+    "Multiple attempts to fix scope issues with errorContext variable",
+    "Reverted to working state after user feedback about breaking changes",
+    "MCP setup challenges (Docker permission issues)",
+    "Final analysis using GitHub MCP and codebase examination"
+  ],
+  "changesMade": {
+    "attempted": [
+      "Added NCAAB support to refresh-odds-fast/index.ts",
+      "Refactored market type filtering in suggest-picks.js",
+      "Added predictions history feature (PredictionsHistory.jsx)",
+      "Added copy suggestions feature (CopySuggestions.jsx)",
+      "Multiple attempts to fix errorContext scope issues",
+      "Added debug logging for Easy Money mode",
+      "Fixed debug-odds-cache.js endpoint"
+    ],
+    "reverted": [
+      "All changes reverted to commit c72fcd7 after user feedback",
+      "Returned to known working state before debugging session"
+    ],
+    "currentWorkingState": "Commit c72fcd7 - 'Fix NCAAB data sync and AI rate limit issues'"
+  },
+  "databaseStructure": {
+    "keyTables": [
+      "odds_cache - stores betting odds by market type",
+      "ai_suggestions - tracks AI predictions with outcomes", 
+      "parlay_legs - individual parlay components",
+      "game_analysis - pre-analyzed games with moneyline/spread data"
+    ],
+    "ncaabDataIssue": {
+      "spreadDataExample": "[{\"name\": \"Purdue Boilermakers\", \"point\": -25.5, \"price\": -110}, {\"name\": \"Queens University Royals\", \"point\": 25.5, \"price\": -110}]",
+      "problem": "Easy Money mode looks for negative moneyline odds (favorites to win outright) but NCAAB data has spreads with -110 juice odds",
+      "missing": "True moneyline favorites in NCAAB dataset"
+    }
+  },
+  "errorAnalysis": {
+    "aiEdgeError": "Returns 'No betting opportunities found for selected criteria' (HTTP 200 with error body)",
+    "easyMoneyError": "Returns 'Failed to generate pick suggestions' with 'sportKeys is not defined' (HTTP 500)",
+    "difference": "AI Edge fails early with no data, Easy Money gets further but hits scope error"
+  },
+  "mcpConfiguration": {
+    "serversConfigured": [
+      "supabase-mcp-server with access token sbp_5e63c680e3ef975de419c4c7b0a45b834255d62d",
+      "github-mcp-server (needs GitHub token)",
+      "railway-mcp-server with token 3d33345f-0a06-4df8-baf4-59b413629c81",
+      "vercel-mcp-server"
+    ],
+    "issues": "Docker permission errors preventing MCP server startup"
+  },
+  "userRequests": {
+    "primary": "Debug 404 errors for NCAAB Easy Money mode",
+    "secondary": "Add predictions history page showing AI success rates",
+    "tertiary": "Add copy button for selecting multiple AI suggestions",
+    "constraint": "Don't break existing functionality that was working"
+  },
+  "solutionsIdentified": {
+    "immediate": "Fix sport vs selectedSports parameter mapping in suggest-picks.js",
+    "enhancement": "Update Easy Money logic to handle spread favorites for college sports",
+    "verification": "Run SQL queries to check actual NCAAB market types available"
+  },
+  "recommendedActionPlan": [
+    "Fix parameter mapping: const finalSelectedSports = sport ? [sport] : (selectedSports || ['NFL']);",
+    "Test both AI Edge and Easy Money with NCAAB",
+    "Enhance Easy Money to include spread favorites (teams giving points)",
+    "Re-add features once core functionality stable",
+    "Deploy and verify end-to-end functionality"
+  ],
+  "lessonsLearned": [
+    "Always verify working state before making changes",
+    "Parameter mismatches can cause subtle but critical issues",
+    "Different generation modes can have different failure paths",
+    "College sports betting data differs from pro sports (more spreads, fewer moneylines)",
+    "MCP setup requires proper Docker permissions"
+  ],
+  "nextSteps": {
+    "immediate": "Apply minimal fix for parameter mapping",
+    "testing": "Verify both modes work with NCAAB data",
+    "enhancement": "Improve Easy Money logic for college sports",
+    "features": "Re-implement predictions history and copy features"
+  }
+}
