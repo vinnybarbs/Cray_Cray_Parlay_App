@@ -133,14 +133,14 @@ async function executeTool(name, args) {
       }
 
       case 'get_team_stats': {
-        // Check team_stats_season and current_standings
+        // Check current_standings
         const { data: standings } = await supabase
           .from('current_standings')
           .select('*')
           .ilike('team_name', `%${args.team_name}%`)
           .limit(3);
 
-        // Also check game_analysis for recent insights
+        // Check game_analysis for recent insights
         const { data: analysis } = await supabase
           .from('game_analysis')
           .select('home_team, away_team, analysis_text, game_date')
@@ -149,8 +149,35 @@ async function executeTool(name, args) {
           .order('game_date', { ascending: false })
           .limit(3);
 
+        // Get injury report from news_cache
+        const { data: injuries } = await supabase
+          .from('news_cache')
+          .select('summary, last_updated')
+          .eq('search_type', 'injuries')
+          .ilike('team_name', `%${args.team_name}%`)
+          .order('last_updated', { ascending: false })
+          .limit(1);
+
+        // Get recent scores involving this team
+        const { data: recentScores } = await supabase
+          .from('news_cache')
+          .select('summary, last_updated')
+          .eq('search_type', 'recent_results')
+          .order('last_updated', { ascending: false })
+          .limit(1);
+
+        // Filter scores mentioning this team
+        let teamScores = null;
+        if (recentScores?.[0]?.summary) {
+          const lines = recentScores[0].summary.split('\n')
+            .filter(l => l.toLowerCase().includes(args.team_name.toLowerCase().split(' ').pop()));
+          if (lines.length > 0) teamScores = lines.join('\n');
+        }
+
         return {
           standings: standings || [],
+          injuries: injuries?.[0]?.summary || 'No injury data available',
+          recentScores: teamScores || 'No recent scores found',
           recentAnalysis: analysis?.map(a => ({
             matchup: `${a.away_team} @ ${a.home_team}`,
             date: a.game_date,
@@ -160,31 +187,60 @@ async function executeTool(name, args) {
       }
 
       case 'get_news': {
-        // Get from news_cache (Serper intelligence)
+        // Get structured intelligence from news_cache (ESPN injuries, scores, standings)
         let newsQuery = supabase
           .from('news_cache')
-          .select('sport, team_name, search_type, articles, summary')
+          .select('sport, team_name, search_type, summary, last_updated')
           .eq('sport', args.sport)
-          .limit(10);
+          .order('last_updated', { ascending: false })
+          .limit(15);
 
         if (args.team_name) newsQuery = newsQuery.ilike('team_name', `%${args.team_name}%`);
 
         const { data: newsCache } = await newsQuery;
 
-        // Also get RSS articles
-        const { data: articles } = await supabase
+        // Get enriched articles with betting analysis
+        let articlesQuery = supabase
           .from('news_articles')
-          .select('title, published_at, source_id')
+          .select('title, published_at, betting_summary, injury_mentions, sentiment, content')
+          .not('betting_summary', 'is', null)
+          .neq('betting_summary', 'Not analyzed')
           .order('published_at', { ascending: false })
           .limit(10);
+
+        // Filter by sport keyword in title if possible
+        if (args.sport) {
+          const sportKeywords = {
+            'NBA': 'NBA,Lakers,Celtics,basketball',
+            'NCAAB': 'NCAA,March Madness,college basketball,tournament',
+            'NHL': 'NHL,hockey',
+            'MLB': 'MLB,baseball',
+            'NFL': 'NFL,football'
+          };
+          const keywords = sportKeywords[args.sport];
+          if (keywords) {
+            const orFilter = keywords.split(',').map(k => `title.ilike.%${k}%`).join(',');
+            articlesQuery = articlesQuery.or(orFilter);
+          }
+        }
+
+        const { data: articles } = await articlesQuery;
 
         return {
           intelligence: newsCache?.map(n => ({
             team: n.team_name,
             type: n.search_type,
-            summary: n.summary?.substring(0, 300)
+            data: n.summary?.substring(0, 500),
+            updated: n.last_updated
           })) || [],
-          headlines: articles?.map(a => a.title) || []
+          enrichedArticles: articles?.map(a => ({
+            title: a.title,
+            date: a.published_at,
+            bettingSummary: a.betting_summary,
+            injuries: a.injury_mentions,
+            sentiment: a.sentiment,
+            excerpt: a.content?.substring(0, 300)
+          })) || []
         };
       }
 

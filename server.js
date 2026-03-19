@@ -405,6 +405,14 @@ app.post('/cron/backfill-game-results', backfillGameResults);
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);
 
+// Enrich articles with full content + AI betting analysis
+const enrichArticles = require('./api/cron/enrich-articles');
+app.post('/cron/enrich-articles', enrichArticles);
+
+// Fetch structured ESPN intelligence (injuries, scores, standings)
+const fetchEspnIntelligence = require('./api/cron/fetch-espn-intelligence');
+app.post('/cron/fetch-espn-intelligence', fetchEspnIntelligence);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 
