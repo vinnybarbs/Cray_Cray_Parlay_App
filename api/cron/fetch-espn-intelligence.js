@@ -40,14 +40,16 @@ async function espnFetch(path) {
 }
 
 async function upsertNewsCache(sport, searchType, teamName, data) {
+  const summaryText = typeof data === 'string' ? data : JSON.stringify(data);
   const { error } = await supabase
     .from('news_cache')
     .upsert({
       sport,
       search_type: searchType,
       team_name: teamName || sport,
-      articles: null,
-      summary: typeof data === 'string' ? data : JSON.stringify(data),
+      search_query: `espn_${searchType}_${sport}`,
+      articles: JSON.stringify([{ source: 'espn_api', fetched: new Date().toISOString() }]),
+      summary: summaryText,
       last_updated: new Date().toISOString(),
       expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()
     }, { onConflict: 'sport,search_type,team_name' });
@@ -55,42 +57,27 @@ async function upsertNewsCache(sport, searchType, teamName, data) {
   if (error) logger.warn(`Upsert error for ${sport}/${searchType}/${teamName}: ${error.message}`);
 }
 
-// Fetch injury report for a sport
+// Fetch injury report for a sport (single API call for all teams)
 async function fetchInjuries(sport) {
-  // ESPN doesn't have a direct injuries endpoint for all sports,
-  // but the scoreboard events include injury info in the competitor status
-  // For NBA/NHL, we can check team pages
-  const teams = await espnFetch(`${sport.espn}/teams`);
-  if (!teams?.sports?.[0]?.leagues?.[0]?.teams) return [];
+  const data = await espnFetch(`${sport.espn}/injuries`);
+  if (!data?.injuries) return [];
 
   const injuries = [];
-  const teamList = teams.sports[0].leagues[0].teams.slice(0, 15); // Top 15 teams to limit API calls
 
-  for (const t of teamList) {
-    const team = t.team;
-    try {
-      const injuryData = await espnFetch(`${sport.espn}/teams/${team.id}/injuries`);
-      if (injuryData?.items?.length > 0) {
-        const teamInjuries = injuryData.items.map(item => ({
-          player: item.athlete?.displayName || 'Unknown',
-          position: item.athlete?.position?.abbreviation || '',
-          status: item.status || 'Unknown',
-          details: item.longComment || item.shortComment || '',
-          date: item.date
-        }));
+  for (const teamData of data.injuries) {
+    const teamName = teamData.displayName;
+    const teamInjuries = (teamData.injuries || []).map(item => ({
+      player: item.shortComment?.split('(')[0]?.trim() || 'Unknown',
+      status: item.status || 'Unknown',
+      details: item.longComment || item.shortComment || '',
+    }));
 
-        if (teamInjuries.length > 0) {
-          injuries.push({
-            team: team.displayName,
-            teamId: team.id,
-            injuries: teamInjuries
-          });
-        }
-      }
-      // Be polite
-      await new Promise(r => setTimeout(r, 300));
-    } catch (err) {
-      // Skip this team
+    if (teamInjuries.length > 0) {
+      injuries.push({
+        team: teamName,
+        teamId: teamData.id,
+        injuries: teamInjuries
+      });
     }
   }
 
@@ -141,15 +128,29 @@ async function fetchRecentScores(sport) {
   return allGames;
 }
 
-// Fetch standings/rankings
+// Fetch standings/rankings (different base URL)
 async function fetchStandings(sport) {
-  const data = await espnFetch(`${sport.espn}/standings`);
+  // Standings use /apis/v2/ instead of /apis/site/v2/
+  let data;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
+    const res = await fetch(`https://site.api.espn.com/apis/v2/sports/${sport.espn}/standings`, {
+      headers: { 'User-Agent': 'CrayCrayParlay/1.0' },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    data = await res.json();
+  } catch (err) {
+    return null;
+  }
   if (!data) return null;
 
   const standings = [];
 
   // Handle different standings formats
-  const groups = data.children || data.standings?.entries || [];
+  const groups = data.children || [];
   for (const group of groups) {
     const entries = group.standings?.entries || group.entries || [];
     for (const entry of entries) {
