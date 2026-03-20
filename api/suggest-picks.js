@@ -1416,7 +1416,7 @@ async function suggestPicksHandler(req, res) {
           betTypes: wantsTraditionalTypes, // Only traditional types
           riskLevel,
           dateRange,
-          numSuggestions: Math.ceil(numSuggestions / 2), // Split suggestions between props and traditional
+          numSuggestions: wantsPropTypes.length > 0 ? Math.ceil(numSuggestions / 2) : numSuggestions, // Full count if no props requested
           sportsbook: req.body.oddsPlatform || 'DraftKings',
           playerContext: playerData
         });
