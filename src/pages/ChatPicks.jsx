@@ -14,8 +14,8 @@ const STARTERS = [
 function ChatMessage({ role, content }) {
   if (role === 'user') {
     return (
-      <div className="flex justify-end mb-4">
-        <div className="bg-yellow-600 text-white rounded-2xl rounded-br-sm px-4 py-3 max-w-[85%] text-sm leading-relaxed">
+      <div className="flex justify-end mb-3">
+        <div className="bg-yellow-600 text-white rounded-2xl rounded-br-sm px-4 py-3 max-w-[80%] text-sm leading-relaxed">
           {content}
         </div>
       </div>
@@ -23,7 +23,7 @@ function ChatMessage({ role, content }) {
   }
 
   return (
-    <div className="flex justify-start mb-4">
+    <div className="flex justify-start mb-3">
       <div className="bg-gray-800 border border-gray-700 text-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap">
         {content}
       </div>
@@ -38,14 +38,11 @@ export default function ChatPicks({ onBack }) {
   const [conversationHistory, setConversationHistory] = useState([])
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+  const scrollContainerRef = useRef(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  useEffect(() => {
-    inputRef.current?.focus()
-  }, [])
 
   const sendMessage = async (text) => {
     if (!text.trim() || loading) return
@@ -54,6 +51,11 @@ export default function ChatPicks({ onBack }) {
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setLoading(true)
+
+    // Blur input on mobile to dismiss keyboard after send
+    if (window.innerWidth < 768) {
+      inputRef.current?.blur()
+    }
 
     try {
       const response = await fetch(`${API_BASE}/api/chat-picks`, {
@@ -87,33 +89,36 @@ export default function ChatPicks({ onBack }) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700">
-        <button onClick={onBack} className="text-gray-400 hover:text-white text-sm">
-          &larr; Back
+    <div className="flex flex-col" style={{ height: '100dvh', minHeight: '100dvh' }}>
+      {/* Header - big tap target for back */}
+      <header className="flex-shrink-0 flex items-center px-3 py-2 bg-gray-800 border-b border-gray-700 safe-top">
+        <button
+          onClick={onBack}
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-xl transition-colors"
+          aria-label="Go back"
+        >
+          &larr;
         </button>
-        <h1 className="text-lg font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-          Ask the Degen AI
+        <h1 className="flex-1 text-center text-base font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent pr-10">
+          Try asking De-Genny anything!
         </h1>
-        <div className="w-12" />
       </header>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4">
+      {/* Messages - scrollable area */}
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
         {messages.length === 0 && (
-          <div className="text-center mt-8">
-            <div className="text-4xl mb-4">🎰</div>
-            <h2 className="text-xl font-bold text-gray-300 mb-2">What are you feeling?</h2>
-            <p className="text-gray-500 text-sm mb-6">
+          <div className="text-center mt-6">
+            <div className="text-4xl mb-3">🎰</div>
+            <h2 className="text-lg font-bold text-gray-300 mb-2">What are you feeling?</h2>
+            <p className="text-gray-500 text-sm mb-5">
               Tell me what you're looking for and I'll search our database for the best plays.
             </p>
-            <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto">
+            <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto px-2">
               {STARTERS.map((s, i) => (
                 <button
                   key={i}
                   onClick={() => sendMessage(s)}
-                  className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-700 hover:border-yellow-500 transition-colors"
+                  className="px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-700 active:bg-gray-600 hover:border-yellow-500 transition-colors"
                 >
                   {s}
                 </button>
@@ -127,7 +132,7 @@ export default function ChatPicks({ onBack }) {
         ))}
 
         {loading && (
-          <div className="flex justify-start mb-4">
+          <div className="flex justify-start mb-3">
             <div className="bg-gray-800 border border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3">
               <div className="flex gap-1">
                 <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -141,9 +146,9 @@ export default function ChatPicks({ onBack }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="px-4 py-3 bg-gray-800 border-t border-gray-700">
-        <div className="flex gap-2 max-w-2xl mx-auto">
+      {/* Input - pinned to bottom, respects mobile keyboard */}
+      <form onSubmit={handleSubmit} className="flex-shrink-0 px-3 py-2 bg-gray-800 border-t border-gray-700 safe-bottom">
+        <div className="flex gap-2">
           <input
             ref={inputRef}
             type="text"
@@ -151,17 +156,18 @@ export default function ChatPicks({ onBack }) {
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask about odds, picks, matchups..."
             disabled={loading}
-            className="flex-1 bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-sm text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 disabled:opacity-50"
+            autoComplete="off"
+            className="flex-1 min-w-0 bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-base text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="px-5 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:from-yellow-600 hover:to-orange-600 transition-colors"
+            className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed active:from-yellow-700 active:to-orange-700 transition-colors"
           >
             Send
           </button>
         </div>
-        <p className="text-center text-gray-600 text-xs mt-2">For entertainment only. Gamble responsibly.</p>
+        <p className="text-center text-gray-600 text-xs mt-1">For entertainment only. Gamble responsibly.</p>
       </form>
     </div>
   )

@@ -1200,9 +1200,9 @@ export default function MainApp() {
         </div>
       )}
 
-      {/* Chat Picks - Full Screen */}
+      {/* Chat Picks - Full Screen Dedicated Page */}
       {showChatPicks && (
-        <div className="fixed inset-0 bg-gray-900 z-50 overflow-hidden">
+        <div className="fixed inset-0 bg-gray-900 z-50">
           <ChatPicks onBack={() => setShowChatPicks(false)} />
         </div>
       )}
