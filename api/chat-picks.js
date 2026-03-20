@@ -230,17 +230,29 @@ async function executeTool(name, args) {
       }
 
       case 'get_news': {
-        // Get structured intelligence from news_cache (ESPN injuries, scores, standings)
-        let newsQuery = supabase
+        // Get team-specific intelligence (injuries for NBA/NHL/MLB)
+        let teamIntel = [];
+        if (args.team_name) {
+          const { data } = await supabase
+            .from('news_cache')
+            .select('sport, team_name, search_type, summary, last_updated')
+            .eq('sport', args.sport)
+            .ilike('team_name', `%${args.team_name}%`)
+            .order('last_updated', { ascending: false })
+            .limit(5);
+          teamIntel = data || [];
+        }
+
+        // ALWAYS get sport-level data (recent scores, standings, upcoming games)
+        const { data: sportLevel } = await supabase
           .from('news_cache')
           .select('sport, team_name, search_type, summary, last_updated')
           .eq('sport', args.sport)
+          .in('search_type', ['recent_results', 'standings', 'upcoming_games'])
           .order('last_updated', { ascending: false })
-          .limit(15);
+          .limit(5);
 
-        if (args.team_name) newsQuery = newsQuery.ilike('team_name', `%${args.team_name}%`);
-
-        const { data: newsCache } = await newsQuery;
+        const newsCache = [...teamIntel, ...(sportLevel || [])];
 
         // Get articles — prefer enriched but also include recent unenriched ones
         let articlesQuery = supabase
@@ -253,12 +265,18 @@ async function executeTool(name, args) {
         // Filter by sport keyword in title if possible
         if (args.sport) {
           const sportKeywords = {
-            'NBA': 'NBA,Lakers,Celtics,basketball',
-            'NCAAB': 'NCAA,March Madness,college basketball,tournament',
-            'NHL': 'NHL,hockey',
-            'MLB': 'MLB,baseball',
-            'NFL': 'NFL,football'
+            'NBA': 'NBA,Lakers,Celtics,basketball,Knicks,Warriors',
+            'NCAAB': 'NCAA,March Madness,college basketball,tournament,bracket,seed',
+            'NHL': 'NHL,hockey,Bruins,Rangers',
+            'MLB': 'MLB,baseball,Yankees,Dodgers',
+            'NFL': 'NFL,football,Super Bowl'
           };
+          // If team name provided, add it to keywords
+          if (args.team_name) {
+            const teamKeyword = args.team_name.split(' ').pop(); // Last word (nickname)
+            const existing = sportKeywords[args.sport] || '';
+            sportKeywords[args.sport] = existing ? `${existing},${teamKeyword}` : teamKeyword;
+          }
           const keywords = sportKeywords[args.sport];
           if (keywords) {
             const orFilter = keywords.split(',').map(k => `title.ilike.%${k}%`).join(',');
