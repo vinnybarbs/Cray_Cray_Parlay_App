@@ -170,8 +170,9 @@ async function processFeeds() {
     // Process 10 feeds per run, rotating through all sources over time
     // Use hour-based offset to rotate which feeds get processed
     const batchSize = 15;
-    const hour = new Date().getHours();
-    const offset = (hour * batchSize) % FEEDS.length;
+    // Use epoch minutes so each invocation hits different feeds (not stuck on same hour)
+    const epochMinutes = Math.floor(Date.now() / 60000);
+    const offset = (epochMinutes * batchSize) % FEEDS.length;
     const feedsToProcess = [];
     for (let i = 0; i < batchSize; i++) {
       feedsToProcess.push(FEEDS[(offset + i) % FEEDS.length]);
