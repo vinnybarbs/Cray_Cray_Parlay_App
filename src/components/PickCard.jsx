@@ -59,6 +59,23 @@ const parsePlayerPropPick = (pick) => {
 
 export default function PickCard({ pick, onAdd, isAdded }) {
   const [showFullAnalysis, setShowFullAnalysis] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const copyAnalysis = () => {
+    const lines = [
+      `${pick.sport} | ${pick.awayTeam} @ ${pick.homeTeam}`,
+      `${pick.betType}: ${pick.pick} ${pick.point ? pick.point + ' ' : ''}${pick.odds}`,
+      `Confidence: ${pick.confidence}/10`,
+      '',
+      pick.reasoning || '',
+      '',
+      '— via Cray Cray for Parlays'
+    ]
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
   const propMeta = parsePlayerPropPick(pick)
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD'
@@ -179,13 +196,21 @@ export default function PickCard({ pick, onAdd, isAdded }) {
           {getShortTagline(pick)}
         </div>
         
-        {/* Expand button */}
-        <button
-          onClick={() => setShowFullAnalysis(!showFullAnalysis)}
-          className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:text-blue-300 hover:bg-blue-600/30 text-xs rounded border border-blue-500/30 transition-all mb-2"
-        >
-          {showFullAnalysis ? '▲ Hide Full Analysis' : '▼ Read Full Analysis'}
-        </button>
+        {/* Expand + Copy buttons */}
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => setShowFullAnalysis(!showFullAnalysis)}
+            className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:text-blue-300 hover:bg-blue-600/30 text-xs rounded border border-blue-500/30 transition-all"
+          >
+            {showFullAnalysis ? '▲ Hide Full Analysis' : '▼ Read Full Analysis'}
+          </button>
+          <button
+            onClick={copyAnalysis}
+            className="px-3 py-1 bg-gray-700/50 text-gray-300 hover:text-white hover:bg-gray-600/50 text-xs rounded border border-gray-600/30 transition-all"
+          >
+            {copied ? '✓ Copied!' : '📋 Share Pick'}
+          </button>
+        </div>
         
         {/* Detailed analysis - expandable */}
         {showFullAnalysis && (
