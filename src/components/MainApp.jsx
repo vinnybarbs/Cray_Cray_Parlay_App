@@ -794,7 +794,7 @@ export default function MainApp() {
                   Suggestions This Week
                 </button>
                 <button
-                  onClick={() => { setShowChatPicks(true); setShowNavMenu(false); }}
+                  onClick={() => { if (!isAuthenticated) { setShowAuth(true); } else { setShowChatPicks(true); } setShowNavMenu(false); }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
                 >
                   🤖 Chat with De-Genny
@@ -858,12 +858,15 @@ export default function MainApp() {
       {/* Ask the Degen AI - Prominent CTA */}
       <div className="max-w-2xl mx-auto mb-6">
         <button
-          onClick={() => setShowChatPicks(true)}
+          onClick={() => {
+            if (!isAuthenticated) { setShowAuth(true); return; }
+            setShowChatPicks(true);
+          }}
           className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 rounded-xl font-bold text-lg text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
         >
           🤖 Chat with De-Genny — Tell Me What You're Feeling!
         </button>
-        <p className="text-center text-gray-500 text-xs mt-1">Chat with AI to get personalized picks based on real data</p>
+        <p className="text-center text-gray-500 text-xs mt-1">{isAuthenticated ? 'Chat with AI to get personalized picks based on real data' : 'Sign in to chat with De-Genny'}</p>
       </div>
 
       {/* Configuration */}
