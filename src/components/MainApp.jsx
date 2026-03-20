@@ -797,7 +797,7 @@ export default function MainApp() {
                   onClick={() => { setShowChatPicks(true); setShowNavMenu(false); }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
                 >
-                  🤖 Ask the Degen AI
+                  🤖 Chat with De-Genny
                 </button>
                 <button
                   onClick={() => { setShowResults(true); setShowNavMenu(false); }}
@@ -861,7 +861,7 @@ export default function MainApp() {
           onClick={() => setShowChatPicks(true)}
           className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 rounded-xl font-bold text-lg text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
         >
-          🤖 Ask the Degen AI — Tell Me What You Want
+          🤖 Chat with De-Genny — Tell Me What You're Feeling!
         </button>
         <p className="text-center text-gray-500 text-xs mt-1">Chat with AI to get personalized picks based on real data</p>
       </div>
