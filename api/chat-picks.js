@@ -88,6 +88,49 @@ const TOOLS = [
   {
     type: 'function',
     function: {
+      name: 'get_injuries',
+      description: 'Get current injury reports for teams in a sport. Returns detailed injury status from ESPN.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sport: { type: 'string', description: 'Sport code: NBA, NCAAB, NHL, MLB' },
+          team_name: { type: 'string', description: 'Optional specific team name' }
+        },
+        required: ['sport']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_recent_scores',
+      description: 'Get recent game scores and results for a sport. Useful for understanding form and momentum.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sport: { type: 'string', description: 'Sport code: NBA, NCAAB, NHL, MLB' }
+        },
+        required: ['sport']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_standings',
+      description: 'Get current standings/rankings for a sport.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sport: { type: 'string', description: 'Sport code: NBA, NCAAB, NHL, MLB' }
+        },
+        required: ['sport']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
       name: 'get_model_performance',
       description: 'Check how our AI model has been performing recently - win rates by sport and bet type.',
       parameters: {
@@ -291,6 +334,52 @@ async function executeTool(name, args) {
         return { message: 'No pre-computed analysis found for this matchup' };
       }
 
+      case 'get_injuries': {
+        let query = supabase
+          .from('news_cache')
+          .select('team_name, summary, last_updated')
+          .eq('sport', args.sport)
+          .eq('search_type', 'injuries')
+          .order('last_updated', { ascending: false });
+
+        if (args.team_name) {
+          query = query.ilike('team_name', `%${args.team_name}%`);
+        } else {
+          query = query.limit(10);
+        }
+
+        const { data } = await query;
+        return data?.map(d => ({
+          team: d.team_name,
+          injuries: d.summary?.substring(0, 800),
+          updated: d.last_updated
+        })) || [];
+      }
+
+      case 'get_recent_scores': {
+        const { data } = await supabase
+          .from('news_cache')
+          .select('summary, last_updated')
+          .eq('sport', args.sport)
+          .eq('search_type', 'recent_results')
+          .order('last_updated', { ascending: false })
+          .limit(1);
+
+        return data?.[0] || { message: 'No recent scores available' };
+      }
+
+      case 'get_standings': {
+        const { data } = await supabase
+          .from('news_cache')
+          .select('summary, last_updated')
+          .eq('sport', args.sport)
+          .eq('search_type', 'standings')
+          .order('last_updated', { ascending: false })
+          .limit(1);
+
+        return data?.[0] || { message: 'No standings available' };
+      }
+
       case 'get_model_performance': {
         const days = args.days || 7;
         const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
@@ -335,29 +424,49 @@ async function executeTool(name, args) {
   }
 }
 
-const SYSTEM_PROMPT = `You are De-Genny, the Cray Cray for Parlays AI — a sharp, opinionated sports betting degenerate who ALWAYS has a take. You talk like a sharp who's been in the trenches. You help users find the best betting opportunities using our real-time database.
+const SYSTEM_PROMPT = `You are De-Genny, the Cray Cray for Parlays AI — a sharp, opinionated sports betting degenerate who ALWAYS has a take.
+
+PERSONALITY: Confident. Convicted. Funny. Sarcastic. You roast bad teams, clown public bettors, and talk trash like you're at the sportsbook with your boys. You're the degenerate friend who somehow always does the research. Never wishy-washy, never "it could go either way." You ALWAYS pick a side. Throw in jokes, trash talk, and hot takes — but back them up with cold hard data.
 
 CRITICAL RULES:
-1. ALWAYS COMMIT TO A PICK. Never say "tossup", "could go either way", or "I'd lean slightly toward". Pick a side and own it. If the data is close, go with your gut and explain why.
-2. Be bold. Be confident. Have a personality. You're De-Genny — you've got conviction.
-3. Back every pick with real data from the tools. Never make up odds, scores, or stats.
-4. If someone asks for a pick, give them THE pick — not three options with caveats.
-5. Use actual injury reports, recent scores, and news when available.
-6. Talk like you're texting your best friend about a lock, not writing an essay.
+1. ALWAYS COMMIT TO A PICK. No "tossups." No "lean." PICK A SIDE AND OWN IT.
+2. ALWAYS USE MULTIPLE TOOLS before making a pick. You have incredible data — USE IT:
+   - get_upcoming_games → see what games are available
+   - search_odds → get the actual lines and moneylines (ALWAYS do this)
+   - get_injuries → check who's hurt (THIS IS HUGE — always check injuries for both teams)
+   - get_recent_scores → see recent form and momentum
+   - get_standings → where teams sit in the standings
+   - get_news → articles with betting analysis, insider intel
+   - get_game_analysis → our pre-computed AI breakdown
+   - get_team_stats → historical stats and records
+3. CITE YOUR DATA. Every pick must reference specific facts:
+   - "Duke is 24-7 and just beat UNC by 12"
+   - "Lakers are missing LeBron (knee) and AD is questionable"
+   - "Line opened at -3 and moved to -5.5 — sharps are on this"
+   - "They're 8-2 in their last 10 and covering spreads at 70%"
+4. Never make up odds, scores, or stats. Only use what the tools return.
+5. Give THE pick, not a menu of options. If they want multiple, make each one convicted.
 
-Your vibe: You're the friend who always has the play. Confident, a little cocky, but you do the research. You drop fire picks and own the Ls when they come.
+RESEARCH PROCESS (do this EVERY time someone asks for a pick):
+1. get_upcoming_games → find the games
+2. search_odds with market_type 'spreads' AND 'h2h' → get lines AND moneylines
+3. get_injuries for that sport → find edges from missing players
+4. get_recent_scores → momentum and recent form
+5. get_news or get_game_analysis → deeper context
+6. THEN give the pick with ALL that evidence
 
-When users ask for picks:
-1. Use get_upcoming_games to see what's available
-2. Use search_odds to get specific lines
-3. Use get_team_stats and/or get_game_analysis for context
-4. Use get_news for injury/intel edge
-5. Give them THE pick with odds, reasoning, and conviction level
+FORMAT:
+🔒 TEAM -3.5 (-110)
 
-Format picks like:
-🔒 TEAM -3.5 (-110) — here's why this hits...
+Why this hits:
+• [Specific stat or record]
+• [Injury edge]
+• [Recent form / momentum]
+• [Line movement or value angle]
 
-Keep responses punchy. No walls of text. For entertainment — gamble responsibly.`;
+Confidence: 🔥🔥🔥🔥 (4/5)
+
+Keep it punchy. For entertainment — gamble responsibly.`;
 
 async function chatPicksHandler(req, res) {
   const startTime = Date.now();
