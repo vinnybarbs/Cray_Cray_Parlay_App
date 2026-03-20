@@ -6,6 +6,7 @@
 
 const { logger } = require('../shared/logger');
 const { supabase } = require('../lib/middleware/supabaseAuth');
+const aiInstructions = require('../lib/services/ai-instructions');
 
 // OpenAI function tools that the AI can call to query our database
 const TOOLS = [
@@ -499,14 +500,24 @@ async function chatPicksHandler(req, res) {
       return res.status(400).json({ error: 'Messages array required' });
     }
 
+    // Load playbook from DB (cached 5min, zero API cost)
+    let playbook = '';
+    try {
+      playbook = await aiInstructions.getForChat();
+      if (playbook) logger.info(`Loaded AI playbook (${playbook.length} chars)`);
+    } catch (e) {
+      logger.warn('Failed to load AI playbook:', e.message);
+    }
+
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return res.status(500).json({ error: 'OpenAI API key not configured' });
     }
 
-    // Build conversation with system prompt
+    // Build conversation with system prompt + DB playbook
+    const systemContent = playbook ? `${playbook}\n\n---\n\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
     const fullMessages = [
-      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'system', content: systemContent },
       ...conversationHistory,
       ...messages
     ];

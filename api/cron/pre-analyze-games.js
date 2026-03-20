@@ -6,6 +6,7 @@
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { ApiSportsMulti } = require('../../lib/services/apisports-multi.js');
+const aiInstructions = require('../../lib/services/ai-instructions.js');
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -469,7 +470,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
 /**
  * Generate AI analysis for a single game using GPT-4o-mini
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx) {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '') {
   const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -492,7 +493,7 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
   if (accuracy) contextParts.push(`Past accuracy: ${accuracy}`);
 
-  const prompt = `You are a sharp sports betting analyst writing for a premium picks service. Analyze this game and provide a detailed, data-backed betting recommendation.
+  const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Analyze this game and provide a detailed, data-backed betting recommendation.
 
 ${contextParts.join('\n')}
 
@@ -608,6 +609,13 @@ async function preAnalyzeGames(req, res) {
     const gamesToAnalyze = games.filter(g => !existingKeys.has(g.game_key));
     console.log(`🔄 ${gamesToAnalyze.length} games need analysis (${existingKeys.size} already fresh)`);
 
+    // Load AI playbook from DB
+    let playbook = '';
+    try {
+      playbook = await aiInstructions.getForPreAnalysis();
+      if (playbook) console.log(`📖 Loaded AI playbook (${playbook.length} chars)`);
+    } catch (e) { /* continue without */ }
+
     // 3. Analyze each game
     let analyzed = 0;
     let totalPromptTokens = 0;
@@ -634,7 +642,7 @@ async function preAnalyzeGames(req, res) {
           getPlayerStatsContext(game.home_team, game.away_team, game.sport)
         ]);
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx);
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook);
 
         if (result) {
           const record = {

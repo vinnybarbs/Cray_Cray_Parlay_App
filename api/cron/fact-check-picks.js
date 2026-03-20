@@ -9,6 +9,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../../shared/logger');
+const aiInstructions = require('../../lib/services/ai-instructions');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -35,13 +36,17 @@ async function factCheckPicks(req, res) {
       return res.json({ success: true, checked: 0, message: 'No picks to fact-check' });
     }
 
+    // Load playbook
+    let playbook = '';
+    try { playbook = await aiInstructions.getForFactCheck(); } catch (e) { /* continue */ }
+
     for (const pick of picks) {
       try {
         // Gather real data for this matchup
         const realData = await gatherRealData(pick);
 
         // Ask mini to fact-check the reasoning
-        const factCheck = await runFactCheck(pick, realData);
+        const factCheck = await runFactCheck(pick, realData, playbook);
 
         // Save results
         await supabase
@@ -137,8 +142,8 @@ async function gatherRealData(pick) {
   return data;
 }
 
-async function runFactCheck(pick, realData) {
-  const prompt = `You are a sports data fact-checker. Your job is to verify claims in betting analysis against actual data.
+async function runFactCheck(pick, realData, playbook = '') {
+  const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sports data fact-checker. Your job is to verify claims in betting analysis against actual data.
 
 PICK BEING CHECKED:
 - Game: ${pick.away_team} @ ${pick.home_team}
