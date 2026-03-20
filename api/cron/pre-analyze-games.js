@@ -469,7 +469,7 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
         max_tokens: 500
@@ -601,7 +601,7 @@ async function preAnalyzeGames(req, res) {
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
-            model_used: 'gpt-4o-mini',
+            model_used: 'gpt-4o',
             prompt_tokens: result.prompt_tokens,
             completion_tokens: result.completion_tokens,
             generated_at: new Date().toISOString(),
