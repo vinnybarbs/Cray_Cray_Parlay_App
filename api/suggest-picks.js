@@ -1379,6 +1379,7 @@ async function suggestPicksHandler(req, res) {
     console.log(`   Traditional requested: ${wantsTraditionalTypes.length > 0 ? wantsTraditionalTypes.join(', ') : 'None'}`);
     
     let allSuggestions = [];
+    let lastTraditionalError = null;
 
     // Generate props if requested
     if (wantsPropTypes.length > 0) {
@@ -1429,6 +1430,7 @@ async function suggestPicksHandler(req, res) {
       } catch (error) {
         console.error(`❌ Error generating traditional suggestions:`, error.message);
         console.error(error.stack);
+        lastTraditionalError = error.message;
         // Continue with props only - don't fail entire request
       }
     }
@@ -1438,7 +1440,8 @@ async function suggestPicksHandler(req, res) {
       logger.warn('No suggestions generated', { selectedSports, selectedBetTypes });
       return res.status(404).json({
         success: false,
-        error: 'No betting opportunities found for selected criteria'
+        error: 'No betting opportunities found for selected criteria',
+        debug: lastTraditionalError || 'Coordinator returned 0 suggestions without error'
       });
     }
 
