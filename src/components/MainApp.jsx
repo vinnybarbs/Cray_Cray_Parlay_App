@@ -577,9 +577,12 @@ export default function MainApp() {
       
       clearTimeout(timeoutId)
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-
       const data = await response.json()
+
+      if (!response.ok) {
+        const msg = data?.error || data?.debug || `Server error (${response.status})`
+        throw new Error(msg)
+      }
 
       if (data.success && data.suggestions) {
         console.log('✅ Received suggestions:', data.suggestions.length, data.suggestions);
@@ -601,12 +604,15 @@ export default function MainApp() {
         throw new Error('Invalid response format')
       }
     } catch (err) {
-      const errorMsg = err.message || 'Failed to fetch suggestions';
-      // Check if it's a "sport not in season" error
-      if (errorMsg.includes('not available in cache') || errorMsg.includes('out of season')) {
-        setError(`${errorMsg}\n\n✅ Available sports: NFL, NHL, Soccer (EPL)`);
+      if (err.name === 'AbortError') {
+        setError('Request timed out — the AI is taking longer than usual. Try again or pick fewer sports.');
       } else {
-        setError(errorMsg);
+        const errorMsg = err.message || 'Failed to fetch suggestions';
+        if (errorMsg.includes('not available in cache') || errorMsg.includes('out of season')) {
+          setError(`${errorMsg}\n\n✅ Available sports: NFL, NHL, Soccer (EPL)`);
+        } else {
+          setError(errorMsg);
+        }
       }
     } finally {
       clearInterval(progressInterval)
