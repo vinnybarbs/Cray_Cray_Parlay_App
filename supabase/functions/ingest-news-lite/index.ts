@@ -20,6 +20,14 @@ const FEEDS: { name: string; url: string }[] = [
   { name: 'espn-nfl', url: 'https://www.espn.com/espn/rss/nfl/news' },
   { name: 'espn-soccer', url: 'https://www.espn.com/espn/rss/soccer/news' },
 
+  // ── Google News (aggregates On3, 247Sports, team sites, local papers, etc.) ──
+  { name: 'gnews-march-madness', url: 'https://news.google.com/rss/search?q=March+Madness+NCAA+tournament+basketball&hl=en-US&gl=US&ceid=US:en' },
+  { name: 'gnews-ncaab', url: 'https://news.google.com/rss/search?q=college+basketball+NCAA+preview+picks&hl=en-US&gl=US&ceid=US:en' },
+  { name: 'gnews-nba', url: 'https://news.google.com/rss/search?q=NBA+basketball+injury+report+preview&hl=en-US&gl=US&ceid=US:en' },
+  { name: 'gnews-nhl', url: 'https://news.google.com/rss/search?q=NHL+hockey+injury+preview+tonight&hl=en-US&gl=US&ceid=US:en' },
+  { name: 'gnews-mlb', url: 'https://news.google.com/rss/search?q=MLB+baseball+spring+training+preview&hl=en-US&gl=US&ceid=US:en' },
+  { name: 'gnews-betting', url: 'https://news.google.com/rss/search?q=sports+betting+picks+odds+predictions+today&hl=en-US&gl=US&ceid=US:en' },
+
   // ── CBS Sports ──
   { name: 'cbs-headlines', url: 'https://www.cbssports.com/rss/headlines/' },
   { name: 'cbs-nba', url: 'https://www.cbssports.com/rss/headlines/nba/' },
@@ -63,13 +71,6 @@ const FEEDS: { name: string; url: string }[] = [
   { name: 'sportingnews', url: 'https://www.sportingnews.com/us/rss' },
   { name: 'ncaa-official', url: 'https://www.ncaa.com/news/basketball-men/d1/rss.xml' },
 
-  // ── Google News (aggregates On3, 247Sports, team sites, local papers, etc.) ──
-  { name: 'gnews-march-madness', url: 'https://news.google.com/rss/search?q=March+Madness+NCAA+tournament+basketball&hl=en-US&gl=US&ceid=US:en' },
-  { name: 'gnews-ncaab', url: 'https://news.google.com/rss/search?q=college+basketball+NCAA+preview+picks&hl=en-US&gl=US&ceid=US:en' },
-  { name: 'gnews-nba', url: 'https://news.google.com/rss/search?q=NBA+basketball+injury+report+preview&hl=en-US&gl=US&ceid=US:en' },
-  { name: 'gnews-nhl', url: 'https://news.google.com/rss/search?q=NHL+hockey+injury+preview+tonight&hl=en-US&gl=US&ceid=US:en' },
-  { name: 'gnews-mlb', url: 'https://news.google.com/rss/search?q=MLB+baseball+spring+training+preview&hl=en-US&gl=US&ceid=US:en' },
-  { name: 'gnews-betting', url: 'https://news.google.com/rss/search?q=sports+betting+picks+odds+predictions+today&hl=en-US&gl=US&ceid=US:en' },
 ];
 
 const MAX_ITEMS_PER_FEED = 10;
@@ -168,7 +169,7 @@ async function processFeeds() {
   try {
     // Process 10 feeds per run, rotating through all sources over time
     // Use hour-based offset to rotate which feeds get processed
-    const batchSize = 10;
+    const batchSize = 15;
     const hour = new Date().getHours();
     const offset = (hour * batchSize) % FEEDS.length;
     const feedsToProcess = [];
