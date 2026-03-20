@@ -117,7 +117,7 @@ async function getNewsContext(homeTeam, awayTeam, sport) {
 
     const { data } = await supabase
       .from('news_articles')
-      .select('title, summary, published_at')
+      .select('title, summary, betting_summary, content, published_at')
       .gte('published_at', threeDaysAgo)
       .or(`title.ilike.%${homeWords}%,title.ilike.%${awayWords}%,summary.ilike.%${homeWords}%,summary.ilike.%${awayWords}%`)
       .order('published_at', { ascending: false })
@@ -125,27 +125,53 @@ async function getNewsContext(homeTeam, awayTeam, sport) {
 
     if (!data || data.length === 0) return null;
 
-    return data.map(a => `- ${a.title}`).join('\n');
+    return data.map(a => {
+      let line = `- ${a.title}`;
+      if (a.betting_summary) line += ` | BETTING: ${a.betting_summary}`;
+      if (a.content && !a.betting_summary) line += ` | ${a.content.substring(0, 150)}`;
+      return line;
+    }).join('\n');
   } catch {
     return null;
   }
 }
 
 /**
- * Get injury context for teams
+ * Get injury context from ESPN intelligence (news_cache table)
  */
 async function getInjuryContext(homeTeam, awayTeam) {
   try {
+    // Try exact team name match in news_cache (ESPN injuries)
     const { data } = await supabase
-      .from('injuries')
-      .select('player_name, status, injury_type')
-      .or(`team_name.ilike.%${homeTeam.split(' ').slice(-1)[0]}%,team_name.ilike.%${awayTeam.split(' ').slice(-1)[0]}%`)
-      .in('status', ['Out', 'Doubtful', 'Questionable'])
-      .limit(10);
+      .from('news_cache')
+      .select('team_name, summary')
+      .eq('search_type', 'injuries')
+      .in('team_name', [homeTeam, awayTeam])
+      .gt('last_updated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-    if (!data || data.length === 0) return null;
+    if (!data || data.length === 0) {
+      // Fallback: try mascot-based match
+      const homeMascot = homeTeam.split(' ').slice(-1)[0];
+      const awayMascot = awayTeam.split(' ').slice(-1)[0];
+      const { data: fallback } = await supabase
+        .from('news_cache')
+        .select('team_name, summary')
+        .eq('search_type', 'injuries')
+        .or(`team_name.ilike.%${homeMascot}%,team_name.ilike.%${awayMascot}%`)
+        .gt('last_updated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
-    return data.map(i => `${i.player_name} (${i.status} - ${i.injury_type || 'undisclosed'})`).join(', ');
+      if (!fallback || fallback.length === 0) return null;
+
+      return fallback.map(row => {
+        const summary = row.summary.substring(0, 300);
+        return `${row.team_name}: ${summary}`;
+      }).join('\n');
+    }
+
+    return data.map(row => {
+      const summary = row.summary.substring(0, 300);
+      return `${row.team_name}: ${summary}`;
+    }).join('\n');
   } catch {
     return null;
   }
@@ -196,6 +222,37 @@ async function getRankingsContext(homeTeam, awayTeam) {
         result.away_rank = r.rank;
         result.away_record = r.record;
       }
+    }
+
+    // If rankings_cache didn't find them, try ESPN news_cache standings
+    if (!result.home_record || !result.away_record) {
+      try {
+        const sportMap = { 'americanfootball_nfl': 'NFL', 'basketball_nba': 'NBA', 'basketball_ncaab': 'NCAAB', 'icehockey_nhl': 'NHL', 'baseball_mlb': 'MLB' };
+        // We need the sport slug here but don't have it — use a broad search
+        const { data: standingsData } = await supabase
+          .from('news_cache')
+          .select('summary')
+          .eq('search_type', 'standings')
+          .gt('last_updated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .limit(5);
+
+        if (standingsData) {
+          for (const row of standingsData) {
+            const lines = (row.summary || '').split('\n');
+            for (const line of lines) {
+              // Format: "Iowa State Cyclones: 27-7 (.900) Streak: W3"
+              const homeMascot = homeTeam.split(' ').slice(-1)[0].toLowerCase();
+              const awayMascot = awayTeam.split(' ').slice(-1)[0].toLowerCase();
+              const lower = line.toLowerCase();
+              const recordMatch = line.match(/:\s*(\d+-\d+)/);
+              if (recordMatch) {
+                if (lower.includes(homeMascot) && !result.home_record) result.home_record = recordMatch[1];
+                if (lower.includes(awayMascot) && !result.away_record) result.away_record = recordMatch[1];
+              }
+            }
+          }
+        }
+      } catch { /* continue without standings */ }
     }
 
     return result;
@@ -469,10 +526,10 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
-        max_tokens: 500
+        max_tokens: 600
       })
     });
 
@@ -520,7 +577,7 @@ async function preAnalyzeGames(req, res) {
     // Sports to analyze (Odds API slugs)
     const sportSlugs = [
       'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
-      'icehockey_nhl', 'americanfootball_ncaaf'
+      'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb'
     ];
 
     // 1. Get upcoming games from odds cache
@@ -601,7 +658,7 @@ async function preAnalyzeGames(req, res) {
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
-            model_used: 'gpt-4o',
+            model_used: 'gpt-4o-mini',
             prompt_tokens: result.prompt_tokens,
             completion_tokens: result.completion_tokens,
             generated_at: new Date().toISOString(),
