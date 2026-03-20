@@ -413,6 +413,9 @@ app.post('/cron/enrich-articles', enrichArticles);
 const fetchEspnIntelligence = require('./api/cron/fetch-espn-intelligence');
 app.post('/cron/fetch-espn-intelligence', fetchEspnIntelligence);
 
+const factCheckPicks = require('./api/cron/fact-check-picks');
+app.post('/cron/fact-check-picks', factCheckPicks);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 
