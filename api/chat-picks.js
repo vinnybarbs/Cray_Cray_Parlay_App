@@ -242,14 +242,13 @@ async function executeTool(name, args) {
 
         const { data: newsCache } = await newsQuery;
 
-        // Get enriched articles with betting analysis
+        // Get articles — prefer enriched but also include recent unenriched ones
         let articlesQuery = supabase
           .from('news_articles')
-          .select('title, published_at, betting_summary, injury_mentions, sentiment, content')
-          .not('betting_summary', 'is', null)
-          .neq('betting_summary', 'Not analyzed')
+          .select('title, published_at, betting_summary, injury_mentions, sentiment, summary')
+          .gte('published_at', new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString())
           .order('published_at', { ascending: false })
-          .limit(10);
+          .limit(15);
 
         // Filter by sport keyword in title if possible
         if (args.sport) {
@@ -276,13 +275,13 @@ async function executeTool(name, args) {
             data: n.summary?.substring(0, 500),
             updated: n.last_updated
           })) || [],
-          enrichedArticles: articles?.map(a => ({
+          articles: articles?.map(a => ({
             title: a.title,
             date: a.published_at,
-            bettingSummary: a.betting_summary,
-            injuries: a.injury_mentions,
-            sentiment: a.sentiment,
-            excerpt: a.content?.substring(0, 300)
+            bettingSummary: a.betting_summary || null,
+            injuries: a.injury_mentions || null,
+            sentiment: a.sentiment || null,
+            summary: a.summary?.substring(0, 200) || null
           })) || []
         };
       }
