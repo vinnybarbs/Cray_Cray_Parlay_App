@@ -215,8 +215,17 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         {/* Detailed analysis - expandable */}
         {showFullAnalysis && (
           <div className="mt-3 p-4 bg-gray-900/70 rounded-lg border border-blue-500/30">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center justify-between mb-3">
               <span className="text-blue-400 text-sm font-semibold">🎯 Analytical Edge Analysis</span>
+              {((pick.factCheckScore ?? pick.fact_check_score) ?? pick.fact_check_score) != null && (
+                <span className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${
+                  (pick.factCheckScore ?? pick.fact_check_score) >= 7 ? 'bg-green-900/50 text-green-300 border border-green-700/50' :
+                  (pick.factCheckScore ?? pick.fact_check_score) >= 5 ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/50' :
+                  'bg-red-900/50 text-red-300 border border-red-700/50'
+                }`}>
+                  {(pick.factCheckScore ?? pick.fact_check_score) >= 7 ? '✓' : (pick.factCheckScore ?? pick.fact_check_score) >= 5 ? '⚠' : '✗'} Fact-check: {(pick.factCheckScore ?? pick.fact_check_score)}/10
+                </span>
+              )}
             </div>
             <div className="text-sm text-gray-200 leading-relaxed mb-3">
               {getDetailedAnalysis(pick)}

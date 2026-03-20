@@ -35,6 +35,7 @@ export default function ChatPicks({ onBack }) {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [loadingPhase, setLoadingPhase] = useState(0)
   const [conversationHistory, setConversationHistory] = useState([])
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -51,6 +52,10 @@ export default function ChatPicks({ onBack }) {
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setLoading(true)
+    setLoadingPhase(0)
+    const phaseInterval = setInterval(() => {
+      setLoadingPhase(p => p < 5 ? p + 1 : p)
+    }, 2500)
 
     // Blur input on mobile to dismiss keyboard after send
     if (window.innerWidth < 768) {
@@ -80,6 +85,7 @@ export default function ChatPicks({ onBack }) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Connection error: ${err.message}` }])
     } finally {
       setLoading(false)
+      clearInterval(phaseInterval)
     }
   }
 
@@ -133,11 +139,22 @@ export default function ChatPicks({ onBack }) {
 
         {loading && (
           <div className="flex justify-start mb-3">
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3">
-              <div className="flex gap-1">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="bg-gray-800 border border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[85%]">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-xs font-semibold text-yellow-400">De-Genny is researching...</span>
+              </div>
+              <div className="space-y-0.5 text-[10px] text-gray-400">
+                {loadingPhase >= 0 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Searching odds database</div>}
+                {loadingPhase >= 1 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Checking injury reports</div>}
+                {loadingPhase >= 2 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Pulling recent scores & standings</div>}
+                {loadingPhase >= 3 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Reading news & analysis</div>}
+                {loadingPhase >= 4 && <div className="flex items-center gap-1"><span className="text-yellow-400 animate-pulse">◉</span> Forming picks from intel...</div>}
+                {loadingPhase >= 5 && <div className="flex items-center gap-1"><span className="text-yellow-400 animate-pulse">◉</span> Almost done...</div>}
               </div>
             </div>
           </div>
