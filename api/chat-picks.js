@@ -546,11 +546,18 @@ async function chatPicksHandler(req, res) {
 
     const duration = Date.now() - startTime;
 
+    // Extract and store any picks De-Genny made for model tracking
+    const savedPicks = await extractAndStorePicks(assistantMessage.content);
+    if (savedPicks > 0) {
+      logger.info(`Stored ${savedPicks} De-Genny picks for model tracking`);
+    }
+
     res.json({
       success: true,
       message: assistantMessage.content,
       usage: response.usage,
-      duration: `${duration}ms`
+      duration: `${duration}ms`,
+      picksSaved: savedPicks
     });
 
   } catch (error) {
@@ -585,6 +592,117 @@ async function callOpenAI(apiKey, messages, tools, toolChoice = 'auto') {
   }
 
   return response.json();
+}
+
+/**
+ * Extract picks from De-Genny's response and store in ai_suggestions
+ * for model performance tracking. Uses gpt-4o-mini to parse the
+ * unstructured chat response into structured pick data.
+ */
+async function extractAndStorePicks(responseText) {
+  if (!responseText || responseText.length < 50) return 0;
+
+  // Quick check — does this look like it contains picks?
+  const hasPickSignals = /🔒|spread|moneyline|over|under|(-\d{3}|\+\d{3})|\d+\.\d+/i.test(responseText);
+  if (!hasPickSignals) return 0;
+
+  try {
+    const extractResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{
+          role: 'user',
+          content: `Extract structured betting picks from this text. Return a JSON array of picks found. If no clear picks, return [].
+
+TEXT:
+${responseText}
+
+Return ONLY valid JSON array with this format:
+[{
+  "sport": "NBA" or "NCAAB" or "NHL" or "MLB",
+  "home_team": "full team name",
+  "away_team": "full team name",
+  "bet_type": "Spread" or "Moneyline" or "Total" or "Player Props",
+  "pick": "the pick (e.g. 'Iowa State Cyclones -24.5' or 'Over 147.5')",
+  "odds": "-110" or "+150" etc,
+  "point": number or null,
+  "confidence": 1-10,
+  "reasoning": "brief summary of why (1-2 sentences)"
+}]`
+        }],
+        temperature: 0.1,
+        max_tokens: 1500,
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!extractResponse.ok) return 0;
+
+    const extractData = await extractResponse.json();
+    let parsed;
+    try {
+      parsed = JSON.parse(extractData.choices[0].message.content);
+    } catch { return 0; }
+
+    // Handle both { picks: [...] } and direct array
+    const picks = Array.isArray(parsed) ? parsed : (parsed.picks || []);
+    if (!picks.length) return 0;
+
+    let saved = 0;
+    for (const pick of picks.slice(0, 5)) { // Max 5 picks per chat
+      if (!pick.home_team || !pick.away_team || !pick.pick) continue;
+
+      // Find matching game in odds_cache for game_date
+      const sportKey = {
+        'NBA': 'basketball_nba', 'NCAAB': 'basketball_ncaab',
+        'NFL': 'americanfootball_nfl', 'NHL': 'icehockey_nhl', 'MLB': 'baseball_mlb'
+      }[pick.sport] || pick.sport;
+
+      const homeNick = pick.home_team.split(' ').pop();
+      const { data: gameMatch } = await supabase
+        .from('odds_cache')
+        .select('commence_time, external_game_id')
+        .eq('sport', sportKey)
+        .ilike('home_team', `%${homeNick}%`)
+        .gt('commence_time', new Date().toISOString())
+        .order('commence_time', { ascending: true })
+        .limit(1);
+
+      const gameDate = gameMatch?.[0]?.commence_time || null;
+      const espnId = gameMatch?.[0]?.external_game_id || null;
+
+      const { error } = await supabase
+        .from('ai_suggestions')
+        .insert({
+          session_id: `degenny_${Date.now()}`,
+          sport: pick.sport,
+          home_team: pick.home_team,
+          away_team: pick.away_team,
+          game_date: gameDate,
+          espn_event_id: espnId,
+          bet_type: pick.bet_type,
+          pick: pick.pick,
+          odds: pick.odds || null,
+          point: pick.point || null,
+          confidence: pick.confidence || 7,
+          reasoning: pick.reasoning || null,
+          risk_level: 'medium',
+          generate_mode: 'degenny_chat'
+        });
+
+      if (!error) saved++;
+    }
+
+    return saved;
+  } catch (err) {
+    logger.warn('Failed to extract/store De-Genny picks:', err.message);
+    return 0;
+  }
 }
 
 module.exports = { chatPicksHandler };
