@@ -1435,13 +1435,57 @@ async function suggestPicksHandler(req, res) {
       }
     }
 
-    // If no suggestions generated at all, return error
+    // If no suggestions generated, try to return cached suggestions
     if (allSuggestions.length === 0) {
-      logger.warn('No suggestions generated', { selectedSports, selectedBetTypes });
+      logger.warn('No suggestions generated, trying cache fallback', { selectedSports, selectedBetTypes });
+
+      try {
+        const { data: cached } = await supabase
+          .from('ai_suggestions')
+          .select('*')
+          .in('sport', selectedSports)
+          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+          .order('created_at', { ascending: false })
+          .limit(numSuggestions);
+
+        if (cached && cached.length > 0) {
+          const cachedSuggestions = cached.map(c => ({
+            id: String(c.id),
+            gameDate: c.game_date,
+            commenceTime: c.game_date,
+            sport: c.sport,
+            homeTeam: c.home_team,
+            awayTeam: c.away_team,
+            betType: c.bet_type,
+            pick: c.pick,
+            odds: c.odds,
+            point: c.point ? String(c.point) : null,
+            confidence: c.confidence,
+            reasoning: c.reasoning,
+            edgeType: 'cached',
+            fromCache: true,
+            cachedAt: c.created_at
+          }));
+
+          return res.json({
+            success: true,
+            suggestions: cachedSuggestions,
+            fromCache: true,
+            alert: {
+              type: 'info',
+              message: `Showing ${cachedSuggestions.length} recent picks from cache — live generation had no results`
+            },
+            metadata: { fromCache: true, cachedCount: cachedSuggestions.length }
+          });
+        }
+      } catch (cacheErr) {
+        logger.warn('Cache fallback failed:', cacheErr.message);
+      }
+
       return res.status(404).json({
         success: false,
         error: 'No betting opportunities found for selected criteria',
-        debug: lastTraditionalError || 'Coordinator returned 0 suggestions without error'
+        debug: lastTraditionalError || 'No fresh or cached suggestions available. Try a different sport or date range.'
       });
     }
 
