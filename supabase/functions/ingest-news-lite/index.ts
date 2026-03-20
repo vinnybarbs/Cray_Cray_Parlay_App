@@ -10,30 +10,57 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const DB_ENABLED = !!(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
 
 const FEEDS: { name: string; url: string }[] = [
-  // ESPN
+  // ── ESPN (sport-specific) ──
   { name: 'espn-news', url: 'https://www.espn.com/espn/rss/news' },
-  { name: 'espn-nfl', url: 'https://www.espn.com/espn/rss/nfl/news' },
   { name: 'espn-nba', url: 'https://www.espn.com/espn/rss/nba/news' },
   { name: 'espn-nhl', url: 'https://www.espn.com/espn/rss/nhl/news' },
   { name: 'espn-mlb', url: 'https://www.espn.com/espn/rss/mlb/news' },
-  
-  // CBS Sports
+  { name: 'espn-ncaab', url: 'https://www.espn.com/espn/rss/ncb/news' },
+  { name: 'espn-ncaaf', url: 'https://www.espn.com/espn/rss/ncf/news' },
+  { name: 'espn-nfl', url: 'https://www.espn.com/espn/rss/nfl/news' },
+  { name: 'espn-soccer', url: 'https://www.espn.com/espn/rss/soccer/news' },
+
+  // ── CBS Sports ──
   { name: 'cbs-headlines', url: 'https://www.cbssports.com/rss/headlines/' },
-  { name: 'cbs-nfl', url: 'https://www.cbssports.com/rss/headlines/nfl/' },
   { name: 'cbs-nba', url: 'https://www.cbssports.com/rss/headlines/nba/' },
   { name: 'cbs-nhl', url: 'https://www.cbssports.com/rss/headlines/nhl/' },
   { name: 'cbs-mlb', url: 'https://www.cbssports.com/rss/headlines/mlb/' },
-  
-  // Yahoo Sports
+  { name: 'cbs-nfl', url: 'https://www.cbssports.com/rss/headlines/nfl/' },
+  { name: 'cbs-ncaab', url: 'https://www.cbssports.com/rss/headlines/college-basketball/' },
+
+  // ── Yahoo Sports ──
   { name: 'yahoo-sports', url: 'https://sports.yahoo.com/rss/' },
-  { name: 'yahoo-nfl', url: 'https://sports.yahoo.com/nfl/rss.xml' },
   { name: 'yahoo-nba', url: 'https://sports.yahoo.com/nba/rss.xml' },
   { name: 'yahoo-nhl', url: 'https://sports.yahoo.com/nhl/rss.xml' },
   { name: 'yahoo-mlb', url: 'https://sports.yahoo.com/mlb/rss.xml' },
-  
-  // Bleacher Report
-  { name: 'br-nfl', url: 'https://bleacherreport.com/articles/feed?tag_id=18' },
+  { name: 'yahoo-nfl', url: 'https://sports.yahoo.com/nfl/rss.xml' },
+  { name: 'yahoo-ncaab', url: 'https://sports.yahoo.com/college-basketball/rss.xml' },
+  { name: 'yahoo-soccer', url: 'https://sports.yahoo.com/soccer/rss.xml' },
+
+  // ── Bleacher Report ──
   { name: 'br-nba', url: 'https://bleacherreport.com/articles/feed?tag_id=20' },
+  { name: 'br-nfl', url: 'https://bleacherreport.com/articles/feed?tag_id=18' },
+  { name: 'br-mlb', url: 'https://bleacherreport.com/articles/feed?tag_id=23' },
+  { name: 'br-nhl', url: 'https://bleacherreport.com/articles/feed?tag_id=22' },
+
+  // ── Betting / Odds / Picks ──
+  { name: 'covers-news', url: 'https://www.covers.com/rss/cmsnews.aspx' },
+  { name: 'oddschecker-insights', url: 'https://www.oddschecker.com/us/insight/rss' },
+  { name: 'sportsbettingdime', url: 'https://www.sportsbettingdime.com/feed/' },
+  { name: 'betiq-picks', url: 'https://betiq.teamrankings.com/feed/' },
+  { name: 'actionnetwork', url: 'https://www.actionnetwork.com/feed' },
+
+  // ── The Ringer / SBNation / Deadspin ──
+  { name: 'ringer', url: 'https://www.theringer.com/rss/index.xml' },
+  { name: 'sbnation', url: 'https://www.sbnation.com/rss/current' },
+
+  // ── Sport-specific deep sources ──
+  { name: 'nba-official', url: 'https://www.nba.com/feeds/allnews.xml' },
+  { name: 'mlb-news', url: 'https://www.mlb.com/feeds/news/rss.xml' },
+  { name: 'nhl-news', url: 'https://www.nhl.com/rss/news.xml' },
+  { name: 'rotowire-news', url: 'https://www.rotowire.com/rss/news.htm' },
+  { name: 'rotoworld-nba', url: 'https://www.rotoworld.com/rss/feed/nba' },
+  { name: 'rotoworld-mlb', url: 'https://www.rotoworld.com/rss/feed/mlb' },
 ];
 
 const MAX_ITEMS_PER_FEED = 10;
@@ -130,9 +157,16 @@ async function processFeeds() {
   console.log('[ingest-news-lite] Background processing started');
   
   try {
-    // Process 3 feeds per run (rotate through all sources over time)
-    const feedsToProcess = FEEDS.slice(0, 3);
-    console.log('[ingest-news-lite] Processing', feedsToProcess.length, 'feeds');
+    // Process 10 feeds per run, rotating through all sources over time
+    // Use hour-based offset to rotate which feeds get processed
+    const batchSize = 10;
+    const hour = new Date().getHours();
+    const offset = (hour * batchSize) % FEEDS.length;
+    const feedsToProcess = [];
+    for (let i = 0; i < batchSize; i++) {
+      feedsToProcess.push(FEEDS[(offset + i) % FEEDS.length]);
+    }
+    console.log(`[ingest-news-lite] Processing ${feedsToProcess.length} feeds (offset=${offset})`);
     
     for (const feed of feedsToProcess) {
       console.log('[ingest-news-lite] Processing feed:', feed.name);
