@@ -42,10 +42,21 @@ async function storeAISuggestions(suggestions, options = {}) {
       user_id: options.userId || null
     }));
 
-    // Insert suggestions into database
-    const { error } = await supabase
-      .from('ai_suggestions')
-      .insert(suggestionRecords);
+    // Insert suggestions one by one, skipping exact dupes (unique index prevents them)
+    let inserted = 0;
+    for (const rec of suggestionRecords) {
+      const { error: insertErr } = await supabase.from('ai_suggestions').insert(rec);
+      if (insertErr && insertErr.code === '23505') {
+        // Duplicate — skip silently
+        continue;
+      }
+      if (insertErr) {
+        console.warn('Insert error:', insertErr.message);
+      } else {
+        inserted++;
+      }
+    }
+    const error = inserted === 0 && suggestionRecords.length > 0 ? { message: 'All dupes' } : null;
 
     if (error) {
       console.error('❌ Error storing AI suggestions:', error.message);

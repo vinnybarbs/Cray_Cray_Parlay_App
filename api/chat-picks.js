@@ -703,8 +703,11 @@ Return ONLY valid JSON array with this format:
           confidence: pick.confidence || 7,
           reasoning: pick.reasoning || null,
           risk_level: 'medium',
-          generate_mode: 'degenny_chat'
+          generate_mode: 'degenny_chat',
+          actual_outcome: 'pending'
         });
+      // Silently skip if exact dupe (unique index violation 23505)
+      if (error && error.code === '23505') continue;
 
       if (!error) saved++;
     }
