@@ -30,26 +30,33 @@ async function getAdminDashboard(req, res) {
   }
 
   try {
-    // --- 1. Cron Health: last 20 entries from cron_job_logs ---
+    // --- 1. Cron Health: from pg_cron's own run details (ALL jobs) ---
     const cronHealthResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('cron_job_logs')
-        .select('job_name, status, details, created_at')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('get_cron_health');
+      if (error) {
+        // Fallback: try direct SQL via cron_job_logs
+        const { data: fallback } = await supabase
+          .from('cron_job_logs')
+          .select('job_name, status, details, created_at')
+          .order('created_at', { ascending: false })
+          .limit(20);
+        return fallback || [];
+      }
       return data || [];
     });
 
     // --- 2. Recent Errors: failed cron jobs, last 10 ---
     const recentErrorsResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('cron_job_logs')
-        .select('job_name, status, details, created_at')
-        .eq('status', 'failed')
-        .order('created_at', { ascending: false })
-        .limit(10);
-      if (error) throw error;
+      const { data, error } = await supabase.rpc('get_cron_errors');
+      if (error) {
+        const { data: fallback } = await supabase
+          .from('cron_job_logs')
+          .select('job_name, status, details, created_at')
+          .eq('status', 'failed')
+          .order('created_at', { ascending: false })
+          .limit(10);
+        return fallback || [];
+      }
       return data || [];
     });
 

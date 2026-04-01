@@ -131,15 +131,16 @@ function CronHealthSection({ cronHealth, recentErrors }) {
 
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-700 p-5">
-      <SectionHeader title="Cron Job Health" sub={`${jobs.length} unique jobs, last 20 log entries`} />
+      <SectionHeader title="Cron Job Health" sub={`${jobs.length} jobs tracked via pg_cron`} />
       {jobs.length === 0 ? (
-        <p className="text-gray-500 text-sm">No cron logs found.</p>
+        <p className="text-gray-500 text-sm">No cron jobs found.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-gray-500 text-xs uppercase border-b border-gray-700">
                 <th className="text-left pb-2 pr-4">Job</th>
+                <th className="text-left pb-2 pr-4">Schedule</th>
                 <th className="text-left pb-2 pr-4">Status</th>
                 <th className="text-left pb-2">Last Run</th>
               </tr>
@@ -148,6 +149,7 @@ function CronHealthSection({ cronHealth, recentErrors }) {
               {jobs.map((job) => (
                 <tr key={job.job_name} className="border-b border-gray-800 hover:bg-gray-800/50">
                   <td className="py-2 pr-4 text-gray-300 font-mono text-xs">{job.job_name}</td>
+                  <td className="py-2 pr-4 text-gray-500 font-mono text-xs">{job.schedule || '—'}</td>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
                       <StatusDot status={job.status} />
@@ -567,7 +569,7 @@ export default function AdminDashboard({ onBack }) {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard
                 label="Cron Jobs Tracked"
-                value={[...new Set((data.cronHealth || []).map(j => j.job_name))].length}
+                value={(data.cronHealth || []).length}
                 color="blue"
               />
               <StatCard
