@@ -342,7 +342,7 @@ function RecentPicksSection({ recentPicks }) {
                     </td>
                     <td className="py-2 pr-3">
                       {pick.confidence != null ? (
-                        <span className="text-yellow-400 text-xs font-bold">{pick.confidence}%</span>
+                        <span className="text-yellow-400 text-xs font-bold">{pick.confidence}/10</span>
                       ) : '—'}
                     </td>
                     <td className="py-2 pr-3">
@@ -363,6 +363,39 @@ function RecentPicksSection({ recentPicks }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+function ConfidenceCalibrationSection({ calibration }) {
+  if (!calibration || calibration.length === 0) return null
+  return (
+    <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
+      <SectionHeader title="Confidence Calibration" sub="Is the model honest about how sure it is?" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-4">
+        {calibration.map(b => {
+          const isCalibrated = Math.abs(b.winPct - (b.confidence * 10)) < 15
+          return (
+            <div key={b.confidence} className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+              <div className="text-2xl font-bold text-yellow-400">{b.confidence}/10</div>
+              <div className={`text-lg font-bold mt-1 ${b.winPct >= 65 ? 'text-green-400' : b.winPct >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {b.winPct}%
+              </div>
+              <div className="text-xs text-gray-500 mt-1">{b.won}W-{b.lost}L ({b.total})</div>
+              <div className="mt-2 w-full bg-gray-700 rounded-full h-2">
+                <div className={`h-2 rounded-full ${b.winPct >= 65 ? 'bg-green-500' : b.winPct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                  style={{ width: `${b.winPct}%` }} />
+              </div>
+              <div className="text-[10px] mt-1 text-gray-600">
+                {isCalibrated ? '✓ calibrated' : b.winPct > b.confidence * 10 ? '↑ underconfident' : '↓ overconfident'}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <p className="text-xs text-gray-500 mt-3">
+        Ideal: a 7/10 confidence pick should win ~70% of the time. If 8/10 picks only win 60%, the model is overconfident at that level.
+      </p>
     </div>
   )
 }
@@ -568,6 +601,9 @@ export default function AdminDashboard({ onBack }) {
 
             {/* Recent Picks */}
             <RecentPicksSection recentPicks={data.recentPicks} />
+
+            {/* Confidence Calibration */}
+            <ConfidenceCalibrationSection calibration={data.confidenceCalibration} />
 
             {/* Settlement Monitor */}
             <SettlementSection settlementStatus={data.settlementStatus} />

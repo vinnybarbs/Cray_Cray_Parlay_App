@@ -172,6 +172,26 @@ async function getAdminDashboard(req, res) {
       freshnessResults[table] = result || { table, count: null, maxTimestamp: null };
     }));
 
+    // Confidence calibration — win rate by confidence level
+    const confidenceCalibrationResult = await safeQuery(async () => {
+      const { data } = await supabase
+        .from('ai_suggestions')
+        .select('confidence, actual_outcome')
+        .not('confidence', 'is', null)
+        .in('actual_outcome', ['won', 'lost']);
+      if (!data) return [];
+      const buckets = {};
+      data.forEach(row => {
+        const c = row.confidence;
+        if (!buckets[c]) buckets[c] = { confidence: c, won: 0, lost: 0 };
+        if (row.actual_outcome === 'won') buckets[c].won++;
+        else buckets[c].lost++;
+      });
+      return Object.values(buckets)
+        .map(b => ({ ...b, total: b.won + b.lost, winPct: Math.round(100 * b.won / (b.won + b.lost)) }))
+        .sort((a, b) => a.confidence - b.confidence);
+    });
+
     // Build response
     res.json({
       status: 'ok',
@@ -188,7 +208,8 @@ async function getAdminDashboard(req, res) {
         parlaysByStatus: parlayStatusResult || {},
         legsByOutcome: parlayLegsResult || {}
       },
-      dataFreshness: freshnessResults
+      dataFreshness: freshnessResults,
+      confidenceCalibration: confidenceCalibrationResult || []
     });
 
   } catch (err) {
