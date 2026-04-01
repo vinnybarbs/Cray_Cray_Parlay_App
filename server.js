@@ -416,6 +416,10 @@ app.post('/cron/fetch-espn-intelligence', fetchEspnIntelligence);
 const factCheckPicks = require('./api/cron/fact-check-picks');
 app.post('/cron/fact-check-picks', factCheckPicks);
 
+// Admin dashboard - protected by secret query param
+const { getAdminDashboard } = require('./api/admin-dashboard');
+app.get('/api/admin/dashboard', getAdminDashboard);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 

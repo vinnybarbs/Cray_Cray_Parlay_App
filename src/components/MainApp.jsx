@@ -6,6 +6,7 @@ import PickCard from './PickCard'
 import BetslipBuilder from '../pages/BetslipBuilder'
 import ChatPicks from '../pages/ChatPicks'
 import ResultsPage from '../pages/ResultsPage'
+import AdminDashboard from '../pages/AdminDashboard'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -409,6 +410,17 @@ export default function MainApp() {
   const [showBetslipBuilder, setShowBetslipBuilder] = useState(false);
   const [showChatPicks, setShowChatPicks] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
+
+  // Open admin dashboard when navigating to /#/admin
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === '#/admin') setShowAdmin(true);
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...",
@@ -1220,6 +1232,16 @@ export default function MainApp() {
       {showResults && (
         <div className="fixed inset-0 bg-gray-900 z-50 overflow-auto">
           <ResultsPage onBack={() => setShowResults(false)} />
+        </div>
+      )}
+
+      {/* Admin Dashboard - Full Screen, accessible via /#/admin */}
+      {showAdmin && (
+        <div className="fixed inset-0 bg-gray-950 z-50 overflow-auto">
+          <AdminDashboard onBack={() => {
+            setShowAdmin(false);
+            window.location.hash = '';
+          }} />
         </div>
       )}
     </div>
