@@ -471,12 +471,12 @@ export default function MainApp() {
   // Use bookmaker names that match server validation (MGM expected, not 'BetMGM')
   // Limit sportsbook choices to DraftKings and FanDuel only
   const sportsbooks = ['DraftKings', 'FanDuel']
-  const generationModes = ['Easy Money', 'AI Edge Advantages', 'Top Picks of the Day']
+  const generationModes = ['Easy Money (Moneyline Faves)', 'AI Edge Advantages', 'Top Picks of the Day']
 
   // Keep internal riskLevel mapped from the selected generation mode so existing
   // backend/DB behavior continues to work without exposing Low/Medium/High directly.
   useEffect(() => {
-    if (generationMode === 'Easy Money') {
+    if (generationMode === 'Easy Money (Moneyline Faves)') {
       setRiskLevel('Low');
     } else if (generationMode === 'AI Edge Advantages') {
       setRiskLevel('Medium');
