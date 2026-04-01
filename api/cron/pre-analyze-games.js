@@ -565,14 +565,22 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
 }
 
 async function preAnalyzeGames(req, res) {
+  const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+  if (cronSecret !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  // Respond immediately — processing happens in background
+  res.status(202).json({ status: 'accepted', message: 'Pre-analysis started in background' });
+
+  // Run in background (no await — fire and forget)
+  runPreAnalysis().catch(err => console.error('❌ Pre-analysis background error:', err.message));
+}
+
+async function runPreAnalysis() {
   const startTime = Date.now();
 
   try {
-    const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
-    if (cronSecret !== process.env.CRON_SECRET) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-
     console.log('\n🧠 CRON: Pre-analyzing upcoming games...');
 
     // Sports to analyze (Odds API slugs)
@@ -586,7 +594,8 @@ async function preAnalyzeGames(req, res) {
     console.log(`📊 Found ${games.length} upcoming games to analyze`);
 
     if (games.length === 0) {
-      return res.status(200).json({ success: true, analyzed: 0, message: 'No upcoming games found' });
+      console.log('No upcoming games found');
+      return;
     }
 
     // 2. Check which games already have fresh analysis
@@ -623,7 +632,7 @@ async function preAnalyzeGames(req, res) {
     const errors = [];
 
     // Cap at 30 games per run to stay within limits
-    const batch = gamesToAnalyze.slice(0, 30);
+    const batch = gamesToAnalyze.slice(0, 15);
 
     for (const game of batch) {
       try {
@@ -704,20 +713,10 @@ async function preAnalyzeGames(req, res) {
     console.log(`📊 Analyzed: ${analyzed}/${batch.length} games`);
     console.log(`💰 Tokens: ${totalPromptTokens} prompt + ${totalCompletionTokens} completion ≈ $${estimatedCost}`);
 
-    return res.status(200).json({
-      success: true,
-      duration_ms: duration,
-      games_found: games.length,
-      already_fresh: existingKeys.size,
-      analyzed,
-      tokens: { prompt: totalPromptTokens, completion: totalCompletionTokens },
-      estimated_cost: `$${estimatedCost}`,
-      errors
-    });
+    console.log(`✅ Pre-analysis complete: ${analyzed} games, $${estimatedCost}`);
 
   } catch (error) {
     console.error('❌ Pre-analysis failed:', error.message);
-    return res.status(500).json({ success: false, error: error.message });
   }
 }
 
