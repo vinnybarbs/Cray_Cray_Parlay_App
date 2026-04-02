@@ -836,6 +836,9 @@ async function runPreAnalysis(sportSlugs) {
         status: errors.length === 0 ? 'completed' : 'partial',
         details: JSON.stringify({
           games_found: games.length,
+          games_to_analyze: gamesToAnalyze.length,
+          batch_size: batch.length,
+          existing_fresh: existingKeys.size,
           analyzed,
           errors: errors.slice(0, 5),
           duration_ms: duration,
