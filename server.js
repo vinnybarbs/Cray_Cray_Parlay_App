@@ -420,6 +420,10 @@ app.post('/cron/fact-check-picks', factCheckPicks);
 const { getAdminDashboard } = require('./api/admin-dashboard');
 app.get('/api/admin/dashboard', getAdminDashboard);
 
+// Daily Digest - public endpoint, no auth required
+const { getDigest } = require('./api/digest');
+app.get('/api/digest', getDigest);
+
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
     port: PORT, 

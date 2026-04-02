@@ -7,6 +7,7 @@ import BetslipBuilder from '../pages/BetslipBuilder'
 import ChatPicks from '../pages/ChatPicks'
 import ResultsPage from '../pages/ResultsPage'
 import AdminDashboard from '../pages/AdminDashboard'
+import DailyDigest from '../pages/DailyDigest'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -411,11 +412,14 @@ export default function MainApp() {
   const [showChatPicks, setShowChatPicks] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showDigest, setShowDigest] = useState(false);
 
   // Open admin dashboard when navigating to /#/admin
+  // Open daily digest when navigating to /#/digest
   useEffect(() => {
     const checkHash = () => {
       if (window.location.hash === '#/admin') setShowAdmin(true);
+      if (window.location.hash === '#/digest') setShowDigest(true);
     };
     checkHash();
     window.addEventListener('hashchange', checkHash);
@@ -812,8 +816,14 @@ export default function MainApp() {
                   Suggestions This Week
                 </button>
                 <button
-                  onClick={() => { if (!isAuthenticated) { setShowAuth(true); } else { setShowChatPicks(true); } setShowNavMenu(false); }}
+                  onClick={() => { setShowDigest(true); setShowNavMenu(false); window.location.hash = '#/digest'; }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
+                >
+                  📊 Daily Digest
+                </button>
+                <button
+                  onClick={() => { if (!isAuthenticated) { setShowAuth(true); } else { setShowChatPicks(true); } setShowNavMenu(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
                 >
                   🤖 Chat with De-Genny
                 </button>
@@ -874,7 +884,7 @@ export default function MainApp() {
       </header>
 
       {/* Ask the Degen AI - Prominent CTA */}
-      <div className="max-w-2xl mx-auto mb-6">
+      <div className="max-w-2xl mx-auto mb-4">
         <button
           onClick={() => {
             if (!isAuthenticated) { setShowAuth(true); return; }
@@ -885,6 +895,17 @@ export default function MainApp() {
           🤖 Chat with De-Genny — Tell Me What You're Feeling!
         </button>
         <p className="text-center text-gray-500 text-xs mt-1">{isAuthenticated ? 'Chat with AI to get personalized picks based on real data' : 'Sign in to chat with De-Genny'}</p>
+      </div>
+
+      {/* Daily Digest CTA */}
+      <div className="max-w-2xl mx-auto mb-6">
+        <button
+          onClick={() => { setShowDigest(true); window.location.hash = '#/digest'; }}
+          className="w-full py-3 bg-gradient-to-r from-blue-700 to-cyan-600 hover:from-blue-600 hover:to-cyan-500 rounded-xl font-bold text-base text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+        >
+          📊 Daily Digest — Today's Games, Picks & Results
+        </button>
+        <p className="text-center text-gray-500 text-xs mt-1">Morning briefing: top picks, injuries, yesterday's recap, 7-day model stats</p>
       </div>
 
       {/* Configuration */}
@@ -1240,6 +1261,16 @@ export default function MainApp() {
         <div className="fixed inset-0 bg-gray-950 z-50 overflow-auto">
           <AdminDashboard onBack={() => {
             setShowAdmin(false);
+            window.location.hash = '';
+          }} />
+        </div>
+      )}
+
+      {/* Daily Digest - Full Screen, accessible via /#/digest */}
+      {showDigest && (
+        <div className="fixed inset-0 bg-gray-900 z-50 overflow-auto">
+          <DailyDigest onBack={() => {
+            setShowDigest(false);
             window.location.hash = '';
           }} />
         </div>
