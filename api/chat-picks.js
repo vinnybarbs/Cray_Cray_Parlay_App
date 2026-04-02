@@ -167,13 +167,20 @@ async function executeTool(name, args) {
         const { data, error } = await query;
         if (error) return { error: error.message };
 
-        return data?.map(row => ({
-          game: `${row.away_team} @ ${row.home_team}`,
-          time: row.commence_time,
-          market: row.market_type,
-          bookmaker: row.bookmaker,
-          outcomes: typeof row.outcomes === 'string' ? JSON.parse(row.outcomes) : row.outcomes
-        })) || [];
+        return data?.map(row => {
+          const mt = new Date(row.commence_time).toLocaleString('en-US', {
+            timeZone: 'America/Denver', weekday: 'short', month: 'short', day: 'numeric',
+            hour: 'numeric', minute: '2-digit', hour12: true
+          });
+          return {
+            game: `${row.away_team} @ ${row.home_team}`,
+            time_mt: `${mt} MT`,
+            time_utc: row.commence_time,
+            market: row.market_type,
+            bookmaker: row.bookmaker,
+            outcomes: typeof row.outcomes === 'string' ? JSON.parse(row.outcomes) : row.outcomes
+          };
+        }) || [];
       }
 
       case 'get_team_stats': {
@@ -442,9 +449,19 @@ async function executeTool(name, args) {
   }
 }
 
+// Get current Mountain Time date for the system prompt
+function getMountainTimeContext() {
+  const mt = new Date().toLocaleString('en-US', { timeZone: 'America/Denver', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+  const todayMT = new Date().toLocaleDateString('en-US', { timeZone: 'America/Denver', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const tomorrowDate = new Date(Date.now() + 86400000).toLocaleDateString('en-US', { timeZone: 'America/Denver', year: 'numeric', month: '2-digit', day: '2-digit' });
+  return { mt, todayMT, tomorrowDate };
+}
+
 const SYSTEM_PROMPT = `You are De-Genny, the Cray Cray for Parlays AI — a sharp, opinionated sports betting degenerate who ALWAYS has a take.
 
 PERSONALITY: Confident. Convicted. Funny. Sarcastic. You roast bad teams, clown public bettors, and talk trash like you're at the sportsbook with your boys. You're the degenerate friend who somehow always does the research. Never wishy-washy, never "it could go either way." You ALWAYS pick a side. Throw in jokes, trash talk, and hot takes — but back them up with cold hard data.
+
+TIMEZONE: The user is in MOUNTAIN TIME (America/Denver). When they say "today" they mean Mountain Time today. Game times in tool results are UTC — convert to Mountain Time (UTC-6 in MDT, UTC-7 in MST) when talking to the user. A game at "2026-04-02T02:00:00Z" is 8:00 PM MT on April 1st — that's TODAY not tomorrow.
 
 ABSOLUTE RULES — VIOLATION OF THESE MEANS YOU FAILED:
 1. NEVER EVER fabricate statistics, records, ATS data, streaks, or trends. If a tool didn't return it, YOU DON'T KNOW IT. Say "my data shows X" only when X came from a tool.
@@ -514,8 +531,10 @@ async function chatPicksHandler(req, res) {
       return res.status(500).json({ error: 'OpenAI API key not configured' });
     }
 
-    // Build conversation with system prompt + DB playbook
-    const systemContent = playbook ? `${playbook}\n\n---\n\n${SYSTEM_PROMPT}` : SYSTEM_PROMPT;
+    // Build conversation with system prompt + DB playbook + live time context
+    const { mt, todayMT, tomorrowDate } = getMountainTimeContext();
+    const timeContext = `\nCURRENT TIME: ${mt}\nTODAY (Mountain Time): ${todayMT}\nTOMORROW (Mountain Time): ${tomorrowDate}\n`;
+    const systemContent = (playbook ? `${playbook}\n\n---\n\n` : '') + SYSTEM_PROMPT + timeContext;
     const fullMessages = [
       { role: 'system', content: systemContent },
       ...conversationHistory,

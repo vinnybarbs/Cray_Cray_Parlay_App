@@ -618,7 +618,18 @@ async function runPreAnalysis() {
     }
 
     const gamesToAnalyze = games.filter(g => !existingKeys.has(g.game_key));
-    console.log(`🔄 ${gamesToAnalyze.length} games need analysis (${existingKeys.size} already fresh)`);
+
+    // Prioritize games in next 24 hours, then by sport variety
+    const next24h = Date.now() + 24 * 60 * 60 * 1000;
+    gamesToAnalyze.sort((a, b) => {
+      const aIn24 = new Date(a.game_date).getTime() < next24h ? 0 : 1;
+      const bIn24 = new Date(b.game_date).getTime() < next24h ? 0 : 1;
+      if (aIn24 !== bIn24) return aIn24 - bIn24; // Next 24h first
+      return new Date(a.game_date) - new Date(b.game_date); // Then by time
+    });
+
+    const in24Count = gamesToAnalyze.filter(g => new Date(g.game_date).getTime() < next24h).length;
+    console.log(`🔄 ${gamesToAnalyze.length} games need analysis (${existingKeys.size} fresh, ${in24Count} in next 24h)`);
 
     // Load AI playbook from DB
     let playbook = '';
@@ -633,8 +644,7 @@ async function runPreAnalysis() {
     let totalCompletionTokens = 0;
     const errors = [];
 
-    // Cap at 30 games per run to stay within limits
-    const batch = gamesToAnalyze.slice(0, 15);
+    const batch = gamesToAnalyze.slice(0, 30);
 
     for (const game of batch) {
       try {
