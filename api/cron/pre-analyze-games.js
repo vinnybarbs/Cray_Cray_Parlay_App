@@ -723,6 +723,50 @@ async function runPreAnalysis(sportSlugs) {
             analyzed++;
             totalPromptTokens += result.prompt_tokens || 0;
             totalCompletionTokens += result.completion_tokens || 0;
+
+            // Auto-save high-confidence picks to ai_suggestions for performance tracking
+            if (result.edge_score >= 7 && result.recommended_pick) {
+              try {
+                // Determine bet type from the recommended pick text
+                let betType = 'Moneyline';
+                let point = null;
+                const pickText = result.recommended_pick;
+                if (pickText.match(/[+-]\d+\.?\d*/)) {
+                  const spreadMatch = pickText.match(/([+-]\d+\.?\d*)/);
+                  if (spreadMatch) point = parseFloat(spreadMatch[1]);
+                  betType = 'Spread';
+                }
+                if (pickText.toLowerCase().includes('over') || pickText.toLowerCase().includes('under')) {
+                  betType = 'Total';
+                  const totalMatch = pickText.match(/(\d+\.?\d*)/);
+                  if (totalMatch) point = parseFloat(totalMatch[1]);
+                }
+
+                await supabase
+                  .from('ai_suggestions')
+                  .upsert({
+                    sport: sportDisplay,
+                    home_team: game.home_team,
+                    away_team: game.away_team,
+                    game_date: game.game_date,
+                    bet_type: betType,
+                    pick: result.recommended_pick,
+                    point: point,
+                    odds: null,
+                    confidence: Math.round(result.edge_score),
+                    reasoning: result.analysis_snippet,
+                    risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
+                    generate_mode: 'auto_digest'
+                  }, { onConflict: 'home_team,away_team,bet_type,pick,immutable_date(game_date),COALESCE(point::text, \'null\')' })
+                  .then(({ error: sugErr }) => {
+                    if (sugErr && !sugErr.message.includes('duplicate')) {
+                      console.warn(`  Auto-save pick failed: ${sugErr.message}`);
+                    }
+                  });
+              } catch (e) {
+                // Don't block analysis if auto-save fails
+              }
+            }
           }
         }
 
