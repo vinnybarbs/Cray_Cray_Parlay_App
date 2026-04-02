@@ -410,7 +410,9 @@ function YesterdayRecap({ results }) {
   )
 }
 
-function SevenDayPerformance({ data }) {
+function ModelPerformance({ sevenDay, allTime }) {
+  const [view, setView] = React.useState('7day')
+  const data = view === '7day' ? sevenDay : allTime
   if (!data || !data.overall) return null
 
   const { overall, bySport } = data
@@ -418,9 +420,21 @@ function SevenDayPerformance({ data }) {
 
   return (
     <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-700">
-        <h2 className="text-lg font-bold text-white">7-Day Model Performance</h2>
-        <p className="text-xs text-gray-400 mt-0.5">{overall.total} picks settled in the last 7 days</p>
+      <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-white">Model Performance</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{overall.total} picks settled {view === '7day' ? 'in the last 7 days' : 'all time'}</p>
+        </div>
+        <div className="flex bg-gray-900 rounded-lg p-0.5">
+          <button
+            onClick={() => setView('7day')}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${view === '7day' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+          >7 Day</button>
+          <button
+            onClick={() => setView('alltime')}
+            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${view === 'alltime' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+          >All Time</button>
+        </div>
       </div>
       <div className="p-6">
         {/* Overall rate */}
@@ -603,9 +617,9 @@ export default function DailyDigest({ onBack }) {
               <YesterdayRecap results={data.yesterdayResults} />
             )}
 
-            {/* 7-Day Performance */}
-            {data.sevenDayAccuracy?.overall && (
-              <SevenDayPerformance data={data.sevenDayAccuracy} />
+            {/* Model Performance (7-day / All-time toggle) */}
+            {(data.sevenDayAccuracy?.overall || data.allTimeAccuracy?.overall) && (
+              <ModelPerformance sevenDay={data.sevenDayAccuracy} allTime={data.allTimeAccuracy} />
             )}
 
             {/* Bottom CTA */}

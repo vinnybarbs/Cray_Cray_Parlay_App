@@ -161,6 +161,44 @@ async function getDigest(req, res) {
       return { overall, bySport: bySportFormatted };
     });
 
+    // 4b. All-time model accuracy by sport
+    const allTimeAccuracyResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('ai_suggestions')
+        .select('sport, actual_outcome')
+        .in('actual_outcome', ['won', 'lost']);
+
+      if (error) throw error;
+
+      const bySport = {};
+      let totalWon = 0;
+      let totalLost = 0;
+
+      for (const row of data || []) {
+        const sport = row.sport || 'Unknown';
+        if (!bySport[sport]) bySport[sport] = { won: 0, lost: 0 };
+        bySport[sport][row.actual_outcome]++;
+        if (row.actual_outcome === 'won') totalWon++;
+        else totalLost++;
+      }
+
+      const overall = {
+        won: totalWon, lost: totalLost, total: totalWon + totalLost,
+        winRate: totalWon + totalLost > 0 ? Math.round((totalWon / (totalWon + totalLost)) * 100) : null,
+      };
+
+      const bySportFormatted = {};
+      for (const [sport, counts] of Object.entries(bySport)) {
+        const total = counts.won + counts.lost;
+        bySportFormatted[sport] = {
+          won: counts.won, lost: counts.lost, total,
+          winRate: total > 0 ? Math.round((counts.won / total) * 100) : null,
+        };
+      }
+
+      return { overall, bySport: bySportFormatted };
+    });
+
     // 5. Upcoming game count by sport from odds_cache
     const upcomingCountResult = await safeQuery(async () => {
       const now = new Date().toISOString();
@@ -206,6 +244,7 @@ async function getDigest(req, res) {
       injuries: injuriesBySport || {},
       yesterdayResults: yesterdayResultsResult || {},
       sevenDayAccuracy: sevenDayAccuracyResult || { overall: null, bySport: {} },
+      allTimeAccuracy: allTimeAccuracyResult || { overall: null, bySport: {} },
       upcomingCounts: upcomingCountResult || {},
       firstGameTime: firstGameResult || null,
     });
