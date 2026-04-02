@@ -34,7 +34,7 @@ function makeGameKey(homeTeam, awayTeam, dateStr) {
  */
 async function getUpcomingGames(sports) {
   const now = new Date().toISOString();
-  const twoDaysOut = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+  const twoDaysOut = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from('odds_cache')
