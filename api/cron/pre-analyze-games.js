@@ -724,8 +724,8 @@ async function runPreAnalysis(sportSlugs) {
             totalPromptTokens += result.prompt_tokens || 0;
             totalCompletionTokens += result.completion_tokens || 0;
 
-            // Auto-save high-confidence picks to ai_suggestions for performance tracking
-            if (result.edge_score >= 7 && result.recommended_pick) {
+            // Auto-save ALL predictions to ai_suggestions for honest performance tracking
+            if (result.recommended_pick) {
               try {
                 // Determine bet type from the recommended pick text
                 let betType = 'Moneyline';
