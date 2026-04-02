@@ -610,7 +610,7 @@ async function runPreAnalysis() {
     const staleKeys = new Set();
     for (const ea of (existingAnalysis || [])) {
       const age = Date.now() - new Date(ea.generated_at).getTime();
-      if (age < 4 * 60 * 60 * 1000 && !ea.stale) {
+      if (age < 3 * 60 * 60 * 1000 && !ea.stale) {
         existingKeys.add(ea.game_key); // Fresh, skip
       } else {
         staleKeys.add(ea.game_key); // Needs refresh
