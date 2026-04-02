@@ -40,7 +40,7 @@ async function getDigest(req, res) {
       const { data, error } = await supabase
         .from('game_analysis')
         .select(
-          'home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, sport'
+          'game_key, home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, sport, analysis_version, edge_movement, what_changed'
         )
         .eq('stale', false)
         .gt('expires_at', new Date().toISOString())

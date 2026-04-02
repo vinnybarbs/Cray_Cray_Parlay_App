@@ -672,12 +672,9 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   const injuryEntry = injuries[injuryCode]
   const topEdge = games[0]?.edge_score != null ? Number(games[0].edge_score).toFixed(1) : null
 
-  // Build game_key matching the DB format: {away}_vs_{home}_{date} (lowercase, underscored)
-  function buildGameKey(game) {
-    if (!game.home_team || !game.away_team) return null
-    const normalize = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/_+$/, '')
-    const datePart = game.game_date ? game.game_date.slice(0, 10) : ''
-    return `${normalize(game.away_team)}_vs_${normalize(game.home_team)}_${datePart}`
+  // Use game_key from the DB directly (returned by /api/digest)
+  function getGameKey(game) {
+    return game.game_key || null
   }
 
   const buildQuickParlay = (e) => {
@@ -757,7 +754,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               <GameCard
                 key={`${game.home_team}-${game.away_team}-${i}`}
                 game={game}
-                gameKey={buildGameKey(game)}
+                gameKey={getGameKey(game)}
                 onDeepResearch={onDeepResearch}
               />
             ))}
@@ -778,7 +775,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                   <GameCard
                     key={`${game.home_team}-${game.away_team}-extra-${i}`}
                     game={game}
-                    gameKey={buildGameKey(game)}
+                    gameKey={getGameKey(game)}
                     onDeepResearch={onDeepResearch}
                   />
                 ))}
