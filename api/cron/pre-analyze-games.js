@@ -692,7 +692,7 @@ async function runPreAnalysis(sportSlugs) {
     for (const game of batch) {
       try {
         const oddsCtx = extractOddsContext(game);
-        const sportDisplay = game.sport.replace('americanfootball_', '').replace('basketball_', '').replace('icehockey_', '').toUpperCase();
+        const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
         // Fetch context in parallel — DB queries + API-Sports + news
         const [newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx] = await Promise.all([
