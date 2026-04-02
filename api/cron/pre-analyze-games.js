@@ -471,7 +471,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
 /**
  * Generate AI analysis for a single game using GPT-4o-mini
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '') {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '', priorAnalysis = null) {
   const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -494,7 +494,26 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
   if (accuracy) contextParts.push(`Past accuracy: ${accuracy}`);
 
+  // Refinement: inject prior analysis if this is a re-analysis
+  let refinementBlock = '';
+  if (priorAnalysis) {
+    refinementBlock = `
+REFINEMENT CONTEXT — This is pass #${priorAnalysis.version + 1} on this game.
+YOUR PRIOR ANALYSIS (${priorAnalysis.version === 1 ? 'initial' : 'pass #' + priorAnalysis.version}):
+  Edge score: ${priorAnalysis.prior_edge}/10
+  Pick: ${priorAnalysis.prior_pick}
+  Analysis: ${priorAnalysis.prior_snippet}
+
+YOUR TASK: Compare the current data above to your prior analysis. What changed?
+- New injury reports? Line movement? Recent game results?
+- Should your edge score go UP (more confident), DOWN (less confident), or STAY?
+- Explain SPECIFICALLY what changed and why in the "what_changed" field.
+- If nothing meaningful changed, keep your prior score but note "No significant changes."
+`;
+  }
+
   const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Analyze this game and provide a detailed, data-backed betting recommendation.
+${refinementBlock}
 
 ${contextParts.join('\n')}
 
@@ -515,7 +534,7 @@ Respond in EXACTLY this JSON format (no markdown):
   "edge_score": 7.5,
   "recommended_pick": "Kansas -7.5",
   "recommended_side": "home_spread",
-  "key_factors": ["factor1 with numbers", "factor2 with numbers", "factor3 with numbers"]
+  "key_factors": ["factor1 with numbers", "factor2 with numbers", "factor3 with numbers"]${priorAnalysis ? ',\n  "what_changed": "Explain what changed since last analysis (injuries, line movement, new results)"' : ''}
 }
 
 edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Key factors MUST include specific numbers/records.`;
@@ -556,6 +575,7 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
       recommended_pick: parsed.recommended_pick,
       recommended_side: parsed.recommended_side,
       key_factors: parsed.key_factors,
+      what_changed: parsed.what_changed || null,
       prompt_tokens: usage?.prompt_tokens,
       completion_tokens: usage?.completion_tokens
     };
@@ -617,20 +637,26 @@ async function runPreAnalysis(sportSlugs) {
       return;
     }
 
-    // 2. Check which games already have fresh analysis
+    // 2. Check which games already have analysis (fresh or stale)
     const { data: existingAnalysis } = await supabase
       .from('game_analysis')
-      .select('game_key, generated_at, stale')
+      .select('game_key, generated_at, stale, analysis_snippet, edge_score, analysis_version, recommended_pick')
       .in('game_key', games.map(g => g.game_key));
 
     const existingKeys = new Set();
-    const staleKeys = new Set();
+    const priorAnalysisMap = {};
     for (const ea of (existingAnalysis || [])) {
       const age = Date.now() - new Date(ea.generated_at).getTime();
       if (age < 3 * 60 * 60 * 1000 && !ea.stale) {
         existingKeys.add(ea.game_key); // Fresh, skip
       } else {
-        staleKeys.add(ea.game_key); // Needs refresh
+        // Stale — store prior analysis for refinement
+        priorAnalysisMap[ea.game_key] = {
+          prior_snippet: ea.analysis_snippet,
+          prior_edge: ea.edge_score,
+          prior_pick: ea.recommended_pick,
+          version: ea.analysis_version || 1
+        };
       }
     }
 
@@ -680,7 +706,13 @@ async function runPreAnalysis(sportSlugs) {
           getPlayerStatsContext(game.home_team, game.away_team, game.sport)
         ]);
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook);
+        // Get prior analysis for refinement loop
+        const prior = priorAnalysisMap[game.game_key] || null;
+        if (prior) {
+          console.log(`  🔄 Refinement pass #${prior.version + 1} for ${game.game_key} (prior edge: ${prior.prior_edge}/10)`);
+        }
+
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior);
 
         if (result) {
           const record = {
@@ -709,7 +741,13 @@ async function runPreAnalysis(sportSlugs) {
             completion_tokens: result.completion_tokens,
             generated_at: new Date().toISOString(),
             expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
-            stale: false
+            stale: false,
+            // Refinement loop fields
+            analysis_version: prior ? prior.version + 1 : 1,
+            prior_analysis: prior ? prior.prior_snippet : null,
+            prior_edge_score: prior ? prior.prior_edge : null,
+            edge_movement: prior ? (result.edge_score > prior.prior_edge ? 'up' : result.edge_score < prior.prior_edge ? 'down' : 'stable') : null,
+            what_changed: result.what_changed || null
           };
 
           const { error } = await supabase
