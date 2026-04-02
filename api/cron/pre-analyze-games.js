@@ -789,9 +789,9 @@ async function runPreAnalysis(sportSlugs) {
                   if (totalMatch) point = parseFloat(totalMatch[1]);
                 }
 
-                await supabase
+                const { error: sugErr } = await supabase
                   .from('ai_suggestions')
-                  .upsert({
+                  .insert({
                     sport: sportDisplay,
                     home_team: game.home_team,
                     away_team: game.away_team,
@@ -803,13 +803,13 @@ async function runPreAnalysis(sportSlugs) {
                     confidence: Math.round(result.edge_score),
                     reasoning: result.analysis_snippet,
                     risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
-                    generate_mode: 'auto_digest'
-                  }, { onConflict: 'home_team,away_team,bet_type,pick,immutable_date(game_date),COALESCE(point::text, \'null\')' })
-                  .then(({ error: sugErr }) => {
-                    if (sugErr && !sugErr.message.includes('duplicate')) {
-                      console.warn(`  Auto-save pick failed: ${sugErr.message}`);
-                    }
+                    generate_mode: 'auto_digest',
+                    actual_outcome: 'pending'
                   });
+                // Duplicate = unique index rejection, that's fine
+                if (sugErr && !sugErr.message.includes('duplicate') && !sugErr.message.includes('unique')) {
+                  console.warn(`  Auto-save pick failed: ${sugErr.message}`);
+                }
               } catch (e) {
                 // Don't block analysis if auto-save fails
               }
