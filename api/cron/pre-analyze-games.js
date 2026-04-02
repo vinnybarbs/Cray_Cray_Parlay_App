@@ -644,7 +644,7 @@ async function runPreAnalysis() {
     let totalCompletionTokens = 0;
     const errors = [];
 
-    const batch = gamesToAnalyze.slice(0, 30);
+    const batch = gamesToAnalyze.slice(0, 50);
 
     for (const game of batch) {
       try {
