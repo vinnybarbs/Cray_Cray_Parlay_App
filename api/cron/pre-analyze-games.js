@@ -806,9 +806,10 @@ async function runPreAnalysis(sportSlugs) {
                     generate_mode: 'auto_digest',
                     actual_outcome: 'pending'
                   });
-                // Duplicate = unique index rejection, that's fine
-                if (sugErr && !sugErr.message.includes('duplicate') && !sugErr.message.includes('unique')) {
-                  console.warn(`  Auto-save pick failed: ${sugErr.message}`);
+                if (sugErr) {
+                  console.warn(`  Auto-save pick result: ${sugErr.message}`);
+                } else {
+                  console.log(`  ✅ Auto-saved pick: ${result.recommended_pick} (${sportDisplay})`);
                 }
               } catch (e) {
                 // Don't block analysis if auto-save fails
