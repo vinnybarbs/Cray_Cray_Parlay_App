@@ -559,7 +559,7 @@ export default function DailyDigest({ onBack }) {
             {/* Upcoming game counts */}
             {data && Object.keys(data.upcomingCounts).length > 0 && (
               <div className="bg-gray-900/60 rounded-xl border border-gray-700 px-4 py-3">
-                <div className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-semibold">Games Next 24h</div>
+                <div className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-semibold">De-Genny's 24-Hr Game Analysis</div>
                 <div className="space-y-1">
                   {Object.entries(data.upcomingCounts).map(([sport, count]) => {
                     const meta = getSportMeta(sport)
