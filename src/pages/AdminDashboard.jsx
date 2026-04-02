@@ -28,20 +28,31 @@ function winRate(won, lost) {
   return Math.round((won / settled) * 100)
 }
 
-function freshnessColor(ts) {
+// Per-table freshness thresholds (hours) — some tables only update daily
+const FRESHNESS_THRESHOLDS = {
+  game_results: { fresh: 26, stale: 50 },     // Daily backfill at 5 AM
+  game_analysis: { fresh: 4, stale: 8 },       // Every 2-3h per sport
+  news_cache: { fresh: 4, stale: 12 },         // Every 3h
+  news_articles: { fresh: 4, stale: 8 },       // Every 2h
+  odds_cache: { fresh: 2, stale: 4 },          // Hourly
+}
+
+function freshnessColor(ts, table) {
   if (!ts) return 'text-red-400'
   const hrs = (Date.now() - new Date(ts).getTime()) / 3600000
-  if (hrs < 4) return 'text-green-400'
-  if (hrs < 12) return 'text-yellow-400'
+  const t = FRESHNESS_THRESHOLDS[table] || { fresh: 4, stale: 12 }
+  if (hrs < t.fresh) return 'text-green-400'
+  if (hrs < t.stale) return 'text-yellow-400'
   return 'text-red-400'
 }
 
-function freshnessLabel(ts) {
+function freshnessLabel(ts, table) {
   if (!ts) return 'No data'
   const hrs = (Date.now() - new Date(ts).getTime()) / 3600000
-  if (hrs < 4) return 'Fresh'
-  if (hrs < 12) return 'Stale'
-  return 'Very stale'
+  const t = FRESHNESS_THRESHOLDS[table] || { fresh: 4, stale: 12 }
+  if (hrs < t.fresh) return 'Active'
+  if (hrs < t.stale) return 'Aging'
+  return 'Needs attention'
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -198,8 +209,8 @@ function DataFreshnessSection({ dataFreshness }) {
           const d = dataFreshness?.[table]
           const ts = d?.maxTimestamp
           const count = d?.count
-          const colorCls = freshnessColor(ts)
-          const label = freshnessLabel(ts)
+          const colorCls = freshnessColor(ts, table)
+          const label = freshnessLabel(ts, table)
           return (
             <div key={table} className="bg-gray-800 rounded-lg p-3 border border-gray-700">
               <p className="text-gray-400 text-xs font-mono mb-1">{table}</p>
