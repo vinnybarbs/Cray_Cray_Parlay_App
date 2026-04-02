@@ -627,7 +627,6 @@ export default function DailyDigest({ onBack }) {
               <button
                 onClick={() => {
                   window.location.hash = '#/chat'
-                  onBack()
                 }}
                 className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:opacity-90 rounded-xl font-bold text-white shadow-lg transition-all"
               >
