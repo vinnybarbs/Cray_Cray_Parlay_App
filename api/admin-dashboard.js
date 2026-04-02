@@ -155,7 +155,7 @@ async function getAdminDashboard(req, res) {
           .select('*', { count: 'exact', head: true });
 
         // Try common timestamp column names
-        const timestampCols = ['created_at', 'updated_at', 'last_updated', 'fetched_at', 'analyzed_at'];
+        const timestampCols = ['generated_at', 'created_at', 'updated_at', 'last_updated', 'fetched_at', 'analyzed_at', 'published_at'];
         let maxTimestamp = null;
 
         for (const col of timestampCols) {
