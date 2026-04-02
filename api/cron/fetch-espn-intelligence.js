@@ -20,6 +20,7 @@ const ACTIVE_SPORTS = [
   { code: 'NCAAB', espn: 'basketball/mens-college-basketball', slug: 'basketball_ncaab' },
   { code: 'NHL', espn: 'hockey/nhl', slug: 'icehockey_nhl' },
   { code: 'MLB', espn: 'baseball/mlb', slug: 'baseball_mlb' },
+  { code: 'EPL', espn: 'soccer/eng.1', slug: 'soccer_epl' },
 ];
 
 async function espnFetch(path) {

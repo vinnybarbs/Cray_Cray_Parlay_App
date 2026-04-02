@@ -17,7 +17,8 @@ const SLUG_TO_SPORT = {
   basketball_nba: 'NBA',
   basketball_ncaab: 'NCAAB',
   icehockey_nhl: 'NHL',
-  baseball_mlb: 'MLB'
+  baseball_mlb: 'MLB',
+  soccer_epl: 'EPL'
 };
 
 /**
@@ -586,7 +587,8 @@ async function runPreAnalysis() {
     // Sports to analyze (Odds API slugs)
     const sportSlugs = [
       'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
-      'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb'
+      'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
+      'soccer_epl'
     ];
 
     // 1. Get upcoming games from odds cache

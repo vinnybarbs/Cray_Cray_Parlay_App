@@ -8,14 +8,15 @@
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 
-const ESPN_BASE = 'http://site.api.espn.com/apis/site/v2/sports';
+const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
 
 const SPORT_PATHS = {
   NFL: 'football/nfl',
   NBA: 'basketball/nba',
   NCAAB: 'basketball/mens-college-basketball',
   NHL: 'hockey/nhl',
-  MLB: 'baseball/mlb'
+  MLB: 'baseball/mlb',
+  EPL: 'soccer/eng.1'
 };
 
 function sleep(ms) {
@@ -104,7 +105,7 @@ async function backfillGameResults(req, res) {
     }
 
     const days = parseInt(req.query.days || '30', 10);
-    const sports = (req.query.sports || 'NBA,NCAAB,NFL,NHL').split(',').map(s => s.trim().toUpperCase());
+    const sports = (req.query.sports || 'NBA,NCAAB,NFL,NHL,MLB,EPL').split(',').map(s => s.trim().toUpperCase());
 
     console.log(`\n📊 Backfilling game results: ${days} days, sports: ${sports.join(', ')}`);
 

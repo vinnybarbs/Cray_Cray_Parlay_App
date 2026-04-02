@@ -70,6 +70,8 @@ const FEEDS: { name: string; url: string }[] = [
   { name: 'clutchpoints', url: 'https://clutchpoints.com/feed' },
   { name: 'sportingnews', url: 'https://www.sportingnews.com/us/rss' },
   { name: 'ncaa-official', url: 'https://www.ncaa.com/news/basketball-men/d1/rss.xml' },
+  { name: 'gnews-epl', url: 'https://news.google.com/rss/search?q=Premier+League+EPL+football+predictions+injuries&hl=en-US&gl=US&ceid=US:en' },
+  { name: 'gnews-soccer-betting', url: 'https://news.google.com/rss/search?q=EPL+soccer+betting+picks+odds+preview&hl=en-US&gl=US&ceid=US:en' },
 
 ];
 
