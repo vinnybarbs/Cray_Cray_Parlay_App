@@ -688,6 +688,10 @@ async function runPreAnalysis(sportSlugs) {
     const errors = [];
 
     const batch = gamesToAnalyze.slice(0, 50);
+    console.log(`🎯 Batch size: ${batch.length} games to analyze`);
+    if (batch.length > 0) {
+      console.log(`  First game: ${batch[0].game_key} (${batch[0].sport})`);
+    }
 
     for (const game of batch) {
       try {
@@ -713,6 +717,11 @@ async function runPreAnalysis(sportSlugs) {
         }
 
         const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior);
+
+        if (!result) {
+          console.warn(`  ⚠️ analyzeGame returned null for ${game.game_key}`);
+          errors.push(`${game.game_key}: AI returned null`);
+        }
 
         if (result) {
           const record = {
