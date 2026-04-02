@@ -820,6 +820,21 @@ async function runPreAnalysis(sportSlugs) {
     const duration = Date.now() - startTime;
     const estimatedCost = ((totalPromptTokens * 0.00000015) + (totalCompletionTokens * 0.0000006)).toFixed(4);
 
+    // Log results to cron_job_logs for admin dashboard visibility
+    try {
+      await supabase.from('cron_job_logs').insert({
+        job_name: `pre-analyze-${sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join('-')}`,
+        status: errors.length === 0 ? 'completed' : 'partial',
+        details: JSON.stringify({
+          games_found: games.length,
+          analyzed,
+          errors: errors.slice(0, 5),
+          duration_ms: duration,
+          cost: estimatedCost
+        })
+      });
+    } catch (e) { /* don't block on logging */ }
+
     console.log(`\n🧠 Pre-analysis complete in ${(duration / 1000).toFixed(1)}s`);
     console.log(`📊 Analyzed: ${analyzed}/${batch.length} games`);
     console.log(`💰 Tokens: ${totalPromptTokens} prompt + ${totalCompletionTokens} completion ≈ $${estimatedCost}`);
