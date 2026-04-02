@@ -9,6 +9,7 @@ const SPORTS = [
   "basketball_nba",
   "basketball_ncaab",
   "icehockey_nhl",
+  "baseball_mlb",
   "soccer_epl"
 ];
 
@@ -202,7 +203,7 @@ async function refreshOdds(req: Request): Promise<Response> {
     //   - Fetch core markets, clear old rows for those sports, insert fresh data
     //   - Then fetch per-event player props and insert those as well.
 
-    const SPORTS_TO_REFRESH = ["americanfootball_nfl", "basketball_nba", "basketball_ncaab"];
+    const SPORTS_TO_REFRESH = SPORTS;
     const allSportGames: Array<{ sport: string; games: any[] }> = [];
 
     // 1) Fetch core odds for NFL & NBA
