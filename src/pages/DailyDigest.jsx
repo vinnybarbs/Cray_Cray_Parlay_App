@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
 
@@ -79,6 +79,14 @@ function winRateBarColor(rate) {
   return 'bg-red-500'
 }
 
+function edgeMovementIcon(movement) {
+  if (!movement) return null
+  const m = String(movement).toLowerCase()
+  if (m === 'up' || m === 'rising') return <span className="text-green-400 font-bold">↑</span>
+  if (m === 'down' || m === 'falling') return <span className="text-red-400 font-bold">↓</span>
+  return <span className="text-gray-400">→</span>
+}
+
 function Skeleton({ className = '' }) {
   return <div className={`animate-pulse bg-gray-700 rounded ${className}`} />
 }
@@ -144,13 +152,378 @@ function Countdown({ targetIso }) {
   )
 }
 
-function GameCard({ game, onQuickParlay }) {
+// ─── Deep Research Modal ────────────────────────────────────────────────────
+
+function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const overlayRef = useRef(null)
+
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const res = await fetch(`${API_BASE}/api/deep-research?game_key=${encodeURIComponent(gameKey)}`)
+        if (!res.ok) throw new Error(`Server error ${res.status}`)
+        const json = await res.json()
+        if (!cancelled) setData(json)
+      } catch (err) {
+        if (!cancelled) setError(err.message)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [gameKey])
+
+  // Close on overlay click
+  const handleOverlayClick = (e) => {
+    if (e.target === overlayRef.current) onClose()
+  }
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  // Prevent body scroll while modal open
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  const handleLockPick = () => {
+    const pick = {
+      sport: game.sport || 'Unknown',
+      homeTeam: game.home_team,
+      awayTeam: game.away_team,
+      pick: game.recommended_pick,
+      betType: game.recommended_side || 'Moneyline/Spread',
+      odds: -110,
+      confidence: game.edge_score || 7,
+      reasoning: game.analysis_snippet || '',
+      gameDate: game.game_date,
+      id: `${game.home_team}-${game.away_team}-deep`,
+    }
+    try {
+      const existing = JSON.parse(localStorage.getItem('digest_parlay_picks') || '[]')
+      const deduped = existing.filter(p => p.id !== pick.id)
+      localStorage.setItem('digest_parlay_picks', JSON.stringify([...deduped, pick]))
+    } catch (e) { /* storage unavailable */ }
+    onLockPick && onLockPick(pick)
+    onClose()
+  }
+
+  const analysis = data?.analysis || game
+  const version = analysis.analysis_version
+  const keyFactors = Array.isArray(analysis.key_factors)
+    ? analysis.key_factors
+    : analysis.key_factors
+      ? String(analysis.key_factors).split(/[·\n]/).map(s => s.trim()).filter(Boolean)
+      : []
+
+  return (
+    <div
+      ref={overlayRef}
+      onClick={handleOverlayClick}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
+    >
+      <div className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] bg-gray-900 sm:rounded-2xl border border-gray-700 shadow-2xl flex flex-col overflow-hidden">
+
+        {/* Modal header */}
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-700 bg-gray-800 flex-shrink-0">
+          <div>
+            <div className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Deep Research</div>
+            <h2 className="text-base font-bold text-white leading-tight">
+              {game.away_team} <span className="text-gray-500">@</span> {game.home_team}
+            </h2>
+            {game.game_date && (
+              <div className="text-xs text-gray-500 mt-0.5">{toMountainTime(game.game_date)} MT</div>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 text-gray-500 hover:text-white text-xl leading-none p-1 -mr-1 mt-0.5 transition-colors"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Modal body — scrollable */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+
+          {loading && (
+            <div className="space-y-3">
+              {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 w-full" />)}
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="bg-red-900/40 border border-red-700 rounded-xl p-4 text-center">
+              <p className="text-red-300 text-sm font-medium">Failed to load deep research data</p>
+              <p className="text-red-400 text-xs mt-1">{error}</p>
+              <p className="text-xs text-gray-500 mt-2">Showing available card data below.</p>
+            </div>
+          )}
+
+          {/* Edge score + movement */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Edge Analysis</span>
+              {version && (
+                <span className="text-xs bg-gray-700 text-gray-300 rounded-full px-2 py-0.5">
+                  Pass #{version}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {analysis.edge_score != null && (
+                <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${edgeBadgeClass(analysis.edge_score)}`}>
+                  Edge {Number(analysis.edge_score).toFixed(1)}
+                </span>
+              )}
+              {analysis.edge_movement && (
+                <span className="text-sm flex items-center gap-1 text-gray-400">
+                  Movement: {edgeMovementIcon(analysis.edge_movement)}
+                  <span className="capitalize">{analysis.edge_movement}</span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Analysis snippet + key factors */}
+          {(analysis.analysis_snippet || keyFactors.length > 0) && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-3">
+              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Analysis</div>
+              {analysis.analysis_snippet && (
+                <p className="text-sm text-gray-300 leading-relaxed">{analysis.analysis_snippet}</p>
+              )}
+              {keyFactors.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-500 mb-1.5 font-medium">Key Factors</div>
+                  <ul className="space-y-1">
+                    {keyFactors.map((f, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-gray-400">
+                        <span className="text-blue-500 flex-shrink-0 mt-0.5">•</span>
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* What changed (refinement history) */}
+          {analysis.what_changed && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">What Changed</div>
+              <p className="text-xs text-gray-400 leading-relaxed italic">{analysis.what_changed}</p>
+            </div>
+          )}
+
+          {/* Current lines */}
+          {(() => {
+            const odds = data?.odds || []
+            const hasOdds = odds.length > 0
+            const hasCardLines = analysis.spread != null || analysis.total != null || analysis.moneyline_home != null
+            if (!hasOdds && !hasCardLines) return null
+            return (
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Current Lines</div>
+                {hasOdds ? (
+                  <div className="space-y-2">
+                    {odds.map((line, i) => (
+                      <div key={i} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500 capitalize">{line.market_type || 'Line'}</span>
+                        <div className="flex gap-3 text-gray-300">
+                          {line.spread != null && <span>Spread: {line.spread > 0 ? '+' : ''}{line.spread}</span>}
+                          {line.total != null && <span>O/U: {line.total}</span>}
+                          {line.moneyline_home != null && (
+                            <span>ML: {line.moneyline_home > 0 ? '+' : ''}{line.moneyline_home} / {line.moneyline_away > 0 ? '+' : ''}{line.moneyline_away}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {analysis.spread != null && (
+                      <span className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
+                        Spread: {analysis.spread > 0 ? '+' : ''}{analysis.spread}
+                      </span>
+                    )}
+                    {analysis.total != null && (
+                      <span className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
+                        O/U: {analysis.total}
+                      </span>
+                    )}
+                    {analysis.moneyline_home != null && (
+                      <span className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
+                        ML: {analysis.moneyline_home > 0 ? '+' : ''}{analysis.moneyline_home} / {analysis.moneyline_away > 0 ? '+' : ''}{analysis.moneyline_away}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Injury report */}
+          {data?.injuries && data.injuries.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <div className="text-xs text-orange-400 uppercase tracking-wider font-semibold mb-3">Injury Report</div>
+              <div className="space-y-3">
+                {data.injuries.map((entry, i) => {
+                  const lines = typeof entry.content === 'string'
+                    ? entry.content.split('\n').filter(l => l.trim())
+                    : []
+                  return (
+                    <div key={i}>
+                      <div className="text-xs text-gray-500 font-medium mb-1">{entry.team_name}</div>
+                      <ul className="space-y-0.5">
+                        {lines.slice(0, 6).map((line, j) => (
+                          <li key={j} className="flex items-start gap-2 text-xs text-gray-400">
+                            <span className="text-orange-500 flex-shrink-0 mt-0.5">•</span>
+                            {line}
+                          </li>
+                        ))}
+                        {lines.length === 0 && (
+                          <li className="text-xs text-gray-600 italic">No injury data.</li>
+                        )}
+                      </ul>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Recent articles */}
+          {data?.articles && data.articles.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Recent News</div>
+              <div className="space-y-3">
+                {data.articles.map((article, i) => (
+                  <div key={i} className="border-b border-gray-700 last:border-0 pb-3 last:pb-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <p className="text-xs text-gray-300 font-medium leading-snug">{article.title}</p>
+                      {article.sentiment && (
+                        <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${
+                          article.sentiment === 'positive' ? 'bg-green-900/60 text-green-400' :
+                          article.sentiment === 'negative' ? 'bg-red-900/60 text-red-400' :
+                          'bg-gray-700 text-gray-400'
+                        }`}>
+                          {article.sentiment}
+                        </span>
+                      )}
+                    </div>
+                    {article.betting_summary && (
+                      <p className="text-xs text-gray-500 leading-relaxed">{article.betting_summary}</p>
+                    )}
+                    {article.published_at && (
+                      <p className="text-xs text-gray-700 mt-1">
+                        {new Date(article.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recent form — last 5 games each team */}
+          {(() => {
+            const homeResults = data?.homeTeamResults || []
+            const awayResults = data?.awayTeamResults || []
+            if (homeResults.length === 0 && awayResults.length === 0) return null
+
+            const renderResult = (r, teamName) => {
+              const isHome = r.home_team_name === teamName
+              const teamScore = isHome ? r.home_score : r.away_score
+              const oppScore = isHome ? r.away_score : r.home_score
+              const opponent = isHome ? r.away_team_name : r.home_team_name
+              const won = teamScore != null && oppScore != null ? teamScore > oppScore : null
+              return (
+                <div key={`${r.date}-${r.home_team_name}`} className="flex items-center gap-2 text-xs">
+                  <span className={`px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${
+                    won === true ? 'bg-green-900 text-green-300' :
+                    won === false ? 'bg-red-900 text-red-300' :
+                    'bg-gray-700 text-gray-400'
+                  }`}>
+                    {won === true ? 'W' : won === false ? 'L' : '?'}
+                  </span>
+                  <span className="text-gray-400 truncate">
+                    {isHome ? 'vs' : '@'} {opponent}
+                    {teamScore != null && ` ${teamScore}-${oppScore}`}
+                  </span>
+                  {r.date && (
+                    <span className="text-gray-700 flex-shrink-0 ml-auto">
+                      {new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  )}
+                </div>
+              )
+            }
+
+            return (
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Recent Form</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {homeResults.length > 0 && (
+                    <div>
+                      <div className="text-xs text-gray-400 font-medium mb-2">{game.home_team}</div>
+                      <div className="space-y-1.5">
+                        {homeResults.map(r => renderResult(r, game.home_team))}
+                      </div>
+                    </div>
+                  )}
+                  {awayResults.length > 0 && (
+                    <div>
+                      <div className="text-xs text-gray-400 font-medium mb-2">{game.away_team}</div>
+                      <div className="space-y-1.5">
+                        {awayResults.map(r => renderResult(r, game.away_team))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Modal footer — Lock Pick */}
+        {game.recommended_pick && (
+          <div className="flex-shrink-0 px-5 py-4 border-t border-gray-700 bg-gray-800">
+            <button
+              onClick={handleLockPick}
+              className="w-full py-3 rounded-xl font-bold text-gray-900 text-sm bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 shadow-lg transition-all active:scale-95"
+            >
+              Lock This Pick — {game.recommended_pick}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── GameCard ───────────────────────────────────────────────────────────────
+
+function GameCard({ game, gameKey, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
   const edge = game.edge_score != null ? Number(game.edge_score).toFixed(1) : null
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden">
-      <div className="p-4">
+    <div className="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden flex flex-col">
+      <div className="p-4 flex-1">
         {/* Matchup header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
@@ -234,9 +607,23 @@ function GameCard({ game, onQuickParlay }) {
           </div>
         )}
       </div>
+
+      {/* Deep Research button */}
+      {gameKey && (
+        <div className="px-4 pb-4 pt-0">
+          <button
+            onClick={() => onDeepResearch(game, gameKey)}
+            className="w-full py-1.5 text-xs font-semibold text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-gray-600 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5"
+          >
+            <span>🔬</span> Deep Research
+          </button>
+        </div>
+      )}
     </div>
   )
 }
+
+// ─── InjurySection ──────────────────────────────────────────────────────────
 
 function InjurySection({ content }) {
   const [open, setOpen] = useState(false)
@@ -273,13 +660,27 @@ function InjurySection({ content }) {
   )
 }
 
-function SportSection({ sport, games, injuries, onQuickParlay }) {
+// ─── SportSection ────────────────────────────────────────────────────────────
+
+function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch }) {
+  const [expanded, setExpanded] = useState(isDefaultExpanded)
   const meta = getSportMeta(sport)
+  // Top 3 by edge score (already sorted desc from API)
   const topGames = games.slice(0, 3)
+  const extraGames = games.slice(3)
   const injuryCode = ANALYSIS_SPORT_TO_CODE[sport] || sport
   const injuryEntry = injuries[injuryCode]
+  const topEdge = games[0]?.edge_score != null ? Number(games[0].edge_score).toFixed(1) : null
 
-  const buildQuickParlay = () => {
+  // Build game_key for each game: {away_team}_{home_team}_{date_prefix}
+  function buildGameKey(game) {
+    if (!game.home_team || !game.away_team) return null
+    const datePart = game.game_date ? game.game_date.slice(0, 10) : ''
+    return `${game.away_team}_${game.home_team}_${datePart}`.replace(/\s+/g, '_')
+  }
+
+  const buildQuickParlay = (e) => {
+    e.stopPropagation()
     const picks = topGames
       .filter(g => g.recommended_pick)
       .map(g => ({
@@ -294,66 +695,105 @@ function SportSection({ sport, games, injuries, onQuickParlay }) {
         gameDate: g.game_date,
         id: `${g.home_team}-${g.away_team}-digest`,
       }))
-
     if (picks.length === 0) return
-
     try {
       localStorage.setItem('digest_parlay_picks', JSON.stringify(picks))
-    } catch (e) {
-      // storage not available
-    }
-
+    } catch (e) { /* storage unavailable */ }
     window.location.hash = '/'
   }
 
   return (
     <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-      {/* Sport header bar */}
-      <div className="bg-gradient-to-r from-gray-800 to-gray-750 px-6 py-4 border-b border-gray-700">
-        <div className="flex items-center justify-between">
+      {/* Sport header bar — clickable to collapse/expand */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full text-left bg-gradient-to-r from-gray-800 to-gray-750 px-6 py-4 border-b border-gray-700 hover:bg-gray-750 transition-colors"
+      >
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <span className="text-2xl">{meta.emoji}</span>
             <div>
               <h2 className="text-lg font-bold text-white">{meta.label}</h2>
               <p className="text-xs text-gray-400">
-                {games.length} game{games.length !== 1 ? 's' : ''} with analysis today
+                {games.length} game{games.length !== 1 ? 's' : ''} with analysis
+                {!expanded && topEdge && (
+                  <span className="ml-2 text-gray-500">
+                    · Top edge: <span className={`font-semibold ${Number(topEdge) >= 8 ? 'text-green-400' : Number(topEdge) >= 6 ? 'text-yellow-400' : 'text-gray-400'}`}>{topEdge}</span>
+                  </span>
+                )}
               </p>
             </div>
           </div>
-          {/* Quick Parlay button */}
-          {topGames.some(g => g.recommended_pick) && (
-            <button
-              onClick={buildQuickParlay}
-              className="px-4 py-2 text-sm font-bold rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 shadow-lg transition-all hover:shadow-xl active:scale-95"
-            >
-              Quick Parlay
-            </button>
-          )}
+          <div className="flex items-center gap-3 flex-shrink-0">
+            {/* Quick Parlay button — only when expanded */}
+            {expanded && topGames.some(g => g.recommended_pick) && (
+              <button
+                onClick={buildQuickParlay}
+                className="px-4 py-2 text-sm font-bold rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 shadow-lg transition-all hover:shadow-xl active:scale-95"
+              >
+                Quick Parlay
+              </button>
+            )}
+            {/* Chevron */}
+            <span className="text-gray-500 text-lg select-none">
+              {expanded ? '▲' : '▼'}
+            </span>
+          </div>
         </div>
-      </div>
+      </button>
 
-      <div className="p-6">
-        {/* Top picks grid */}
-        <div className="mb-2">
-          <h3 className="text-xs uppercase tracking-widest text-gray-500 mb-3 font-semibold">Top Picks by Edge Score</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* Collapsible body */}
+      {expanded && (
+        <div className="p-6">
+          {/* Label */}
+          <h3 className="text-xs uppercase tracking-widest text-gray-500 mb-3 font-semibold">
+            Top Picks by Edge Score
+          </h3>
+
+          {/* Top 3 tiles */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {topGames.map((game, i) => (
-              <GameCard key={`${game.home_team}-${game.away_team}-${i}`} game={game} />
+              <GameCard
+                key={`${game.home_team}-${game.away_team}-${i}`}
+                game={game}
+                gameKey={buildGameKey(game)}
+                onDeepResearch={onDeepResearch}
+              />
             ))}
           </div>
-          {games.length > 3 && (
-            <p className="text-xs text-gray-600 mt-2 text-center">
-              + {games.length - 3} more {meta.label} games in the system
-            </p>
-          )}
-        </div>
 
-        {/* Injuries */}
-        <InjurySection content={injuryEntry?.content} />
-      </div>
+          {/* Additional games (beyond top 3) */}
+          {extraGames.length > 0 && (
+            <>
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 border-t border-gray-700" />
+                <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
+                  {extraGames.length} more {meta.label} game{extraGames.length !== 1 ? 's' : ''}
+                </span>
+                <div className="flex-1 border-t border-gray-700" />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {extraGames.map((game, i) => (
+                  <GameCard
+                    key={`${game.home_team}-${game.away_team}-extra-${i}`}
+                    game={game}
+                    gameKey={buildGameKey(game)}
+                    onDeepResearch={onDeepResearch}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Injuries */}
+          <InjurySection content={injuryEntry?.content} />
+        </div>
+      )}
     </div>
   )
 }
+
+// ─── YesterdayRecap ──────────────────────────────────────────────────────────
 
 function YesterdayRecap({ results }) {
   const sports = Object.keys(results)
@@ -409,6 +849,8 @@ function YesterdayRecap({ results }) {
     </div>
   )
 }
+
+// ─── ModelPerformance ────────────────────────────────────────────────────────
 
 function ModelPerformance({ sevenDay, allTime }) {
   const [view, setView] = React.useState('7day')
@@ -483,10 +925,13 @@ function ModelPerformance({ sevenDay, allTime }) {
   )
 }
 
+// ─── Main Page ───────────────────────────────────────────────────────────────
+
 export default function DailyDigest({ onBack }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
 
   const fetchDigest = useCallback(async () => {
     setLoading(true)
@@ -515,6 +960,14 @@ export default function DailyDigest({ onBack }) {
 
   const totalGames = sportSections.reduce((sum, [, games]) => sum + games.length, 0)
   const totalSports = sportSections.length
+
+  const handleOpenDeepResearch = useCallback((game, gameKey) => {
+    setDeepResearchTarget({ game, gameKey })
+  }, [])
+
+  const handleCloseDeepResearch = useCallback(() => {
+    setDeepResearchTarget(null)
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans">
@@ -602,12 +1055,14 @@ export default function DailyDigest({ onBack }) {
                 <p className="text-gray-600 text-sm mt-2">Check back later or run the Pick Generator to generate analysis.</p>
               </div>
             ) : (
-              sportSections.map(([sport, games]) => (
+              sportSections.map(([sport, games], idx) => (
                 <SportSection
                   key={sport}
                   sport={sport}
                   games={games}
                   injuries={data.injuries}
+                  isDefaultExpanded={idx === 0}
+                  onDeepResearch={handleOpenDeepResearch}
                 />
               ))
             )}
@@ -642,6 +1097,16 @@ export default function DailyDigest({ onBack }) {
           </>
         )}
       </div>
+
+      {/* Deep Research Modal */}
+      {deepResearchTarget && (
+        <DeepResearchModal
+          gameKey={deepResearchTarget.gameKey}
+          game={deepResearchTarget.game}
+          onClose={handleCloseDeepResearch}
+          onLockPick={() => {}}
+        />
+      )}
     </div>
   )
 }

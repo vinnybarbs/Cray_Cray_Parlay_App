@@ -254,4 +254,116 @@ async function getDigest(req, res) {
   }
 }
 
-module.exports = { getDigest };
+async function deepResearch(req, res) {
+  const { game_key } = req.query;
+  if (!game_key) {
+    return res.status(400).json({ error: 'game_key query param required' });
+  }
+
+  const supabase = getSupabase();
+  if (!supabase) {
+    return res.status(500).json({ error: 'Supabase not configured' });
+  }
+
+  try {
+    // 1. game_analysis row for this game_key
+    const gameAnalysisResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('game_analysis')
+        .select(
+          'home_team, away_team, game_date, sport, edge_score, edge_movement, analysis_snippet, key_factors, what_changed, prior_analysis, analysis_version, recommended_pick, recommended_side, spread, total, moneyline_home, moneyline_away, home_record, away_record'
+        )
+        .eq('game_key', game_key)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    });
+
+    if (!gameAnalysisResult) {
+      return res.status(404).json({ error: 'Game not found', game_key });
+    }
+
+    const { home_team, away_team, sport } = gameAnalysisResult;
+
+    // 2. Injury reports for both teams' sport from news_cache
+    const injuriesResult = await safeQuery(async () => {
+      const sportCode = SPORT_SLUG_TO_DISPLAY[sport] || sport;
+      const teamsToSearch = [home_team, away_team, sportCode];
+      const { data, error } = await supabase
+        .from('news_cache')
+        .select('team_name, content, last_updated')
+        .eq('search_type', 'injuries')
+        .in('team_name', teamsToSearch);
+      if (error) throw error;
+      return data || [];
+    });
+
+    // 3. News articles mentioning either team (last 5 days, limit 10)
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    const articlesResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('news_articles')
+        .select('title, betting_summary, published_at, sentiment')
+        .or(`title.ilike.%${home_team}%,title.ilike.%${away_team}%`)
+        .gt('published_at', fiveDaysAgo)
+        .order('published_at', { ascending: false })
+        .limit(10);
+      if (error) throw error;
+      return data || [];
+    });
+
+    // 4. Current odds lines for this matchup
+    const oddsResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('odds_cache')
+        .select('market_type, home_team, away_team, spread, total, moneyline_home, moneyline_away, bookmaker, commence_time')
+        .eq('home_team', home_team)
+        .eq('away_team', away_team)
+        .order('market_type');
+      if (error) throw error;
+      return data || [];
+    });
+
+    // 5. Last 5 games for each team from game_results
+    const [homeResultsResult, awayResultsResult] = await Promise.all([
+      safeQuery(async () => {
+        const { data, error } = await supabase
+          .from('game_results')
+          .select('home_team_name, away_team_name, home_score, away_score, date, status')
+          .or(`home_team_name.eq.${home_team},away_team_name.eq.${home_team}`)
+          .eq('status', 'final')
+          .order('date', { ascending: false })
+          .limit(5);
+        if (error) throw error;
+        return data || [];
+      }),
+      safeQuery(async () => {
+        const { data, error } = await supabase
+          .from('game_results')
+          .select('home_team_name, away_team_name, home_score, away_score, date, status')
+          .or(`home_team_name.eq.${away_team},away_team_name.eq.${away_team}`)
+          .eq('status', 'final')
+          .order('date', { ascending: false })
+          .limit(5);
+        if (error) throw error;
+        return data || [];
+      }),
+    ]);
+
+    res.json({
+      status: 'ok',
+      game_key,
+      analysis: gameAnalysisResult,
+      injuries: injuriesResult || [],
+      articles: articlesResult || [],
+      odds: oddsResult || [],
+      homeTeamResults: homeResultsResult || [],
+      awayTeamResults: awayResultsResult || [],
+    });
+  } catch (err) {
+    logger.error('Deep research endpoint error', { error: err.message, game_key });
+    res.status(500).json({ error: 'Internal server error', message: err.message });
+  }
+}
+
+module.exports = { getDigest, deepResearch };

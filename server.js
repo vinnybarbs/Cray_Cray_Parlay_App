@@ -421,8 +421,9 @@ const { getAdminDashboard } = require('./api/admin-dashboard');
 app.get('/api/admin/dashboard', getAdminDashboard);
 
 // Daily Digest - public endpoint, no auth required
-const { getDigest } = require('./api/digest');
+const { getDigest, deepResearch } = require('./api/digest');
 app.get('/api/digest', getDigest);
+app.get('/api/deep-research', deepResearch);
 
 app.listen(PORT, () => {
   logger.info(`Backend server started`, { 
