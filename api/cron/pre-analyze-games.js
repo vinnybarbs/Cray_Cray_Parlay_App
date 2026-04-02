@@ -565,33 +565,50 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
   }
 }
 
+// All supported sports
+const ALL_SPORT_SLUGS = [
+  'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
+  'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
+  'soccer_epl'
+];
+
+// Sport group mappings for staggered crons
+const SPORT_GROUPS = {
+  'nba': ['basketball_nba'],
+  'ncaab': ['basketball_ncaab'],
+  'nhl': ['icehockey_nhl'],
+  'mlb': ['baseball_mlb'],
+  'epl': ['soccer_epl'],
+  'football': ['americanfootball_nfl', 'americanfootball_ncaaf'],
+  'all': ALL_SPORT_SLUGS
+};
+
 async function preAnalyzeGames(req, res) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
   if (cronSecret !== process.env.CRON_SECRET) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  // Respond immediately — processing happens in background
-  res.status(202).json({ status: 'accepted', message: 'Pre-analysis started in background' });
+  // Accept ?sports=nba or ?sports=nba,nhl or ?sports=all (default)
+  const sportsParam = (req.query.sports || 'all').toLowerCase();
+  const sportSlugs = sportsParam.split(',').flatMap(s => SPORT_GROUPS[s.trim()] || []);
+  if (sportSlugs.length === 0) {
+    return res.status(400).json({ error: `Unknown sport group: ${sportsParam}. Use: ${Object.keys(SPORT_GROUPS).join(', ')}` });
+  }
 
-  // Run in background (no await — fire and forget)
-  runPreAnalysis().catch(err => console.error('❌ Pre-analysis background error:', err.message));
+  const sportNames = sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join(', ');
+  res.status(202).json({ status: 'accepted', message: `Pre-analysis started for ${sportNames}`, sports: sportSlugs });
+
+  runPreAnalysis(sportSlugs).catch(err => console.error('❌ Pre-analysis background error:', err.message));
 }
 
-async function runPreAnalysis() {
+async function runPreAnalysis(sportSlugs) {
   const startTime = Date.now();
 
   try {
-    console.log('\n🧠 CRON: Pre-analyzing upcoming games...');
+    const sportNames = sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join(', ');
+    console.log(`\n🧠 CRON: Pre-analyzing ${sportNames}...`);
 
-    // Sports to analyze (Odds API slugs)
-    const sportSlugs = [
-      'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
-      'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
-      'soccer_epl'
-    ];
-
-    // 1. Get upcoming games from odds cache
     const games = await getUpcomingGames(sportSlugs);
     console.log(`📊 Found ${games.length} upcoming games to analyze`);
 
