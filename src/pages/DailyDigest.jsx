@@ -740,10 +740,31 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         </div>
       </button>
 
-      {/* Collapsible body */}
+      {/* Collapsed preview — top 3 picks as compact rows */}
+      {!expanded && topGames.length > 0 && (
+        <div className="px-6 py-3 space-y-2">
+          {topGames.map((game, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 text-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${edgeBadgeClass(game.edge_score)}`}>
+                  {Number(game.edge_score).toFixed(1)}
+                </span>
+                <span className="text-gray-300 truncate">{game.away_team} @ {game.home_team}</span>
+              </div>
+              <span className="text-yellow-400 text-xs font-semibold flex-shrink-0 truncate max-w-[140px]">
+                {game.recommended_pick || '—'}
+              </span>
+            </div>
+          ))}
+          {games.length > 3 && (
+            <p className="text-[11px] text-gray-600 text-center pt-1">Tap to see all {games.length} games</p>
+          )}
+        </div>
+      )}
+
+      {/* Expanded body — full tiles */}
       {expanded && (
         <div className="p-6">
-          {/* Label */}
           <h3 className="text-xs uppercase tracking-widest text-gray-500 mb-3 font-semibold">
             Top Picks by Edge Score
           </h3>
@@ -1057,32 +1078,33 @@ export default function DailyDigest({ onBack }) {
         {/* Sport sections */}
         {!loading && !error && data && (
           <>
+            {/* Model Performance — right after hero */}
+            {(data.sevenDayAccuracy?.overall || data.allTimeAccuracy?.overall) && (
+              <ModelPerformance sevenDay={data.sevenDayAccuracy} allTime={data.allTimeAccuracy} />
+            )}
+
+            {/* Yesterday's Recap — right after performance */}
+            {Object.keys(data.yesterdayResults).length > 0 && (
+              <YesterdayRecap results={data.yesterdayResults} />
+            )}
+
+            {/* Sport sections — all start collapsed, show 3 game preview */}
             {sportSections.length === 0 ? (
               <div className="bg-gray-800 rounded-2xl border border-gray-700 p-8 text-center">
                 <p className="text-gray-400 text-lg font-medium">No fresh game analysis available today.</p>
                 <p className="text-gray-600 text-sm mt-2">Check back later or run the Pick Generator to generate analysis.</p>
               </div>
             ) : (
-              sportSections.map(([sport, games], idx) => (
+              sportSections.map(([sport, games]) => (
                 <SportSection
                   key={sport}
                   sport={sport}
                   games={games}
                   injuries={data.injuries}
-                  isDefaultExpanded={idx === 0}
+                  isDefaultExpanded={false}
                   onDeepResearch={handleOpenDeepResearch}
                 />
               ))
-            )}
-
-            {/* Yesterday's Recap */}
-            {Object.keys(data.yesterdayResults).length > 0 && (
-              <YesterdayRecap results={data.yesterdayResults} />
-            )}
-
-            {/* Model Performance (7-day / All-time toggle) */}
-            {(data.sevenDayAccuracy?.overall || data.allTimeAccuracy?.overall) && (
-              <ModelPerformance sevenDay={data.sevenDayAccuracy} allTime={data.allTimeAccuracy} />
             )}
 
             {/* Bottom CTA */}
