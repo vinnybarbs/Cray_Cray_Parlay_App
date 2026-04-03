@@ -420,6 +420,7 @@ export default function MainApp() {
     const checkHash = () => {
       if (window.location.hash === '#/admin') setShowAdmin(true);
       if (window.location.hash === '#/digest') setShowDigest(true);
+      if (window.location.hash === '#/chat') { setShowChatPicks(true); setShowDigest(false); }
     };
     checkHash();
     window.addEventListener('hashchange', checkHash);
