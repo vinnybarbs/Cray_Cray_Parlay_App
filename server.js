@@ -405,6 +405,39 @@ app.post('/cron/backfill-game-results', backfillGameResults);
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);
 
+// ATS backfill endpoint
+app.post('/cron/backfill-ats', async (req, res) => {
+  try {
+    const ATSTracker = require('./lib/services/ats-tracker');
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const tracker = new ATSTracker(supabase);
+    const days = parseInt(req.query.days) || 30;
+    res.status(202).json({ status: 'accepted', message: `ATS backfill started for last ${days} days` });
+    const result = await tracker.backfillATS(days);
+    console.log('ATS backfill result:', result);
+  } catch (err) {
+    console.error('ATS backfill error:', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+// ATS lookup endpoint
+app.get('/api/ats', async (req, res) => {
+  try {
+    const ATSTracker = require('./lib/services/ats-tracker');
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+    const tracker = new ATSTracker(supabase);
+    const { team, sport, limit } = req.query;
+    if (!team || !sport) return res.status(400).json({ error: 'team and sport required' });
+    const ats = await tracker.getTeamATS(team, sport, parseInt(limit) || 20);
+    res.json({ success: true, ats });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Enrich articles with full content + AI betting analysis
 const enrichArticles = require('./api/cron/enrich-articles');
 app.post('/cron/enrich-articles', enrichArticles);
