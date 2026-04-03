@@ -7,6 +7,7 @@
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { ApiSportsMulti } = require('../../lib/services/apisports-multi.js');
 const aiInstructions = require('../../lib/services/ai-instructions.js');
+const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -471,7 +472,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
 /**
  * Generate AI analysis for a single game using GPT-4o-mini
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '', priorAnalysis = null) {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null) {
   const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -492,6 +493,36 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
+
+  // Statistical edge block — injected when EdgeCalculator has results
+  if (edgeData) {
+    const ed = edgeData;
+    const edgeLines = [
+      `--- STATISTICAL EDGE ANALYSIS ---`,
+      `Calculated Win Probability: ${game.home_team} ${(ed.homeWinProb * 100).toFixed(1)}% | ${game.away_team} ${(ed.awayWinProb * 100).toFixed(1)}%`
+    ];
+    if (ed.impliedHomeProb !== null) {
+      edgeLines.push(`Implied Probability (vig-free): ${game.home_team} ${(ed.impliedHomeProb * 100).toFixed(1)}% | ${game.away_team} ${(ed.impliedAwayProb * 100).toFixed(1)}%`);
+    }
+    if (ed.edge !== null) {
+      const edgeSign = ed.edge >= 0 ? '+' : '';
+      edgeLines.push(`Mathematical Edge: ${edgeSign}${(ed.edge * 100).toFixed(1)}% on ${ed.edgeSide === 'home' ? game.home_team : game.away_team} (${ed.confidence} confidence)`);
+    }
+    if (ed.factors) {
+      const f = ed.factors;
+      if (f.homeRecord) edgeLines.push(`Season record — ${game.home_team}: ${f.homeRecord.wins}-${f.homeRecord.losses} (${(f.homeRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.homePointDiff >= 0 ? '+' : ''}${f.homePointDiff}`);
+      if (f.awayRecord) edgeLines.push(`Season record — ${game.away_team}: ${f.awayRecord.wins}-${f.awayRecord.losses} (${(f.awayRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.awayPointDiff >= 0 ? '+' : ''}${f.awayPointDiff}`);
+      if (f.homeRecentForm) edgeLines.push(`Recent form — ${game.home_team}: ${f.homeRecentForm.last5} last 5 (${(f.homeRecentForm.winPct * 100).toFixed(0)}%)`);
+      if (f.awayRecentForm) edgeLines.push(`Recent form — ${game.away_team}: ${f.awayRecentForm.last5} last 5 (${(f.awayRecentForm.winPct * 100).toFixed(0)}%)`);
+      if (f.scheduleStrength) edgeLines.push(`Schedule strength — ${game.home_team}: ${(f.scheduleStrength.home * 100).toFixed(1)}% opp avg | ${game.away_team}: ${(f.scheduleStrength.away * 100).toFixed(1)}% opp avg`);
+    }
+    if (ed.adjustments && ed.adjustments.length > 0) {
+      edgeLines.push(`Key adjustments: ${ed.adjustments.map(a => `${a.factor} (${a.impact >= 0 ? '+' : ''}${(a.impact * 100).toFixed(1)}%)`).join('; ')}`);
+    }
+    edgeLines.push(`Your job: Does the news/injury/trend context SUPPORT or CONTRADICT this ${ed.edgePercent !== null ? ed.edgePercent.toFixed(1) + '% mathematical edge' : 'edge'}? Be explicit.`);
+    edgeLines.push(`--- END STATISTICAL EDGE ---`);
+    contextParts.push(edgeLines.join('\n'));
+  }
   if (accuracy) contextParts.push(`Past accuracy: ${accuracy}`);
 
   // Refinement: inject prior analysis if this is a re-analysis
@@ -681,6 +712,9 @@ async function runPreAnalysis(sportSlugs) {
       if (playbook) console.log(`📖 Loaded AI playbook (${playbook.length} chars)`);
     } catch (e) { /* continue without */ }
 
+    // Instantiate edge calculator (reuse single instance across all games)
+    const edgeCalc = new EdgeCalculator(supabase);
+
     // 3. Analyze each game
     let analyzed = 0;
     let totalPromptTokens = 0;
@@ -716,7 +750,19 @@ async function runPreAnalysis(sportSlugs) {
           console.log(`  🔄 Refinement pass #${prior.version + 1} for ${game.game_key} (prior edge: ${prior.prior_edge}/10)`);
         }
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior);
+        // Calculate statistical edge BEFORE passing to AI
+        let edgeData = null;
+        try {
+          edgeData = await edgeCalc.calculateEdge(game);
+          if (edgeData) {
+            const edgeSign = edgeData.edge !== null ? (edgeData.edge >= 0 ? '+' : '') + (edgeData.edge * 100).toFixed(1) + '%' : 'N/A';
+            console.log(`  📐 Edge: ${edgeSign} on ${edgeData.edgeSide || '?'} (${edgeData.confidence}) — home ${(edgeData.homeWinProb * 100).toFixed(1)}% vs implied ${edgeData.impliedHomeProb !== null ? (edgeData.impliedHomeProb * 100).toFixed(1) + '%' : 'N/A'}`);
+          }
+        } catch (edgeErr) {
+          console.warn(`  Edge calc failed for ${game.game_key}: ${edgeErr.message}`);
+        }
+
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior, edgeData);
 
         if (!result) {
           console.warn(`  ⚠️ analyzeGame returned null for ${game.game_key}`);
@@ -756,7 +802,15 @@ async function runPreAnalysis(sportSlugs) {
             prior_analysis: prior ? prior.prior_snippet : null,
             prior_edge_score: prior ? prior.prior_edge : null,
             edge_movement: prior ? (result.edge_score > prior.prior_edge ? 'up' : result.edge_score < prior.prior_edge ? 'down' : 'stable') : null,
-            what_changed: result.what_changed || null
+            what_changed: result.what_changed || null,
+            // Statistical edge calculator outputs
+            calc_home_prob: edgeData ? edgeData.homeWinProb : null,
+            calc_away_prob: edgeData ? edgeData.awayWinProb : null,
+            implied_home_prob: edgeData ? edgeData.impliedHomeProb : null,
+            implied_away_prob: edgeData ? edgeData.impliedAwayProb : null,
+            calc_edge: edgeData ? edgeData.edge : null,
+            calc_edge_side: edgeData ? edgeData.edgeSide : null,
+            edge_factors: edgeData ? edgeData.factors : null
           };
 
           const { error } = await supabase
