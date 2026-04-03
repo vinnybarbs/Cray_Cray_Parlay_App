@@ -793,6 +793,52 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 
 // ─── YesterdayRecap ──────────────────────────────────────────────────────────
 
+function RecapCard({ sport, won, lost, picks }) {
+  const [expanded, setExpanded] = useState(false)
+  const total = won + lost
+  const rate = total > 0 ? Math.round((won / total) * 100) : null
+  const meta = getSportMeta(sport)
+  const visible = expanded ? picks : picks.slice(0, 4)
+
+  return (
+    <div className="bg-gray-900 rounded-xl p-4 border border-gray-700">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span>{meta.emoji}</span>
+          <span className="font-semibold text-white text-sm">{meta.label}</span>
+        </div>
+        <span className={`text-sm font-bold ${winRateColor(rate)}`}>
+          {won}-{lost}{rate != null ? ` (${rate}%)` : ''}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {visible.map((p, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
+              p.outcome === 'won'
+                ? 'bg-green-900 text-green-300 border border-green-700'
+                : 'bg-red-900 text-red-300 border border-red-700'
+            }`}>
+              {p.outcome === 'won' ? 'W' : 'L'}
+            </span>
+            <span className="text-xs text-gray-400 truncate">
+              {p.pick || `${p.away_team} @ ${p.home_team}`}
+            </span>
+          </div>
+        ))}
+      </div>
+      {picks.length > 4 && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+        >
+          {expanded ? 'Show less' : `Show all ${picks.length} picks`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 function YesterdayRecap({ results }) {
   const sports = Object.keys(results)
   if (sports.length === 0) return null
@@ -804,45 +850,9 @@ function YesterdayRecap({ results }) {
         <p className="text-xs text-gray-400 mt-0.5">Picks settled in the last 24 hours</p>
       </div>
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sports.map(sport => {
-          const { won, lost, picks } = results[sport]
-          const total = won + lost
-          const rate = total > 0 ? Math.round((won / total) * 100) : null
-          const meta = getSportMeta(sport)
-
-          return (
-            <div key={sport} className="bg-gray-900 rounded-xl p-4 border border-gray-700">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span>{meta.emoji}</span>
-                  <span className="font-semibold text-white text-sm">{meta.label}</span>
-                </div>
-                <span className={`text-sm font-bold ${winRateColor(rate)}`}>
-                  {won}-{lost}{rate != null ? ` (${rate}%)` : ''}
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                {picks.slice(0, 4).map((p, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
-                      p.outcome === 'won'
-                        ? 'bg-green-900 text-green-300 border border-green-700'
-                        : 'bg-red-900 text-red-300 border border-red-700'
-                    }`}>
-                      {p.outcome === 'won' ? 'W' : 'L'}
-                    </span>
-                    <span className="text-xs text-gray-400 truncate">
-                      {p.pick || `${p.away_team} @ ${p.home_team}`}
-                    </span>
-                  </div>
-                ))}
-                {picks.length > 4 && (
-                  <p className="text-xs text-gray-600">+ {picks.length - 4} more</p>
-                )}
-              </div>
-            </div>
-          )
-        })}
+        {sports.map(sport => (
+          <RecapCard key={sport} sport={sport} won={results[sport].won} lost={results[sport].lost} picks={results[sport].picks} />
+        ))}
       </div>
     </div>
   )
