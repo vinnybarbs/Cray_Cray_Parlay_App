@@ -44,6 +44,7 @@ async function getDigest(req, res) {
         )
         .eq('stale', false)
         .gt('expires_at', new Date().toISOString())
+        .gt('game_date', new Date().toISOString())
         .order('edge_score', { ascending: false });
 
       if (error) throw error;
