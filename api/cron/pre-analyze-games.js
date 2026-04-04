@@ -556,6 +556,12 @@ CRITICAL RULES:
 - If a team's recent results show a trend (3 straight wins, blowout losses), highlight it
 - Compare the spread/total to the actual scoring data when available
 
+BET TYPE PRIORITY (based on our actual model performance):
+- MONEYLINE picks hit at 70-77%. If one team is clearly stronger, recommend home_ml or away_ml.
+- SPREAD picks hit at 61%. Only recommend when data strongly supports the margin.
+- TOTAL picks hit at 56%. Only recommend when you have scoring data for BOTH teams.
+- PREFER MONEYLINE when there's a clear favorite. Our users make the most money on ML picks.
+
 BAD example: "Alabama has strong offensive performance and home advantage"
 GOOD example: "Alabama (23-8, #15) beat Auburn 96-84 and Tennessee 71-69 in their last two, averaging 83.5 PPG. Florida (25-6, #4) is dominant at home but the 11.5-point spread is steep given Bama's recent form."
 
