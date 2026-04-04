@@ -594,7 +594,7 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'ft:gpt-4o-mini-2024-07-18:morello-family-ventures:cray-cray-picks:DQzgI6Ti',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
         max_tokens: 600
@@ -852,7 +852,7 @@ async function runPreAnalysis(sportSlugs) {
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
-            model_used: 'ft:cray-cray-picks',
+            model_used: 'gpt-4o-mini',
             prompt_tokens: result.prompt_tokens,
             completion_tokens: result.completion_tokens,
             generated_at: new Date().toISOString(),
