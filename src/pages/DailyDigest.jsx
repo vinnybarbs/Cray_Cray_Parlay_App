@@ -867,8 +867,8 @@ function YesterdayRecap({ results }) {
   return (
     <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-700">
-        <h2 className="text-lg font-bold text-white">Yesterday's Results</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Picks settled in the last 24 hours</p>
+        <h2 className="text-lg font-bold text-white">Recent Results</h2>
+        <p className="text-xs text-gray-400 mt-0.5">Picks settled in the last 3 days</p>
       </div>
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {sports.map(sport => (

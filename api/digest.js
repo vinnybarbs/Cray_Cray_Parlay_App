@@ -89,9 +89,9 @@ async function getDigest(req, res) {
       injuriesBySport[entry.team_name] = entry;
     }
 
-    // 3. Yesterday's results from ai_suggestions
+    // 3. Recent results from ai_suggestions (last 3 days for more data)
     const yesterdayResultsResult = await safeQuery(async () => {
-      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('ai_suggestions')
         .select('sport, actual_outcome, pick, home_team, away_team, bet_type, resolved_at')
