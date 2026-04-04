@@ -479,7 +479,11 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   contextParts.push(`Sport: ${sportDisplay}`);
   contextParts.push(`Matchup: ${game.away_team} @ ${game.home_team}`);
 
-  if (oddsCtx.spread != null) contextParts.push(`Spread: ${game.home_team} ${oddsCtx.spread}`);
+  if (oddsCtx.spread != null) {
+    const homeSpread = oddsCtx.spread >= 0 ? `+${oddsCtx.spread}` : `${oddsCtx.spread}`;
+    const awaySpread = oddsCtx.spread >= 0 ? `-${oddsCtx.spread}` : `+${Math.abs(oddsCtx.spread)}`;
+    contextParts.push(`Spread: ${game.home_team} ${homeSpread} / ${game.away_team} ${awaySpread}`);
+  }
   if (oddsCtx.total != null) contextParts.push(`O/U Total: ${oddsCtx.total}`);
   if (oddsCtx.ml_home != null) contextParts.push(`Moneyline: ${game.home_team} ${oddsCtx.ml_home} / ${game.away_team} ${oddsCtx.ml_away}`);
 
@@ -565,6 +569,12 @@ BET TYPE PRIORITY (based on our actual model performance):
 BAD example: "Alabama has strong offensive performance and home advantage"
 GOOD example: "Alabama (23-8, #15) beat Auburn 96-84 and Tennessee 71-69 in their last two, averaging 83.5 PPG. Florida (25-6, #4) is dominant at home but the 11.5-point spread is steep given Bama's recent form."
 
+SPREAD SIGN RULES (critical — get this right):
+- NEGATIVE spread (-1.5, -7.5) = FAVORITE, they must win by more than that margin
+- POSITIVE spread (+1.5, +7.5) = UNDERDOG, they get those points added to their score
+- The spread sign is provided in the matchup data above — use it EXACTLY as shown
+- Example: if Team A is +1.5, your pick must say "Team A +1.5" NOT "Team A -1.5"
+
 Respond in EXACTLY this JSON format (no markdown):
 {
   "analysis": "3-5 sentence analysis citing specific records, scores, and matchup factors",
@@ -574,7 +584,7 @@ Respond in EXACTLY this JSON format (no markdown):
   "key_factors": ["factor1 with numbers", "factor2 with numbers", "factor3 with numbers"]${priorAnalysis ? ',\n  "what_changed": "Explain what changed since last analysis (injuries, line movement, new results)"' : ''}
 }
 
-edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Key factors MUST include specific numbers/records.`;
+edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Key factors MUST include specific numbers/records. The recommended_pick MUST include the correct spread sign (+ or -) matching the data provided.`;
 
   try {
     const response = await fetch(OPENAI_URL, {
@@ -584,7 +594,7 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
         'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'ft:gpt-4o-mini-2024-07-18:morello-family-ventures:cray-cray-picks:DQzgI6Ti',
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.3,
         max_tokens: 600
@@ -682,6 +692,7 @@ async function runPreAnalysis(sportSlugs) {
         }
       }
     }
+    const allGamesBeforeFilter = [...games];
     const beforeFilter = games.length;
     games = games.filter(g => {
       const gameTime = new Date(g.game_date).getTime();
@@ -693,7 +704,22 @@ async function runPreAnalysis(sportSlugs) {
       return !homeHasEarlier && !awayHasEarlier;
     });
     if (beforeFilter !== games.length) {
-      console.log(`🔍 Filtered ${beforeFilter - games.length} hypothetical future-round games`);
+      const keptKeys = new Set(games.map(g => g.game_key));
+      const hypotheticalKeys = allGamesBeforeFilter
+        .filter(g => !keptKeys.has(g.game_key))
+        .map(g => g.game_key);
+      console.log(`🔍 Filtered ${hypotheticalKeys.length} hypothetical future-round games`);
+
+      // Clean up any previously-analyzed hypothetical games from game_analysis
+      if (hypotheticalKeys.length > 0) {
+        const { error: delErr } = await supabase
+          .from('game_analysis')
+          .delete()
+          .in('game_key', hypotheticalKeys);
+        if (!delErr) {
+          console.log(`🗑️ Cleaned ${hypotheticalKeys.length} hypothetical games from game_analysis`);
+        }
+      }
     }
 
     console.log(`📊 Found ${games.length} upcoming games to analyze`);
@@ -826,7 +852,7 @@ async function runPreAnalysis(sportSlugs) {
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
-            model_used: 'gpt-4o-mini',
+            model_used: 'ft:cray-cray-picks',
             prompt_tokens: result.prompt_tokens,
             completion_tokens: result.completion_tokens,
             generated_at: new Date().toISOString(),

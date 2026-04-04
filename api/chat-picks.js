@@ -75,7 +75,7 @@ const TOOLS = [
     type: 'function',
     function: {
       name: 'get_game_analysis',
-      description: 'Get pre-computed AI analysis for a specific matchup.',
+      description: 'Get pre-computed AI analysis for a specific matchup. Returns detailed analysis with edge score, recommended pick, key factors, news context, injury context, statistical edge calculations, and win probabilities. ALWAYS call this for any game you are analyzing.',
       parameters: {
         type: 'object',
         properties: {
@@ -184,6 +184,8 @@ async function executeTool(name, args) {
       }
 
       case 'get_team_stats': {
+        const mascot = args.team_name.split(' ').slice(-1)[0];
+
         // Check current_standings
         const { data: standings } = await supabase
           .from('current_standings')
@@ -191,48 +193,65 @@ async function executeTool(name, args) {
           .ilike('team_name', `%${args.team_name}%`)
           .limit(3);
 
-        // Check game_analysis for recent insights
-        const { data: analysis } = await supabase
-          .from('game_analysis')
-          .select('home_team, away_team, analysis_text, game_date')
-          .or(`home_team.ilike.%${args.team_name}%,away_team.ilike.%${args.team_name}%`)
-          .gte('game_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-          .order('game_date', { ascending: false })
+        // Check rankings_cache
+        const { data: rankings } = await supabase
+          .from('rankings_cache')
+          .select('rank, record, team_name, poll_name')
+          .or(`team_name.ilike.%${mascot}%,team_name.ilike.%${args.team_name}%`)
           .limit(3);
+
+        // Get actual game results (last 10 games)
+        const { data: gameResults } = await supabase
+          .from('game_results')
+          .select('home_team_name, away_team_name, home_score, away_score, date, sport')
+          .eq('status', 'final')
+          .or(`home_team_name.ilike.%${mascot}%,away_team_name.ilike.%${mascot}%`)
+          .order('date', { ascending: false })
+          .limit(10);
+
+        // Build recent results summary
+        let recentGames = [];
+        if (gameResults?.length) {
+          for (const g of gameResults) {
+            const isHome = g.home_team_name.toLowerCase().includes(mascot.toLowerCase());
+            const teamScore = isHome ? g.home_score : g.away_score;
+            const oppScore = isHome ? g.away_score : g.home_score;
+            const opp = isHome ? g.away_team_name : g.home_team_name;
+            if (teamScore != null && oppScore != null) {
+              recentGames.push(`${teamScore > oppScore ? 'W' : 'L'} ${teamScore}-${oppScore} vs ${opp} (${g.date})`);
+            }
+          }
+        }
 
         // Get injury report from news_cache
         const { data: injuries } = await supabase
           .from('news_cache')
           .select('summary, last_updated')
           .eq('search_type', 'injuries')
-          .ilike('team_name', `%${args.team_name}%`)
+          .or(`team_name.ilike.%${mascot}%,team_name.ilike.%${args.team_name}%`)
           .order('last_updated', { ascending: false })
           .limit(1);
 
-        // Get recent scores involving this team
-        const { data: recentScores } = await supabase
-          .from('news_cache')
-          .select('summary, last_updated')
-          .eq('search_type', 'recent_results')
-          .order('last_updated', { ascending: false })
-          .limit(1);
-
-        // Filter scores mentioning this team
-        let teamScores = null;
-        if (recentScores?.[0]?.summary) {
-          const lines = recentScores[0].summary.split('\n')
-            .filter(l => l.toLowerCase().includes(args.team_name.toLowerCase().split(' ').pop()));
-          if (lines.length > 0) teamScores = lines.join('\n');
-        }
+        // Get pre-computed analysis if available
+        const { data: analysis } = await supabase
+          .from('game_analysis')
+          .select('home_team, away_team, analysis_snippet, edge_score, recommended_pick, game_date')
+          .or(`home_team.ilike.%${args.team_name}%,away_team.ilike.%${args.team_name}%`)
+          .eq('stale', false)
+          .order('generated_at', { ascending: false })
+          .limit(3);
 
         return {
           standings: standings || [],
+          rankings: rankings || [],
+          recentGames: recentGames.length > 0 ? recentGames : ['No recent game results found'],
           injuries: injuries?.[0]?.summary || 'No injury data available',
-          recentScores: teamScores || 'No recent scores found',
           recentAnalysis: analysis?.map(a => ({
             matchup: `${a.away_team} @ ${a.home_team}`,
             date: a.game_date,
-            analysis: a.analysis_text?.substring(0, 500)
+            edge_score: a.edge_score,
+            pick: a.recommended_pick,
+            analysis: a.analysis_snippet?.substring(0, 500)
           })) || []
         };
       }
@@ -338,22 +357,47 @@ async function executeTool(name, args) {
       }
 
       case 'get_game_analysis': {
+        // Try both team orderings since game_key can be either direction
         const { data } = await supabase
           .from('game_analysis')
-          .select('*')
-          .ilike('home_team', `%${args.home_team}%`)
-          .ilike('away_team', `%${args.away_team}%`)
-          .order('analyzed_at', { ascending: false })
+          .select('home_team, away_team, game_date, sport, analysis_snippet, edge_score, recommended_pick, recommended_side, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, news_context, injury_context, calc_home_prob, calc_away_prob, implied_home_prob, implied_away_prob, calc_edge, calc_edge_side, edge_factors, generated_at')
+          .or(`home_team.ilike.%${args.home_team}%,home_team.ilike.%${args.away_team}%`)
+          .or(`away_team.ilike.%${args.home_team}%,away_team.ilike.%${args.away_team}%`)
+          .eq('stale', false)
+          .order('generated_at', { ascending: false })
           .limit(1);
 
         if (data?.[0]) {
+          const g = data[0];
           return {
-            matchup: `${data[0].away_team} @ ${data[0].home_team}`,
-            date: data[0].game_date,
-            analysis: data[0].analysis_text,
-            moneyline: data[0].moneyline_pick,
-            spread: data[0].spread_pick,
-            analyzedAt: data[0].analyzed_at
+            matchup: `${g.away_team} @ ${g.home_team}`,
+            date: g.game_date,
+            sport: g.sport,
+            analysis: g.analysis_snippet,
+            recommended_pick: g.recommended_pick,
+            recommended_side: g.recommended_side,
+            edge_score: g.edge_score,
+            key_factors: g.key_factors,
+            spread: g.spread,
+            total: g.total,
+            moneyline_home: g.moneyline_home,
+            moneyline_away: g.moneyline_away,
+            home_record: g.home_record,
+            away_record: g.away_record,
+            home_ranking: g.home_ranking,
+            away_ranking: g.away_ranking,
+            news_context: g.news_context,
+            injury_context: g.injury_context,
+            edge_calculator: g.calc_edge != null ? {
+              home_win_prob: g.calc_home_prob,
+              away_win_prob: g.calc_away_prob,
+              implied_home_prob: g.implied_home_prob,
+              implied_away_prob: g.implied_away_prob,
+              calc_edge: g.calc_edge,
+              edge_side: g.calc_edge_side,
+              factors: g.edge_factors
+            } : null,
+            generated_at: g.generated_at
           };
         }
         return { message: 'No pre-computed analysis found for this matchup' };
@@ -481,11 +525,11 @@ YOUR TOOLS (use them aggressively):
 - get_team_stats → team records from our database
 
 RESEARCH PROCESS (do this EVERY time someone asks for a pick):
-1. search_odds with market_type 'spreads' AND 'h2h' → get the ACTUAL lines
-2. get_injuries for that sport → find edges from missing players
-3. get_recent_scores → actual recent scores (who beat whom and by how much)
-4. get_standings → actual records
-5. get_news or get_game_analysis → deeper context from articles
+1. get_game_analysis for the specific matchup → THIS IS YOUR RICHEST DATA SOURCE. It has AI analysis, edge scores, win probabilities, news context, injury context, key factors, and recommended picks. ALWAYS call this first.
+2. search_odds with market_type 'spreads' AND 'h2h' → get the ACTUAL lines
+3. get_injuries for that sport → find edges from missing players
+4. get_team_stats for both teams → records, rankings, last 10 game results with scores
+5. get_news → articles with deeper context
 6. THEN and ONLY THEN give the pick citing ONLY data from steps 1-5
 
 FORMAT:
