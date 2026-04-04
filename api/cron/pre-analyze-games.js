@@ -875,6 +875,7 @@ async function runPreAnalysis(sportSlugs) {
                 const { error: sugErr } = await supabase
                   .from('ai_suggestions')
                   .insert({
+                    session_id: `auto_digest_${new Date().toISOString().split('T')[0]}`,
                     sport: sportDisplay,
                     home_team: game.home_team,
                     away_team: game.away_team,
@@ -895,7 +896,7 @@ async function runPreAnalysis(sportSlugs) {
                   console.log(`  ✅ Auto-saved pick: ${result.recommended_pick} (${sportDisplay})`);
                 }
               } catch (e) {
-                // Don't block analysis if auto-save fails
+                console.error(`  ❌ Auto-save exception: ${e.message}`);
               }
             }
           }
