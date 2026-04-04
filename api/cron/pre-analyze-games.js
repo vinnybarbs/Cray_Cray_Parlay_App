@@ -660,7 +660,36 @@ async function runPreAnalysis(sportSlugs) {
     const sportNames = sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join(', ');
     console.log(`\n🧠 CRON: Pre-analyzing ${sportNames}...`);
 
-    const games = await getUpcomingGames(sportSlugs);
+    let games = await getUpcomingGames(sportSlugs);
+
+    // Filter out hypothetical future-round matchups (e.g., championship lines
+    // posted before semifinals are played). If a team has a game within 48h,
+    // skip any later game for that team — they have to win the earlier one first.
+    const now = Date.now();
+    const cutoff48h = now + 48 * 60 * 60 * 1000;
+    const teamEarliestGame = {};
+    for (const g of games) {
+      const gameTime = new Date(g.game_date).getTime();
+      for (const team of [g.home_team, g.away_team]) {
+        if (!teamEarliestGame[team] || gameTime < teamEarliestGame[team]) {
+          teamEarliestGame[team] = gameTime;
+        }
+      }
+    }
+    const beforeFilter = games.length;
+    games = games.filter(g => {
+      const gameTime = new Date(g.game_date).getTime();
+      // Keep if this IS the earliest game for both teams, or if both teams' earliest game is >48h out
+      const homeEarliest = teamEarliestGame[g.home_team];
+      const awayEarliest = teamEarliestGame[g.away_team];
+      const homeHasEarlier = homeEarliest < gameTime && homeEarliest < cutoff48h;
+      const awayHasEarlier = awayEarliest < gameTime && awayEarliest < cutoff48h;
+      return !homeHasEarlier && !awayHasEarlier;
+    });
+    if (beforeFilter !== games.length) {
+      console.log(`🔍 Filtered ${beforeFilter - games.length} hypothetical future-round games`);
+    }
+
     console.log(`📊 Found ${games.length} upcoming games to analyze`);
 
     if (games.length === 0) {
