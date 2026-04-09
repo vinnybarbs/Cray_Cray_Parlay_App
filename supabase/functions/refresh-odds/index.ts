@@ -4,6 +4,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const SPORTS = [
+  // Team sports
   "americanfootball_nfl",
   "americanfootball_ncaaf",
   "basketball_nba",
@@ -12,7 +13,21 @@ const SPORTS = [
   "baseball_mlb",
   "soccer_epl",
   "soccer_usa_mls",
-  "mma_mixed_martial_arts"
+  "mma_mixed_martial_arts",
+  // Tennis — only returns data when tournament is in season
+  "tennis_atp_monte_carlo_masters",
+  "tennis_atp_madrid_open",
+  "tennis_atp_italian_open",
+  "tennis_atp_french_open",
+  "tennis_atp_wimbledon",
+  "tennis_atp_us_open",
+  "tennis_atp_aus_open_singles",
+  "tennis_wta_madrid_open",
+  "tennis_wta_italian_open",
+  "tennis_wta_french_open",
+  "tennis_wta_wimbledon",
+  "tennis_wta_us_open",
+  "tennis_wta_aus_open_singles"
 ];
 
 const PROP_SPORTS = ["americanfootball_nfl", "basketball_nba", "basketball_ncaab"];

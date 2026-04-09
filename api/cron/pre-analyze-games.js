@@ -21,7 +21,20 @@ const SLUG_TO_SPORT = {
   baseball_mlb: 'MLB',
   soccer_epl: 'EPL',
   soccer_usa_mls: 'MLS',
-  mma_mixed_martial_arts: 'UFC'
+  mma_mixed_martial_arts: 'UFC',
+  tennis_atp_monte_carlo_masters: 'Tennis',
+  tennis_atp_madrid_open: 'Tennis',
+  tennis_atp_italian_open: 'Tennis',
+  tennis_atp_french_open: 'Tennis',
+  tennis_atp_wimbledon: 'Tennis',
+  tennis_atp_us_open: 'Tennis',
+  tennis_atp_aus_open_singles: 'Tennis',
+  tennis_wta_madrid_open: 'Tennis',
+  tennis_wta_italian_open: 'Tennis',
+  tennis_wta_french_open: 'Tennis',
+  tennis_wta_wimbledon: 'Tennis',
+  tennis_wta_us_open: 'Tennis',
+  tennis_wta_aus_open_singles: 'Tennis'
 };
 
 /**
@@ -609,10 +622,18 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
 }
 
 // All supported sports
+const TENNIS_SLUGS = [
+  'tennis_atp_monte_carlo_masters', 'tennis_atp_madrid_open', 'tennis_atp_italian_open',
+  'tennis_atp_french_open', 'tennis_atp_wimbledon', 'tennis_atp_us_open', 'tennis_atp_aus_open_singles',
+  'tennis_wta_madrid_open', 'tennis_wta_italian_open', 'tennis_wta_french_open',
+  'tennis_wta_wimbledon', 'tennis_wta_us_open', 'tennis_wta_aus_open_singles'
+];
+
 const ALL_SPORT_SLUGS = [
   'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
   'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
-  'soccer_epl', 'soccer_usa_mls', 'mma_mixed_martial_arts'
+  'soccer_epl', 'soccer_usa_mls', 'mma_mixed_martial_arts',
+  ...TENNIS_SLUGS
 ];
 
 // Sport group mappings for staggered crons
@@ -624,6 +645,7 @@ const SPORT_GROUPS = {
   'epl': ['soccer_epl'],
   'mls': ['soccer_usa_mls'],
   'ufc': ['mma_mixed_martial_arts'],
+  'tennis': TENNIS_SLUGS,
   'soccer': ['soccer_epl', 'soccer_usa_mls'],
   'football': ['americanfootball_nfl', 'americanfootball_ncaaf'],
   'all': ALL_SPORT_SLUGS
