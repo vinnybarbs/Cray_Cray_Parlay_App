@@ -28,13 +28,9 @@ const SPORT_CONFIGS = {
  * MLB/EPL: season = calendar year.
  */
 function currentSeason(sport) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1; // 1-indexed
-  if (['MLB'].includes(sport)) return year;
-  if (['EPL'].includes(sport)) return year;
-  // Fall sports: if before August, it's last year's season
-  return month >= 8 ? year : year - 1;
+  // Use current year for all sports — the current_standings view filters
+  // WHERE season = EXTRACT(YEAR FROM CURRENT_DATE), so we must match.
+  return new Date().getFullYear();
 }
 
 function sleep(ms) {
@@ -101,44 +97,62 @@ async function fetchESPNStandings(sport, config) {
  * Ensure team exists in teams table, return team_id
  */
 async function ensureTeam(teamData) {
-  // Try to find by name + sport
-  const { data: existing } = await supabase
-    .from('teams')
-    .select('id')
-    .eq('sport', teamData.sport)
-    .eq('name', teamData.name)
-    .maybeSingle();
+  try {
+    // Try exact name match
+    const { data: exact } = await supabase
+      .from('teams')
+      .select('id')
+      .eq('sport', teamData.sport)
+      .eq('name', teamData.name)
+      .limit(1);
 
-  if (existing) return existing.id;
+    if (exact?.length) return exact[0].id;
 
-  // Try fuzzy match (mascot)
-  const mascot = teamData.name.split(' ').slice(-1)[0];
-  const { data: fuzzy } = await supabase
-    .from('teams')
-    .select('id, name')
-    .eq('sport', teamData.sport)
-    .ilike('name', `%${mascot}%`)
-    .maybeSingle();
+    // Try ilike match on full name (handles "LA Clippers" vs "Los Angeles Clippers")
+    const { data: fuzzyFull } = await supabase
+      .from('teams')
+      .select('id, name')
+      .eq('sport', teamData.sport)
+      .ilike('name', `%${teamData.name}%`)
+      .limit(1);
 
-  if (fuzzy) return fuzzy.id;
+    if (fuzzyFull?.length) return fuzzyFull[0].id;
 
-  // Insert new team
-  const { data: newTeam, error } = await supabase
-    .from('teams')
-    .insert({
-      sport: teamData.sport,
-      name: teamData.name,
-      provider_ids: { espn: teamData.espn_id }
-    })
-    .select('id')
-    .single();
+    // Try mascot match (last word)
+    const mascot = teamData.name.split(' ').slice(-1)[0];
+    if (mascot.length >= 4) { // Avoid short matches like "FC"
+      const { data: fuzzyMascot } = await supabase
+        .from('teams')
+        .select('id, name')
+        .eq('sport', teamData.sport)
+        .ilike('name', `%${mascot}%`)
+        .limit(1);
 
-  if (error) {
-    console.warn(`  ⚠️ Failed to create team ${teamData.name}: ${error.message}`);
+      if (fuzzyMascot?.length) return fuzzyMascot[0].id;
+    }
+
+    // Insert new team
+    const { data: newTeam, error } = await supabase
+      .from('teams')
+      .insert({
+        sport: teamData.sport,
+        name: teamData.name,
+        provider_ids: { espn: teamData.espn_id }
+      })
+      .select('id')
+      .single();
+
+    if (error) {
+      console.warn(`  ⚠️ Failed to create team ${teamData.name}: ${error.message}`);
+      return null;
+    }
+
+    console.log(`  ➕ Created team: ${teamData.name} (${teamData.sport})`);
+    return newTeam.id;
+  } catch (err) {
+    console.warn(`  ⚠️ ensureTeam error for ${teamData.name}: ${err.message}`);
     return null;
   }
-
-  return newTeam.id;
 }
 
 /**
