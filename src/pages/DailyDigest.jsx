@@ -812,6 +812,75 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   )
 }
 
+// ─── GolfLeaderboard ─────────────────────────────────────────────────────────
+
+function GolfLeaderboard({ golf }) {
+  const [expanded, setExpanded] = useState(false)
+  if (!golf) return null
+
+  const preview = golf.leaderboard?.slice(0, 5) || []
+  const full = golf.leaderboard || []
+  const shown = expanded ? full : preview
+
+  return (
+    <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between p-4 hover:bg-gray-750 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">⛳</span>
+          <div className="text-left">
+            <h3 className="text-lg font-bold text-white">{golf.tournament}</h3>
+            <p className="text-sm text-gray-400">{golf.status}{golf.venue ? ` — ${golf.venue}` : ''}</p>
+          </div>
+        </div>
+        <span className="text-gray-400 text-sm">{expanded ? '▲' : '▼'}</span>
+      </button>
+
+      <div className="px-4 pb-4">
+        {/* Leaderboard */}
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-gray-500 px-2 mb-1">
+            <span>Pos</span>
+            <span className="flex-1 ml-3">Player</span>
+            <span className="w-16 text-right">Score</span>
+            {golf.outrightOdds && <span className="w-16 text-right">Odds</span>}
+          </div>
+          {shown.map((p, i) => {
+            const odds = golf.outrightOdds?.find(o =>
+              o.name.toLowerCase().includes(p.name.split(' ').slice(-1)[0].toLowerCase())
+            )
+            return (
+              <div key={i} className={`flex items-center justify-between px-2 py-1.5 rounded ${i < 3 ? 'bg-gray-750' : ''}`}>
+                <span className={`w-6 text-sm font-bold ${i < 3 ? 'text-yellow-400' : 'text-gray-400'}`}>{p.position}</span>
+                <span className="flex-1 ml-2 text-sm text-white font-medium">{p.name}</span>
+                <span className={`w-16 text-right text-sm font-bold ${
+                  p.score?.toString().startsWith('-') ? 'text-green-400' : p.score === 'E' ? 'text-gray-300' : 'text-red-400'
+                }`}>{p.score}</span>
+                {golf.outrightOdds && (
+                  <span className="w-16 text-right text-xs text-gray-400">
+                    {odds ? `+${odds.odds}` : ''}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {full.length > 5 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="w-full mt-2 text-center text-sm text-purple-400 hover:text-purple-300"
+          >
+            {expanded ? 'Show less' : `Show all ${full.length} players`}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ─── YesterdayRecap ──────────────────────────────────────────────────────────
 
 function RecapCard({ sport, won, lost, picks }) {
@@ -1087,6 +1156,9 @@ export default function DailyDigest({ onBack }) {
             {Object.keys(data.yesterdayResults).length > 0 && (
               <YesterdayRecap results={data.yesterdayResults} />
             )}
+
+            {/* Golf tournament leaderboard */}
+            {data.golf && <GolfLeaderboard golf={data.golf} />}
 
             {/* Sport sections — all start collapsed, show 3 game preview */}
             {sportSections.length === 0 ? (

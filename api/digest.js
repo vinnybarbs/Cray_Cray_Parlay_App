@@ -225,6 +225,68 @@ async function getDigest(req, res) {
       return countsBySport;
     });
 
+    // 6. Golf tournaments (leaderboard from ESPN + outright odds)
+    const golfResult = await safeQuery(async () => {
+      try {
+        const espnRes = await fetch('https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard');
+        if (!espnRes.ok) return null;
+        const espnData = await espnRes.json();
+        const events = espnData.events || [];
+        if (events.length === 0) return null;
+
+        const event = events[0];
+        const comp = event.competitions?.[0];
+        if (!comp) return null;
+
+        const players = (comp.competitors || []).slice(0, 20).map((p, idx) => {
+          const athlete = p.athlete || {};
+          const round1 = p.linescores?.[0];
+          return {
+            position: idx + 1,
+            name: athlete.displayName || 'Unknown',
+            score: p.score || 'E',
+            round1Score: round1?.displayValue || null,
+            round1Strokes: round1?.value || null
+          };
+        });
+
+        // Get outright odds from odds_cache if available
+        const { data: oddsData } = await supabase
+          .from('odds_cache')
+          .select('outcomes, bookmaker')
+          .eq('sport', 'golf_masters_tournament_winner')
+          .eq('market_type', 'outrights')
+          .limit(1);
+
+        let topOdds = null;
+        if (oddsData?.[0]?.outcomes) {
+          const outcomes = typeof oddsData[0].outcomes === 'string'
+            ? JSON.parse(oddsData[0].outcomes)
+            : oddsData[0].outcomes;
+          topOdds = outcomes
+            .sort((a, b) => {
+              // Sort favorites first (lowest positive or most negative)
+              const aPrice = a.price || 99999;
+              const bPrice = b.price || 99999;
+              return aPrice - bPrice;
+            })
+            .slice(0, 15)
+            .map(o => ({ name: o.name, odds: o.price }));
+        }
+
+        return {
+          tournament: event.name,
+          status: event.status?.type?.description || 'In Progress',
+          venue: comp.venue?.fullName || null,
+          leaderboard: players,
+          outrightOdds: topOdds
+        };
+      } catch (err) {
+        console.warn('Golf fetch error:', err.message);
+        return null;
+      }
+    });
+
     // First game time for countdown
     const firstGameResult = await safeQuery(async () => {
       const now = new Date().toISOString();
@@ -248,6 +310,7 @@ async function getDigest(req, res) {
       allTimeAccuracy: allTimeAccuracyResult || { overall: null, bySport: {} },
       upcomingCounts: upcomingCountResult || {},
       firstGameTime: firstGameResult || null,
+      golf: golfResult || null,
     });
   } catch (err) {
     logger.error('Digest endpoint error', { error: err.message });
