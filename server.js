@@ -401,6 +401,10 @@ app.post('/cron/sync-ncaab-data', syncNCAABData);
 const backfillGameResults = require('./api/cron/backfill-game-results');
 app.post('/cron/backfill-game-results', backfillGameResults);
 
+// Sync standings from ESPN for all sports
+const syncStandings = require('./api/cron/sync-standings');
+app.post('/cron/sync-standings', syncStandings);
+
 // Add cron endpoint to pre-analyze upcoming games with GPT-4o-mini
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);

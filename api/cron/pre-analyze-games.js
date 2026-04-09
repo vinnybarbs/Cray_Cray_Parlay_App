@@ -185,77 +185,51 @@ async function getInjuryContext(homeTeam, awayTeam) {
  */
 async function getRankingsContext(homeTeam, awayTeam) {
   try {
-    // rankings_cache stores mascot-only names (e.g., 'Crimson Tide', 'Blue Devils')
-    // Extract possible mascot variations to match against
-    const homeWords = homeTeam.split(' ');
-    const awayWords = awayTeam.split(' ');
-    
-    // Try last word, last 2 words, and last 3 words as mascot
-    const homeMascots = [
-      homeWords.slice(-1).join(' '),
-      homeWords.slice(-2).join(' '),
-      homeWords.slice(-3).join(' ')
-    ];
-    const awayMascots = [
-      awayWords.slice(-1).join(' '),
-      awayWords.slice(-2).join(' '),
-      awayWords.slice(-3).join(' ')
-    ];
-    
-    // Use ilike for flexible matching
-    const allMascots = [...new Set([...homeMascots, ...awayMascots])];
-    const orFilter = allMascots.map(m => `team_name.ilike.%${m}%`).join(',');
-    
-    const { data } = await supabase
-      .from('rankings_cache')
-      .select('team_name, rank, record')
-      .or(orFilter);
+    const homeMascot = homeTeam.split(' ').slice(-1)[0];
+    const awayMascot = awayTeam.split(' ').slice(-1)[0];
 
     const result = { home_rank: null, away_rank: null, home_record: null, away_record: null };
 
-    for (const r of (data || [])) {
-      const rName = r.team_name.toLowerCase();
-      // Check if any home mascot variant matches
-      if (homeMascots.some(m => rName.includes(m.toLowerCase()) || m.toLowerCase().includes(rName))) {
-        result.home_rank = r.rank;
-        result.home_record = r.record;
-      }
-      // Check if any away mascot variant matches
-      if (awayMascots.some(m => rName.includes(m.toLowerCase()) || m.toLowerCase().includes(rName))) {
-        result.away_rank = r.rank;
-        result.away_record = r.record;
+    // Primary source: standings table (populated by sync-standings cron from ESPN)
+    const { data: standingsData } = await supabase
+      .from('current_standings')
+      .select('team_name, wins, losses, ties, win_percentage, point_differential, streak, division_rank')
+      .or(`team_name.ilike.%${homeMascot}%,team_name.ilike.%${awayMascot}%,team_name.ilike.%${homeTeam}%,team_name.ilike.%${awayTeam}%`);
+
+    if (standingsData) {
+      for (const s of standingsData) {
+        const sName = s.team_name.toLowerCase();
+        const isHome = sName.includes(homeMascot.toLowerCase()) || sName.includes(homeTeam.toLowerCase());
+        const isAway = sName.includes(awayMascot.toLowerCase()) || sName.includes(awayTeam.toLowerCase());
+
+        const record = s.ties > 0 ? `${s.wins}-${s.losses}-${s.ties}` : `${s.wins}-${s.losses}`;
+        if (isHome && !result.home_record) {
+          result.home_record = record;
+        }
+        if (isAway && !result.away_record) {
+          result.away_record = record;
+        }
       }
     }
 
-    // If rankings_cache didn't find them, try ESPN news_cache standings
-    if (!result.home_record || !result.away_record) {
-      try {
-        const sportMap = { 'americanfootball_nfl': 'NFL', 'basketball_nba': 'NBA', 'basketball_ncaab': 'NCAAB', 'icehockey_nhl': 'NHL', 'baseball_mlb': 'MLB' };
-        // We need the sport slug here but don't have it — use a broad search
-        const { data: standingsData } = await supabase
-          .from('news_cache')
-          .select('summary')
-          .eq('search_type', 'standings')
-          .gt('last_updated', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-          .limit(5);
+    // Secondary source: rankings_cache (AP Top 25 — adds rank for college teams)
+    const { data: rankData } = await supabase
+      .from('rankings_cache')
+      .select('team_name, rank, record')
+      .or(`team_name.ilike.%${homeMascot}%,team_name.ilike.%${awayMascot}%`);
 
-        if (standingsData) {
-          for (const row of standingsData) {
-            const lines = (row.summary || '').split('\n');
-            for (const line of lines) {
-              // Format: "Iowa State Cyclones: 27-7 (.900) Streak: W3"
-              const homeMascot = homeTeam.split(' ').slice(-1)[0].toLowerCase();
-              const awayMascot = awayTeam.split(' ').slice(-1)[0].toLowerCase();
-              const lower = line.toLowerCase();
-              const recordMatch = line.match(/:\s*(\d+-\d+)/);
-              if (recordMatch) {
-                if (lower.includes(homeMascot) && !result.home_record) result.home_record = recordMatch[1];
-                if (lower.includes(awayMascot) && !result.away_record) result.away_record = recordMatch[1];
-              }
-            }
-          }
+    if (rankData) {
+      for (const r of rankData) {
+        const rName = r.team_name.toLowerCase();
+        if (rName.includes(homeMascot.toLowerCase())) {
+          result.home_rank = r.rank;
+          if (!result.home_record && r.record) result.home_record = r.record;
         }
-      } catch { /* continue without standings */ }
+        if (rName.includes(awayMascot.toLowerCase())) {
+          result.away_rank = r.rank;
+          if (!result.away_record && r.record) result.away_record = r.record;
+        }
+      }
     }
 
     return result;
