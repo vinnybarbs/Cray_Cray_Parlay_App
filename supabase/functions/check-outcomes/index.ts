@@ -95,7 +95,7 @@ async function fetchYesterdaysGames(supabase: any): Promise<number> {
   yesterday.setDate(yesterday.getDate() - 1);
   const dateStr = formatDate(yesterday);
   
-  const sports = ['NFL', 'NBA', 'MLB', 'NHL', 'NCAAB'];
+  const sports = ['NFL', 'NBA', 'MLB', 'NHL', 'NCAAB', 'MLS', 'UFC'];
   const baseUrl = 'http://site.api.espn.com/apis/site/v2/sports';
 
   const sportPaths: Record<string, string> = {
@@ -103,7 +103,9 @@ async function fetchYesterdaysGames(supabase: any): Promise<number> {
     NBA: 'basketball/nba',
     MLB: 'baseball/mlb',
     NHL: 'hockey/nhl',
-    NCAAB: 'basketball/mens-college-basketball'
+    NCAAB: 'basketball/mens-college-basketball',
+    MLS: 'soccer/usa.1',
+    UFC: 'mma/ufc'
   };
   
   let totalGames = 0;

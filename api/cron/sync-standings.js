@@ -18,7 +18,8 @@ const SPORT_CONFIGS = {
   NFL:   { path: 'football/nfl',                          season: () => currentSeason('NFL') },
   NCAAB: { path: 'basketball/mens-college-basketball',    season: () => currentSeason('NCAAB'), groups: 50 },
   NCAAF: { path: 'football/college-football',             season: () => currentSeason('NCAAF'), groups: 80 },
-  EPL:   { path: 'soccer/eng.1',                          season: () => currentSeason('EPL') }
+  EPL:   { path: 'soccer/eng.1',                          season: () => currentSeason('EPL') },
+  MLS:   { path: 'soccer/usa.1',                          season: () => new Date().getFullYear() }
 };
 
 /**

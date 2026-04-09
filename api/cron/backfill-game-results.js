@@ -14,9 +14,12 @@ const SPORT_PATHS = {
   NFL: 'football/nfl',
   NBA: 'basketball/nba',
   NCAAB: 'basketball/mens-college-basketball',
+  NCAAF: 'football/college-football',
   NHL: 'hockey/nhl',
   MLB: 'baseball/mlb',
-  EPL: 'soccer/eng.1'
+  EPL: 'soccer/eng.1',
+  MLS: 'soccer/usa.1',
+  UFC: 'mma/ufc'
 };
 
 function sleep(ms) {

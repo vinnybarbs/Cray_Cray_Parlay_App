@@ -10,7 +10,9 @@ const SPORTS = [
   "basketball_ncaab",
   "icehockey_nhl",
   "baseball_mlb",
-  "soccer_epl"
+  "soccer_epl",
+  "soccer_usa_mls",
+  "mma_mixed_martial_arts"
 ];
 
 const PROP_SPORTS = ["americanfootball_nfl", "basketball_nba", "basketball_ncaab"];

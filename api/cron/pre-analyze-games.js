@@ -19,7 +19,9 @@ const SLUG_TO_SPORT = {
   basketball_ncaab: 'NCAAB',
   icehockey_nhl: 'NHL',
   baseball_mlb: 'MLB',
-  soccer_epl: 'EPL'
+  soccer_epl: 'EPL',
+  soccer_usa_mls: 'MLS',
+  mma_mixed_martial_arts: 'UFC'
 };
 
 /**
@@ -610,7 +612,7 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
 const ALL_SPORT_SLUGS = [
   'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
   'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
-  'soccer_epl'
+  'soccer_epl', 'soccer_usa_mls', 'mma_mixed_martial_arts'
 ];
 
 // Sport group mappings for staggered crons
@@ -620,6 +622,9 @@ const SPORT_GROUPS = {
   'nhl': ['icehockey_nhl'],
   'mlb': ['baseball_mlb'],
   'epl': ['soccer_epl'],
+  'mls': ['soccer_usa_mls'],
+  'ufc': ['mma_mixed_martial_arts'],
+  'soccer': ['soccer_epl', 'soccer_usa_mls'],
   'football': ['americanfootball_nfl', 'americanfootball_ncaaf'],
   'all': ALL_SPORT_SLUGS
 };
