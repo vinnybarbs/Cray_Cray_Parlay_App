@@ -95,21 +95,23 @@ async function fetchYesterdaysGames(supabase: any): Promise<number> {
   yesterday.setDate(yesterday.getDate() - 1);
   const dateStr = formatDate(yesterday);
   
-  const sports = ['NFL', 'NBA', 'MLB', 'NHL'];
+  const sports = ['NFL', 'NBA', 'MLB', 'NHL', 'NCAAB'];
   const baseUrl = 'http://site.api.espn.com/apis/site/v2/sports';
-  
+
   const sportPaths: Record<string, string> = {
     NFL: 'football/nfl',
     NBA: 'basketball/nba',
     MLB: 'baseball/mlb',
-    NHL: 'hockey/nhl'
+    NHL: 'hockey/nhl',
+    NCAAB: 'basketball/mens-college-basketball'
   };
   
   let totalGames = 0;
   
   for (const sport of sports) {
     try {
-      const url = `${baseUrl}/${sportPaths[sport]}/scoreboard?dates=${dateStr}`;
+      const groups = sport === 'NCAAB' ? '&groups=50' : '';
+      const url = `${baseUrl}/${sportPaths[sport]}/scoreboard?dates=${dateStr}${groups}`;
       console.log(`  Fetching ${sport} scoreboard...`);
       
       const response = await fetch(url);
@@ -155,9 +157,9 @@ function parseGames(data: any, sport: string): any[] {
       games.push({
         espn_event_id: event.id,
         sport,
-        game_date: new Date(event.date).toISOString().split('T')[0],
-        home_team: homeTeam.team.displayName,
-        away_team: awayTeam.team.displayName,
+        date: new Date(event.date).toISOString().split('T')[0],
+        home_team_name: homeTeam.team.displayName,
+        away_team_name: awayTeam.team.displayName,
         home_score: parseInt(homeTeam.score) || null,
         away_score: parseInt(awayTeam.score) || null,
         status: normalizeStatus(event.status?.type?.name),
@@ -236,20 +238,30 @@ async function checkAISuggestions(supabase: any) {
 async function checkSuggestion(supabase: any, suggestion: any): Promise<boolean> {
   const gameDate = new Date(suggestion.game_date).toISOString().split('T')[0];
   
+  // Check game date ±1 day to handle timezone edge cases
+  const gd = new Date(gameDate);
+  const dayBefore = new Date(gd); dayBefore.setDate(gd.getDate() - 1);
+  const dayAfter = new Date(gd); dayAfter.setDate(gd.getDate() + 1);
+  const dates = [
+    dayBefore.toISOString().split('T')[0],
+    gameDate,
+    dayAfter.toISOString().split('T')[0]
+  ];
+
   const { data: games, error } = await supabase
     .from('game_results')
     .select('*')
     .eq('sport', suggestion.sport)
-    .eq('game_date', gameDate)
+    .in('date', dates)
     .eq('status', 'final');
-  
+
   if (error || !games || games.length === 0) {
     return false;
   }
-  
+
   const match = games.find((g: any) =>
-    teamsMatch(g.home_team, suggestion.home_team) &&
-    teamsMatch(g.away_team, suggestion.away_team)
+    teamsMatch(g.home_team_name, suggestion.home_team) &&
+    teamsMatch(g.away_team_name, suggestion.away_team)
   );
   
   if (!match) return false;
@@ -284,12 +296,12 @@ function determineOutcome(suggestion: any, game: any): string {
   
   switch (suggestion.bet_type) {
     case 'Moneyline':
-      const winner = home_score > away_score ? game.home_team : game.away_team;
+      const winner = home_score > away_score ? game.home_team_name : game.away_team_name;
       return suggestion.pick.toLowerCase().includes(winner.toLowerCase()) ? 'won' : 'lost';
-    
+
     case 'Spread':
       const line = parseFloat(suggestion.point) || 0;
-      const pickedHome = suggestion.pick.toLowerCase().includes(game.home_team.toLowerCase());
+      const pickedHome = suggestion.pick.toLowerCase().includes(game.home_team_name.toLowerCase());
       const adjustedHomeScore = pickedHome ? home_score + line : home_score - line;
       if (adjustedHomeScore === away_score) return 'push';
       return adjustedHomeScore > away_score ? 'won' : 'lost';

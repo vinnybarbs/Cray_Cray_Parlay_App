@@ -33,7 +33,8 @@ function formatDateISO(date) {
 
 async function fetchScoreboard(sport, sportPath, dateStr) {
   try {
-    const url = `${ESPN_BASE}/${sportPath}/scoreboard?dates=${dateStr}&groups=50&limit=200`;
+    const groups = (sport === 'NCAAB' || sport === 'NCAAF') ? '&groups=50' : '';
+    const url = `${ESPN_BASE}/${sportPath}/scoreboard?dates=${dateStr}${groups}&limit=200`;
     const res = await fetch(url);
     if (!res.ok) return [];
     const data = await res.json();
