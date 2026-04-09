@@ -3,7 +3,7 @@
  * Fetches current standings for all sports from ESPN public API
  * Populates standings table (via teams foreign key) for accurate W-L records
  *
- * Schedule: Every 6 hours (0 */6 * * *)
+ * Schedule: Every 6 hours
  * Endpoint: POST /cron/sync-standings
  */
 
