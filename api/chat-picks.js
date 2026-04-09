@@ -142,6 +142,19 @@ const TOOLS = [
         }
       }
     }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_golf_leaderboard',
+      description: 'Get the live golf tournament leaderboard from ESPN. Shows player positions, scores, and round details. Use this when users ask about golf tournaments like the Masters, PGA Championship, US Open, or The Open.',
+      parameters: {
+        type: 'object',
+        properties: {
+          tour: { type: 'string', description: 'Golf tour: pga (default), lpga, european', default: 'pga' }
+        }
+      }
+    }
   }
 ];
 
@@ -484,6 +497,68 @@ async function executeTool(name, args) {
         };
       }
 
+      case 'get_golf_leaderboard': {
+        try {
+          const tour = args.tour || 'pga';
+          const tourPath = { pga: 'golf/pga', lpga: 'golf/lpga', european: 'golf/eur' }[tour] || 'golf/pga';
+          const espnRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${tourPath}/scoreboard`);
+          if (!espnRes.ok) return { message: 'No golf tournament data available right now' };
+          const espnData = await espnRes.json();
+          const events = espnData.events || [];
+          if (events.length === 0) return { message: 'No active golf tournament right now' };
+
+          const event = events[0];
+          const comp = event.competitions?.[0];
+          if (!comp) return { message: 'No competition data' };
+
+          const players = (comp.competitors || []).slice(0, 30).map((p, idx) => {
+            const athlete = p.athlete || {};
+            const round1 = p.linescores?.[0];
+            const round2 = p.linescores?.[1];
+            const round3 = p.linescores?.[2];
+            const round4 = p.linescores?.[3];
+            return {
+              position: idx + 1,
+              name: athlete.displayName || 'Unknown',
+              score: p.score || 'E',
+              r1: round1?.value || null,
+              r2: round2?.value || null,
+              r3: round3?.value || null,
+              r4: round4?.value || null
+            };
+          });
+
+          // Also get outright odds from odds_cache
+          const { data: oddsData } = await supabase
+            .from('odds_cache')
+            .select('outcomes, bookmaker')
+            .ilike('sport', '%golf%')
+            .eq('market_type', 'outrights')
+            .limit(2);
+
+          let topOdds = null;
+          if (oddsData?.[0]?.outcomes) {
+            const outcomes = typeof oddsData[0].outcomes === 'string'
+              ? JSON.parse(oddsData[0].outcomes) : oddsData[0].outcomes;
+            topOdds = outcomes
+              .sort((a, b) => (a.price || 99999) - (b.price || 99999))
+              .slice(0, 20)
+              .map(o => ({ name: o.name, odds: o.price }));
+          }
+
+          return {
+            tournament: event.name,
+            status: event.status?.type?.description || 'In Progress',
+            venue: comp.venue?.fullName || null,
+            leaderboard: players,
+            outrightOdds: topOdds,
+            bookmaker: oddsData?.[0]?.bookmaker || null
+          };
+        } catch (err) {
+          return { message: `Golf data error: ${err.message}` };
+        }
+      }
+
       default:
         return { error: `Unknown tool: ${name}` };
     }
@@ -523,6 +598,7 @@ YOUR TOOLS (use them aggressively):
 - get_upcoming_games → what's on the schedule
 - get_game_analysis → pre-computed AI breakdown
 - get_team_stats → team records from our database
+- get_golf_leaderboard → live tournament leaderboard + outright winner odds (for golf questions)
 
 RESEARCH PROCESS (do this EVERY time someone asks for a pick):
 1. get_game_analysis for the specific matchup → THIS IS YOUR RICHEST DATA SOURCE. It has AI analysis, edge scores, win probabilities, news context, injury context, key factors, and recommended picks. ALWAYS call this first.
