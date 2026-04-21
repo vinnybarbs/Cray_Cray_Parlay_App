@@ -23,6 +23,39 @@ function StatCard({ label, value, sub, color = 'yellow' }) {
   )
 }
 
+function BreakdownList({ items }) {
+  const entries = Object.entries(items || {})
+  if (entries.length === 0) {
+    return <p className="text-gray-500 text-xs mb-4">No data for this period.</p>
+  }
+  return (
+    <div className="space-y-2 mb-2">
+      {entries.map(([label, stats]) => {
+        const decided = stats.wins + stats.losses
+        const wr = decided > 0 ? ((stats.wins / decided) * 100).toFixed(1) : 'N/A'
+        const roi = stats.roi_pct
+        return (
+          <div key={label} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
+            <span className="text-sm text-gray-300">{label}</span>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="text-green-400">{stats.wins}W</span>
+              <span className="text-red-400">{stats.losses}L</span>
+              <span className="text-yellow-400 font-bold">{wr}{wr !== 'N/A' ? '%' : ''}</span>
+              <span className={`font-bold w-14 text-right ${
+                roi == null ? 'text-gray-600' :
+                roi > 0 ? 'text-green-400' :
+                roi < 0 ? 'text-red-400' : 'text-gray-400'
+              }`}>
+                {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+              </span>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function ParlayRow({ parlay, legs }) {
   const [expanded, setExpanded] = useState(false)
   const outcomeColor = {
@@ -76,9 +109,12 @@ export default function ResultsPage({ onBack }) {
   const { user, isAuthenticated } = useAuth()
   const [parlays, setParlays] = useState([])
   const [parlayLegs, setParlayLegs] = useState({})
-  const [modelStats, setModelStats] = useState(null)
+  const [modelStatsByPeriod, setModelStatsByPeriod] = useState({ last_7d: null, last_30d: null, all: null })
+  const [modelPeriod, setModelPeriod] = useState('last_30d')
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('my-bets') // 'my-bets' | 'model'
+
+  const modelStats = modelStatsByPeriod[modelPeriod]
 
   useEffect(() => {
     loadData()
@@ -142,18 +178,14 @@ export default function ResultsPage({ onBack }) {
         }
       }
 
-      // Load model performance from precomputed MV (public)
+      // Load model performance from precomputed MV (all three periods in one call)
       if (supabase) {
         const { data: mvRows } = await supabase
           .from('mv_model_accuracy')
           .select('*')
-          .eq('period_bucket', 'last_30d')
+          .in('period_bucket', ['last_7d', 'last_30d', 'all'])
 
         if (mvRows && mvRows.length > 0) {
-          const overallRow = mvRows.find(r => r.dimension_type === 'overall')
-          const sportRows  = mvRows.filter(r => r.dimension_type === 'sport')
-          const modeRows   = mvRows.filter(r => r.dimension_type === 'generate_mode')
-
           const asMap = (rows) => {
             const out = {}
             for (const r of rows) {
@@ -167,17 +199,24 @@ export default function ResultsPage({ onBack }) {
             return out
           }
 
-          const total   = overallRow ? (overallRow.won + overallRow.lost + overallRow.push) : 0
-          const wins    = overallRow?.won || 0
-          const losses  = overallRow?.lost || 0
-          const winRate = wins + losses > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : 'N/A'
-          const roi_pct = overallRow?.roi_pct != null ? Number(overallRow.roi_pct) : null
-
-          setModelStats({
-            total, wins, losses, winRate, roi_pct,
-            bySport: asMap(sportRows),
-            byMode:  asMap(modeRows),
-          })
+          const byPeriod = { last_7d: null, last_30d: null, all: null }
+          for (const period of Object.keys(byPeriod)) {
+            const rows = mvRows.filter(r => r.period_bucket === period)
+            if (rows.length === 0) continue
+            const overallRow = rows.find(r => r.dimension_type === 'overall')
+            const wins   = overallRow?.won || 0
+            const losses = overallRow?.lost || 0
+            const total  = overallRow ? (overallRow.won + overallRow.lost + overallRow.push) : 0
+            byPeriod[period] = {
+              total, wins, losses,
+              winRate: wins + losses > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : 'N/A',
+              roi_pct: overallRow?.roi_pct != null ? Number(overallRow.roi_pct) : null,
+              bySport:   asMap(rows.filter(r => r.dimension_type === 'sport')),
+              byBetType: asMap(rows.filter(r => r.dimension_type === 'bet_type')),
+              byMode:    asMap(rows.filter(r => r.dimension_type === 'generate_mode')),
+            }
+          }
+          setModelStatsByPeriod(byPeriod)
         }
       }
     } catch (err) {
@@ -262,6 +301,27 @@ export default function ResultsPage({ onBack }) {
           </>
         ) : (
           <>
+            {/* Period pills */}
+            <div className="flex gap-2 mb-4">
+              {[
+                { key: 'last_7d',  label: '7d' },
+                { key: 'last_30d', label: '30d' },
+                { key: 'all',      label: 'All time' },
+              ].map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => setModelPeriod(opt.key)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    modelPeriod === opt.key
+                      ? 'bg-yellow-400 text-gray-900 border-yellow-400'
+                      : 'bg-transparent text-gray-400 border-gray-600 hover:border-yellow-400 hover:text-yellow-400'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
             {/* Model Stats */}
             {modelStats ? (
               <>
@@ -269,7 +329,12 @@ export default function ResultsPage({ onBack }) {
                   <StatCard label="Predictions" value={modelStats.total} color="blue" />
                   <StatCard label="Wins" value={modelStats.wins} color="green" />
                   <StatCard label="Losses" value={modelStats.losses} color="red" />
-                  <StatCard label="Win %" value={`${modelStats.winRate}%`} color="yellow" sub="Last 30 days" />
+                  <StatCard
+                    label="Win %"
+                    value={`${modelStats.winRate}%`}
+                    color="yellow"
+                    sub={modelPeriod === 'last_7d' ? 'Last 7 days' : modelPeriod === 'last_30d' ? 'Last 30 days' : 'All time'}
+                  />
                   <StatCard
                     label="ROI"
                     value={modelStats.roi_pct != null
@@ -284,62 +349,18 @@ export default function ResultsPage({ onBack }) {
 
                 {/* By Sport */}
                 <h3 className="text-sm font-semibold text-gray-300 mb-3 mt-6">By Sport</h3>
-                <div className="space-y-2 mb-6">
-                  {Object.entries(modelStats.bySport).map(([sport, stats]) => {
-                    const wr = stats.wins + stats.losses > 0
-                      ? ((stats.wins / (stats.wins + stats.losses)) * 100).toFixed(1)
-                      : 'N/A'
-                    const roi = stats.roi_pct
-                    return (
-                      <div key={sport} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
-                        <span className="text-sm text-gray-300">{sport}</span>
-                        <div className="flex items-center gap-4 text-xs">
-                          <span className="text-green-400">{stats.wins}W</span>
-                          <span className="text-red-400">{stats.losses}L</span>
-                          <span className="text-yellow-400 font-bold">{wr}%</span>
-                          <span className={`font-bold w-14 text-right ${
-                            roi == null ? 'text-gray-600' :
-                            roi > 0 ? 'text-green-400' :
-                            roi < 0 ? 'text-red-400' : 'text-gray-400'
-                          }`}>
-                            {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                <BreakdownList items={modelStats.bySport} />
+
+                {/* By Bet Type */}
+                <h3 className="text-sm font-semibold text-gray-300 mb-3 mt-6">By Bet Type</h3>
+                <BreakdownList items={modelStats.byBetType} />
 
                 {/* By Mode */}
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">By Generation Mode</h3>
-                <div className="space-y-2">
-                  {Object.entries(modelStats.byMode).map(([mode, stats]) => {
-                    const wr = stats.wins + stats.losses > 0
-                      ? ((stats.wins / (stats.wins + stats.losses)) * 100).toFixed(1)
-                      : 'N/A'
-                    const roi = stats.roi_pct
-                    return (
-                      <div key={mode} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
-                        <span className="text-sm text-gray-300">{mode}</span>
-                        <div className="flex items-center gap-4 text-xs">
-                          <span className="text-green-400">{stats.wins}W</span>
-                          <span className="text-red-400">{stats.losses}L</span>
-                          <span className="text-yellow-400 font-bold">{wr}%</span>
-                          <span className={`font-bold w-14 text-right ${
-                            roi == null ? 'text-gray-600' :
-                            roi > 0 ? 'text-green-400' :
-                            roi < 0 ? 'text-red-400' : 'text-gray-400'
-                          }`}>
-                            {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
-                          </span>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
+                <h3 className="text-sm font-semibold text-gray-300 mb-3 mt-6">By Generation Mode</h3>
+                <BreakdownList items={modelStats.byMode} />
               </>
             ) : (
-              <p className="text-center text-gray-500 py-8">No resolved AI predictions yet. Check back after games complete.</p>
+              <p className="text-center text-gray-500 py-8">No resolved AI predictions yet for this period.</p>
             )}
           </>
         )}

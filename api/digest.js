@@ -118,86 +118,52 @@ async function getDigest(req, res) {
       return bySport;
     });
 
-    // 4. 7-day model accuracy by sport
-    const sevenDayAccuracyResult = await safeQuery(async () => {
-      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // 4. Model accuracy — 3 periods (7d / 30d / all) x (overall + bySport + byBetType) from MV
+    const modelAccuracyResult = await safeQuery(async () => {
       const { data, error } = await supabase
-        .from('ai_suggestions')
-        .select('sport, actual_outcome')
-        .gt('resolved_at', cutoff)
-        .in('actual_outcome', ['won', 'lost']);
-
+        .from('mv_model_accuracy')
+        .select('period_bucket, dimension_type, dimension_value, won, lost, push, total, roi_pct')
+        .in('period_bucket', ['last_7d', 'last_30d', 'all']);
       if (error) throw error;
 
-      const bySport = {};
-      let totalWon = 0;
-      let totalLost = 0;
-
-      for (const row of data || []) {
-        const sport = row.sport || 'Unknown';
-        if (!bySport[sport]) bySport[sport] = { won: 0, lost: 0 };
-        bySport[sport][row.actual_outcome]++;
-        if (row.actual_outcome === 'won') totalWon++;
-        else totalLost++;
-      }
-
-      const overall = {
-        won: totalWon,
-        lost: totalLost,
-        total: totalWon + totalLost,
-        winRate: totalWon + totalLost > 0 ? Math.round((totalWon / (totalWon + totalLost)) * 100) : null,
+      const buildBreakdown = (rows) => {
+        const out = {};
+        for (const r of rows) {
+          const won = r.won || 0;
+          const lost = r.lost || 0;
+          const decided = won + lost;
+          out[r.dimension_value] = {
+            won,
+            lost,
+            total: decided,
+            winRate: decided > 0 ? Math.round((won / decided) * 100) : null,
+            roi_pct: r.roi_pct != null ? Number(r.roi_pct) : null,
+          };
+        }
+        return out;
       };
 
-      const bySportFormatted = {};
-      for (const [sport, counts] of Object.entries(bySport)) {
-        const total = counts.won + counts.lost;
-        bySportFormatted[sport] = {
-          won: counts.won,
-          lost: counts.lost,
-          total,
-          winRate: total > 0 ? Math.round((counts.won / total) * 100) : null,
+      const byPeriod = { last_7d: null, last_30d: null, all: null };
+      for (const period of Object.keys(byPeriod)) {
+        const rows = (data || []).filter(r => r.period_bucket === period);
+        if (rows.length === 0) continue;
+        const overallRow = rows.find(r => r.dimension_type === 'overall');
+        const won = overallRow?.won || 0;
+        const lost = overallRow?.lost || 0;
+        const decided = won + lost;
+        byPeriod[period] = {
+          overall: {
+            won,
+            lost,
+            total: decided,
+            winRate: decided > 0 ? Math.round((won / decided) * 100) : null,
+            roi_pct: overallRow?.roi_pct != null ? Number(overallRow.roi_pct) : null,
+          },
+          bySport:   buildBreakdown(rows.filter(r => r.dimension_type === 'sport')),
+          byBetType: buildBreakdown(rows.filter(r => r.dimension_type === 'bet_type')),
         };
       }
-
-      return { overall, bySport: bySportFormatted };
-    });
-
-    // 4b. All-time model accuracy by sport
-    const allTimeAccuracyResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('ai_suggestions')
-        .select('sport, actual_outcome')
-        .in('actual_outcome', ['won', 'lost']);
-
-      if (error) throw error;
-
-      const bySport = {};
-      let totalWon = 0;
-      let totalLost = 0;
-
-      for (const row of data || []) {
-        const sport = row.sport || 'Unknown';
-        if (!bySport[sport]) bySport[sport] = { won: 0, lost: 0 };
-        bySport[sport][row.actual_outcome]++;
-        if (row.actual_outcome === 'won') totalWon++;
-        else totalLost++;
-      }
-
-      const overall = {
-        won: totalWon, lost: totalLost, total: totalWon + totalLost,
-        winRate: totalWon + totalLost > 0 ? Math.round((totalWon / (totalWon + totalLost)) * 100) : null,
-      };
-
-      const bySportFormatted = {};
-      for (const [sport, counts] of Object.entries(bySport)) {
-        const total = counts.won + counts.lost;
-        bySportFormatted[sport] = {
-          won: counts.won, lost: counts.lost, total,
-          winRate: total > 0 ? Math.round((counts.won / total) * 100) : null,
-        };
-      }
-
-      return { overall, bySport: bySportFormatted };
+      return byPeriod;
     });
 
     // 5. Upcoming game count by sport from odds_cache
@@ -306,8 +272,7 @@ async function getDigest(req, res) {
       gamesBySport: gamesBySport || {},
       injuries: injuriesBySport || {},
       yesterdayResults: yesterdayResultsResult || {},
-      sevenDayAccuracy: sevenDayAccuracyResult || { overall: null, bySport: {} },
-      allTimeAccuracy: allTimeAccuracyResult || { overall: null, bySport: {} },
+      modelAccuracy: modelAccuracyResult || { last_7d: null, last_30d: null, all: null },
       upcomingCounts: upcomingCountResult || {},
       firstGameTime: firstGameResult || null,
       golf: golfResult || null,
