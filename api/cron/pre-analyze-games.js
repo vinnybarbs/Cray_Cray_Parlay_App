@@ -150,22 +150,30 @@ function resolveOddsForPick(oddsCtx, recommendedSide) {
 }
 
 /**
- * Get relevant news snippets for a game's teams
+ * Get relevant news snippets for a game's teams.
+ *
+ * Matches on the FULL team/player name (not last-word mascot) to prevent
+ * cross-sport contamination. Previously `"Leylah Fernandez"` → `"Fernandez"`
+ * matched unrelated Brooklyn Nets articles about assistant coach Fernandez.
+ * Full-name matching may miss articles that use short forms (e.g., "Lakers"
+ * alone instead of "Los Angeles Lakers"), but fewer false matches beats
+ * hallucinated cross-sport context — source-of-truth > coverage.
  */
 async function getNewsContext(homeTeam, awayTeam, sport) {
   try {
-    // Search for articles mentioning either team in the last 3 days
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Extract key words from team names for search
-    const homeWords = homeTeam.split(' ').slice(-1)[0]; // Last word (mascot)
-    const awayWords = awayTeam.split(' ').slice(-1)[0];
+    // Strip chars that break PostgREST filter syntax (commas, parens).
+    // Apostrophes are fine — supabase-js URL-encodes them.
+    const homeQuery = homeTeam.replace(/[(),]/g, '').trim();
+    const awayQuery = awayTeam.replace(/[(),]/g, '').trim();
+    if (!homeQuery || !awayQuery) return null;
 
     const { data } = await supabase
       .from('news_articles')
       .select('title, summary, betting_summary, content, published_at')
       .gte('published_at', threeDaysAgo)
-      .or(`title.ilike.%${homeWords}%,title.ilike.%${awayWords}%,summary.ilike.%${homeWords}%,summary.ilike.%${awayWords}%`)
+      .or(`title.ilike.%${homeQuery}%,title.ilike.%${awayQuery}%,summary.ilike.%${homeQuery}%,summary.ilike.%${awayQuery}%`)
       .order('published_at', { ascending: false })
       .limit(5);
 
@@ -228,47 +236,60 @@ async function getInjuryContext(homeTeam, awayTeam) {
  */
 async function getRankingsContext(homeTeam, awayTeam) {
   try {
-    const homeMascot = homeTeam.split(' ').slice(-1)[0];
-    const awayMascot = awayTeam.split(' ').slice(-1)[0];
+    // Full-team-name match prevents collisions like "%Sox%" catching both
+    // White Sox and Red Sox rows. Same rationale as edge-calculator.js.
+    const homeQ = (homeTeam || '').replace(/[(),]/g, '').trim();
+    const awayQ = (awayTeam || '').replace(/[(),]/g, '').trim();
+    const homeLower = homeQ.toLowerCase();
+    const awayLower = awayQ.toLowerCase();
 
-    const result = { home_rank: null, away_rank: null, home_record: null, away_record: null };
+    const result = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
+    if (!homeQ || !awayQ) return result;
 
-    // Primary source: standings table (populated by sync-standings cron from ESPN)
+    // Primary source: current_standings (populated by sync-standings cron from ESPN)
     const { data: standingsData } = await supabase
       .from('current_standings')
       .select('team_name, wins, losses, ties, win_percentage, point_differential, streak, division_rank')
-      .or(`team_name.ilike.%${homeMascot}%,team_name.ilike.%${awayMascot}%,team_name.ilike.%${homeTeam}%,team_name.ilike.%${awayTeam}%`);
+      .or(`team_name.ilike.%${homeQ}%,team_name.ilike.%${awayQ}%`);
 
     if (standingsData) {
       for (const s of standingsData) {
-        const sName = s.team_name.toLowerCase();
-        const isHome = sName.includes(homeMascot.toLowerCase()) || sName.includes(homeTeam.toLowerCase());
-        const isAway = sName.includes(awayMascot.toLowerCase()) || sName.includes(awayTeam.toLowerCase());
+        const sLower = s.team_name.toLowerCase();
+        // Bidirectional match: either the standings name contains the full query,
+        // or the query contains the standings name (handles cases where ESPN uses
+        // a slightly shorter form than the odds feed, e.g. "LA Dodgers" vs "Los Angeles Dodgers").
+        const isHome = sLower.includes(homeLower) || homeLower.includes(sLower);
+        const isAway = sLower.includes(awayLower) || awayLower.includes(sLower);
 
         const record = s.ties > 0 ? `${s.wins}-${s.losses}-${s.ties}` : `${s.wins}-${s.losses}`;
         if (isHome && !result.home_record) {
           result.home_record = record;
+          result.home_streak = s.streak || null;
         }
         if (isAway && !result.away_record) {
           result.away_record = record;
+          result.away_streak = s.streak || null;
         }
       }
     }
 
-    // Secondary source: rankings_cache (AP Top 25 — adds rank for college teams)
+    // Secondary source: rankings_cache (AP Top 25 — adds rank for college teams).
+    // Full-team-name match, same rationale as standings block above.
     const { data: rankData } = await supabase
       .from('rankings_cache')
       .select('team_name, rank, record')
-      .or(`team_name.ilike.%${homeMascot}%,team_name.ilike.%${awayMascot}%`);
+      .or(`team_name.ilike.%${homeQ}%,team_name.ilike.%${awayQ}%`);
 
     if (rankData) {
       for (const r of rankData) {
-        const rName = r.team_name.toLowerCase();
-        if (rName.includes(homeMascot.toLowerCase())) {
+        const rLower = r.team_name.toLowerCase();
+        const isHome = rLower.includes(homeLower) || homeLower.includes(rLower);
+        const isAway = rLower.includes(awayLower) || awayLower.includes(rLower);
+        if (isHome) {
           result.home_rank = r.rank;
           if (!result.home_record && r.record) result.home_record = r.record;
         }
-        if (rName.includes(awayMascot.toLowerCase())) {
+        if (isAway) {
           result.away_rank = r.rank;
           if (!result.away_record && r.record) result.away_record = r.record;
         }
@@ -277,7 +298,7 @@ async function getRankingsContext(homeTeam, awayTeam) {
 
     return result;
   } catch {
-    return { home_rank: null, away_rank: null, home_record: null, away_record: null };
+    return { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
   }
 }
 
@@ -504,8 +525,23 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (oddsCtx.total != null) contextParts.push(`O/U Total: ${oddsCtx.total}`);
   if (oddsCtx.ml_home != null) contextParts.push(`Moneyline: ${game.home_team} ${oddsCtx.ml_home} / ${game.away_team} ${oddsCtx.ml_away}`);
 
-  if (rankCtx.home_rank) contextParts.push(`${game.home_team}: Ranked #${rankCtx.home_rank} (${rankCtx.home_record || ''})`);
-  if (rankCtx.away_rank) contextParts.push(`${game.away_team}: Ranked #${rankCtx.away_rank} (${rankCtx.away_record || ''})`);
+  // Emit the actual season record whenever we have it (from current_standings).
+  // Previously this only fired when `rank` was populated, which is college-only.
+  // NBA/MLB/NHL etc. have no AP-style ranking, so their real season record never
+  // made it into the prompt — the model was left with only the EdgeCalculator's
+  // "last 20 games" record (mislabeled as Season record) and ended up writing
+  // wrong records into snippets. This path is the single source of truth for
+  // the full-season W-L.
+  if (rankCtx.home_record) {
+    const rankStr = rankCtx.home_rank ? ` (Ranked #${rankCtx.home_rank})` : '';
+    const streakStr = rankCtx.home_streak ? `, streak ${rankCtx.home_streak}` : '';
+    contextParts.push(`${game.home_team} season record: ${rankCtx.home_record}${rankStr}${streakStr}`);
+  }
+  if (rankCtx.away_record) {
+    const rankStr = rankCtx.away_rank ? ` (Ranked #${rankCtx.away_rank})` : '';
+    const streakStr = rankCtx.away_streak ? `, streak ${rankCtx.away_streak}` : '';
+    contextParts.push(`${game.away_team} season record: ${rankCtx.away_record}${rankStr}${streakStr}`);
+  }
 
   if (homeTrend) contextParts.push(`${game.home_team} last ${homeTrend.games.length}: ${homeTrend.record} — ${homeTrend.games.join('; ')}`);
   if (awayTrend) contextParts.push(`${game.away_team} last ${awayTrend.games.length}: ${awayTrend.record} — ${awayTrend.games.join('; ')}`);
@@ -515,8 +551,18 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
 
-  // Statistical edge block — injected when EdgeCalculator has results
-  if (edgeData) {
+  // Statistical edge block — only inject when EdgeCalculator has REAL record/form data.
+  // Without this gate, sports with no stats source (Tennis, UFC, sometimes MLS) got the
+  // calculator's no-data fallback (~53% / 47% defaults) fed to the prompt as truth,
+  // producing identical-looking "calculated win probability" numbers on every tile.
+  const hasRealEdgeData = edgeData
+    && edgeData.factors
+    && (edgeData.factors.homeRecord
+        || edgeData.factors.awayRecord
+        || edgeData.factors.homeRecentForm
+        || edgeData.factors.awayRecentForm);
+
+  if (hasRealEdgeData) {
     const ed = edgeData;
     const edgeLines = [
       `--- STATISTICAL EDGE ANALYSIS ---`,
@@ -531,8 +577,8 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
     }
     if (ed.factors) {
       const f = ed.factors;
-      if (f.homeRecord) edgeLines.push(`Season record — ${game.home_team}: ${f.homeRecord.wins}-${f.homeRecord.losses} (${(f.homeRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.homePointDiff >= 0 ? '+' : ''}${f.homePointDiff}`);
-      if (f.awayRecord) edgeLines.push(`Season record — ${game.away_team}: ${f.awayRecord.wins}-${f.awayRecord.losses} (${(f.awayRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.awayPointDiff >= 0 ? '+' : ''}${f.awayPointDiff}`);
+      if (f.homeRecord) edgeLines.push(`Last 20 games record — ${game.home_team}: ${f.homeRecord.wins}-${f.homeRecord.losses} (${(f.homeRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.homePointDiff >= 0 ? '+' : ''}${f.homePointDiff}`);
+      if (f.awayRecord) edgeLines.push(`Last 20 games record — ${game.away_team}: ${f.awayRecord.wins}-${f.awayRecord.losses} (${(f.awayRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.awayPointDiff >= 0 ? '+' : ''}${f.awayPointDiff}`);
       if (f.homeRecentForm) edgeLines.push(`Recent form — ${game.home_team}: ${f.homeRecentForm.last5} last 5 (${(f.homeRecentForm.winPct * 100).toFixed(0)}%)`);
       if (f.awayRecentForm) edgeLines.push(`Recent form — ${game.away_team}: ${f.awayRecentForm.last5} last 5 (${(f.awayRecentForm.winPct * 100).toFixed(0)}%)`);
       if (f.scheduleStrength) edgeLines.push(`Schedule strength — ${game.home_team}: ${(f.scheduleStrength.home * 100).toFixed(1)}% opp avg | ${game.away_team}: ${(f.scheduleStrength.away * 100).toFixed(1)}% opp avg`);
@@ -576,6 +622,10 @@ CRITICAL RULES:
 - Your analysis should read like an expert handicapper, not a generic preview
 - If a team's recent results show a trend (3 straight wins, blowout losses), highlight it
 - Compare the spread/total to the actual scoring data when available
+- NEVER INVENT NUMBERS: if a spread, total, record, ranking, win probability, or trend
+  is NOT provided in the matchup data above, DO NOT write a specific value for it.
+  If the data isn't there, either omit that dimension or say "not available" explicitly.
+  It is better to have shorter analysis than confident-sounding invented numbers.
 
 BET TYPE PRIORITY (based on our actual model performance):
 - MONEYLINE picks hit at 70-77%. If one team is clearly stronger, recommend home_ml or away_ml.
