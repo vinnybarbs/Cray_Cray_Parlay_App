@@ -497,12 +497,13 @@ export default function AdminDashboard({ onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [lastRefresh, setLastRefresh] = useState(null)
+  const [period, setPeriod] = useState('all')
 
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/api/admin/dashboard?secret=${ADMIN_SECRET}`)
+      const res = await fetch(`${API_BASE}/api/admin/dashboard?secret=${ADMIN_SECRET}&period=${period}`)
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         throw new Error(body.error || `HTTP ${res.status}`)
@@ -515,7 +516,7 @@ export default function AdminDashboard({ onBack }) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [period])
 
   useEffect(() => {
     fetchData()
@@ -542,18 +543,29 @@ export default function AdminDashboard({ onBack }) {
               </p>
             </div>
           </div>
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            {loading ? (
-              <>
-                <span className="animate-spin inline-block w-3 h-3 border-2 border-gray-900 border-t-transparent rounded-full" />
-                Loading...
-              </>
-            ) : 'Refresh'}
-          </button>
+          <div className="flex items-center gap-3">
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="bg-gray-800 text-white text-sm px-3 py-2 rounded-lg border border-gray-700"
+            >
+              <option value="all">All-time</option>
+              <option value="last_30d">Last 30 days</option>
+              <option value="last_7d">Last 7 days</option>
+            </select>
+            <button
+              onClick={fetchData}
+              disabled={loading}
+              className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-gray-900 text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            >
+              {loading ? (
+                <>
+                  <span className="animate-spin inline-block w-3 h-3 border-2 border-gray-900 border-t-transparent rounded-full" />
+                  Loading...
+                </>
+              ) : 'Refresh'}
+            </button>
+          </div>
         </div>
       </div>
 
