@@ -60,7 +60,11 @@ const PROP_MARKETS = {
   ]
 };
 
-const BOOKMAKERS = "draftkings,fanduel";
+// Expanded to 6 US-regulated books for cross-book line comparison (market_edge
+// in the fact sheet). The-odds-api bills per request, not per bookmaker —
+// adding books does not increase API credit cost; it just returns richer payloads.
+// If a book key is invalid, the API silently omits it (no error).
+const BOOKMAKERS = "draftkings,fanduel,betmgm,caesars,betrivers,fanatics";
 const REGIONS = "us";
 const ODDS_FORMAT = "american";
 
