@@ -150,22 +150,30 @@ function resolveOddsForPick(oddsCtx, recommendedSide) {
 }
 
 /**
- * Get relevant news snippets for a game's teams
+ * Get relevant news snippets for a game's teams.
+ *
+ * Matches on the FULL team/player name (not last-word mascot) to prevent
+ * cross-sport contamination. Previously `"Leylah Fernandez"` → `"Fernandez"`
+ * matched unrelated Brooklyn Nets articles about assistant coach Fernandez.
+ * Full-name matching may miss articles that use short forms (e.g., "Lakers"
+ * alone instead of "Los Angeles Lakers"), but fewer false matches beats
+ * hallucinated cross-sport context — source-of-truth > coverage.
  */
 async function getNewsContext(homeTeam, awayTeam, sport) {
   try {
-    // Search for articles mentioning either team in the last 3 days
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Extract key words from team names for search
-    const homeWords = homeTeam.split(' ').slice(-1)[0]; // Last word (mascot)
-    const awayWords = awayTeam.split(' ').slice(-1)[0];
+    // Strip chars that break PostgREST filter syntax (commas, parens).
+    // Apostrophes are fine — supabase-js URL-encodes them.
+    const homeQuery = homeTeam.replace(/[(),]/g, '').trim();
+    const awayQuery = awayTeam.replace(/[(),]/g, '').trim();
+    if (!homeQuery || !awayQuery) return null;
 
     const { data } = await supabase
       .from('news_articles')
       .select('title, summary, betting_summary, content, published_at')
       .gte('published_at', threeDaysAgo)
-      .or(`title.ilike.%${homeWords}%,title.ilike.%${awayWords}%,summary.ilike.%${homeWords}%,summary.ilike.%${awayWords}%`)
+      .or(`title.ilike.%${homeQuery}%,title.ilike.%${awayQuery}%,summary.ilike.%${homeQuery}%,summary.ilike.%${awayQuery}%`)
       .order('published_at', { ascending: false })
       .limit(5);
 
@@ -515,8 +523,18 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
 
-  // Statistical edge block — injected when EdgeCalculator has results
-  if (edgeData) {
+  // Statistical edge block — only inject when EdgeCalculator has REAL record/form data.
+  // Without this gate, sports with no stats source (Tennis, UFC, sometimes MLS) got the
+  // calculator's no-data fallback (~53% / 47% defaults) fed to the prompt as truth,
+  // producing identical-looking "calculated win probability" numbers on every tile.
+  const hasRealEdgeData = edgeData
+    && edgeData.factors
+    && (edgeData.factors.homeRecord
+        || edgeData.factors.awayRecord
+        || edgeData.factors.homeRecentForm
+        || edgeData.factors.awayRecentForm);
+
+  if (hasRealEdgeData) {
     const ed = edgeData;
     const edgeLines = [
       `--- STATISTICAL EDGE ANALYSIS ---`,
@@ -576,6 +594,10 @@ CRITICAL RULES:
 - Your analysis should read like an expert handicapper, not a generic preview
 - If a team's recent results show a trend (3 straight wins, blowout losses), highlight it
 - Compare the spread/total to the actual scoring data when available
+- NEVER INVENT NUMBERS: if a spread, total, record, ranking, win probability, or trend
+  is NOT provided in the matchup data above, DO NOT write a specific value for it.
+  If the data isn't there, either omit that dimension or say "not available" explicitly.
+  It is better to have shorter analysis than confident-sounding invented numbers.
 
 BET TYPE PRIORITY (based on our actual model performance):
 - MONEYLINE picks hit at 70-77%. If one team is clearly stronger, recommend home_ml or away_ml.
