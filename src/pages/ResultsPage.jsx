@@ -142,44 +142,41 @@ export default function ResultsPage({ onBack }) {
         }
       }
 
-      // Load model performance (public)
+      // Load model performance from precomputed MV (public)
       if (supabase) {
-        const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
-        const { data: suggestions } = await supabase
-          .from('ai_suggestions')
-          .select('sport, bet_type, actual_outcome, generate_mode, created_at')
-          .neq('actual_outcome', 'pending')
-          .gte('created_at', since)
+        const { data: mvRows } = await supabase
+          .from('mv_model_accuracy')
+          .select('*')
+          .eq('period_bucket', 'last_30d')
 
-        if (suggestions && suggestions.length > 0) {
-          const total = suggestions.length
-          const wins = suggestions.filter(s => s.actual_outcome === 'won').length
-          const losses = suggestions.filter(s => s.actual_outcome === 'lost').length
+        if (mvRows && mvRows.length > 0) {
+          const overallRow = mvRows.find(r => r.dimension_type === 'overall')
+          const sportRows  = mvRows.filter(r => r.dimension_type === 'sport')
+          const modeRows   = mvRows.filter(r => r.dimension_type === 'generate_mode')
 
-          const bySport = {}
-          const byMode = {}
-          suggestions.forEach(s => {
-            // By sport
-            if (!bySport[s.sport]) bySport[s.sport] = { wins: 0, losses: 0, total: 0 }
-            bySport[s.sport].total++
-            if (s.actual_outcome === 'won') bySport[s.sport].wins++
-            if (s.actual_outcome === 'lost') bySport[s.sport].losses++
+          const asMap = (rows) => {
+            const out = {}
+            for (const r of rows) {
+              out[r.dimension_value] = {
+                wins: r.won || 0,
+                losses: r.lost || 0,
+                total: (r.won || 0) + (r.lost || 0) + (r.push || 0),
+                roi_pct: r.roi_pct != null ? Number(r.roi_pct) : null,
+              }
+            }
+            return out
+          }
 
-            // By mode
-            const mode = s.generate_mode || 'Unknown'
-            if (!byMode[mode]) byMode[mode] = { wins: 0, losses: 0, total: 0 }
-            byMode[mode].total++
-            if (s.actual_outcome === 'won') byMode[mode].wins++
-            if (s.actual_outcome === 'lost') byMode[mode].losses++
-          })
+          const total   = overallRow ? (overallRow.won + overallRow.lost + overallRow.push) : 0
+          const wins    = overallRow?.won || 0
+          const losses  = overallRow?.lost || 0
+          const winRate = wins + losses > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : 'N/A'
+          const roi_pct = overallRow?.roi_pct != null ? Number(overallRow.roi_pct) : null
 
           setModelStats({
-            total,
-            wins,
-            losses,
-            winRate: wins + losses > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : 'N/A',
-            bySport,
-            byMode
+            total, wins, losses, winRate, roi_pct,
+            bySport: asMap(sportRows),
+            byMode:  asMap(modeRows),
           })
         }
       }
@@ -268,11 +265,21 @@ export default function ResultsPage({ onBack }) {
             {/* Model Stats */}
             {modelStats ? (
               <>
-                <div className="grid grid-cols-4 gap-3 mb-6">
+                <div className="grid grid-cols-5 gap-3 mb-6">
                   <StatCard label="Predictions" value={modelStats.total} color="blue" />
                   <StatCard label="Wins" value={modelStats.wins} color="green" />
                   <StatCard label="Losses" value={modelStats.losses} color="red" />
-                  <StatCard label="Win %" value={`${modelStats.winRate}%`} color="yellow" sub="Last 14 days" />
+                  <StatCard label="Win %" value={`${modelStats.winRate}%`} color="yellow" sub="Last 30 days" />
+                  <StatCard
+                    label="ROI"
+                    value={modelStats.roi_pct != null
+                      ? `${modelStats.roi_pct >= 0 ? '+' : ''}${modelStats.roi_pct.toFixed(1)}%`
+                      : '—'}
+                    color={modelStats.roi_pct == null ? 'gray'
+                      : modelStats.roi_pct > 0 ? 'green'
+                      : modelStats.roi_pct < 0 ? 'red'
+                      : 'yellow'}
+                  />
                 </div>
 
                 {/* By Sport */}
@@ -282,6 +289,7 @@ export default function ResultsPage({ onBack }) {
                     const wr = stats.wins + stats.losses > 0
                       ? ((stats.wins / (stats.wins + stats.losses)) * 100).toFixed(1)
                       : 'N/A'
+                    const roi = stats.roi_pct
                     return (
                       <div key={sport} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
                         <span className="text-sm text-gray-300">{sport}</span>
@@ -289,6 +297,13 @@ export default function ResultsPage({ onBack }) {
                           <span className="text-green-400">{stats.wins}W</span>
                           <span className="text-red-400">{stats.losses}L</span>
                           <span className="text-yellow-400 font-bold">{wr}%</span>
+                          <span className={`font-bold w-14 text-right ${
+                            roi == null ? 'text-gray-600' :
+                            roi > 0 ? 'text-green-400' :
+                            roi < 0 ? 'text-red-400' : 'text-gray-400'
+                          }`}>
+                            {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+                          </span>
                         </div>
                       </div>
                     )
@@ -302,6 +317,7 @@ export default function ResultsPage({ onBack }) {
                     const wr = stats.wins + stats.losses > 0
                       ? ((stats.wins / (stats.wins + stats.losses)) * 100).toFixed(1)
                       : 'N/A'
+                    const roi = stats.roi_pct
                     return (
                       <div key={mode} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
                         <span className="text-sm text-gray-300">{mode}</span>
@@ -309,6 +325,13 @@ export default function ResultsPage({ onBack }) {
                           <span className="text-green-400">{stats.wins}W</span>
                           <span className="text-red-400">{stats.losses}L</span>
                           <span className="text-yellow-400 font-bold">{wr}%</span>
+                          <span className={`font-bold w-14 text-right ${
+                            roi == null ? 'text-gray-600' :
+                            roi > 0 ? 'text-green-400' :
+                            roi < 0 ? 'text-red-400' : 'text-gray-400'
+                          }`}>
+                            {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+                          </span>
                         </div>
                       </div>
                     )
