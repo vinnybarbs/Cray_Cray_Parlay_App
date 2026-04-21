@@ -194,10 +194,19 @@ BEGIN
       END IF;
 
     WHEN 'Spread', 'Puck Line' THEN
+      -- Compute adjusted score of PICKED team, compare to OTHER team.
+      -- `point` is stored sign-aware for the picked side (e.g., -7.5 for home
+      -- favorite, +7.5 for away dog).
       picked_home := pick_lower LIKE '%' || home_lower || '%';
-      adjusted_home := home_score + (CASE WHEN picked_home THEN COALESCE(point, 0) ELSE -COALESCE(point, 0) END);
-      IF adjusted_home = away_score THEN RETURN 'push';
-      ELSIF adjusted_home > away_score THEN RETURN 'won';
+      IF picked_home THEN
+        picked_score := home_score + COALESCE(point, 0);
+        other_score := away_score;
+      ELSE
+        picked_score := away_score + COALESCE(point, 0);
+        other_score := home_score;
+      END IF;
+      IF picked_score = other_score THEN RETURN 'push';
+      ELSIF picked_score > other_score THEN RETURN 'won';
       ELSE RETURN 'lost';
       END IF;
 
@@ -392,11 +401,21 @@ Returns a single-row result set so callers can do `SELECT * FROM run_settlement(
 
 ### Trigger & safety net
 
+Postgres trigger functions must `RETURNS TRIGGER`, but `run_settlement()` returns a count-table so callers can `SELECT * FROM run_settlement()`. A thin wrapper lets us reuse the coordinator:
+
 ```sql
+CREATE OR REPLACE FUNCTION public.run_settlement_trigger()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM * FROM public.run_settlement();
+  RETURN NULL;
+END;
+$$;
+
 CREATE TRIGGER trg_settle_on_game_results
   AFTER INSERT OR UPDATE ON public.game_results
   FOR EACH STATEMENT
-  EXECUTE FUNCTION public.run_settlement();
+  EXECUTE FUNCTION public.run_settlement_trigger();
 
 SELECT cron.schedule(
   'settlement_daily_safety',
