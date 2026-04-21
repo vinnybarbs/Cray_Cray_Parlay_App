@@ -549,8 +549,8 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
     }
     if (ed.factors) {
       const f = ed.factors;
-      if (f.homeRecord) edgeLines.push(`Season record — ${game.home_team}: ${f.homeRecord.wins}-${f.homeRecord.losses} (${(f.homeRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.homePointDiff >= 0 ? '+' : ''}${f.homePointDiff}`);
-      if (f.awayRecord) edgeLines.push(`Season record — ${game.away_team}: ${f.awayRecord.wins}-${f.awayRecord.losses} (${(f.awayRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.awayPointDiff >= 0 ? '+' : ''}${f.awayPointDiff}`);
+      if (f.homeRecord) edgeLines.push(`Last 20 games record — ${game.home_team}: ${f.homeRecord.wins}-${f.homeRecord.losses} (${(f.homeRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.homePointDiff >= 0 ? '+' : ''}${f.homePointDiff}`);
+      if (f.awayRecord) edgeLines.push(`Last 20 games record — ${game.away_team}: ${f.awayRecord.wins}-${f.awayRecord.losses} (${(f.awayRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.awayPointDiff >= 0 ? '+' : ''}${f.awayPointDiff}`);
       if (f.homeRecentForm) edgeLines.push(`Recent form — ${game.home_team}: ${f.homeRecentForm.last5} last 5 (${(f.homeRecentForm.winPct * 100).toFixed(0)}%)`);
       if (f.awayRecentForm) edgeLines.push(`Recent form — ${game.away_team}: ${f.awayRecentForm.last5} last 5 (${(f.awayRecentForm.winPct * 100).toFixed(0)}%)`);
       if (f.scheduleStrength) edgeLines.push(`Schedule strength — ${game.home_team}: ${(f.scheduleStrength.home * 100).toFixed(1)}% opp avg | ${game.away_team}: ${(f.scheduleStrength.away * 100).toFixed(1)}% opp avg`);
