@@ -72,6 +72,10 @@ async function getAdminDashboard(req, res) {
         .eq('period_bucket', period);
       if (error) throw error;
 
+      // ROI intentionally dropped from response. The MV still computes it in
+      // roi_units / roi_pct / settled_with_odds columns, but single-leg ROI
+      // isn't a useful metric for a parlay-focused product — per-leg hit rate
+      // is the north-star signal. See memory/project_performance_page_direction.md.
       const keyByValue = (rows) => {
         const out = {};
         for (const r of rows) {
@@ -81,9 +85,6 @@ async function getAdminDashboard(req, res) {
             push: r.push || 0,
             pending: r.pending || 0,
             total: r.total || 0,
-            settled_with_odds: r.settled_with_odds || 0,
-            roi_units: r.roi_units != null ? Number(r.roi_units) : null,
-            roi_pct: r.roi_pct != null ? Number(r.roi_pct) : null,
           };
         }
         return out;
@@ -96,10 +97,7 @@ async function getAdminDashboard(req, res) {
         push: overallRow.push || 0,
         pending: overallRow.pending || 0,
         total: overallRow.total || 0,
-        settled_with_odds: overallRow.settled_with_odds || 0,
-        roi_units: overallRow.roi_units != null ? Number(overallRow.roi_units) : null,
-        roi_pct: overallRow.roi_pct != null ? Number(overallRow.roi_pct) : null,
-      } : { won: 0, lost: 0, push: 0, pending: 0, total: 0, settled_with_odds: 0, roi_units: null, roi_pct: null };
+      } : { won: 0, lost: 0, push: 0, pending: 0, total: 0 };
 
       return {
         overall,
@@ -109,10 +107,6 @@ async function getAdminDashboard(req, res) {
         edgeCalibration:           data.filter(r => r.dimension_type === 'edge_integer').sort((a, b) => Number(a.dimension_value) - Number(b.dimension_value)),
         edgeBuckets:               data.filter(r => r.dimension_type === 'edge_bucket'),
         chatConfidenceCalibration: data.filter(r => r.dimension_type === 'chat_confidence').sort((a, b) => Number(a.dimension_value) - Number(b.dimension_value)),
-        roi: {
-          units: overall.roi_units,
-          pct: overall.roi_pct,
-        },
         period,
       };
     });
@@ -198,14 +192,13 @@ async function getAdminDashboard(req, res) {
       cronHealth: cronHealthResult || [],
       recentErrors: recentErrorsResult || [],
       modelAccuracy: modelAccuracyResult || {
-        overall: { won: 0, lost: 0, push: 0, pending: 0, total: 0, settled_with_odds: 0, roi_units: null, roi_pct: null },
+        overall: { won: 0, lost: 0, push: 0, pending: 0, total: 0 },
         bySport: {},
         byBetType: {},
         byMode: {},
         edgeCalibration: [],
         edgeBuckets: [],
         chatConfidenceCalibration: [],
-        roi: { units: null, pct: null },
         period: 'all',
       },
       recentPicks: recentPicksResult || [],

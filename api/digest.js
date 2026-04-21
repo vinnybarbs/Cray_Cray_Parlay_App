@@ -118,11 +118,12 @@ async function getDigest(req, res) {
       return bySport;
     });
 
-    // 4. Model accuracy — 3 periods (7d / 30d / all) x (overall + bySport + byBetType) from MV
+    // 4. Model accuracy — 3 periods (7d / 30d / all) x (overall + bySport + byBetType) from MV.
+    // ROI dropped: per-leg hit rate is the signal a parlay-focused product cares about.
     const modelAccuracyResult = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('mv_model_accuracy')
-        .select('period_bucket, dimension_type, dimension_value, won, lost, push, total, roi_pct')
+        .select('period_bucket, dimension_type, dimension_value, won, lost, push, total')
         .in('period_bucket', ['last_7d', 'last_30d', 'all']);
       if (error) throw error;
 
@@ -137,7 +138,6 @@ async function getDigest(req, res) {
             lost,
             total: decided,
             winRate: decided > 0 ? Math.round((won / decided) * 100) : null,
-            roi_pct: r.roi_pct != null ? Number(r.roi_pct) : null,
           };
         }
         return out;
@@ -157,7 +157,6 @@ async function getDigest(req, res) {
             lost,
             total: decided,
             winRate: decided > 0 ? Math.round((won / decided) * 100) : null,
-            roi_pct: overallRow?.roi_pct != null ? Number(overallRow.roi_pct) : null,
           },
           bySport:   buildBreakdown(rows.filter(r => r.dimension_type === 'sport')),
           byBetType: buildBreakdown(rows.filter(r => r.dimension_type === 'bet_type')),
