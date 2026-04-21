@@ -60,49 +60,61 @@ async function getAdminDashboard(req, res) {
       return data || [];
     });
 
-    // --- 3. Model Accuracy: aggregate from ai_suggestions ---
-    const overallAccuracyResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('ai_suggestions')
-        .select('actual_outcome');
-      if (error) throw error;
-      const counts = { won: 0, lost: 0, push: 0, pending: 0, total: 0 };
-      for (const row of data || []) {
-        const outcome = row.actual_outcome || 'pending';
-        counts[outcome] = (counts[outcome] || 0) + 1;
-        counts.total++;
-      }
-      return counts;
-    });
+    // --- 3. Model Accuracy: single MV read, slice by dimension ---
+    const period = ['all', 'last_30d', 'last_7d'].includes(req.query.period)
+      ? req.query.period
+      : 'all';
 
-    const sportBreakdownResult = await safeQuery(async () => {
+    const modelAccuracyResult = await safeQuery(async () => {
       const { data, error } = await supabase
-        .from('ai_suggestions')
-        .select('sport, actual_outcome');
+        .from('mv_model_accuracy')
+        .select('*')
+        .eq('period_bucket', period);
       if (error) throw error;
-      const breakdown = {};
-      for (const row of data || []) {
-        const sport = row.sport || 'unknown';
-        const outcome = row.actual_outcome || 'pending';
-        if (!breakdown[sport]) breakdown[sport] = { won: 0, lost: 0, push: 0, pending: 0 };
-        breakdown[sport][outcome] = (breakdown[sport][outcome] || 0) + 1;
-      }
-      return breakdown;
-    });
 
-    const betTypeBreakdownResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('ai_suggestions')
-        .select('bet_type, actual_outcome');
-      if (error) throw error;
-      const breakdown = {};
-      for (const row of data || []) {
-        const betType = row.bet_type || 'unknown';
-        const outcome = row.actual_outcome || 'pending';
-        if (!breakdown[betType]) breakdown[betType] = { won: 0, lost: 0, push: 0, pending: 0 };
-        breakdown[betType][outcome] = (breakdown[betType][outcome] || 0) + 1;
-      }
-      return breakdown;
+      const keyByValue = (rows) => {
+        const out = {};
+        for (const r of rows) {
+          out[r.dimension_value] = {
+            won: r.won || 0,
+            lost: r.lost || 0,
+            push: r.push || 0,
+            pending: r.pending || 0,
+            total: r.total || 0,
+            settled_with_odds: r.settled_with_odds || 0,
+            roi_units: r.roi_units != null ? Number(r.roi_units) : null,
+            roi_pct: r.roi_pct != null ? Number(r.roi_pct) : null,
+          };
+        }
+        return out;
+      };
+
+      const overallRow = data.find(r => r.dimension_type === 'overall');
+      const overall = overallRow ? {
+        won: overallRow.won || 0,
+        lost: overallRow.lost || 0,
+        push: overallRow.push || 0,
+        pending: overallRow.pending || 0,
+        total: overallRow.total || 0,
+        settled_with_odds: overallRow.settled_with_odds || 0,
+        roi_units: overallRow.roi_units != null ? Number(overallRow.roi_units) : null,
+        roi_pct: overallRow.roi_pct != null ? Number(overallRow.roi_pct) : null,
+      } : { won: 0, lost: 0, push: 0, pending: 0, total: 0, settled_with_odds: 0, roi_units: null, roi_pct: null };
+
+      return {
+        overall,
+        bySport:   keyByValue(data.filter(r => r.dimension_type === 'sport')),
+        byBetType: keyByValue(data.filter(r => r.dimension_type === 'bet_type')),
+        byMode:    keyByValue(data.filter(r => r.dimension_type === 'generate_mode')),
+        edgeCalibration:           data.filter(r => r.dimension_type === 'edge_integer').sort((a, b) => Number(a.dimension_value) - Number(b.dimension_value)),
+        edgeBuckets:               data.filter(r => r.dimension_type === 'edge_bucket'),
+        chatConfidenceCalibration: data.filter(r => r.dimension_type === 'chat_confidence').sort((a, b) => Number(a.dimension_value) - Number(b.dimension_value)),
+        roi: {
+          units: overall.roi_units,
+          pct: overall.roi_pct,
+        },
+        period,
+      };
     });
 
     // --- 4. Recent Picks: last 15 from ai_suggestions ---
@@ -179,36 +191,22 @@ async function getAdminDashboard(req, res) {
       freshnessResults[table] = result || { table, count: null, maxTimestamp: null };
     }));
 
-    // Confidence calibration — win rate by confidence level
-    const confidenceCalibrationResult = await safeQuery(async () => {
-      const { data } = await supabase
-        .from('ai_suggestions')
-        .select('confidence, actual_outcome')
-        .not('confidence', 'is', null)
-        .in('actual_outcome', ['won', 'lost']);
-      if (!data) return [];
-      const buckets = {};
-      data.forEach(row => {
-        const c = row.confidence;
-        if (!buckets[c]) buckets[c] = { confidence: c, won: 0, lost: 0 };
-        if (row.actual_outcome === 'won') buckets[c].won++;
-        else buckets[c].lost++;
-      });
-      return Object.values(buckets)
-        .map(b => ({ ...b, total: b.won + b.lost, winPct: Math.round(100 * b.won / (b.won + b.lost)) }))
-        .sort((a, b) => a.confidence - b.confidence);
-    });
-
     // Build response
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
       cronHealth: cronHealthResult || [],
       recentErrors: recentErrorsResult || [],
-      modelAccuracy: {
-        overall: overallAccuracyResult || { won: 0, lost: 0, push: 0, pending: 0, total: 0 },
-        bySport: sportBreakdownResult || {},
-        byBetType: betTypeBreakdownResult || {}
+      modelAccuracy: modelAccuracyResult || {
+        overall: { won: 0, lost: 0, push: 0, pending: 0, total: 0, settled_with_odds: 0, roi_units: null, roi_pct: null },
+        bySport: {},
+        byBetType: {},
+        byMode: {},
+        edgeCalibration: [],
+        edgeBuckets: [],
+        chatConfidenceCalibration: [],
+        roi: { units: null, pct: null },
+        period: 'all',
       },
       recentPicks: recentPicksResult || [],
       settlementStatus: {
@@ -216,7 +214,6 @@ async function getAdminDashboard(req, res) {
         legsByOutcome: parlayLegsResult || {}
       },
       dataFreshness: freshnessResults,
-      confidenceCalibration: confidenceCalibrationResult || []
     });
 
   } catch (err) {
