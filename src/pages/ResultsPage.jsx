@@ -33,7 +33,6 @@ function BreakdownList({ items }) {
       {entries.map(([label, stats]) => {
         const decided = stats.wins + stats.losses
         const wr = decided > 0 ? ((stats.wins / decided) * 100).toFixed(1) : 'N/A'
-        const roi = stats.roi_pct
         return (
           <div key={label} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
             <span className="text-sm text-gray-300">{label}</span>
@@ -41,13 +40,6 @@ function BreakdownList({ items }) {
               <span className="text-green-400">{stats.wins}W</span>
               <span className="text-red-400">{stats.losses}L</span>
               <span className="text-yellow-400 font-bold">{wr}{wr !== 'N/A' ? '%' : ''}</span>
-              <span className={`font-bold w-14 text-right ${
-                roi == null ? 'text-gray-600' :
-                roi > 0 ? 'text-green-400' :
-                roi < 0 ? 'text-red-400' : 'text-gray-400'
-              }`}>
-                {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
-              </span>
             </div>
           </div>
         )
@@ -193,7 +185,6 @@ export default function ResultsPage({ onBack }) {
                 wins: r.won || 0,
                 losses: r.lost || 0,
                 total: (r.won || 0) + (r.lost || 0) + (r.push || 0),
-                roi_pct: r.roi_pct != null ? Number(r.roi_pct) : null,
               }
             }
             return out
@@ -210,7 +201,6 @@ export default function ResultsPage({ onBack }) {
             byPeriod[period] = {
               total, wins, losses,
               winRate: wins + losses > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) : 'N/A',
-              roi_pct: overallRow?.roi_pct != null ? Number(overallRow.roi_pct) : null,
               bySport:   asMap(rows.filter(r => r.dimension_type === 'sport')),
               byBetType: asMap(rows.filter(r => r.dimension_type === 'bet_type')),
               byMode:    asMap(rows.filter(r => r.dimension_type === 'generate_mode')),
@@ -325,7 +315,7 @@ export default function ResultsPage({ onBack }) {
             {/* Model Stats */}
             {modelStats ? (
               <>
-                <div className="grid grid-cols-5 gap-3 mb-6">
+                <div className="grid grid-cols-4 gap-3 mb-6">
                   <StatCard label="Predictions" value={modelStats.total} color="blue" />
                   <StatCard label="Wins" value={modelStats.wins} color="green" />
                   <StatCard label="Losses" value={modelStats.losses} color="red" />
@@ -334,16 +324,6 @@ export default function ResultsPage({ onBack }) {
                     value={`${modelStats.winRate}%`}
                     color="yellow"
                     sub={modelPeriod === 'last_7d' ? 'Last 7 days' : modelPeriod === 'last_30d' ? 'Last 30 days' : 'All time'}
-                  />
-                  <StatCard
-                    label="ROI"
-                    value={modelStats.roi_pct != null
-                      ? `${modelStats.roi_pct >= 0 ? '+' : ''}${modelStats.roi_pct.toFixed(1)}%`
-                      : '—'}
-                    color={modelStats.roi_pct == null ? 'gray'
-                      : modelStats.roi_pct > 0 ? 'green'
-                      : modelStats.roi_pct < 0 ? 'red'
-                      : 'yellow'}
                   />
                 </div>
 

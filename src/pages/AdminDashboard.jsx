@@ -310,27 +310,17 @@ function ByModeSection({ byMode }) {
       <div className="space-y-2">
         {Object.entries(byMode)
           .sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost))
-          .map(([mode, counts]) => {
-            const roi = counts.roi_pct
-            return (
-              <div key={mode} className="flex items-center gap-3">
-                <span className="text-gray-300 text-xs w-40 flex-shrink-0">{mode}</span>
-                <div className="flex-1">
-                  <WinRateBar won={counts.won} lost={counts.lost} />
-                </div>
-                <span className="text-gray-500 text-xs w-20 text-right flex-shrink-0">
-                  {counts.won}W / {counts.lost}L
-                </span>
-                <span className={`text-xs font-bold w-16 text-right flex-shrink-0 ${
-                  roi == null ? 'text-gray-600' :
-                  roi > 0 ? 'text-green-400' :
-                  roi < 0 ? 'text-red-400' : 'text-gray-400'
-                }`}>
-                  {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
-                </span>
+          .map(([mode, counts]) => (
+            <div key={mode} className="flex items-center gap-3">
+              <span className="text-gray-300 text-xs w-40 flex-shrink-0">{mode}</span>
+              <div className="flex-1">
+                <WinRateBar won={counts.won} lost={counts.lost} />
               </div>
-            )
-          })}
+              <span className="text-gray-500 text-xs w-20 text-right flex-shrink-0">
+                {counts.won}W / {counts.lost}L
+              </span>
+            </div>
+          ))}
       </div>
     </div>
   )
@@ -625,7 +615,7 @@ export default function AdminDashboard({ onBack }) {
         {data && (
           <>
             {/* Quick stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <StatCard
                 label="Cron Jobs Tracked"
                 value={(data.cronHealth || []).length}
@@ -645,19 +635,6 @@ export default function AdminDashboard({ onBack }) {
                 label="Total Parlays"
                 value={Object.values(data.settlementStatus?.parlaysByStatus || {}).reduce((s, v) => s + v, 0).toLocaleString()}
                 color="purple"
-              />
-              <StatCard
-                label="ROI"
-                value={data.modelAccuracy?.roi?.pct != null
-                  ? `${data.modelAccuracy.roi.pct >= 0 ? '+' : ''}${data.modelAccuracy.roi.pct.toFixed(1)}%`
-                  : '—'}
-                sub={data.modelAccuracy?.roi?.units != null
-                  ? `${data.modelAccuracy.roi.units >= 0 ? '+' : ''}${data.modelAccuracy.roi.units.toFixed(2)} units`
-                  : 'no settled odds'}
-                color={data.modelAccuracy?.roi?.pct == null ? 'gray'
-                  : data.modelAccuracy.roi.pct > 0 ? 'green'
-                  : data.modelAccuracy.roi.pct < 0 ? 'red'
-                  : 'yellow'}
               />
             </div>
 

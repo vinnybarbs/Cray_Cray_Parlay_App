@@ -551,10 +551,16 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
 
-  // Statistical edge block — only inject when EdgeCalculator has REAL record/form data.
-  // Without this gate, sports with no stats source (Tennis, UFC, sometimes MLS) got the
-  // calculator's no-data fallback (~53% / 47% defaults) fed to the prompt as truth,
+  // Statistical edge block — inject only when EdgeCalculator has REAL record/form data.
+  // Sports without a stats source (Tennis, UFC, sometimes MLS) previously got the
+  // calculator's no-data fallback (~53% / 47% defaults) surfaced as prompt input,
   // producing identical-looking "calculated win probability" numbers on every tile.
+  //
+  // Trimmed to a tight 2-line signal (math-edge conclusion + recent form) now that
+  // the prompt already carries the actual season record from current_standings.
+  // Intermediate math inputs (calculated win prob, implied prob, pt diff, schedule
+  // strength, adjustments, last-20 record) removed — they were noise the model
+  // parroted incorrectly and are redundant with the real season record.
   const hasRealEdgeData = edgeData
     && edgeData.factors
     && (edgeData.factors.homeRecord
@@ -564,31 +570,25 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
 
   if (hasRealEdgeData) {
     const ed = edgeData;
-    const edgeLines = [
-      `--- STATISTICAL EDGE ANALYSIS ---`,
-      `Calculated Win Probability: ${game.home_team} ${(ed.homeWinProb * 100).toFixed(1)}% | ${game.away_team} ${(ed.awayWinProb * 100).toFixed(1)}%`
-    ];
-    if (ed.impliedHomeProb !== null) {
-      edgeLines.push(`Implied Probability (vig-free): ${game.home_team} ${(ed.impliedHomeProb * 100).toFixed(1)}% | ${game.away_team} ${(ed.impliedAwayProb * 100).toFixed(1)}%`);
-    }
+    const edgeLines = [`--- STATISTICAL EDGE ---`];
+
     if (ed.edge !== null) {
       const edgeSign = ed.edge >= 0 ? '+' : '';
-      edgeLines.push(`Mathematical Edge: ${edgeSign}${(ed.edge * 100).toFixed(1)}% on ${ed.edgeSide === 'home' ? game.home_team : game.away_team} (${ed.confidence} confidence)`);
+      const edgeTeam = ed.edgeSide === 'home' ? game.home_team : game.away_team;
+      edgeLines.push(`Edge: ${edgeSign}${(ed.edge * 100).toFixed(1)}% on ${edgeTeam} (${ed.confidence} confidence)`);
     }
+
     if (ed.factors) {
       const f = ed.factors;
-      if (f.homeRecord) edgeLines.push(`Last 20 games record — ${game.home_team}: ${f.homeRecord.wins}-${f.homeRecord.losses} (${(f.homeRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.homePointDiff >= 0 ? '+' : ''}${f.homePointDiff}`);
-      if (f.awayRecord) edgeLines.push(`Last 20 games record — ${game.away_team}: ${f.awayRecord.wins}-${f.awayRecord.losses} (${(f.awayRecord.winPct * 100).toFixed(1)}% win) | Pt diff/g: ${f.awayPointDiff >= 0 ? '+' : ''}${f.awayPointDiff}`);
-      if (f.homeRecentForm) edgeLines.push(`Recent form — ${game.home_team}: ${f.homeRecentForm.last5} last 5 (${(f.homeRecentForm.winPct * 100).toFixed(0)}%)`);
-      if (f.awayRecentForm) edgeLines.push(`Recent form — ${game.away_team}: ${f.awayRecentForm.last5} last 5 (${(f.awayRecentForm.winPct * 100).toFixed(0)}%)`);
-      if (f.scheduleStrength) edgeLines.push(`Schedule strength — ${game.home_team}: ${(f.scheduleStrength.home * 100).toFixed(1)}% opp avg | ${game.away_team}: ${(f.scheduleStrength.away * 100).toFixed(1)}% opp avg`);
+      if (f.homeRecentForm) edgeLines.push(`${game.home_team} last 5: ${f.homeRecentForm.last5}`);
+      if (f.awayRecentForm) edgeLines.push(`${game.away_team} last 5: ${f.awayRecentForm.last5}`);
     }
-    if (ed.adjustments && ed.adjustments.length > 0) {
-      edgeLines.push(`Key adjustments: ${ed.adjustments.map(a => `${a.factor} (${a.impact >= 0 ? '+' : ''}${(a.impact * 100).toFixed(1)}%)`).join('; ')}`);
+
+    // Only emit the block if we actually added at least one data line beyond the header
+    if (edgeLines.length > 1) {
+      edgeLines.push(`--- END EDGE ---`);
+      contextParts.push(edgeLines.join('\n'));
     }
-    edgeLines.push(`Your job: Does the news/injury/trend context SUPPORT or CONTRADICT this ${ed.edgePercent !== null ? ed.edgePercent.toFixed(1) + '% mathematical edge' : 'edge'}? Be explicit.`);
-    edgeLines.push(`--- END STATISTICAL EDGE ---`);
-    contextParts.push(edgeLines.join('\n'));
   }
   if (accuracy) contextParts.push(`Past accuracy: ${accuracy}`);
 
