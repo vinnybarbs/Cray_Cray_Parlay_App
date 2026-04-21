@@ -236,47 +236,60 @@ async function getInjuryContext(homeTeam, awayTeam) {
  */
 async function getRankingsContext(homeTeam, awayTeam) {
   try {
-    const homeMascot = homeTeam.split(' ').slice(-1)[0];
-    const awayMascot = awayTeam.split(' ').slice(-1)[0];
+    // Full-team-name match prevents collisions like "%Sox%" catching both
+    // White Sox and Red Sox rows. Same rationale as edge-calculator.js.
+    const homeQ = (homeTeam || '').replace(/[(),]/g, '').trim();
+    const awayQ = (awayTeam || '').replace(/[(),]/g, '').trim();
+    const homeLower = homeQ.toLowerCase();
+    const awayLower = awayQ.toLowerCase();
 
-    const result = { home_rank: null, away_rank: null, home_record: null, away_record: null };
+    const result = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
+    if (!homeQ || !awayQ) return result;
 
-    // Primary source: standings table (populated by sync-standings cron from ESPN)
+    // Primary source: current_standings (populated by sync-standings cron from ESPN)
     const { data: standingsData } = await supabase
       .from('current_standings')
       .select('team_name, wins, losses, ties, win_percentage, point_differential, streak, division_rank')
-      .or(`team_name.ilike.%${homeMascot}%,team_name.ilike.%${awayMascot}%,team_name.ilike.%${homeTeam}%,team_name.ilike.%${awayTeam}%`);
+      .or(`team_name.ilike.%${homeQ}%,team_name.ilike.%${awayQ}%`);
 
     if (standingsData) {
       for (const s of standingsData) {
-        const sName = s.team_name.toLowerCase();
-        const isHome = sName.includes(homeMascot.toLowerCase()) || sName.includes(homeTeam.toLowerCase());
-        const isAway = sName.includes(awayMascot.toLowerCase()) || sName.includes(awayTeam.toLowerCase());
+        const sLower = s.team_name.toLowerCase();
+        // Bidirectional match: either the standings name contains the full query,
+        // or the query contains the standings name (handles cases where ESPN uses
+        // a slightly shorter form than the odds feed, e.g. "LA Dodgers" vs "Los Angeles Dodgers").
+        const isHome = sLower.includes(homeLower) || homeLower.includes(sLower);
+        const isAway = sLower.includes(awayLower) || awayLower.includes(sLower);
 
         const record = s.ties > 0 ? `${s.wins}-${s.losses}-${s.ties}` : `${s.wins}-${s.losses}`;
         if (isHome && !result.home_record) {
           result.home_record = record;
+          result.home_streak = s.streak || null;
         }
         if (isAway && !result.away_record) {
           result.away_record = record;
+          result.away_streak = s.streak || null;
         }
       }
     }
 
-    // Secondary source: rankings_cache (AP Top 25 — adds rank for college teams)
+    // Secondary source: rankings_cache (AP Top 25 — adds rank for college teams).
+    // Full-team-name match, same rationale as standings block above.
     const { data: rankData } = await supabase
       .from('rankings_cache')
       .select('team_name, rank, record')
-      .or(`team_name.ilike.%${homeMascot}%,team_name.ilike.%${awayMascot}%`);
+      .or(`team_name.ilike.%${homeQ}%,team_name.ilike.%${awayQ}%`);
 
     if (rankData) {
       for (const r of rankData) {
-        const rName = r.team_name.toLowerCase();
-        if (rName.includes(homeMascot.toLowerCase())) {
+        const rLower = r.team_name.toLowerCase();
+        const isHome = rLower.includes(homeLower) || homeLower.includes(rLower);
+        const isAway = rLower.includes(awayLower) || awayLower.includes(rLower);
+        if (isHome) {
           result.home_rank = r.rank;
           if (!result.home_record && r.record) result.home_record = r.record;
         }
-        if (rName.includes(awayMascot.toLowerCase())) {
+        if (isAway) {
           result.away_rank = r.rank;
           if (!result.away_record && r.record) result.away_record = r.record;
         }
@@ -285,7 +298,7 @@ async function getRankingsContext(homeTeam, awayTeam) {
 
     return result;
   } catch {
-    return { home_rank: null, away_rank: null, home_record: null, away_record: null };
+    return { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
   }
 }
 
@@ -512,8 +525,23 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (oddsCtx.total != null) contextParts.push(`O/U Total: ${oddsCtx.total}`);
   if (oddsCtx.ml_home != null) contextParts.push(`Moneyline: ${game.home_team} ${oddsCtx.ml_home} / ${game.away_team} ${oddsCtx.ml_away}`);
 
-  if (rankCtx.home_rank) contextParts.push(`${game.home_team}: Ranked #${rankCtx.home_rank} (${rankCtx.home_record || ''})`);
-  if (rankCtx.away_rank) contextParts.push(`${game.away_team}: Ranked #${rankCtx.away_rank} (${rankCtx.away_record || ''})`);
+  // Emit the actual season record whenever we have it (from current_standings).
+  // Previously this only fired when `rank` was populated, which is college-only.
+  // NBA/MLB/NHL etc. have no AP-style ranking, so their real season record never
+  // made it into the prompt — the model was left with only the EdgeCalculator's
+  // "last 20 games" record (mislabeled as Season record) and ended up writing
+  // wrong records into snippets. This path is the single source of truth for
+  // the full-season W-L.
+  if (rankCtx.home_record) {
+    const rankStr = rankCtx.home_rank ? ` (Ranked #${rankCtx.home_rank})` : '';
+    const streakStr = rankCtx.home_streak ? `, streak ${rankCtx.home_streak}` : '';
+    contextParts.push(`${game.home_team} season record: ${rankCtx.home_record}${rankStr}${streakStr}`);
+  }
+  if (rankCtx.away_record) {
+    const rankStr = rankCtx.away_rank ? ` (Ranked #${rankCtx.away_rank})` : '';
+    const streakStr = rankCtx.away_streak ? `, streak ${rankCtx.away_streak}` : '';
+    contextParts.push(`${game.away_team} season record: ${rankCtx.away_record}${rankStr}${streakStr}`);
+  }
 
   if (homeTrend) contextParts.push(`${game.home_team} last ${homeTrend.games.length}: ${homeTrend.record} — ${homeTrend.games.join('; ')}`);
   if (awayTrend) contextParts.push(`${game.away_team} last ${awayTrend.games.length}: ${awayTrend.record} — ${awayTrend.games.join('; ')}`);
