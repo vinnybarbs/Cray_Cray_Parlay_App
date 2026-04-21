@@ -93,20 +93,28 @@ async function getUpcomingGames(sports) {
  * Extract spread, total, moneyline from grouped market data
  */
 function extractOddsContext(game) {
-  const ctx = { spread: null, total: null, ml_home: null, ml_away: null };
+  const ctx = {
+    spread: null, total: null, ml_home: null, ml_away: null,
+    spread_home_odds: null, spread_away_odds: null,
+    over_odds: null, under_odds: null
+  };
 
-  // Spread
+  // Spread — capture both point (line) and price (juice) per side
   const spreads = game.markets['spreads'];
   if (spreads) {
     const homeSpread = spreads.find(o => o.name === game.home_team);
-    if (homeSpread) ctx.spread = homeSpread.point;
+    const awaySpread = spreads.find(o => o.name === game.away_team);
+    if (homeSpread) { ctx.spread = homeSpread.point; ctx.spread_home_odds = homeSpread.price; }
+    if (awaySpread) { ctx.spread_away_odds = awaySpread.price; }
   }
 
-  // Total
+  // Total — capture O/U line and juice per side
   const totals = game.markets['totals'];
   if (totals) {
     const over = totals.find(o => o.name === 'Over');
-    if (over) ctx.total = over.point;
+    const under = totals.find(o => o.name === 'Under');
+    if (over) { ctx.total = over.point; ctx.over_odds = over.price; }
+    if (under) { ctx.under_odds = under.price; }
   }
 
   // Moneyline
@@ -119,6 +127,26 @@ function extractOddsContext(game) {
   }
 
   return ctx;
+}
+
+// Format a numeric American odds value into the signed-string format stored in ai_suggestions.odds
+function formatAmericanOdds(price) {
+  if (price == null || Number.isNaN(Number(price))) return null;
+  const n = Number(price);
+  return n > 0 ? `+${n}` : String(n);
+}
+
+// Resolve the juice for the specific side the model picked
+function resolveOddsForPick(oddsCtx, recommendedSide) {
+  switch (recommendedSide) {
+    case 'home_spread': return oddsCtx.spread_home_odds;
+    case 'away_spread': return oddsCtx.spread_away_odds;
+    case 'over':        return oddsCtx.over_odds;
+    case 'under':       return oddsCtx.under_odds;
+    case 'home_ml':     return oddsCtx.ml_home;
+    case 'away_ml':     return oddsCtx.ml_away;
+    default:            return null;
+  }
 }
 
 /**
@@ -905,6 +933,8 @@ async function runPreAnalysis(sportSlugs) {
                   if (totalMatch) point = parseFloat(totalMatch[1]);
                 }
 
+                const pickOdds = formatAmericanOdds(resolveOddsForPick(oddsCtx, result.recommended_side));
+
                 const { error: sugErr } = await supabase
                   .from('ai_suggestions')
                   .insert({
@@ -916,7 +946,7 @@ async function runPreAnalysis(sportSlugs) {
                     bet_type: betType,
                     pick: result.recommended_pick,
                     point: point,
-                    odds: null,
+                    odds: pickOdds,
                     confidence: Math.round(result.edge_score),
                     reasoning: result.analysis_snippet,
                     risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
