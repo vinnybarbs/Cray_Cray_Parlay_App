@@ -467,7 +467,8 @@ export default function MainApp() {
   // Builder state
   const [selectedPicks, setSelectedPicks] = useState([])
   const [userWinRate, setUserWinRate] = useState(null)
-  const [modelSuccessRate, setModelSuccessRate] = useState(null)
+  const [modelStatsByPeriod, setModelStatsByPeriod] = useState({ last_7d: null, last_30d: null, all: null })
+  const [modelPeriod, setModelPeriod] = useState('last_30d')
   const [lockMessage, setLockMessage] = useState('')
   const [locking, setLocking] = useState(false)
 
@@ -511,17 +512,21 @@ export default function MainApp() {
           setUserWinRate(null);
         }
 
-        // Load model success rate from ai_suggestions
-        const { data: modelData, error: modelError } = await supabase
-          .from('ai_suggestions')
-          .select('actual_outcome')
-          .in('actual_outcome', ['won', 'lost']);
-        
-        if (!modelError && modelData && modelData.length > 0) {
-          const modelWins = modelData.filter(p => p.actual_outcome === 'won').length;
-          const modelDecided = modelData.length;
-          const modelRate = ((modelWins / modelDecided) * 100).toFixed(1);
-          setModelSuccessRate(modelRate);
+        // Load model success rate from precomputed MV (all three periods at once)
+        const { data: mvRows, error: mvError } = await supabase
+          .from('mv_model_accuracy')
+          .select('period_bucket, won, lost')
+          .eq('dimension_type', 'overall');
+
+        if (!mvError && mvRows && !cancelled) {
+          const byPeriod = { last_7d: null, last_30d: null, all: null };
+          for (const r of mvRows) {
+            const decided = (r.won || 0) + (r.lost || 0);
+            byPeriod[r.period_bucket] = decided > 0
+              ? ((r.won / decided) * 100).toFixed(1)
+              : null;
+          }
+          setModelStatsByPeriod(byPeriod);
         }
       } catch (e) {
       }
@@ -848,11 +853,30 @@ export default function MainApp() {
           Cray Cray
         </h1>
         <p className="text-xl font-medium text-gray-300">for Parlays</p>
-        <div className="mt-4 flex flex-col items-center space-y-3">
+        <div className="mt-4 flex flex-col items-center space-y-2">
           <div className="w-24 h-24 rounded-full border-2 border-yellow-400 flex flex-col items-center justify-center text-xs">
             <span className="text-gray-400">Model</span>
-            <span className="text-lg font-bold text-yellow-400">{modelSuccessRate != null ? `${modelSuccessRate}%` : '--'}</span>
+            <span className="text-lg font-bold text-yellow-400">{modelStatsByPeriod[modelPeriod] != null ? `${modelStatsByPeriod[modelPeriod]}%` : '--'}</span>
             <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
+          </div>
+          <div className="flex gap-1">
+            {[
+              { key: 'last_7d',  label: '7d' },
+              { key: 'last_30d', label: '30d' },
+              { key: 'all',      label: 'All' },
+            ].map(opt => (
+              <button
+                key={opt.key}
+                onClick={() => setModelPeriod(opt.key)}
+                className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                  modelPeriod === opt.key
+                    ? 'bg-yellow-400 text-gray-900 border-yellow-400'
+                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-yellow-400 hover:text-yellow-400'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
           </div>
         </div>
 

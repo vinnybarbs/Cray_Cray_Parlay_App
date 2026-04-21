@@ -950,30 +950,40 @@ function YesterdayRecap({ results }) {
 
 // ─── ModelPerformance ────────────────────────────────────────────────────────
 
-function ModelPerformance({ sevenDay, allTime }) {
-  const [view, setView] = React.useState('7day')
-  const data = view === '7day' ? sevenDay : allTime
+function ModelPerformance({ accuracy }) {
+  const [period, setPeriod] = React.useState('last_7d')
+  const data = accuracy?.[period]
   if (!data || !data.overall) return null
 
-  const { overall, bySport } = data
-  const sports = Object.entries(bySport).sort((a, b) => (b[1].winRate || 0) - (a[1].winRate || 0))
+  const { overall, bySport, byBetType } = data
+  const sports = Object.entries(bySport || {}).sort((a, b) => (b[1].winRate || 0) - (a[1].winRate || 0))
+  const betTypes = Object.entries(byBetType || {}).sort((a, b) => (b[1].winRate || 0) - (a[1].winRate || 0))
+
+  const periodLabel = period === 'last_7d' ? 'in the last 7 days'
+    : period === 'last_30d' ? 'in the last 30 days'
+    : 'all time'
+
+  const pills = [
+    { key: 'last_7d',  label: '7d' },
+    { key: 'last_30d', label: '30d' },
+    { key: 'all',      label: 'All' },
+  ]
 
   return (
     <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-white">Model Performance</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{overall.total} picks settled {view === '7day' ? 'in the last 7 days' : 'all time'}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{overall.total} picks settled {periodLabel}</p>
         </div>
         <div className="flex bg-gray-900 rounded-lg p-0.5">
-          <button
-            onClick={() => setView('7day')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${view === '7day' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-          >7 Day</button>
-          <button
-            onClick={() => setView('alltime')}
-            className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${view === 'alltime' ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
-          >All Time</button>
+          {pills.map(p => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${period === p.key ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+            >{p.label}</button>
+          ))}
         </div>
       </div>
       <div className="p-6">
@@ -991,33 +1001,68 @@ function ModelPerformance({ sevenDay, allTime }) {
         )}
 
         {/* Per-sport bars */}
-        <div className="space-y-3">
-          {sports.map(([sport, stats]) => {
-            const meta = getSportMeta(sport)
-            return (
-              <div key={sport}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{meta.emoji}</span>
-                    <span className="text-sm text-gray-300 font-medium">{meta.label}</span>
-                    <span className="text-xs text-gray-600">({stats.won}W-{stats.lost}L)</span>
+        {sports.length > 0 && (
+          <>
+            <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">By Sport</div>
+            <div className="space-y-3 mb-6">
+              {sports.map(([sport, stats]) => {
+                const meta = getSportMeta(sport)
+                return (
+                  <div key={sport}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">{meta.emoji}</span>
+                        <span className="text-sm text-gray-300 font-medium">{meta.label}</span>
+                        <span className="text-xs text-gray-600">({stats.won}W-{stats.lost}L)</span>
+                      </div>
+                      <span className={`text-sm font-bold ${winRateColor(stats.winRate)}`}>
+                        {stats.winRate != null ? `${stats.winRate}%` : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                      {stats.winRate != null && (
+                        <div
+                          className={`h-full rounded-full transition-all ${winRateBarColor(stats.winRate)}`}
+                          style={{ width: `${stats.winRate}%` }}
+                        />
+                      )}
+                    </div>
                   </div>
-                  <span className={`text-sm font-bold ${winRateColor(stats.winRate)}`}>
-                    {stats.winRate != null ? `${stats.winRate}%` : 'N/A'}
-                  </span>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Per-bet-type bars */}
+        {betTypes.length > 0 && (
+          <>
+            <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">By Bet Type</div>
+            <div className="space-y-3">
+              {betTypes.map(([betType, stats]) => (
+                <div key={betType}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-300 font-medium">{betType}</span>
+                      <span className="text-xs text-gray-600">({stats.won}W-{stats.lost}L)</span>
+                    </div>
+                    <span className={`text-sm font-bold ${winRateColor(stats.winRate)}`}>
+                      {stats.winRate != null ? `${stats.winRate}%` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    {stats.winRate != null && (
+                      <div
+                        className={`h-full rounded-full transition-all ${winRateBarColor(stats.winRate)}`}
+                        style={{ width: `${stats.winRate}%` }}
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                  {stats.winRate != null && (
-                    <div
-                      className={`h-full rounded-full transition-all ${winRateBarColor(stats.winRate)}`}
-                      style={{ width: `${stats.winRate}%` }}
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -1148,8 +1193,8 @@ export default function DailyDigest({ onBack }) {
         {!loading && !error && data && (
           <>
             {/* Model Performance — right after hero */}
-            {(data.sevenDayAccuracy?.overall || data.allTimeAccuracy?.overall) && (
-              <ModelPerformance sevenDay={data.sevenDayAccuracy} allTime={data.allTimeAccuracy} />
+            {(data.modelAccuracy?.last_7d?.overall || data.modelAccuracy?.last_30d?.overall || data.modelAccuracy?.all?.overall) && (
+              <ModelPerformance accuracy={data.modelAccuracy} />
             )}
 
             {/* Yesterday's Recap — right after performance */}
