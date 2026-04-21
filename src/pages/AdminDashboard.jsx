@@ -302,6 +302,40 @@ function ModelPerformanceSection({ modelAccuracy }) {
   )
 }
 
+function ByModeSection({ byMode }) {
+  if (!byMode || Object.keys(byMode).length === 0) return null
+  return (
+    <div className="bg-gray-900 rounded-xl border border-gray-700 p-5">
+      <SectionHeader title="By Generate Mode" sub="Performance by pick-generation pipeline" />
+      <div className="space-y-2">
+        {Object.entries(byMode)
+          .sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost))
+          .map(([mode, counts]) => {
+            const roi = counts.roi_pct
+            return (
+              <div key={mode} className="flex items-center gap-3">
+                <span className="text-gray-300 text-xs w-40 flex-shrink-0">{mode}</span>
+                <div className="flex-1">
+                  <WinRateBar won={counts.won} lost={counts.lost} />
+                </div>
+                <span className="text-gray-500 text-xs w-20 text-right flex-shrink-0">
+                  {counts.won}W / {counts.lost}L
+                </span>
+                <span className={`text-xs font-bold w-16 text-right flex-shrink-0 ${
+                  roi == null ? 'text-gray-600' :
+                  roi > 0 ? 'text-green-400' :
+                  roi < 0 ? 'text-red-400' : 'text-gray-400'
+                }`}>
+                  {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+                </span>
+              </div>
+            )
+          })}
+      </div>
+    </div>
+  )
+}
+
 function RecentPicksSection({ recentPicks }) {
   const [expanded, setExpanded] = useState(null)
 
@@ -380,35 +414,37 @@ function RecentPicksSection({ recentPicks }) {
   )
 }
 
-function ConfidenceCalibrationSection({ calibration }) {
+function CalibrationSection({ title, subtitle, calibration }) {
   if (!calibration || calibration.length === 0) return null
   return (
     <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
-      <SectionHeader title="Confidence Calibration" sub="Is the model honest about how sure it is?" />
+      <SectionHeader title={title} sub={subtitle} />
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-4">
         {calibration.map(b => {
-          const isCalibrated = Math.abs(b.winPct - (b.confidence * 10)) < 15
+          const won = b.won || 0
+          const lost = b.lost || 0
+          const total = won + lost
+          const winPct = total > 0 ? Math.round((won / total) * 100) : 0
+          const expected = Number(b.dimension_value) * 10
+          const isCalibrated = Math.abs(winPct - expected) < 15
           return (
-            <div key={b.confidence} className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
-              <div className="text-2xl font-bold text-yellow-400">{b.confidence}/10</div>
-              <div className={`text-lg font-bold mt-1 ${b.winPct >= 65 ? 'text-green-400' : b.winPct >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
-                {b.winPct}%
+            <div key={b.dimension_value} className="bg-gray-900 rounded-lg p-3 text-center border border-gray-700">
+              <div className="text-2xl font-bold text-yellow-400">{b.dimension_value}/10</div>
+              <div className={`text-lg font-bold mt-1 ${winPct >= 65 ? 'text-green-400' : winPct >= 50 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {winPct}%
               </div>
-              <div className="text-xs text-gray-500 mt-1">{b.won}W-{b.lost}L ({b.total})</div>
+              <div className="text-xs text-gray-500 mt-1">{won}W-{lost}L ({total})</div>
               <div className="mt-2 w-full bg-gray-700 rounded-full h-2">
-                <div className={`h-2 rounded-full ${b.winPct >= 65 ? 'bg-green-500' : b.winPct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
-                  style={{ width: `${b.winPct}%` }} />
+                <div className={`h-2 rounded-full ${winPct >= 65 ? 'bg-green-500' : winPct >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                  style={{ width: `${winPct}%` }} />
               </div>
               <div className="text-[10px] mt-1 text-gray-600">
-                {isCalibrated ? '✓ calibrated' : b.winPct > b.confidence * 10 ? '↑ underconfident' : '↓ overconfident'}
+                {total === 0 ? '—' : isCalibrated ? '✓ calibrated' : winPct > expected ? '↑ underconfident' : '↓ overconfident'}
               </div>
             </div>
           )
         })}
       </div>
-      <p className="text-xs text-gray-500 mt-3">
-        Ideal: a 7/10 confidence pick should win ~70% of the time. If 8/10 picks only win 60%, the model is overconfident at that level.
-      </p>
     </div>
   )
 }
@@ -589,7 +625,7 @@ export default function AdminDashboard({ onBack }) {
         {data && (
           <>
             {/* Quick stats row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
               <StatCard
                 label="Cron Jobs Tracked"
                 value={(data.cronHealth || []).length}
@@ -610,6 +646,19 @@ export default function AdminDashboard({ onBack }) {
                 value={Object.values(data.settlementStatus?.parlaysByStatus || {}).reduce((s, v) => s + v, 0).toLocaleString()}
                 color="purple"
               />
+              <StatCard
+                label="ROI"
+                value={data.modelAccuracy?.roi?.pct != null
+                  ? `${data.modelAccuracy.roi.pct >= 0 ? '+' : ''}${data.modelAccuracy.roi.pct.toFixed(1)}%`
+                  : '—'}
+                sub={data.modelAccuracy?.roi?.units != null
+                  ? `${data.modelAccuracy.roi.units >= 0 ? '+' : ''}${data.modelAccuracy.roi.units.toFixed(2)} units`
+                  : 'no settled odds'}
+                color={data.modelAccuracy?.roi?.pct == null ? 'gray'
+                  : data.modelAccuracy.roi.pct > 0 ? 'green'
+                  : data.modelAccuracy.roi.pct < 0 ? 'red'
+                  : 'yellow'}
+              />
             </div>
 
             {/* System Health row */}
@@ -624,11 +673,22 @@ export default function AdminDashboard({ onBack }) {
             {/* Model Performance */}
             <ModelPerformanceSection modelAccuracy={data.modelAccuracy} />
 
+            <ByModeSection byMode={data.modelAccuracy?.byMode} />
+
             {/* Recent Picks */}
             <RecentPicksSection recentPicks={data.recentPicks} />
 
-            {/* Confidence Calibration */}
-            <ConfidenceCalibrationSection calibration={data.confidenceCalibration} />
+            {/* Calibration */}
+            <CalibrationSection
+              title="Edge Score Performance"
+              subtitle="Win rate by calculated edge score (auto-generated picks only)"
+              calibration={data.modelAccuracy?.edgeCalibration}
+            />
+            <CalibrationSection
+              title="De-Genny Confidence Calibration"
+              subtitle="Win rate by De-Genny's self-stated confidence (chat picks only)"
+              calibration={data.modelAccuracy?.chatConfidenceCalibration}
+            />
 
             {/* Settlement Monitor */}
             <SettlementSection settlementStatus={data.settlementStatus} />
