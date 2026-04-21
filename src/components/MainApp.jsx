@@ -737,9 +737,10 @@ export default function MainApp() {
         was_locked_by_user: true
       }))
 
-      const { error: picksError } = await supabase
+      const { data: insertedSuggestions, error: picksError } = await supabase
         .from('ai_suggestions')
         .insert(picksToInsert)
+        .select('id')
 
       if (picksError) {
         console.error('Error saving picks to ai_suggestions:', picksError)
@@ -749,6 +750,7 @@ export default function MainApp() {
       // CRITICAL: Save individual legs to parlay_legs table for outcome tracking
       const legsToInsert = selectedPicks.map((pick, index) => ({
         parlay_id: parlayData.id,
+        suggestion_id: insertedSuggestions?.[index]?.id ?? null,  // linkage for SQL settlement propagation
         leg_number: index + 1,
         game_date: pick.gameDate ? pick.gameDate.split('T')[0] : new Date().toISOString().split('T')[0],
         sport: pick.sport,
