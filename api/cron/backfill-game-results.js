@@ -51,8 +51,25 @@ async function fetchScoreboard(sport, sportPath, dateStr) {
       const away = comp.competitors?.find(c => c.homeAway === 'away');
       if (!home || !away) continue;
 
+      // ESPN uses sport-specific status names for completed games:
+      //   US team sports (NFL/NBA/NHL/MLB/NCAAB/NCAAF): STATUS_FINAL
+      //   Period-ending edge case: STATUS_END_PERIOD
+      //   Soccer (EPL/MLS): STATUS_FULL_TIME (regulation) / STATUS_AFTER_EXTRA_TIME (ET)
+      //                     / STATUS_END_PENALTY_SHOOTOUT (cup PKs)
+      //   MMA: STATUS_FIGHT_OVER
+      // Previously only the first two were accepted, so every finished soccer
+      // match silently hit the `continue` below and got dropped — the real
+      // reason 0 EPL/MLS rows ever landed in game_results.
       const status = event.status?.type?.name;
-      if (status !== 'STATUS_FINAL' && status !== 'STATUS_END_PERIOD') continue;
+      const COMPLETED_STATUSES = new Set([
+        'STATUS_FINAL',
+        'STATUS_END_PERIOD',
+        'STATUS_FULL_TIME',
+        'STATUS_AFTER_EXTRA_TIME',
+        'STATUS_END_PENALTY_SHOOTOUT',
+        'STATUS_FIGHT_OVER'
+      ]);
+      if (!COMPLETED_STATUSES.has(status)) continue;
 
       const homeScore = parseInt(home.score, 10);
       const awayScore = parseInt(away.score, 10);
