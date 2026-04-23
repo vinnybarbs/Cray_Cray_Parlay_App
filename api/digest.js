@@ -51,9 +51,30 @@ async function getDigest(req, res) {
       return data || [];
     });
 
+    // Attach canonical fact sheet per game via build_game_fact_sheet() RPC.
+    // Non-breaking: every flat field on the game row (edge_score, home_record,
+    // analysis_snippet, etc.) stays intact. The `fact_sheet` key is additive
+    // so the tile component can migrate to the canonical shape incrementally.
+    // Parallel RPC calls — ~50 games × one function call each runs in ms.
+    const games = todaysGamesResult || [];
+    await Promise.all(games.map(async (game) => {
+      try {
+        const { data, error } = await supabase.rpc('build_game_fact_sheet', { p_game_key: game.game_key });
+        if (error) {
+          logger.warn('fact_sheet RPC failed', { game_key: game.game_key, error: error.message });
+          game.fact_sheet = null;
+          return;
+        }
+        game.fact_sheet = data || null;
+      } catch (err) {
+        logger.warn('fact_sheet RPC threw', { game_key: game.game_key, error: err.message });
+        game.fact_sheet = null;
+      }
+    }));
+
     // Group games by sport
     const gamesBySport = {};
-    for (const game of todaysGamesResult || []) {
+    for (const game of games) {
       const sport = game.sport || 'Unknown';
       if (!gamesBySport[sport]) gamesBySport[sport] = [];
       gamesBySport[sport].push(game);
@@ -311,6 +332,14 @@ async function deepResearch(req, res) {
       return res.status(404).json({ error: 'Game not found', game_key });
     }
 
+    // Canonical fact sheet (same as /digest list view) — structured matchup,
+    // market, records, edge sections sourced from build_game_fact_sheet().
+    const factSheetResult = await safeQuery(async () => {
+      const { data, error } = await supabase.rpc('build_game_fact_sheet', { p_game_key: game_key });
+      if (error) throw error;
+      return data || null;
+    });
+
     const { home_team, away_team, sport } = gameAnalysisResult;
 
     // 2. Injury reports for both teams' sport from news_cache
@@ -381,6 +410,7 @@ async function deepResearch(req, res) {
     res.json({
       status: 'ok',
       game_key,
+      fact_sheet: factSheetResult,
       analysis: gameAnalysisResult,
       injuries: injuriesResult || [],
       articles: articlesResult || [],
