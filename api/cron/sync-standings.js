@@ -66,6 +66,17 @@ async function fetchESPNStandings(sport, config) {
         stats[s.name] = s.displayValue || s.value;
       }
 
+      // NHL's third column is overtime losses (key `otLosses`), NOT `ties`.
+      // Soccer (EPL/MLS) uses `ties` for draws — ESPN's stats match. Every
+      // other sport has no third column; `ties` is 0 or absent.
+      const thirdCol = sport === 'NHL'
+        ? (parseInt(stats.otLosses ?? stats.overtimeLosses) || 0)
+        : (parseInt(stats.ties) || 0);
+
+      // Strip ", N PTS" suffix that ESPN adds to some display strings (e.g.
+      // NHL "7-2-1, 0 PTS") — keep just the record portion.
+      const cleanDisplay = (v) => typeof v === 'string' ? v.split(',')[0].trim() : v;
+
       teams.push({
         espn_id: team.id,
         name: team.displayName,
@@ -74,18 +85,16 @@ async function fetchESPNStandings(sport, config) {
         conference,
         wins: parseInt(stats.wins) || 0,
         losses: parseInt(stats.losses) || 0,
-        ties: parseInt(stats.ties) || 0,
+        ties: thirdCol,
         points_for: parseInt(stats.pointsFor) || 0,
         points_against: parseInt(stats.pointsAgainst) || 0,
         point_differential: parseInt(stats.pointDifferential) || 0,
         streak: stats.streak || null,
         win_pct: parseFloat(stats.winPercent) || 0,
-        overall_record: stats.overall || `${parseInt(stats.wins) || 0}-${parseInt(stats.losses) || 0}`,
-        home_record: stats.Home || null,
-        away_record: stats.Road || null,
-        last_10: stats['Last Ten Games'] || stats['Last Ten'] || null,
-        playoff_seed: parseInt(stats.playoffSeed) || null,
-        division: stats['vs. Div.'] ? null : null // Division name not in stats, comes from group structure
+        home_record: cleanDisplay(stats.Home) || null,
+        away_record: cleanDisplay(stats.Road) || null,
+        last_10: cleanDisplay(stats['Last Ten Games'] || stats['Last Ten']) || null,
+        playoff_seed: parseInt(stats.playoffSeed) || null
       });
     }
   }
@@ -199,6 +208,10 @@ async function syncStandings(req, res) {
               points_against: team.points_against,
               point_differential: team.point_differential,
               streak: team.streak,
+              last_10: team.last_10,
+              home_record: team.home_record,
+              away_record: team.away_record,
+              playoff_seed: team.playoff_seed,
               updated_at: new Date().toISOString()
             }, { onConflict: 'team_id,season' });
 
