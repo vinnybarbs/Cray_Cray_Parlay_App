@@ -950,7 +950,14 @@ async function runPreAnalysis(sportSlugs) {
             implied_away_prob: edgeData ? edgeData.impliedAwayProb : null,
             calc_edge: edgeData ? edgeData.edge : null,
             calc_edge_side: edgeData ? edgeData.edgeSide : null,
-            edge_factors: edgeData ? edgeData.factors : null
+            // Merge factors + adjustments + confidence into edge_factors so the
+            // fact sheet's edge.adjustments[] path resolves. Calculator returns
+            // them as separate top-level keys on edgeData — flatten for storage.
+            edge_factors: edgeData ? {
+              ...edgeData.factors,
+              adjustments: edgeData.adjustments || [],
+              confidence: edgeData.confidence || null
+            } : null
           };
 
           const { error } = await supabase
