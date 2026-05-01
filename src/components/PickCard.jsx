@@ -80,8 +80,10 @@ export default function PickCard({ pick, onAdd, isAdded }) {
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD'
     const date = new Date(dateString)
-    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' })
-    const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Denver' })
+    // No timeZone option → renders in the visitor's local timezone, which is
+    // what users actually want (a Boston user shouldn't see games in MT).
+    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     return `${datePart} • ${timePart}`
   }
 

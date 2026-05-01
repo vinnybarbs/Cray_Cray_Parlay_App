@@ -37,10 +37,12 @@ const ANALYSIS_SPORT_TO_CODE = {
   soccer_usa_mls: 'MLS',
 }
 
+// Note: function name is now misleading — kept stable to avoid touching every
+// call site. Renders in the user's local timezone (no timeZone option) so a
+// New York user sees Eastern, a London user sees BST, etc.
 function toMountainTime(isoString) {
   if (!isoString) return null
   return new Date(isoString).toLocaleString('en-US', {
-    timeZone: 'America/Denver',
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -50,7 +52,6 @@ function toMountainTime(isoString) {
 function formatFullDate(isoString) {
   const d = isoString ? new Date(isoString) : new Date()
   return d.toLocaleDateString('en-US', {
-    timeZone: 'America/Denver',
     weekday: 'long',
     year: 'numeric',
     month: 'long',
@@ -244,7 +245,7 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
               {game.away_team} <span className="text-gray-500">@</span> {game.home_team}
             </h2>
             {game.game_date && (
-              <div className="text-xs text-gray-500 mt-0.5">{toMountainTime(game.game_date)} MT</div>
+              <div className="text-xs text-gray-500 mt-0.5">{toMountainTime(game.game_date)}</div>
             )}
           </div>
           <button
@@ -538,7 +539,7 @@ function GameCard({ game, gameKey, onDeepResearch }) {
               </div>
             )}
             {game.game_date && (
-              <div className="text-xs text-gray-600 mt-0.5">{toMountainTime(game.game_date)} MT</div>
+              <div className="text-xs text-gray-600 mt-0.5">{toMountainTime(game.game_date)}</div>
             )}
           </div>
           {edge != null && (
