@@ -598,15 +598,15 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
     refinementBlock = `
 REFINEMENT CONTEXT — This is pass #${priorAnalysis.version + 1} on this game.
 YOUR PRIOR ANALYSIS (${priorAnalysis.version === 1 ? 'initial' : 'pass #' + priorAnalysis.version}):
-  Edge score: ${priorAnalysis.prior_edge}/10
   Pick: ${priorAnalysis.prior_pick}
   Analysis: ${priorAnalysis.prior_snippet}
+  (Edge score is computed from our model, not your judgment — last pass: ${priorAnalysis.prior_edge}/10)
 
 YOUR TASK: Compare the current data above to your prior analysis. What changed?
 - New injury reports? Line movement? Recent game results?
-- Should your edge score go UP (more confident), DOWN (less confident), or STAY?
+- Did your recommended pick change? If so, why?
 - Explain SPECIFICALLY what changed and why in the "what_changed" field.
-- If nothing meaningful changed, keep your prior score but note "No significant changes."
+- If nothing meaningful changed, keep your prior pick and note "No significant changes."
 `;
   }
 
@@ -645,13 +645,12 @@ SPREAD SIGN RULES (critical — get this right):
 Respond in EXACTLY this JSON format (no markdown):
 {
   "analysis": "3-5 sentence analysis citing specific records, scores, and matchup factors",
-  "edge_score": 7.5,
   "recommended_pick": "Kansas -7.5",
   "recommended_side": "home_spread",
   "key_factors": ["factor1 with numbers", "factor2 with numbers", "factor3 with numbers"]${priorAnalysis ? ',\n  "what_changed": "Explain what changed since last analysis (injuries, line movement, new results)"' : ''}
 }
 
-edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Key factors MUST include specific numbers/records. The recommended_pick MUST include the correct spread sign (+ or -) matching the data provided.`;
+recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Key factors MUST include specific numbers/records. The recommended_pick MUST include the correct spread sign (+ or -) matching the data provided. The edge_score is computed deterministically from our model (NOT from your judgment) — do not include it in your response.`;
 
   try {
     const response = await fetch(OPENAI_URL, {
@@ -685,7 +684,11 @@ edge_score: 1-10 (10 = strongest edge). recommended_side must be one of: home_sp
 
     return {
       analysis_snippet: parsed.analysis,
-      edge_score: parsed.edge_score,
+      // edge_score intentionally NOT pulled from LLM response — it's computed
+      // deterministically from edge-calculator output at storage time. We
+      // keep parsed.edge_score available as a legacy fallback (only used when
+      // the deterministic calc returns null, e.g., missing market lines).
+      edge_score_llm_fallback: parsed.edge_score ?? null,
       recommended_pick: parsed.recommended_pick,
       recommended_side: parsed.recommended_side,
       key_factors: parsed.key_factors,
@@ -925,7 +928,9 @@ async function runPreAnalysis(sportSlugs) {
             moneyline_home: oddsCtx.ml_home,
             moneyline_away: oddsCtx.ml_away,
             analysis_snippet: result.analysis_snippet,
-            edge_score: result.edge_score,
+            // Deterministic edge_score from edge-calculator (clamp(0,10, edgePct + confBonus)).
+            // Falls back to LLM-supplied number only when calc has no market data.
+            edge_score: edgeCalc.edgeScoreFromCalc(edgeData) ?? result.edge_score_llm_fallback ?? null,
             recommended_pick: result.recommended_pick,
             recommended_side: result.recommended_side,
             key_factors: result.key_factors,
@@ -941,7 +946,12 @@ async function runPreAnalysis(sportSlugs) {
             analysis_version: prior ? prior.version + 1 : 1,
             prior_analysis: prior ? prior.prior_snippet : null,
             prior_edge_score: prior ? prior.prior_edge : null,
-            edge_movement: prior ? (result.edge_score > prior.prior_edge ? 'up' : result.edge_score < prior.prior_edge ? 'down' : 'stable') : null,
+            edge_movement: (() => {
+              if (!prior) return null;
+              const newScore = edgeCalc.edgeScoreFromCalc(edgeData) ?? result.edge_score_llm_fallback;
+              if (newScore == null || prior.prior_edge == null) return null;
+              return newScore > prior.prior_edge ? 'up' : newScore < prior.prior_edge ? 'down' : 'stable';
+            })(),
             what_changed: result.what_changed || null,
             // Statistical edge calculator outputs
             calc_home_prob: edgeData ? edgeData.homeWinProb : null,
