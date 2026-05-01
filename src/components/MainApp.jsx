@@ -407,7 +407,6 @@ export default function MainApp() {
   const [loadingMessage, setLoadingMessage] = useState('');
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const [showWeeklySuggestions, setShowWeeklySuggestions] = useState(false);
   const [showBetslipBuilder, setShowBetslipBuilder] = useState(false);
   const [showChatPicks, setShowChatPicks] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -818,12 +817,6 @@ export default function MainApp() {
                   How It Works
                 </button>
                 <button
-                  onClick={() => { setShowWeeklySuggestions(true); setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-                >
-                  Suggestions This Week
-                </button>
-                <button
                   onClick={() => { setShowDigest(true); setShowNavMenu(false); window.location.hash = '#/digest'; }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
                 >
@@ -1230,28 +1223,12 @@ export default function MainApp() {
               <button
                 onClick={() => setShowHowItWorks(false)}
                 className="text-gray-400 hover:text-white text-2xl"
+                aria-label="Close How It Works"
               >
                 ✕
               </button>
             </div>
             <AIAgentsWorkflow />
-          </div>
-        </div>
-      )}
-
-      {showWeeklySuggestions && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-yellow-400">Suggestions This Week</h2>
-              <button
-                onClick={() => setShowWeeklySuggestions(false)}
-                className="text-gray-400 hover:text-white text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-gray-300">Coming soon: View all suggested picks from the last 7 days.</p>
           </div>
         </div>
       )}

@@ -1,7 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
-const ADMIN_SECRET = 'admin123'
+// SECURITY NOTE: This is read from VITE_ADMIN_SECRET, but Vite ships VITE_*
+// vars to the client bundle — anyone who downloads the JS can extract it.
+// This env-var move stops casual repo grep but is NOT a real auth boundary.
+// Real fix: replace with Supabase auth + an `is_admin` flag on user profile,
+// then have the backend check the bearer token. Tracked as follow-up.
+const ADMIN_SECRET = import.meta.env.VITE_ADMIN_SECRET || ''
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 
