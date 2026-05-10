@@ -35,9 +35,24 @@ async function cronCheckParlays(req, res) {
     // 2. Check AI suggestion outcomes (for model accuracy)
     const suggestionChecker = new AISuggestionOutcomeChecker();
     const suggestionResult = await suggestionChecker.checkAllPendingSuggestions();
-    
+
     logger.info(`✅ AI suggestion check complete: ${suggestionResult.checked} checked, ${suggestionResult.updated} updated`);
-    
+
+    // 3. Refresh model-accuracy MV so admin/digest reflect what we just settled.
+    //    Without this, the dashboard reads yesterday's snapshot and shows N/A
+    //    for sports that just got their first decisions today.
+    if (suggestionResult.updated > 0 || parlayResult.updated > 0) {
+      try {
+        const { createClient } = require('@supabase/supabase-js');
+        const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+        const { error } = await sb.rpc('refresh_mv_model_accuracy');
+        if (error) logger.warn('mv_model_accuracy refresh failed', { error: error.message });
+        else logger.info('🔄 mv_model_accuracy refreshed');
+      } catch (err) {
+        logger.warn('mv_model_accuracy refresh threw', { error: err.message });
+      }
+    }
+
     res.json({
       success: true,
       message: `Checked ${parlayResult.checked} parlays and ${suggestionResult.checked} AI suggestions`,
