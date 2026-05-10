@@ -33,8 +33,13 @@ async function cronCheckParlays(req, res) {
     logger.info(`✅ Parlay check complete: ${parlayResult.checked} checked, ${parlayResult.updated} updated`);
     
     // 2. Check AI suggestion outcomes (for model accuracy)
+    // ?daysBack=N overrides the default 7-day lookback (used to sweep older
+    // pending picks, e.g. props that were reverted from a previous bug).
+    const daysBack = parseInt(req.query.daysBack, 10);
     const suggestionChecker = new AISuggestionOutcomeChecker();
-    const suggestionResult = await suggestionChecker.checkAllPendingSuggestions();
+    const suggestionResult = await suggestionChecker.checkAllPendingSuggestions(
+      Number.isFinite(daysBack) && daysBack > 0 ? { daysBack } : {}
+    );
 
     logger.info(`✅ AI suggestion check complete: ${suggestionResult.checked} checked, ${suggestionResult.updated} updated`);
 
