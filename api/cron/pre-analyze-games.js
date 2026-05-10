@@ -572,7 +572,24 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
     const ed = edgeData;
     const edgeLines = [`--- STATISTICAL EDGE ---`];
 
-    if (ed.edge !== null) {
+    // Per-side edges, signed. The LLM should pick the side with the
+    // largest positive edge — anything < +2pp is market noise; ML picks
+    // hit hardest historically when their edge is real.
+    const fmt = (e) => e == null ? 'N/A' : `${e >= 0 ? '+' : ''}${(e * 100).toFixed(1)}pp`;
+    if (ed.edges) {
+      const e = ed.edges;
+      edgeLines.push(`Per-side model edge vs market (positive = value):`);
+      edgeLines.push(`  ${game.home_team} ML: ${fmt(e.home_ml)}    ${game.away_team} ML: ${fmt(e.away_ml)}`);
+      if (e.home_spread != null || e.away_spread != null) {
+        edgeLines.push(`  ${game.home_team} spread: ${fmt(e.home_spread)}    ${game.away_team} spread: ${fmt(e.away_spread)}`);
+      }
+      if (ed.modelMargin != null && ed.market?.homeSpread != null) {
+        edgeLines.push(`  Model expects ${game.home_team} ${ed.modelMargin >= 0 ? 'wins by' : 'loses by'} ${Math.abs(ed.modelMargin).toFixed(1)} (market spread: ${ed.market.homeSpread})`);
+      }
+      edgeLines.push(`Confidence: ${ed.confidence}.`);
+      edgeLines.push(`Pick the SIDE+MARKET with the largest positive edge. If every market shows < +2pp, the model has no real edge — say so rather than forcing a pick.`);
+    } else if (ed.edge !== null) {
+      // Legacy fallback when per-side edges weren't computed (no spread market).
       const edgeSign = ed.edge >= 0 ? '+' : '';
       const edgeTeam = ed.edgeSide === 'home' ? game.home_team : game.away_team;
       edgeLines.push(`Edge: ${edgeSign}${(ed.edge * 100).toFixed(1)}% on ${edgeTeam} (${ed.confidence} confidence)`);
@@ -930,7 +947,10 @@ async function runPreAnalysis(sportSlugs) {
             analysis_snippet: result.analysis_snippet,
             // Deterministic edge_score from edge-calculator (clamp(0,10, edgePct + confBonus)).
             // Falls back to LLM-supplied number only when calc has no market data.
-            edge_score: edgeCalc.edgeScoreFromCalc(edgeData) ?? result.edge_score_llm_fallback ?? null,
+            // Score the bet that was actually picked. A spread pick on a
+            // heavy ML favorite no longer inherits the ML probability gap.
+            edge_score: edgeCalc.edgeScoreFromCalc(edgeData, result.recommended_side)
+                        ?? result.edge_score_llm_fallback ?? null,
             recommended_pick: result.recommended_pick,
             recommended_side: result.recommended_side,
             key_factors: result.key_factors,
@@ -948,7 +968,8 @@ async function runPreAnalysis(sportSlugs) {
             prior_edge_score: prior ? prior.prior_edge : null,
             edge_movement: (() => {
               if (!prior) return null;
-              const newScore = edgeCalc.edgeScoreFromCalc(edgeData) ?? result.edge_score_llm_fallback;
+              const newScore = edgeCalc.edgeScoreFromCalc(edgeData, result.recommended_side)
+                               ?? result.edge_score_llm_fallback;
               if (newScore == null || prior.prior_edge == null) return null;
               return newScore > prior.prior_edge ? 'up' : newScore < prior.prior_edge ? 'down' : 'stable';
             })(),
