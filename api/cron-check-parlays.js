@@ -15,6 +15,15 @@ const { logger } = require('../shared/logger');
 
 async function cronCheckParlays(req, res) {
   try {
+    // Match the secret-auth pattern used by other cron routes (pre-analyze-games,
+    // backfill-game-results, sync-standings). Endpoint is otherwise public.
+    if (process.env.CRON_SECRET) {
+      const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
+      if (cronSecret !== process.env.CRON_SECRET) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+    }
+
     logger.info('🎲 Starting automated outcome check...');
     
     // 1. Check user parlay outcomes
