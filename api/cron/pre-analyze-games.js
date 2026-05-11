@@ -149,6 +149,41 @@ function resolveOddsForPick(oddsCtx, recommendedSide) {
   }
 }
 
+// Build the displayed pick text deterministically from the math-chosen side
+// plus market context. Previously the LLM wrote this string and frequently
+// got the spread sign wrong; now it's derived.
+function buildPickText(side, oddsCtx, game) {
+  if (!side) return null;
+  switch (side) {
+    case 'home_ml': {
+      const price = formatAmericanOdds(oddsCtx.ml_home);
+      return price ? `${game.home_team} ML ${price}` : `${game.home_team} ML`;
+    }
+    case 'away_ml': {
+      const price = formatAmericanOdds(oddsCtx.ml_away);
+      return price ? `${game.away_team} ML ${price}` : `${game.away_team} ML`;
+    }
+    case 'home_spread': {
+      if (oddsCtx.spread == null) return null;
+      const sign = oddsCtx.spread >= 0 ? '+' : '';
+      return `${game.home_team} ${sign}${oddsCtx.spread}`;
+    }
+    case 'away_spread': {
+      if (oddsCtx.spread == null) return null;
+      // Away spread is the inverse of the home spread.
+      const awaySpread = -oddsCtx.spread;
+      const sign = awaySpread >= 0 ? '+' : '';
+      return `${game.away_team} ${sign}${awaySpread}`;
+    }
+    case 'over':
+      return oddsCtx.total != null ? `Over ${oddsCtx.total}` : null;
+    case 'under':
+      return oddsCtx.total != null ? `Under ${oddsCtx.total}` : null;
+    default:
+      return null;
+  }
+}
+
 /**
  * Get relevant news snippets for a game's teams.
  *
@@ -510,7 +545,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
 /**
  * Generate AI analysis for a single game using GPT-4o-mini
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null) {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null) {
   const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -587,7 +622,6 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
         edgeLines.push(`  Model expects ${game.home_team} ${ed.modelMargin >= 0 ? 'wins by' : 'loses by'} ${Math.abs(ed.modelMargin).toFixed(1)} (market spread: ${ed.market.homeSpread})`);
       }
       edgeLines.push(`Confidence: ${ed.confidence}.`);
-      edgeLines.push(`Pick the SIDE+MARKET with the largest positive edge. If every market shows < +2pp, the model has no real edge — say so rather than forcing a pick.`);
     } else if (ed.edge !== null) {
       // Legacy fallback when per-side edges weren't computed (no spread market).
       const edgeSign = ed.edge >= 0 ? '+' : '';
@@ -627,11 +661,29 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
 `;
   }
 
-  const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Analyze this game and provide a detailed, data-backed betting recommendation.
+  // The pick is chosen by the math (edge-calculator.pickBestSide). The LLM's
+  // job is to JUSTIFY that pick with specific data — not to override it. This
+  // is the structural fix for the "LLM picks the wrong side because of
+  // narrative" problem (e.g., OKC -10.5 picked over Lakers +10.5 despite a
+  // +18pp model edge on the Lakers side).
+  const pickBlock = mathPick
+    ? `\nOUR MODEL'S PICK (fixed — do not change):
+  Side: ${mathPick.recommended_side}
+  Pick text: ${mathPick.recommended_pick}
+  Model edge: ${(mathPick.signedEdge * 100).toFixed(1)}pp vs market
+  Your job is to JUSTIFY this pick using the matchup data above. If the data
+  contradicts the model's pick, say so honestly in the analysis (we'd rather
+  catch a model mistake than confidently bullshit). Do NOT write a different
+  pick — that's chosen by our math.\n`
+    : `\nOUR MODEL HAS NO EDGE on this game (every market < +2pp). Your job is to
+  write a 2-3 sentence preview that explains why this game lacks a clear edge.
+  Do not recommend a pick.\n`;
+
+  const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Justify our model's pick using the data below.
 ${refinementBlock}
 
 ${contextParts.join('\n')}
-
+${pickBlock}
 CRITICAL RULES:
 - CITE SPECIFIC NUMBERS: W-L records, point differentials, recent scores, rankings
 - Reference the ACTUAL recent game results if provided (e.g., "W 96-84 vs Auburn")
@@ -644,30 +696,13 @@ CRITICAL RULES:
   If the data isn't there, either omit that dimension or say "not available" explicitly.
   It is better to have shorter analysis than confident-sounding invented numbers.
 
-BET TYPE PRIORITY (based on our actual model performance):
-- MONEYLINE picks hit at 70-77%. If one team is clearly stronger, recommend home_ml or away_ml.
-- SPREAD picks hit at 61%. Only recommend when data strongly supports the margin.
-- TOTAL picks hit at 56%. Only recommend when you have scoring data for BOTH teams.
-- PREFER MONEYLINE when there's a clear favorite. Our users make the most money on ML picks.
-
-BAD example: "Alabama has strong offensive performance and home advantage"
-GOOD example: "Alabama (23-8, #15) beat Auburn 96-84 and Tennessee 71-69 in their last two, averaging 83.5 PPG. Florida (25-6, #4) is dominant at home but the 11.5-point spread is steep given Bama's recent form."
-
-SPREAD SIGN RULES (critical — get this right):
-- NEGATIVE spread (-1.5, -7.5) = FAVORITE, they must win by more than that margin
-- POSITIVE spread (+1.5, +7.5) = UNDERDOG, they get those points added to their score
-- The spread sign is provided in the matchup data above — use it EXACTLY as shown
-- Example: if Team A is +1.5, your pick must say "Team A +1.5" NOT "Team A -1.5"
-
 Respond in EXACTLY this JSON format (no markdown):
 {
   "analysis": "3-5 sentence analysis citing specific records, scores, and matchup factors",
-  "recommended_pick": "Kansas -7.5",
-  "recommended_side": "home_spread",
   "key_factors": ["factor1 with numbers", "factor2 with numbers", "factor3 with numbers"]${priorAnalysis ? ',\n  "what_changed": "Explain what changed since last analysis (injuries, line movement, new results)"' : ''}
 }
 
-recommended_side must be one of: home_spread, away_spread, over, under, home_ml, away_ml. Key factors MUST include specific numbers/records. The recommended_pick MUST include the correct spread sign (+ or -) matching the data provided. The edge_score is computed deterministically from our model (NOT from your judgment) — do not include it in your response.`;
+Key factors MUST include specific numbers/records. Do NOT include recommended_pick, recommended_side, or edge_score — those are determined by the math, not by you.`;
 
   try {
     const response = await fetch(OPENAI_URL, {
@@ -699,15 +734,13 @@ recommended_side must be one of: home_spread, away_spread, over, under, home_ml,
     const jsonStr = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(jsonStr);
 
+    // Pick is now math-derived — return it alongside the LLM's analysis text.
+    // LLM is no longer allowed to change recommended_pick / recommended_side.
     return {
       analysis_snippet: parsed.analysis,
-      // edge_score intentionally NOT pulled from LLM response — it's computed
-      // deterministically from edge-calculator output at storage time. We
-      // keep parsed.edge_score available as a legacy fallback (only used when
-      // the deterministic calc returns null, e.g., missing market lines).
-      edge_score_llm_fallback: parsed.edge_score ?? null,
-      recommended_pick: parsed.recommended_pick,
-      recommended_side: parsed.recommended_side,
+      edge_score_llm_fallback: null,
+      recommended_pick: mathPick ? mathPick.recommended_pick : null,
+      recommended_side: mathPick ? mathPick.recommended_side : null,
       key_factors: parsed.key_factors,
       what_changed: parsed.what_changed || null,
       prompt_tokens: usage?.prompt_tokens,
@@ -922,7 +955,28 @@ async function runPreAnalysis(sportSlugs) {
           console.warn(`  Edge calc failed for ${game.game_key}: ${edgeErr.message}`);
         }
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior, edgeData);
+        // MATH PICKS, LLM NARRATES — choose side+market from per-side edges,
+        // then ask the LLM only to justify it. The previous flow let the LLM
+        // pick its own side, which broke when narrative ("5-game win streak")
+        // overruled the per-side edge data (e.g., OKC -10.5 chosen over the
+        // +18pp Lakers +10.5 cover edge).
+        let mathPick = null;
+        const bestSide = edgeData ? edgeCalc.pickBestSide(edgeData) : null;
+        if (bestSide) {
+          const pickText = buildPickText(bestSide.side, oddsCtx, game);
+          if (pickText) {
+            mathPick = {
+              recommended_side: bestSide.side,
+              recommended_pick: pickText,
+              signedEdge: bestSide.signedEdge,
+            };
+            console.log(`  🎯 Math pick: ${pickText} (${bestSide.side}, edge ${(bestSide.signedEdge * 100).toFixed(1)}pp)`);
+          }
+        } else {
+          console.log(`  ⚪ No-edge game — every market < +2pp`);
+        }
+
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior, edgeData, mathPick);
 
         if (!result) {
           console.warn(`  ⚠️ analyzeGame returned null for ${game.game_key}`);
@@ -1006,19 +1060,20 @@ async function runPreAnalysis(sportSlugs) {
             // Auto-save ALL predictions to ai_suggestions for honest performance tracking
             if (result.recommended_pick) {
               try {
-                // Determine bet type from the recommended pick text
+                // Derive bet type from the math-chosen side, NOT regex on the
+                // pick text. ML picks include the price ("+310"), which the
+                // old regex misclassified as a Spread.
                 let betType = 'Moneyline';
                 let point = null;
-                const pickText = result.recommended_pick;
-                if (pickText.match(/[+-]\d+\.?\d*/)) {
-                  const spreadMatch = pickText.match(/([+-]\d+\.?\d*)/);
-                  if (spreadMatch) point = parseFloat(spreadMatch[1]);
+                const side = result.recommended_side;
+                if (side === 'home_spread' || side === 'away_spread') {
                   betType = 'Spread';
-                }
-                if (pickText.toLowerCase().includes('over') || pickText.toLowerCase().includes('under')) {
+                  point = oddsCtx.spread != null
+                    ? (side === 'away_spread' ? -oddsCtx.spread : oddsCtx.spread)
+                    : null;
+                } else if (side === 'over' || side === 'under') {
                   betType = 'Total';
-                  const totalMatch = pickText.match(/(\d+\.?\d*)/);
-                  if (totalMatch) point = parseFloat(totalMatch[1]);
+                  point = oddsCtx.total ?? null;
                 }
 
                 const pickOdds = formatAmericanOdds(resolveOddsForPick(oddsCtx, result.recommended_side));
