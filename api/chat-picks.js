@@ -7,6 +7,7 @@
 const { logger } = require('../shared/logger');
 const { supabase } = require('../lib/middleware/supabaseAuth');
 const aiInstructions = require('../lib/services/ai-instructions');
+const pickGrader = require('../lib/services/pick-grader');
 
 // OpenAI function tools that the AI can call to query our database
 const TOOLS = [
@@ -179,21 +180,76 @@ async function executeTool(name, args) {
 
         const { data, error } = await query;
         if (error) return { error: error.message };
+        if (!data || !data.length) return [];
 
-        return data?.map(row => {
+        // Pull pre-computed per-side edges for every game in the result set,
+        // so the LLM sees +EV markers next to each outcome and stops picking
+        // negative-edge sides. Keyed by "{away}_{home}" so it survives the
+        // case-sensitivity of supabase joins.
+        const gamePairs = [...new Set(data.map(r => `${r.away_team}|${r.home_team}`))];
+        const edgesByGame = new Map();
+        if (gamePairs.length > 0) {
+          const homeTeams = [...new Set(data.map(r => r.home_team))];
+          const awayTeams = [...new Set(data.map(r => r.away_team))];
+          const { data: analyses } = await supabase
+            .from('game_analysis')
+            .select('home_team, away_team, edges, recommended_side, recommended_pick, edge_score')
+            .in('home_team', homeTeams)
+            .in('away_team', awayTeams)
+            .eq('stale', false)
+            .gte('expires_at', new Date().toISOString());
+          for (const a of analyses || []) {
+            edgesByGame.set(`${a.away_team}|${a.home_team}`, a);
+          }
+        }
+
+        return data.map(row => {
           const mt = new Date(row.commence_time).toLocaleString('en-US', {
             timeZone: 'America/Denver', weekday: 'short', month: 'short', day: 'numeric',
             hour: 'numeric', minute: '2-digit', hour12: true
           });
+          const parsedOutcomes = typeof row.outcomes === 'string' ? JSON.parse(row.outcomes) : row.outcomes;
+          const analysis = edgesByGame.get(`${row.away_team}|${row.home_team}`);
+
+          // Annotate each outcome with its signed edge (in pp) and a flag if
+          // it matches the math-recommended side. LLM gets concrete numbers
+          // instead of having to call get_game_analysis as a second step.
+          const annotated = Array.isArray(parsedOutcomes) ? parsedOutcomes.map(o => {
+            let sideKey = null;
+            if (row.market_type === 'h2h') {
+              if (o.name === row.home_team) sideKey = 'home_ml';
+              else if (o.name === row.away_team) sideKey = 'away_ml';
+            } else if (row.market_type === 'spreads') {
+              if (o.name === row.home_team) sideKey = 'home_spread';
+              else if (o.name === row.away_team) sideKey = 'away_spread';
+            } else if (row.market_type === 'totals') {
+              if (o.name === 'Over') sideKey = 'over';
+              else if (o.name === 'Under') sideKey = 'under';
+            }
+            const signedEdge = sideKey && analysis?.edges ? analysis.edges[sideKey] : null;
+            return {
+              ...o,
+              side: sideKey,
+              edge_pp: signedEdge != null ? Math.round(signedEdge * 1000) / 10 : null,
+              is_math_pick: !!(sideKey && analysis?.recommended_side === sideKey),
+            };
+          }) : parsedOutcomes;
+
           return {
             game: `${row.away_team} @ ${row.home_team}`,
             time_mt: `${mt} MT`,
             time_utc: row.commence_time,
             market: row.market_type,
             bookmaker: row.bookmaker,
-            outcomes: typeof row.outcomes === 'string' ? JSON.parse(row.outcomes) : row.outcomes
+            outcomes: annotated,
+            // Quick reference: best pick from the math for this game, regardless of market_type filter.
+            math_pick: analysis ? {
+              pick: analysis.recommended_pick,
+              side: analysis.recommended_side,
+              edge_score: analysis.edge_score,
+            } : null,
           };
-        }) || [];
+        });
       }
 
       case 'get_team_stats': {
@@ -607,6 +663,13 @@ RESEARCH PROCESS (do this EVERY time someone asks for a pick):
 4. get_team_stats for both teams → records, rankings, last 10 game results with scores
 5. get_news → articles with deeper context
 6. THEN and ONLY THEN give the pick citing ONLY data from steps 1-5
+
+MATH-GROUNDED PICKING (read this carefully):
+- search_odds now annotates every outcome with \`edge_pp\` (signed model edge in percentage points) and \`is_math_pick\` (true = this is the side our edge calculator selected).
+- search_odds results also include a \`math_pick\` field showing the math-recommended pick for the entire game.
+- A POSITIVE edge_pp means our model thinks this side has value vs the market. A NEGATIVE edge_pp means our model says it's a trap.
+- PREFER the math_pick. If you want to recommend something different, you MUST cite a specific reason (e.g., a tool returned an injury that the math doesn't see). Never silently override.
+- Edges of +2pp or higher are tradable; below ±2pp is noise — don't make a big deal of it.
 
 FORMAT:
 🔒 TEAM -3.5 (-110)

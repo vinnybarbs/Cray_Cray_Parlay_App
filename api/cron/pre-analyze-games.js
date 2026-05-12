@@ -8,6 +8,7 @@ const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { ApiSportsMulti } = require('../../lib/services/apisports-multi.js');
 const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
+const pickGrader = require('../../lib/services/pick-grader.js');
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -129,60 +130,9 @@ function extractOddsContext(game) {
   return ctx;
 }
 
-// Format a numeric American odds value into the signed-string format stored in ai_suggestions.odds
-function formatAmericanOdds(price) {
-  if (price == null || Number.isNaN(Number(price))) return null;
-  const n = Number(price);
-  return n > 0 ? `+${n}` : String(n);
-}
-
-// Resolve the juice for the specific side the model picked
-function resolveOddsForPick(oddsCtx, recommendedSide) {
-  switch (recommendedSide) {
-    case 'home_spread': return oddsCtx.spread_home_odds;
-    case 'away_spread': return oddsCtx.spread_away_odds;
-    case 'over':        return oddsCtx.over_odds;
-    case 'under':       return oddsCtx.under_odds;
-    case 'home_ml':     return oddsCtx.ml_home;
-    case 'away_ml':     return oddsCtx.ml_away;
-    default:            return null;
-  }
-}
-
-// Build the displayed pick text deterministically from the math-chosen side
-// plus market context. Previously the LLM wrote this string and frequently
-// got the spread sign wrong; now it's derived.
-function buildPickText(side, oddsCtx, game) {
-  if (!side) return null;
-  switch (side) {
-    case 'home_ml': {
-      const price = formatAmericanOdds(oddsCtx.ml_home);
-      return price ? `${game.home_team} ML ${price}` : `${game.home_team} ML`;
-    }
-    case 'away_ml': {
-      const price = formatAmericanOdds(oddsCtx.ml_away);
-      return price ? `${game.away_team} ML ${price}` : `${game.away_team} ML`;
-    }
-    case 'home_spread': {
-      if (oddsCtx.spread == null) return null;
-      const sign = oddsCtx.spread >= 0 ? '+' : '';
-      return `${game.home_team} ${sign}${oddsCtx.spread}`;
-    }
-    case 'away_spread': {
-      if (oddsCtx.spread == null) return null;
-      // Away spread is the inverse of the home spread.
-      const awaySpread = -oddsCtx.spread;
-      const sign = awaySpread >= 0 ? '+' : '';
-      return `${game.away_team} ${sign}${awaySpread}`;
-    }
-    case 'over':
-      return oddsCtx.total != null ? `Over ${oddsCtx.total}` : null;
-    case 'under':
-      return oddsCtx.total != null ? `Under ${oddsCtx.total}` : null;
-    default:
-      return null;
-  }
-}
+// Re-exported from the shared pick-grader module so everything that formats a
+// pick goes through one helper.
+const { formatAmericanOdds, buildPickText, resolveOddsForSide: resolveOddsForPick } = pickGrader;
 
 /**
  * Get relevant news snippets for a game's teams.
@@ -1035,6 +985,10 @@ async function runPreAnalysis(sportSlugs) {
             implied_away_prob: edgeData ? edgeData.impliedAwayProb : null,
             calc_edge: edgeData ? edgeData.edge : null,
             calc_edge_side: edgeData ? edgeData.edgeSide : null,
+            // Per-side edges {home_ml, away_ml, home_spread, away_spread, over, under}
+            // so the chatbot + parlay generator can read the same math the
+            // tile uses, without re-running calculateEdge.
+            edges: edgeData ? edgeData.edges : null,
             // Merge factors + adjustments + confidence into edge_factors so the
             // fact sheet's edge.adjustments[] path resolves. Calculator returns
             // them as separate top-level keys on edgeData — flatten for storage.
