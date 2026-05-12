@@ -104,13 +104,24 @@ export default function ResultsPage({ onBack }) {
   const [modelStatsByPeriod, setModelStatsByPeriod] = useState({ last_7d: null, last_30d: null, all: null })
   const [modelPeriod, setModelPeriod] = useState('last_30d')
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('my-bets') // 'my-bets' | 'model'
+  const [tab, setTab] = useState('model') // 'my-bets' | 'model' — default to model so new users see hit-rate data, not an empty "My Bets"
+  const [tabAutoSet, setTabAutoSet] = useState(false)
 
   const modelStats = modelStatsByPeriod[modelPeriod]
 
   useEffect(() => {
     loadData()
   }, [isAuthenticated, user])
+
+  // Auto-route the first visit: if the user has bets, surface them.
+  // Otherwise stay on Model. Only fires once so manual taps stick.
+  useEffect(() => {
+    if (tabAutoSet || loading) return
+    if (isAuthenticated && parlays.length > 0) {
+      setTab('my-bets')
+    }
+    setTabAutoSet(true)
+  }, [loading, isAuthenticated, parlays.length, tabAutoSet])
 
   const loadData = async () => {
     setLoading(true)
@@ -237,28 +248,40 @@ export default function ResultsPage({ onBack }) {
     <div className="min-h-screen bg-ink-950 text-white">
       {/* Header */}
       <header className="flex items-center justify-between px-4 py-3 bg-ink-900 border-b border-ink-700">
-        <button onClick={onBack} className="text-ink-300 hover:text-white text-sm">&larr; Back</button>
-        <h1 className="text-lg font-bold text-signal-pos">
-          Results & Performance
+        <button onClick={onBack} className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-300 hover:text-ink-100 transition-colors">← Back</button>
+        <h1 className="font-mono text-sm font-semibold uppercase tracking-[0.14em] text-ink-100">
+          Track Record
         </h1>
-        <button onClick={triggerSettlement} className="text-xs text-ink-400 hover:text-signal-pos">
-          Refresh
+        <button
+          onClick={triggerSettlement}
+          className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 hover:text-signal-pos transition-colors"
+          title="Manually run the settlement check on pending bets"
+        >
+          ↻ Settle
         </button>
       </header>
 
-      {/* Tabs */}
-      <div className="flex border-b border-ink-700">
+      {/* Tabs — terminal-style segmented control matching MarketTabs */}
+      <div className="flex items-stretch border-b border-ink-700">
         <button
-          onClick={() => setTab('my-bets')}
-          className={`flex-1 py-3 text-sm font-medium ${tab === 'my-bets' ? 'text-signal-pos border-b-2 border-signal-pos' : 'text-ink-400'}`}
+          onClick={() => { setTab('my-bets'); setTabAutoSet(true); }}
+          className={`flex-1 font-mono text-[11px] font-medium uppercase tracking-[0.14em] py-3 transition-colors ${
+            tab === 'my-bets'
+              ? 'text-ink-100 bg-ink-800 border-b-2 border-signal-pos'
+              : 'text-ink-400 hover:text-ink-200'
+          }`}
         >
           My Bets
         </button>
         <button
-          onClick={() => setTab('model')}
-          className={`flex-1 py-3 text-sm font-medium ${tab === 'model' ? 'text-signal-pos border-b-2 border-signal-pos' : 'text-ink-400'}`}
+          onClick={() => { setTab('model'); setTabAutoSet(true); }}
+          className={`flex-1 font-mono text-[11px] font-medium uppercase tracking-[0.14em] py-3 transition-colors border-l border-ink-700 ${
+            tab === 'model'
+              ? 'text-ink-100 bg-ink-800 border-b-2 border-signal-pos'
+              : 'text-ink-400 hover:text-ink-200'
+          }`}
         >
-          AI Model Performance
+          Model
         </button>
       </div>
 
@@ -276,13 +299,25 @@ export default function ResultsPage({ onBack }) {
             </div>
 
             {userPending > 0 && (
-              <p className="text-ink-400 text-xs mb-4">{userPending} parlay(s) still pending settlement</p>
+              <p className="font-mono text-[11px] text-ink-400 mb-4 tabular-nums">
+                <span className="text-signal-pos">{userPending}</span> parlay{userPending !== 1 ? 's' : ''} still pending settlement
+              </p>
             )}
 
             {!isAuthenticated ? (
-              <p className="text-center text-ink-400 py-8">Sign in to see your betting history</p>
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-8 text-center">
+                <p className="font-mono text-sm text-ink-200 mb-2">Sign in to track your bets.</p>
+                <p className="font-mono text-[11px] text-ink-400 leading-relaxed max-w-sm mx-auto">
+                  We grade every locked pick against the model — you'll see your hit-rate next to ours.
+                </p>
+              </div>
             ) : parlays.length === 0 ? (
-              <p className="text-center text-ink-400 py-8">No locked parlays yet. Lock some picks to start tracking!</p>
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-8 text-center">
+                <p className="font-mono text-sm text-ink-200 mb-2">No locked parlays yet.</p>
+                <p className="font-mono text-[11px] text-ink-400 leading-relaxed max-w-sm mx-auto">
+                  Lock picks from the daily digest and they show up here once games finish.
+                </p>
+              </div>
             ) : (
               parlays.map(p => (
                 <ParlayRow key={p.id} parlay={p} legs={parlayLegs[p.id] || []} />
@@ -291,21 +326,21 @@ export default function ResultsPage({ onBack }) {
           </>
         ) : (
           <>
-            {/* Period pills */}
-            <div className="flex gap-2 mb-4">
+            {/* Period — terminal-style segmented control */}
+            <div className="flex items-stretch mb-5 rounded-sharp shadow-hairline overflow-hidden">
               {[
-                { key: 'last_7d',  label: '7d' },
-                { key: 'last_30d', label: '30d' },
+                { key: 'last_7d',  label: '7 days' },
+                { key: 'last_30d', label: '30 days' },
                 { key: 'all',      label: 'All time' },
-              ].map(opt => (
+              ].map((opt, i) => (
                 <button
                   key={opt.key}
                   onClick={() => setModelPeriod(opt.key)}
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  className={`flex-1 font-mono text-[11px] font-medium uppercase tracking-[0.14em] py-2 transition-colors ${
                     modelPeriod === opt.key
-                      ? 'bg-signal-pos text-ink-950 border-signal-pos'
-                      : 'bg-transparent text-ink-300 border-ink-600 hover:border-signal-pos hover:text-signal-pos'
-                  }`}
+                      ? 'text-ink-100 bg-ink-750'
+                      : 'text-ink-400 bg-ink-900 hover:text-ink-200'
+                  } ${i > 0 ? 'border-l border-ink-600' : ''}`}
                 >
                   {opt.label}
                 </button>
@@ -315,32 +350,57 @@ export default function ResultsPage({ onBack }) {
             {/* Model Stats */}
             {modelStats ? (
               <>
-                <div className="grid grid-cols-4 gap-3 mb-6">
-                  <StatCard label="Predictions" value={modelStats.total} color="blue" />
-                  <StatCard label="Wins" value={modelStats.wins} color="green" />
-                  <StatCard label="Losses" value={modelStats.losses} color="red" />
-                  <StatCard
-                    label="Win %"
-                    value={`${modelStats.winRate}%`}
-                    color="yellow"
-                    sub={modelPeriod === 'last_7d' ? 'Last 7 days' : modelPeriod === 'last_30d' ? 'Last 30 days' : 'All time'}
-                  />
+                {/* Hero hit-rate — the headline trust signal */}
+                <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 mb-5">
+                  <div className="font-mono text-[10px] text-ink-400 uppercase tracking-[0.18em] mb-2">
+                    Overall hit rate · {modelPeriod === 'last_7d' ? 'last 7 days' : modelPeriod === 'last_30d' ? 'last 30 days' : 'all time'}
+                  </div>
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <span className={`font-mono text-5xl md:text-6xl font-bold tabular-nums tracking-tight ${
+                      modelStats.winRate === 'N/A' ? 'text-ink-400'
+                        : Number(modelStats.winRate) >= 55 ? 'text-signal-pos'
+                        : Number(modelStats.winRate) >= 50 ? 'text-ink-100'
+                        : 'text-signal-neg'
+                    }`}>
+                      {modelStats.winRate === 'N/A' ? '—' : `${modelStats.winRate}%`}
+                    </span>
+                    <span className="font-mono text-sm text-ink-400 tabular-nums">
+                      {modelStats.wins}W &nbsp;·&nbsp; {modelStats.losses}L &nbsp;·&nbsp; {modelStats.total} settled
+                    </span>
+                  </div>
                 </div>
 
-                {/* By Sport */}
-                <h3 className="text-sm font-semibold text-ink-200 mb-3 mt-6">By Sport</h3>
-                <BreakdownList items={modelStats.bySport} />
+                {/* By Bet Type — the sharp-curious persona's data. Promoted above By Sport. */}
+                {Object.keys(modelStats.byBetType || {}).length > 0 && (
+                  <>
+                    <h3 className="font-mono text-[10px] text-ink-400 uppercase tracking-[0.18em] mb-2.5">By bet type</h3>
+                    <BreakdownList items={modelStats.byBetType} />
+                  </>
+                )}
 
-                {/* By Bet Type */}
-                <h3 className="text-sm font-semibold text-ink-200 mb-3 mt-6">By Bet Type</h3>
-                <BreakdownList items={modelStats.byBetType} />
+                {/* By Sport */}
+                {Object.keys(modelStats.bySport || {}).length > 0 && (
+                  <>
+                    <h3 className="font-mono text-[10px] text-ink-400 uppercase tracking-[0.18em] mb-2.5 mt-5">By sport</h3>
+                    <BreakdownList items={modelStats.bySport} />
+                  </>
+                )}
 
                 {/* By Mode */}
-                <h3 className="text-sm font-semibold text-ink-200 mb-3 mt-6">By Generation Mode</h3>
-                <BreakdownList items={modelStats.byMode} />
+                {Object.keys(modelStats.byMode || {}).length > 0 && (
+                  <>
+                    <h3 className="font-mono text-[10px] text-ink-400 uppercase tracking-[0.18em] mb-2.5 mt-5">By generation mode</h3>
+                    <BreakdownList items={modelStats.byMode} />
+                  </>
+                )}
               </>
             ) : (
-              <p className="text-center text-ink-400 py-8">No resolved AI predictions yet for this period.</p>
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-8 text-center">
+                <p className="font-mono text-sm text-ink-200 mb-2">No settled predictions for this window yet.</p>
+                <p className="font-mono text-[11px] text-ink-400 leading-relaxed max-w-sm mx-auto">
+                  Picks settle automatically as games finish. Check back, or pick a longer window above.
+                </p>
+              </div>
             )}
           </>
         )}
