@@ -1070,8 +1070,9 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 // new users — without it, they'd have to expand sport accordions to find the
 // best play. With it, the value prop lands on first scroll.
 
-function PickOfTheDay({ pick }) {
+function PickOfTheDay({ pick, tierCounts, totalGames }) {
   const { isLocked, toggleLock } = useContext(LockedPicksContext)
+  const [expanded, setExpanded] = useState(false)
   if (!pick) return null
   const { game, sport, signedPp } = pick
   const tier = edgeTier(signedPp)
@@ -1079,6 +1080,19 @@ function PickOfTheDay({ pick }) {
   const arrow = signedPp > 0 ? '▲' : '▼'
   const pp = formatPp(signedPp)
   const locked = isLocked(game)
+
+  // Surface the model's view in human terms when the data is on the row.
+  // pre-analyze writes calc_*_prob and implied_*_prob alongside edges, but
+  // they may be absent on older rows — fall back gracefully.
+  const side = game.recommended_side
+  const isHomeSide = side === 'home_ml' || side === 'home_spread'
+  const isAwaySide = side === 'away_ml' || side === 'away_spread'
+  const modelProb = isHomeSide ? game.calc_home_prob : isAwaySide ? game.calc_away_prob : null
+  const impliedProb = isHomeSide ? game.implied_home_prob : isAwaySide ? game.implied_away_prob : null
+  const showProbCompare = modelProb != null && impliedProb != null && (side === 'home_ml' || side === 'away_ml')
+
+  // Rank context — "highest of N graded today" gives the headline its bite.
+  const totalSignalPicks = (tierCounts?.sharpTakes || 0) + (tierCounts?.strongPlays || 0) + (tierCounts?.plays || 0) + (tierCounts?.leans || 0)
 
   return (
     <div className="bg-ink-900 rounded-sharp overflow-hidden shadow-hairline-pos">
@@ -1116,11 +1130,57 @@ function PickOfTheDay({ pick }) {
           </div>
         </div>
 
-        {/* Analysis snippet — surfaces De-Genny's voice on the featured pick */}
+        {/* Why this pick — rank context + model-vs-market in human terms */}
+        <div className="mt-4 bg-ink-850 shadow-hairline rounded-sharp px-3 py-2.5">
+          <div className="font-mono text-[9px] text-signal-pos uppercase tracking-[0.18em] mb-1.5">Why this pick</div>
+          <div className="space-y-1 font-mono text-xs">
+            <div className="flex items-start gap-2">
+              <span className="text-signal-pos flex-shrink-0">▸</span>
+              <span className="text-ink-200 tabular-nums">
+                Highest edge across <span className="text-ink-100 font-semibold">{totalGames}</span> game{totalGames !== 1 ? 's' : ''} graded today
+                {totalSignalPicks > 0 && (
+                  <span className="text-ink-400"> · ahead of {totalSignalPicks - 1} other actionable pick{totalSignalPicks !== 2 ? 's' : ''}</span>
+                )}
+              </span>
+            </div>
+            {showProbCompare && (
+              <div className="flex items-start gap-2">
+                <span className="text-signal-pos flex-shrink-0">▸</span>
+                <span className="text-ink-200 tabular-nums">
+                  Model gives this side <span className="text-signal-pos font-semibold">{(modelProb * 100).toFixed(1)}%</span>
+                  <span className="text-ink-400"> · book implies </span>
+                  <span className="text-ink-100">{(impliedProb * 100).toFixed(1)}%</span>
+                  <span className="text-ink-400"> · {pp} gap</span>
+                </span>
+              </div>
+            )}
+            {!showProbCompare && (
+              <div className="flex items-start gap-2">
+                <span className="text-signal-pos flex-shrink-0">▸</span>
+                <span className="text-ink-200 tabular-nums">
+                  Model disagrees with the book by <span className="text-signal-pos font-semibold">{pp}</span> on this side
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Analysis snippet — surfaces De-Genny's voice on the featured pick.
+            Expandable with the same +read more / −show less pattern as regular tiles. */}
         {game.analysis_snippet && (
-          <p className="mt-4 text-sm text-ink-300 leading-relaxed line-clamp-3">
-            {game.analysis_snippet}
-          </p>
+          <div className="mt-3">
+            <p className={`text-sm text-ink-300 leading-relaxed ${!expanded ? 'line-clamp-3' : ''}`}>
+              {game.analysis_snippet}
+            </p>
+            {game.analysis_snippet.length > 220 && (
+              <button
+                onClick={() => setExpanded(e => !e)}
+                className="font-mono text-[10px] uppercase tracking-[0.14em] text-signal-pos/80 hover:text-signal-pos mt-1.5"
+              >
+                {expanded ? '− show less' : '+ read more'}
+              </button>
+            )}
+          </div>
         )}
 
         <button
@@ -1648,7 +1708,7 @@ export default function DailyDigest({ onBack }) {
 
             {/* Pick of the Day — the single best edge across all sports, featured
                 above the accordions so new users see the aha moment on first scroll. */}
-            {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} />}
+            {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} tierCounts={tierCounts} totalGames={totalGames} />}
 
             {/* Golf tournament leaderboard */}
             {data.golf && <GolfLeaderboard golf={data.golf} />}
