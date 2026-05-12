@@ -401,6 +401,11 @@ app.post('/cron/sync-ncaab-data', syncNCAABData);
 const backfillGameResults = require('./api/cron/backfill-game-results');
 app.post('/cron/backfill-game-results', backfillGameResults);
 
+// Probe every upstream data source so we get a loud alert when ESPN (or any
+// other vendor) silently changes JSON shape. Writes to data_source_health.
+const probeDataSources = require('./api/cron/probe-data-sources');
+app.post('/cron/probe-data-sources', probeDataSources);
+
 // Sync standings from ESPN for all sports
 const syncStandings = require('./api/cron/sync-standings');
 app.post('/cron/sync-standings', syncStandings);
