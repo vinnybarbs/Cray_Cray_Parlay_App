@@ -416,11 +416,16 @@ export default function MainApp() {
 
   // Open admin dashboard when navigating to /#/admin
   // Open daily digest when navigating to /#/digest
+  // Open betslip builder when navigating to /#/betslip
+  //   — the digest's "Build Parlay" sticky bar sends users here with picks
+  //   pre-staged in localStorage.digest_parlay_picks. Without this route the
+  //   build-parlay flow dead-ends on the MainApp landing page.
   useEffect(() => {
     const checkHash = () => {
       if (window.location.hash === '#/admin') setShowAdmin(true);
       if (window.location.hash === '#/digest') setShowDigest(true);
       if (window.location.hash === '#/chat') { setShowChatPicks(true); setShowDigest(false); }
+      if (window.location.hash === '#/betslip') { setShowBetslipBuilder(true); setShowDigest(false); }
     };
     checkHash();
     window.addEventListener('hashchange', checkHash);

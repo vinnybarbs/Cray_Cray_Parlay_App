@@ -1433,7 +1433,10 @@ export default function DailyDigest({ onBack }) {
       try {
         localStorage.setItem('digest_parlay_picks', JSON.stringify(lockedPicks))
       } catch (e) { /* storage unavailable */ }
-      window.location.hash = '/'
+      // Route to BetslipBuilder via the hash route MainApp listens for.
+      // Previously sent users to '/' which dumped them on the parlay generator
+      // landing with the locked picks silently dropped on the floor.
+      window.location.hash = '#/betslip'
     },
   }), [lockedPicks])
 
