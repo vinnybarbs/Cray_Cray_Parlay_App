@@ -59,24 +59,39 @@ function formatFullDate(isoString) {
 }
 
 function edgeBadgeClass(score) {
-  if (score == null) return 'bg-gray-700 text-gray-400'
-  if (score >= 8) return 'bg-green-700 text-green-200 border border-green-600'
-  if (score >= 6) return 'bg-yellow-700 text-yellow-200 border border-yellow-600'
-  return 'bg-gray-700 text-gray-400 border border-gray-600'
+  if (score == null) return 'bg-ink-800 text-ink-300'
+  if (score >= 8) return 'bg-emerald-900 text-emerald-300 border border-emerald-700'
+  if (score >= 6) return 'bg-signal-pos-dim text-signal-pos border border-signal-pos'
+  return 'bg-ink-800 text-ink-300 border border-ink-600'
 }
 
-// 5-tier label scheme from signed edge in percentage points.
-// We deliberately avoid the word "Lock" — it recreates the
-// "guaranteed-win" mental model the old 10/10 edge_score caused.
-// Negative edges get their own tier so we never silently dress them up.
+// 6-tier label scheme from signed edge in percentage points.
+// Sharp-Quant aesthetic: graphite frame + amber/crimson signal accent.
+// Hybrid labels: analytical primary (Trap/Skip/Lean/Play/Strong Play/Sharp Take)
+// + brand subtitle (fade it / pass on it / lean it / play it / hammer it / sharp take).
+// We deliberately avoid "Lock" — it recreates the "guaranteed-win" mental model
+// the old 10/10 edge_score caused. Negative edges get their own tier so we never
+// silently dress them up.
 function edgeTier(signedPp) {
-  if (signedPp == null || Number.isNaN(signedPp)) return { label: '—', color: 'text-gray-500', bg: 'bg-gray-800 border-gray-700' }
-  if (signedPp < 0) return { label: 'Trap', color: 'text-red-300', bg: 'bg-red-900/40 border-red-800/60' }
-  if (signedPp < 2)  return { label: 'Skip',        color: 'text-gray-400',   bg: 'bg-gray-800 border-gray-700' }
-  if (signedPp < 4)  return { label: 'Lean',        color: 'text-yellow-300', bg: 'bg-yellow-900/40 border-yellow-700/60' }
-  if (signedPp < 7)  return { label: 'Play',        color: 'text-lime-300',   bg: 'bg-lime-900/40 border-lime-700/60' }
-  if (signedPp < 10) return { label: 'Strong Play', color: 'text-green-300',  bg: 'bg-green-900/50 border-green-700/60' }
-  return                   { label: 'Sharp Take',   color: 'text-emerald-300', bg: 'bg-emerald-900/60 border-emerald-600' }
+  if (signedPp == null || Number.isNaN(signedPp)) {
+    return { label: '—', subtitle: '', color: 'text-ink-400', bg: 'bg-ink-850 shadow-hairline' }
+  }
+  if (signedPp < 0) {
+    return { label: 'Trap', subtitle: 'fade it', color: 'text-signal-neg', bg: 'bg-signal-neg-dim/30 shadow-hairline-neg' }
+  }
+  if (signedPp < 2) {
+    return { label: 'Skip', subtitle: 'pass on it', color: 'text-ink-300', bg: 'bg-ink-850 shadow-hairline' }
+  }
+  if (signedPp < 4) {
+    return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
+  }
+  if (signedPp < 7) {
+    return { label: 'Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
+  }
+  if (signedPp < 10) {
+    return { label: 'Strong Play', subtitle: 'hammer it', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/25 shadow-hairline-pos' }
+  }
+  return { label: 'Sharp Take', subtitle: 'sharp take', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/40 shadow-hairline-pos-bright' }
 }
 
 function formatPp(signedPp) {
@@ -108,16 +123,16 @@ function sidePickText(game, side) {
 }
 
 function winRateColor(rate) {
-  if (rate == null) return 'text-gray-400'
+  if (rate == null) return 'text-ink-300'
   if (rate >= 60) return 'text-green-400'
-  if (rate >= 50) return 'text-yellow-400'
-  return 'text-red-400'
+  if (rate >= 50) return 'text-signal-pos'
+  return 'text-signal-neg'
 }
 
 function winRateBarColor(rate) {
-  if (rate == null) return 'bg-gray-600'
+  if (rate == null) return 'bg-ink-700'
   if (rate >= 60) return 'bg-green-500'
-  if (rate >= 50) return 'bg-yellow-500'
+  if (rate >= 50) return 'bg-signal-pos'
   return 'bg-red-500'
 }
 
@@ -125,29 +140,29 @@ function edgeMovementIcon(movement) {
   if (!movement) return null
   const m = String(movement).toLowerCase()
   if (m === 'up' || m === 'rising') return <span className="text-green-400 font-bold">↑</span>
-  if (m === 'down' || m === 'falling') return <span className="text-red-400 font-bold">↓</span>
-  return <span className="text-gray-400">→</span>
+  if (m === 'down' || m === 'falling') return <span className="text-signal-neg font-bold">↓</span>
+  return <span className="text-ink-300">→</span>
 }
 
 function Skeleton({ className = '' }) {
-  return <div className={`animate-pulse bg-gray-700 rounded ${className}`} />
+  return <div className={`animate-pulse bg-ink-800 rounded ${className}`} />
 }
 
 function LoadingSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+      <div className="bg-ink-900 rounded-sharp p-6 border border-ink-700">
         <Skeleton className="h-10 w-64 mb-3" />
         <Skeleton className="h-5 w-40 mb-2" />
         <Skeleton className="h-4 w-32" />
       </div>
       {[1, 2].map(i => (
-        <div key={i} className="bg-gray-800 rounded-2xl p-6 border border-gray-700 space-y-4">
+        <div key={i} className="bg-ink-900 rounded-sharp p-6 border border-ink-700 space-y-4">
           <Skeleton className="h-7 w-36" />
           <Skeleton className="h-4 w-48" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map(j => (
-              <div key={j} className="bg-gray-900 rounded-xl p-4 space-y-2">
+              <div key={j} className="bg-ink-950 rounded-sharp p-4 space-y-2">
                 <Skeleton className="h-5 w-full" />
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-4 w-1/2" />
@@ -187,7 +202,7 @@ function Countdown({ targetIso }) {
   if (!targetIso || !remaining) return null
 
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-400 mt-1">
+    <div className="flex items-center gap-2 text-sm text-ink-300 mt-1">
       <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
       <span>First game in <span className="font-mono text-green-400 font-semibold">{remaining}</span></span>
     </div>
@@ -276,22 +291,22 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
       onClick={handleOverlayClick}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4"
     >
-      <div className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] bg-gray-900 sm:rounded-2xl border border-gray-700 shadow-2xl flex flex-col overflow-hidden">
+      <div className="relative w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[88vh] bg-ink-950 sm:rounded-sharp border border-ink-700 shadow-2xl flex flex-col overflow-hidden">
 
         {/* Modal header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-gray-700 bg-gray-800 flex-shrink-0">
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-ink-700 bg-ink-900 flex-shrink-0">
           <div>
-            <div className="text-xs text-gray-500 uppercase tracking-wider mb-0.5">Deep Research</div>
+            <div className="text-xs text-ink-400 uppercase tracking-wider mb-0.5">Deep Research</div>
             <h2 className="text-base font-bold text-white leading-tight">
-              {game.away_team} <span className="text-gray-500">@</span> {game.home_team}
+              {game.away_team} <span className="text-ink-400">@</span> {game.home_team}
             </h2>
             {game.game_date && (
-              <div className="text-xs text-gray-500 mt-0.5">{toMountainTime(game.game_date)} MT</div>
+              <div className="text-xs text-ink-400 mt-0.5">{toMountainTime(game.game_date)} MT</div>
             )}
           </div>
           <button
             onClick={onClose}
-            className="flex-shrink-0 text-gray-500 hover:text-white text-xl leading-none p-1 -mr-1 mt-0.5 transition-colors"
+            className="flex-shrink-0 text-ink-400 hover:text-white text-xl leading-none p-1 -mr-1 mt-0.5 transition-colors"
             aria-label="Close"
           >
             ✕
@@ -308,31 +323,31 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
           )}
 
           {!loading && error && (
-            <div className="bg-red-900/40 border border-red-700 rounded-xl p-4 text-center">
-              <p className="text-red-300 text-sm font-medium">Failed to load deep research data</p>
-              <p className="text-red-400 text-xs mt-1">{error}</p>
-              <p className="text-xs text-gray-500 mt-2">Showing available card data below.</p>
+            <div className="bg-signal-neg-dim/40 border border-red-700 rounded-sharp p-4 text-center">
+              <p className="text-signal-neg text-sm font-medium">Failed to load deep research data</p>
+              <p className="text-signal-neg text-xs mt-1">{error}</p>
+              <p className="text-xs text-ink-400 mt-2">Showing available card data below.</p>
             </div>
           )}
 
           {/* Edge score + movement */}
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Edge Analysis</span>
+              <span className="text-xs text-ink-400 uppercase tracking-wider font-semibold">Edge Analysis</span>
               {version && (
-                <span className="text-xs bg-gray-700 text-gray-300 rounded-full px-2 py-0.5">
+                <span className="text-xs bg-ink-800 text-ink-200 rounded-full px-2 py-0.5">
                   Pass #{version}
                 </span>
               )}
             </div>
             <div className="flex items-center gap-3">
               {analysis.edge_score != null && (
-                <span className={`px-3 py-1.5 rounded-lg text-sm font-bold ${edgeBadgeClass(analysis.edge_score)}`}>
+                <span className={`px-3 py-1.5 rounded-sharp text-sm font-bold ${edgeBadgeClass(analysis.edge_score)}`}>
                   Edge {Number(analysis.edge_score).toFixed(1)}
                 </span>
               )}
               {analysis.edge_movement && (
-                <span className="text-sm flex items-center gap-1 text-gray-400">
+                <span className="text-sm flex items-center gap-1 text-ink-300">
                   Movement: {edgeMovementIcon(analysis.edge_movement)}
                   <span className="capitalize">{analysis.edge_movement}</span>
                 </span>
@@ -342,18 +357,18 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
 
           {/* Analysis snippet + key factors */}
           {(analysis.analysis_snippet || keyFactors.length > 0) && (
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-3">
-              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Analysis</div>
+            <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700 space-y-3">
+              <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold">Analysis</div>
               {analysis.analysis_snippet && (
-                <p className="text-sm text-gray-300 leading-relaxed">{analysis.analysis_snippet}</p>
+                <p className="text-sm text-ink-200 leading-relaxed">{analysis.analysis_snippet}</p>
               )}
               {keyFactors.length > 0 && (
                 <div>
-                  <div className="text-xs text-gray-500 mb-1.5 font-medium">Key Factors</div>
+                  <div className="text-xs text-ink-400 mb-1.5 font-medium">Key Factors</div>
                   <ul className="space-y-1">
                     {keyFactors.map((f, i) => (
-                      <li key={i} className="flex items-start gap-2 text-xs text-gray-400">
-                        <span className="text-blue-500 flex-shrink-0 mt-0.5">•</span>
+                      <li key={i} className="flex items-start gap-2 text-xs text-ink-300">
+                        <span className="text-signal-pos flex-shrink-0 mt-0.5">•</span>
                         {f}
                       </li>
                     ))}
@@ -365,9 +380,9 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
 
           {/* What changed (refinement history) */}
           {analysis.what_changed && (
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">What Changed</div>
-              <p className="text-xs text-gray-400 leading-relaxed italic">{analysis.what_changed}</p>
+            <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
+              <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-2">What Changed</div>
+              <p className="text-xs text-ink-300 leading-relaxed italic">{analysis.what_changed}</p>
             </div>
           )}
 
@@ -378,14 +393,14 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
             const hasCardLines = analysis.spread != null || analysis.total != null || analysis.moneyline_home != null
             if (!hasOdds && !hasCardLines) return null
             return (
-              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Current Lines</div>
+              <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
+                <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-3">Current Lines</div>
                 {hasOdds ? (
                   <div className="space-y-2">
                     {odds.map((line, i) => (
                       <div key={i} className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500 capitalize">{line.market_type || 'Line'}</span>
-                        <div className="flex gap-3 text-gray-300">
+                        <span className="text-ink-400 capitalize">{line.market_type || 'Line'}</span>
+                        <div className="flex gap-3 text-ink-200">
                           {line.spread != null && <span>Spread: {line.spread > 0 ? '+' : ''}{line.spread}</span>}
                           {line.total != null && <span>O/U: {line.total}</span>}
                           {line.moneyline_home != null && (
@@ -398,17 +413,17 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {analysis.spread != null && (
-                      <span className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
+                      <span className="text-xs bg-ink-800 rounded px-2 py-1 text-ink-200">
                         Spread: {analysis.spread > 0 ? '+' : ''}{analysis.spread}
                       </span>
                     )}
                     {analysis.total != null && (
-                      <span className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
+                      <span className="text-xs bg-ink-800 rounded px-2 py-1 text-ink-200">
                         O/U: {analysis.total}
                       </span>
                     )}
                     {analysis.moneyline_home != null && (
-                      <span className="text-xs bg-gray-700 rounded px-2 py-1 text-gray-300">
+                      <span className="text-xs bg-ink-800 rounded px-2 py-1 text-ink-200">
                         ML: {analysis.moneyline_home > 0 ? '+' : ''}{analysis.moneyline_home} / {analysis.moneyline_away > 0 ? '+' : ''}{analysis.moneyline_away}
                       </span>
                     )}
@@ -420,7 +435,7 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
 
           {/* Injury report */}
           {data?.injuries && data.injuries.length > 0 && (
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
               <div className="text-xs text-orange-400 uppercase tracking-wider font-semibold mb-3">Injury Report</div>
               <div className="space-y-3">
                 {data.injuries.map((entry, i) => {
@@ -429,16 +444,16 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
                     : []
                   return (
                     <div key={i}>
-                      <div className="text-xs text-gray-500 font-medium mb-1">{entry.team_name}</div>
+                      <div className="text-xs text-ink-400 font-medium mb-1">{entry.team_name}</div>
                       <ul className="space-y-0.5">
                         {lines.slice(0, 6).map((line, j) => (
-                          <li key={j} className="flex items-start gap-2 text-xs text-gray-400">
+                          <li key={j} className="flex items-start gap-2 text-xs text-ink-300">
                             <span className="text-orange-500 flex-shrink-0 mt-0.5">•</span>
                             {line}
                           </li>
                         ))}
                         {lines.length === 0 && (
-                          <li className="text-xs text-gray-600 italic">No injury data.</li>
+                          <li className="text-xs text-ink-500 italic">No injury data.</li>
                         )}
                       </ul>
                     </div>
@@ -450,28 +465,28 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
 
           {/* Recent articles */}
           {data?.articles && data.articles.length > 0 && (
-            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-              <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Recent News</div>
+            <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
+              <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-3">Recent News</div>
               <div className="space-y-3">
                 {data.articles.map((article, i) => (
-                  <div key={i} className="border-b border-gray-700 last:border-0 pb-3 last:pb-0">
+                  <div key={i} className="border-b border-ink-700 last:border-0 pb-3 last:pb-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <p className="text-xs text-gray-300 font-medium leading-snug">{article.title}</p>
+                      <p className="text-xs text-ink-200 font-medium leading-snug">{article.title}</p>
                       {article.sentiment && (
                         <span className={`flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${
                           article.sentiment === 'positive' ? 'bg-green-900/60 text-green-400' :
-                          article.sentiment === 'negative' ? 'bg-red-900/60 text-red-400' :
-                          'bg-gray-700 text-gray-400'
+                          article.sentiment === 'negative' ? 'bg-signal-neg-dim/60 text-signal-neg' :
+                          'bg-ink-800 text-ink-300'
                         }`}>
                           {article.sentiment}
                         </span>
                       )}
                     </div>
                     {article.betting_summary && (
-                      <p className="text-xs text-gray-500 leading-relaxed">{article.betting_summary}</p>
+                      <p className="text-xs text-ink-400 leading-relaxed">{article.betting_summary}</p>
                     )}
                     {article.published_at && (
-                      <p className="text-xs text-gray-700 mt-1">
+                      <p className="text-xs text-ink-700 mt-1">
                         {new Date(article.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
                     )}
@@ -497,17 +512,17 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
                 <div key={`${r.date}-${r.home_team_name}`} className="flex items-center gap-2 text-xs">
                   <span className={`px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${
                     won === true ? 'bg-green-900 text-green-300' :
-                    won === false ? 'bg-red-900 text-red-300' :
-                    'bg-gray-700 text-gray-400'
+                    won === false ? 'bg-signal-neg-dim text-signal-neg' :
+                    'bg-ink-800 text-ink-300'
                   }`}>
                     {won === true ? 'W' : won === false ? 'L' : '?'}
                   </span>
-                  <span className="text-gray-400 truncate">
+                  <span className="text-ink-300 truncate">
                     {isHome ? 'vs' : '@'} {opponent}
                     {teamScore != null && ` ${teamScore}-${oppScore}`}
                   </span>
                   {r.date && (
-                    <span className="text-gray-700 flex-shrink-0 ml-auto">
+                    <span className="text-ink-700 flex-shrink-0 ml-auto">
                       {new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   )}
@@ -516,12 +531,12 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
             }
 
             return (
-              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                <div className="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-3">Recent Form</div>
+              <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
+                <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-3">Recent Form</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {homeResults.length > 0 && (
                     <div>
-                      <div className="text-xs text-gray-400 font-medium mb-2">{game.home_team}</div>
+                      <div className="text-xs text-ink-300 font-medium mb-2">{game.home_team}</div>
                       <div className="space-y-1.5">
                         {homeResults.map(r => renderResult(r, game.home_team))}
                       </div>
@@ -529,7 +544,7 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
                   )}
                   {awayResults.length > 0 && (
                     <div>
-                      <div className="text-xs text-gray-400 font-medium mb-2">{game.away_team}</div>
+                      <div className="text-xs text-ink-300 font-medium mb-2">{game.away_team}</div>
                       <div className="space-y-1.5">
                         {awayResults.map(r => renderResult(r, game.away_team))}
                       </div>
@@ -543,10 +558,10 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
 
         {/* Modal footer — Lock Pick */}
         {game.recommended_pick && (
-          <div className="flex-shrink-0 px-5 py-4 border-t border-gray-700 bg-gray-800">
+          <div className="flex-shrink-0 px-5 py-4 border-t border-ink-700 bg-ink-900">
             <button
               onClick={handleLockPick}
-              className="w-full py-3 rounded-xl font-bold text-gray-900 text-sm bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 shadow-lg transition-all active:scale-95"
+              className="w-full py-3 rounded-sharp font-bold text-ink-950 text-sm bg-signal-pos hover:bg-signal-pos/90 shadow-lg transition-all active:scale-95"
             >
               Lock This Pick — {game.recommended_pick}
             </button>
@@ -565,12 +580,20 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
 function EdgeChip({ signedPp, size = 'md' }) {
   const tier = edgeTier(signedPp)
   const pp = formatPp(signedPp)
-  const padding = size === 'sm' ? 'px-2 py-1' : 'px-3 py-2'
-  const ppSize = size === 'sm' ? 'text-xs' : 'text-base'
+  const isNeg = signedPp != null && signedPp < 0
+  const isPos = signedPp != null && signedPp > 0
+  const arrow = isPos ? '▲' : isNeg ? '▼' : '·'
+  const padding = size === 'sm' ? 'px-2 py-1' : 'px-2.5 py-1.5'
+  const ppSize = size === 'sm' ? 'text-[11px]' : 'text-sm'
   return (
-    <div className={`rounded-lg border ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}>
-      <div className={`font-bold ${ppSize} ${tier.color}`}>{pp ?? '—'}</div>
-      <div className={`text-[10px] uppercase tracking-wider ${tier.color} opacity-80`}>{tier.label}</div>
+    <div className={`rounded-sharp ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}>
+      <div className={`font-mono font-semibold ${ppSize} ${tier.color} tabular-nums tracking-tight`}>
+        <span className="mr-0.5">{arrow}</span>{pp ?? '—'}
+      </div>
+      <div className={`font-mono text-[9px] uppercase tracking-[0.14em] ${tier.color} mt-0.5`}>{tier.label}</div>
+      {tier.subtitle && (
+        <div className="text-[9px] text-ink-400 lowercase tracking-wide italic leading-none">{tier.subtitle}</div>
+      )}
     </div>
   )
 }
@@ -580,25 +603,24 @@ function EdgeChip({ signedPp, size = 'md' }) {
 // signed edges. Math-recommended side is highlighted. Below ±2pp we render
 // the value muted so users see "no edge" rather than mistaking 0.4pp for a play.
 
-function MarketRow({ label, sides, recommendedSide }) {
+function MarketRow({ sides, recommendedSide }) {
   const hasAnyEdge = sides.some(s => s.signedPp != null)
   return (
-    <div className="rounded-lg bg-gray-800/60 border border-gray-700/60 p-2">
-      <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">{label}</div>
+    <div className="rounded-sharp bg-ink-850 shadow-hairline px-3 py-2">
       <div className="space-y-1">
         {sides.map(s => {
           const tier = edgeTier(s.signedPp)
           const isPick = s.side === recommendedSide
           const muted = s.signedPp == null || Math.abs(s.signedPp) < 2
           return (
-            <div key={s.side} className="flex items-center justify-between gap-2 text-xs">
+            <div key={s.side} className="flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
-                {isPick && <span className="text-yellow-400" title="Model pick">⭐</span>}
-                <span className={`truncate ${isPick ? 'text-yellow-300 font-semibold' : 'text-gray-300'}`}>
+                {isPick && <span className="text-signal-pos font-mono text-[10px] leading-none" title="Model pick">►</span>}
+                <span className={`truncate ${isPick ? 'text-signal-pos font-medium' : 'text-ink-200'}`}>
                   {s.text}
                 </span>
               </div>
-              <span className={`flex-shrink-0 font-mono text-[11px] ${muted ? 'text-gray-500' : tier.color}`}>
+              <span className={`flex-shrink-0 font-mono text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}>
                 {hasAnyEdge ? (formatPp(s.signedPp) ?? '—') : '—'}
               </span>
             </div>
@@ -619,9 +641,9 @@ function MarketTabs({ game }) {
   const [tab, setTab] = useState(defaultTab)
 
   const tabs = [
-    { id: 'ml',     label: 'Moneyline', show: game.moneyline_home != null || edges?.home_ml != null },
-    { id: 'spread', label: 'Spread',    show: game.spread != null        || edges?.home_spread != null },
-    { id: 'total',  label: 'Total',     show: game.total != null         || edges?.over != null },
+    { id: 'ml',     label: 'ML',     show: game.moneyline_home != null || edges?.home_ml != null },
+    { id: 'spread', label: 'Spread', show: game.spread != null        || edges?.home_spread != null },
+    { id: 'total',  label: 'Total',  show: game.total != null         || edges?.over != null },
   ].filter(t => t.show)
 
   // If the previously-chosen tab is no longer available (no market for it),
@@ -647,23 +669,22 @@ function MarketTabs({ game }) {
 
   return (
     <div>
-      <div className="flex gap-1 mb-2">
-        {tabs.map(t => (
+      <div className="flex items-stretch mb-2 rounded-sharp shadow-hairline overflow-hidden">
+        {tabs.map((t, i) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors ${
+            className={`flex-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] py-1.5 transition-colors ${
               activeTab === t.id
-                ? 'bg-gray-700 text-white'
-                : 'bg-gray-900 text-gray-500 hover:text-gray-300'
-            }`}
+                ? 'text-ink-100 bg-ink-750'
+                : 'text-ink-400 bg-ink-900 hover:text-ink-200'
+            } ${i > 0 ? 'border-l border-ink-600' : ''}`}
           >
             {t.label}
           </button>
         ))}
       </div>
       <MarketRow
-        label={tabs.find(t => t.id === activeTab)?.label || ''}
         sides={sidesByTab[activeTab] || []}
         recommendedSide={recommended_side}
       />
@@ -682,23 +703,23 @@ function GameCard({ game, gameKey, onDeepResearch }) {
   const signedPp = edgePpForSide(game.edges, game.recommended_side)
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden flex flex-col">
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden flex flex-col">
       <div className="p-4 flex-1">
         {/* Matchup header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <div className="font-semibold text-white text-sm leading-tight">
-              {game.away_team} <span className="text-gray-500">@</span> {game.home_team}
+            <div className="font-mono font-medium text-ink-100 text-sm leading-tight tracking-tight">
+              {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
             </div>
             {(game.away_record || game.home_record) && (
-              <div className="text-xs text-gray-500 mt-0.5">
+              <div className="font-mono text-[11px] text-ink-400 mt-0.5 tabular-nums">
                 {game.away_record && <span>{game.away_record}</span>}
-                {game.away_record && game.home_record && <span className="text-gray-600"> vs </span>}
+                {game.away_record && game.home_record && <span className="text-ink-600"> vs </span>}
                 {game.home_record && <span>{game.home_record}</span>}
               </div>
             )}
             {game.game_date && (
-              <div className="text-xs text-gray-600 mt-0.5">{toMountainTime(game.game_date)} MT</div>
+              <div className="font-mono text-[11px] text-ink-500 mt-0.5 tabular-nums">{toMountainTime(game.game_date)} MT</div>
             )}
           </div>
           <EdgeChip signedPp={signedPp} />
@@ -706,13 +727,13 @@ function GameCard({ game, gameKey, onDeepResearch }) {
 
         {/* Recommended pick */}
         {game.recommended_pick ? (
-          <div className="bg-gray-800 rounded-lg px-3 py-2 mb-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Model Pick</div>
-            <div className="text-yellow-400 font-semibold text-sm">{game.recommended_pick}</div>
+          <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
+            <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick</div>
+            <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
           </div>
         ) : (
-          <div className="bg-gray-800/40 rounded-lg px-3 py-2 mb-3 border border-dashed border-gray-700">
-            <div className="text-xs text-gray-500">No model edge — every market &lt; 2pp</div>
+          <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
+            <div className="font-mono text-[11px] text-ink-400">No model edge — every market &lt; 2pp</div>
           </div>
         )}
 
@@ -724,15 +745,15 @@ function GameCard({ game, gameKey, onDeepResearch }) {
         {/* Analysis snippet (expandable) */}
         {game.analysis_snippet && (
           <div>
-            <p className={`text-xs text-gray-400 leading-relaxed ${!expanded ? 'line-clamp-2' : ''}`}>
+            <p className={`text-xs text-ink-300 leading-relaxed ${!expanded ? 'line-clamp-2' : ''}`}>
               {game.analysis_snippet}
             </p>
             {game.analysis_snippet.length > 120 && (
               <button
                 onClick={() => setExpanded(e => !e)}
-                className="text-xs text-blue-400 hover:text-blue-300 mt-1"
+                className="font-mono text-[10px] uppercase tracking-[0.14em] text-signal-pos/80 hover:text-signal-pos mt-1"
               >
-                {expanded ? 'Show less' : 'Read more'}
+                {expanded ? '— show less' : '+ read more'}
               </button>
             )}
           </div>
@@ -740,9 +761,9 @@ function GameCard({ game, gameKey, onDeepResearch }) {
 
         {/* Key factors */}
         {expanded && game.key_factors && (
-          <div className="mt-3 pt-3 border-t border-gray-700">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">Key Factors</div>
-            <p className="text-xs text-gray-400 leading-relaxed">
+          <div className="mt-3 pt-3 border-t border-ink-700">
+            <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-1">Key Factors</div>
+            <p className="text-xs text-ink-300 leading-relaxed">
               {Array.isArray(game.key_factors)
                 ? game.key_factors.join(' · ')
                 : String(game.key_factors)}
@@ -756,9 +777,9 @@ function GameCard({ game, gameKey, onDeepResearch }) {
         <div className="px-4 pb-4 pt-0">
           <button
             onClick={() => onDeepResearch(game, gameKey)}
-            className="w-full py-1.5 text-xs font-semibold text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-750 border border-gray-700 hover:border-gray-600 rounded-lg transition-all active:scale-95 flex items-center justify-center gap-1.5"
+            className="w-full py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-300 hover:text-ink-100 bg-ink-850 hover:bg-ink-800 rounded-sharp shadow-hairline hover:shadow-hairline-bright transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
           >
-            <span>🔬</span> Deep Research
+            <span className="text-signal-pos">+</span> Deep Research
           </button>
         </div>
       )}
@@ -777,25 +798,25 @@ function InjurySection({ content }) {
     : []
 
   return (
-    <div className="mt-4 border-t border-gray-700 pt-4">
+    <div className="mt-4 border-t border-ink-700 pt-4">
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 text-sm font-semibold text-orange-400 hover:text-orange-300 w-full text-left"
       >
         <span>🩹 Injury Report</span>
-        <span className="text-gray-500 text-xs ml-auto">{open ? '▲ Hide' : '▼ Show'}</span>
+        <span className="text-ink-400 text-xs ml-auto">{open ? '▲ Hide' : '▼ Show'}</span>
       </button>
       {open && (
         <ul className="mt-3 space-y-1">
           {lines.length > 0
             ? lines.map((line, i) => (
-                <li key={i} className="text-xs text-gray-400 flex items-start gap-2">
+                <li key={i} className="text-xs text-ink-300 flex items-start gap-2">
                   <span className="text-orange-500 flex-shrink-0 mt-0.5">•</span>
                   {line}
                 </li>
               ))
             : (
-              <li className="text-xs text-gray-500 italic">No injury data available.</li>
+              <li className="text-xs text-ink-400 italic">No injury data available.</li>
             )}
         </ul>
       )}
@@ -854,22 +875,22 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   }
 
   return (
-    <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
       {/* Sport header bar — clickable to collapse/expand */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full text-left bg-gradient-to-r from-gray-800 to-gray-750 px-6 py-4 border-b border-gray-700 hover:bg-gray-750 transition-colors"
+        className="w-full text-left bg-ink-850 px-6 py-4 border-b border-ink-700 hover:bg-ink-800 transition-colors"
       >
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{meta.emoji}</span>
-            <div>
-              <h2 className="text-lg font-bold text-white">{meta.label}</h2>
-              <p className="text-xs text-gray-400">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl flex-shrink-0">{meta.emoji}</span>
+            <div className="min-w-0">
+              <h2 className="font-mono text-base font-semibold text-ink-100 uppercase tracking-[0.06em]">{meta.label}</h2>
+              <p className="font-mono text-[11px] text-ink-400 tabular-nums">
                 {pickGames.length} pick{pickGames.length !== 1 ? 's' : ''}
-                {bubbleGames.length > 0 && <span className="text-gray-600"> · {bubbleGames.length} on the bubble</span>}
+                {bubbleGames.length > 0 && <span className="text-ink-500"> · {bubbleGames.length} on the bubble</span>}
                 {!expanded && topSignedPp != null && (
-                  <span className="ml-2 text-gray-500">
+                  <span className="ml-2 text-ink-500">
                     · Top: <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>
                   </span>
                 )}
@@ -881,13 +902,13 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             {expanded && topGames.some(g => g.recommended_pick) && (
               <button
                 onClick={buildQuickParlay}
-                className="px-4 py-2 text-sm font-bold rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-gray-900 shadow-lg transition-all hover:shadow-xl active:scale-95"
+                className="px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.12em] rounded-sharp bg-signal-pos hover:bg-signal-pos/90 text-ink-950 transition-all active:scale-[0.98]"
               >
                 Quick Parlay
               </button>
             )}
             {/* Chevron */}
-            <span className="text-gray-500 text-lg select-none">
+            <span className="font-mono text-ink-400 text-xs select-none">
               {expanded ? '▲' : '▼'}
             </span>
           </div>
@@ -903,19 +924,19 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             return (
               <div key={i} className="flex items-center justify-between gap-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 border ${tier.bg} ${tier.color}`}>
+                  <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
                     {formatPp(pp) ?? '—'}
                   </span>
-                  <span className="text-gray-300 truncate">{game.away_team} @ {game.home_team}</span>
+                  <span className="text-ink-200 truncate">{game.away_team} @ {game.home_team}</span>
                 </div>
-                <span className="text-yellow-400 text-xs font-semibold flex-shrink-0 truncate max-w-[140px]">
+                <span className="font-mono text-signal-pos text-xs font-medium flex-shrink-0 truncate max-w-[140px] tabular-nums">
                   {game.recommended_pick || '—'}
                 </span>
               </div>
             )
           })}
           {pickGames.length > 3 && (
-            <p className="text-[11px] text-gray-600 text-center pt-1">Tap to see all {pickGames.length} picks</p>
+            <p className="font-mono text-[10px] text-ink-500 text-center pt-1 uppercase tracking-[0.14em]">Tap to see all {pickGames.length} picks</p>
           )}
         </div>
       )}
@@ -925,7 +946,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         <div className="p-6">
           {pickGames.length > 0 ? (
             <>
-              <h3 className="text-xs uppercase tracking-widest text-gray-500 mb-3 font-semibold">
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 mb-3 font-medium">
                 Picks · ranked by model edge
               </h3>
               {/* Top 3 tiles */}
@@ -944,11 +965,11 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               {extraGames.length > 0 && (
                 <>
                   <div className="flex items-center gap-3 my-4">
-                    <div className="flex-1 border-t border-gray-700" />
-                    <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
+                    <div className="flex-1 border-t border-ink-700" />
+                    <span className="font-mono text-[10px] text-ink-500 uppercase tracking-[0.14em] whitespace-nowrap">
                       {extraGames.length} more {meta.label} pick{extraGames.length !== 1 ? 's' : ''}
                     </span>
-                    <div className="flex-1 border-t border-gray-700" />
+                    <div className="flex-1 border-t border-ink-700" />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                     {extraGames.map((game, i) => (
@@ -964,7 +985,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               )}
             </>
           ) : (
-            <div className="rounded-lg bg-gray-900/40 border border-dashed border-gray-700 px-4 py-6 text-center text-sm text-gray-500">
+            <div className="rounded-sharp bg-ink-950/40 border border-dashed border-ink-700 px-4 py-6 text-center text-sm text-ink-400">
               No actionable picks for {meta.label} today — the model considered every game and didn't find an edge ≥ 2pp.
             </div>
           )}
@@ -973,11 +994,11 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
           {bubbleGames.length > 0 && (
             <details className="mt-6 group">
               <summary className="cursor-pointer list-none flex items-center gap-2 select-none">
-                <span className="text-xs uppercase tracking-widest text-gray-500 font-semibold">
+                <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 font-medium">
                   On the bubble
                 </span>
-                <span className="text-[11px] text-gray-600">{bubbleGames.length} game{bubbleGames.length !== 1 ? 's' : ''} · model has no edge</span>
-                <span className="ml-auto text-gray-500 text-xs group-open:rotate-180 transition-transform">▼</span>
+                <span className="font-mono text-[10px] text-ink-500 tabular-nums">{bubbleGames.length} game{bubbleGames.length !== 1 ? 's' : ''} · model has no edge</span>
+                <span className="ml-auto text-ink-400 text-xs group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {bubbleGames.map((game, i) => (
@@ -1011,25 +1032,25 @@ function GolfLeaderboard({ golf }) {
   const shown = expanded ? full : preview
 
   return (
-    <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
+    <div className="bg-ink-900 rounded-sharp border border-ink-700 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-gray-750 transition-colors"
+        className="w-full flex items-center justify-between p-4 hover:bg-ink-850 transition-colors"
       >
         <div className="flex items-center gap-3">
           <span className="text-2xl">⛳</span>
           <div className="text-left">
             <h3 className="text-lg font-bold text-white">{golf.tournament}</h3>
-            <p className="text-sm text-gray-400">{golf.status}{golf.venue ? ` — ${golf.venue}` : ''}</p>
+            <p className="text-sm text-ink-300">{golf.status}{golf.venue ? ` — ${golf.venue}` : ''}</p>
           </div>
         </div>
-        <span className="text-gray-400 text-sm">{expanded ? '▲' : '▼'}</span>
+        <span className="text-ink-300 text-sm">{expanded ? '▲' : '▼'}</span>
       </button>
 
       <div className="px-4 pb-4">
         {/* Leaderboard */}
         <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-gray-500 px-2 mb-1">
+          <div className="flex items-center justify-between text-xs text-ink-400 px-2 mb-1">
             <span>Pos</span>
             <span className="flex-1 ml-3">Player</span>
             <span className="w-16 text-right">Score</span>
@@ -1040,14 +1061,14 @@ function GolfLeaderboard({ golf }) {
               o.name.toLowerCase().includes(p.name.split(' ').slice(-1)[0].toLowerCase())
             )
             return (
-              <div key={i} className={`flex items-center justify-between px-2 py-1.5 rounded ${i < 3 ? 'bg-gray-750' : ''}`}>
-                <span className={`w-6 text-sm font-bold ${i < 3 ? 'text-yellow-400' : 'text-gray-400'}`}>{p.position}</span>
+              <div key={i} className={`flex items-center justify-between px-2 py-1.5 rounded ${i < 3 ? 'bg-ink-850' : ''}`}>
+                <span className={`w-6 text-sm font-bold ${i < 3 ? 'text-signal-pos' : 'text-ink-300'}`}>{p.position}</span>
                 <span className="flex-1 ml-2 text-sm text-white font-medium">{p.name}</span>
                 <span className={`w-16 text-right text-sm font-bold ${
-                  p.score?.toString().startsWith('-') ? 'text-green-400' : p.score === 'E' ? 'text-gray-300' : 'text-red-400'
+                  p.score?.toString().startsWith('-') ? 'text-green-400' : p.score === 'E' ? 'text-ink-200' : 'text-signal-neg'
                 }`}>{p.score}</span>
                 {golf.outrightOdds && (
-                  <span className="w-16 text-right text-xs text-gray-400">
+                  <span className="w-16 text-right text-xs text-ink-300">
                     {odds ? `+${odds.odds}` : ''}
                   </span>
                 )}
@@ -1079,7 +1100,7 @@ function RecapCard({ sport, won, lost, picks }) {
   const visible = expanded ? picks : picks.slice(0, 4)
 
   return (
-    <div className="bg-gray-900 rounded-xl p-4 border border-gray-700">
+    <div className="bg-ink-950 rounded-sharp p-4 border border-ink-700">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <span>{meta.emoji}</span>
@@ -1094,12 +1115,12 @@ function RecapCard({ sport, won, lost, picks }) {
           <div key={i} className="flex items-center gap-2">
             <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
               p.outcome === 'won'
-                ? 'bg-green-900 text-green-300 border border-green-700'
-                : 'bg-red-900 text-red-300 border border-red-700'
+                ? 'bg-green-900 text-green-300 border border-ink-700'
+                : 'bg-signal-neg-dim text-signal-neg border border-red-700'
             }`}>
               {p.outcome === 'won' ? 'W' : 'L'}
             </span>
-            <span className="text-xs text-gray-400 truncate">
+            <span className="text-xs text-ink-300 truncate">
               {p.pick || `${p.away_team} @ ${p.home_team}`}
             </span>
           </div>
@@ -1122,10 +1143,10 @@ function YesterdayRecap({ results }) {
   if (sports.length === 0) return null
 
   return (
-    <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-700">
+    <div className="bg-ink-900 rounded-sharp border border-ink-700 overflow-hidden">
+      <div className="px-6 py-4 border-b border-ink-700">
         <h2 className="text-lg font-bold text-white">Recent Results</h2>
-        <p className="text-xs text-gray-400 mt-0.5">Picks settled in the last 3 days</p>
+        <p className="text-xs text-ink-300 mt-0.5">Picks settled in the last 3 days</p>
       </div>
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {sports.map(sport => (
@@ -1158,18 +1179,18 @@ function ModelPerformance({ accuracy }) {
   ]
 
   return (
-    <div className="bg-gray-800 rounded-2xl border border-gray-700 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-700 flex items-center justify-between">
+    <div className="bg-ink-900 rounded-sharp border border-ink-700 overflow-hidden">
+      <div className="px-6 py-4 border-b border-ink-700 flex items-center justify-between">
         <div>
           <h2 className="text-lg font-bold text-white">Model Performance</h2>
-          <p className="text-xs text-gray-400 mt-0.5">{overall.total} picks settled {periodLabel}</p>
+          <p className="text-xs text-ink-300 mt-0.5">{overall.total} picks settled {periodLabel}</p>
         </div>
-        <div className="flex bg-gray-900 rounded-lg p-0.5">
+        <div className="flex bg-ink-950 rounded-sharp p-0.5">
           {pills.map(p => (
             <button
               key={p.key}
               onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${period === p.key ? 'bg-purple-600 text-white' : 'text-gray-400 hover:text-gray-200'}`}
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${period === p.key ? 'bg-purple-600 text-white' : 'text-ink-300 hover:text-ink-100'}`}
             >{p.label}</button>
           ))}
         </div>
@@ -1177,12 +1198,12 @@ function ModelPerformance({ accuracy }) {
       <div className="p-6">
         {/* Overall rate */}
         {overall.winRate != null && (
-          <div className="text-center mb-6 pb-6 border-b border-gray-700">
-            <div className="text-xs text-gray-500 uppercase tracking-widest mb-1">Overall Win Rate</div>
+          <div className="text-center mb-6 pb-6 border-b border-ink-700">
+            <div className="text-xs text-ink-400 uppercase tracking-widest mb-1">Overall Win Rate</div>
             <div className={`text-5xl font-extrabold ${winRateColor(overall.winRate)}`}>
               {overall.winRate}%
             </div>
-            <div className="text-sm text-gray-500 mt-1">
+            <div className="text-sm text-ink-400 mt-1">
               {overall.won}W — {overall.lost}L
             </div>
           </div>
@@ -1191,7 +1212,7 @@ function ModelPerformance({ accuracy }) {
         {/* Per-sport bars */}
         {sports.length > 0 && (
           <>
-            <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">By Sport</div>
+            <div className="text-xs text-ink-400 uppercase tracking-widest mb-2">By Sport</div>
             <div className="space-y-3 mb-6">
               {sports.map(([sport, stats]) => {
                 const meta = getSportMeta(sport)
@@ -1200,14 +1221,14 @@ function ModelPerformance({ accuracy }) {
                     <div className="flex items-center justify-between mb-1">
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{meta.emoji}</span>
-                        <span className="text-sm text-gray-300 font-medium">{meta.label}</span>
-                        <span className="text-xs text-gray-600">({stats.won}W-{stats.lost}L)</span>
+                        <span className="text-sm text-ink-200 font-medium">{meta.label}</span>
+                        <span className="text-xs text-ink-500">({stats.won}W-{stats.lost}L)</span>
                       </div>
                       <span className={`text-sm font-bold ${winRateColor(stats.winRate)}`}>
                         {stats.winRate != null ? `${stats.winRate}%` : 'N/A'}
                       </span>
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                    <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
                       {stats.winRate != null && (
                         <div
                           className={`h-full rounded-full transition-all ${winRateBarColor(stats.winRate)}`}
@@ -1225,20 +1246,20 @@ function ModelPerformance({ accuracy }) {
         {/* Per-bet-type bars */}
         {betTypes.length > 0 && (
           <>
-            <div className="text-xs text-gray-500 uppercase tracking-widest mb-2">By Bet Type</div>
+            <div className="text-xs text-ink-400 uppercase tracking-widest mb-2">By Bet Type</div>
             <div className="space-y-3">
               {betTypes.map(([betType, stats]) => (
                 <div key={betType}>
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-300 font-medium">{betType}</span>
-                      <span className="text-xs text-gray-600">({stats.won}W-{stats.lost}L)</span>
+                      <span className="text-sm text-ink-200 font-medium">{betType}</span>
+                      <span className="text-xs text-ink-500">({stats.won}W-{stats.lost}L)</span>
                     </div>
                     <span className={`text-sm font-bold ${winRateColor(stats.winRate)}`}>
                       {stats.winRate != null ? `${stats.winRate}%` : 'N/A'}
                     </span>
                   </div>
-                  <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
                     {stats.winRate != null && (
                       <div
                         className={`h-full rounded-full transition-all ${winRateBarColor(stats.winRate)}`}
@@ -1301,20 +1322,20 @@ export default function DailyDigest({ onBack }) {
   }, [])
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans">
+    <div className="min-h-screen bg-ink-950 text-white font-sans">
       {/* Top nav bar */}
-      <div className="sticky top-0 z-30 bg-gray-950/95 border-b border-gray-800 backdrop-blur px-4 py-3 flex items-center gap-3">
+      <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
         <button
           onClick={onBack}
-          className="text-sm text-gray-400 hover:text-white flex items-center gap-1.5 transition-colors"
+          className="text-sm text-ink-300 hover:text-white flex items-center gap-1.5 transition-colors"
         >
           ← Back
         </button>
-        <span className="text-gray-700">|</span>
-        <span className="text-sm font-semibold text-gray-300">Daily Digest</span>
+        <span className="text-ink-700">|</span>
+        <span className="text-sm font-semibold text-ink-200">Daily Digest</span>
         <button
           onClick={fetchDigest}
-          className="ml-auto px-3 py-1.5 text-xs font-semibold bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg border border-gray-700 transition-colors active:scale-95"
+          className="ml-auto px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           {loading ? '...' : '↻ Refresh'}
         </button>
@@ -1323,17 +1344,17 @@ export default function DailyDigest({ onBack }) {
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
         {/* Hero header */}
-        <div className="bg-gradient-to-br from-gray-800 via-gray-850 to-gray-900 rounded-2xl border border-gray-700 p-6 md:p-8 shadow-2xl">
+        <div className="bg-ink-900 rounded-sharp border border-ink-700 p-6 md:p-8 shadow-2xl">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500 leading-tight">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-signal-pos leading-tight">
                 Daily Digest
               </h1>
-              <p className="text-gray-400 text-sm mt-1">
+              <p className="text-ink-300 text-sm mt-1">
                 {data ? formatFullDate(null) : 'Loading...'}
               </p>
               {data && (
-                <p className="text-gray-300 mt-2 font-medium">
+                <p className="text-ink-200 mt-2 font-medium">
                   {totalGames} analyzed game{totalGames !== 1 ? 's' : ''} across {totalSports} sport{totalSports !== 1 ? 's' : ''} today
                 </p>
               )}
@@ -1342,14 +1363,14 @@ export default function DailyDigest({ onBack }) {
 
             {/* Upcoming game counts */}
             {data && Object.keys(data.upcomingCounts).length > 0 && (
-              <div className="bg-gray-900/60 rounded-xl border border-gray-700 px-4 py-3">
-                <div className="text-xs text-gray-500 uppercase tracking-widest mb-2 font-semibold">De-Genny's 24-Hr Game Analysis</div>
+              <div className="bg-ink-950/60 rounded-sharp border border-ink-700 px-4 py-3">
+                <div className="text-xs text-ink-400 uppercase tracking-widest mb-2 font-semibold">De-Genny's 24-Hr Game Analysis</div>
                 <div className="space-y-1">
                   {Object.entries(data.upcomingCounts).map(([sport, count]) => {
                     const meta = getSportMeta(sport)
                     return (
                       <div key={sport} className="flex items-center justify-between gap-6 text-sm">
-                        <span className="text-gray-300">{meta.emoji} {meta.label}</span>
+                        <span className="text-ink-200">{meta.emoji} {meta.label}</span>
                         <span className="font-bold text-white">{count}</span>
                       </div>
                     )
@@ -1365,12 +1386,12 @@ export default function DailyDigest({ onBack }) {
 
         {/* Error state */}
         {!loading && error && (
-          <div className="bg-red-900/40 border border-red-700 rounded-xl p-6 text-center">
-            <p className="text-red-300 font-medium">Failed to load digest</p>
-            <p className="text-red-400 text-sm mt-1">{error}</p>
+          <div className="bg-signal-neg-dim/40 border border-red-700 rounded-sharp p-6 text-center">
+            <p className="text-signal-neg font-medium">Failed to load digest</p>
+            <p className="text-signal-neg text-sm mt-1">{error}</p>
             <button
               onClick={fetchDigest}
-              className="mt-4 px-4 py-2 bg-red-800 hover:bg-red-700 rounded-lg text-sm text-white"
+              className="mt-4 px-4 py-2 bg-red-800 hover:bg-red-700 rounded-sharp text-sm text-white"
             >
               Try Again
             </button>
@@ -1395,9 +1416,9 @@ export default function DailyDigest({ onBack }) {
 
             {/* Sport sections — all start collapsed, show 3 game preview */}
             {sportSections.length === 0 ? (
-              <div className="bg-gray-800 rounded-2xl border border-gray-700 p-8 text-center">
-                <p className="text-gray-400 text-lg font-medium">No fresh game analysis available today.</p>
-                <p className="text-gray-600 text-sm mt-2">Check back later or run the Pick Generator to generate analysis.</p>
+              <div className="bg-ink-900 rounded-sharp border border-ink-700 p-8 text-center">
+                <p className="text-ink-300 text-lg font-medium">No fresh game analysis available today.</p>
+                <p className="text-ink-500 text-sm mt-2">Check back later or run the Pick Generator to generate analysis.</p>
               </div>
             ) : (
               sportSections.map(([sport, games]) => (
@@ -1413,18 +1434,18 @@ export default function DailyDigest({ onBack }) {
             )}
 
             {/* Bottom CTA */}
-            <div className="bg-gray-800 rounded-2xl border border-gray-700 p-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="bg-ink-900 rounded-sharp border border-ink-700 p-6 flex flex-col sm:flex-row items-center justify-center gap-4">
               <button
                 onClick={() => {
                   window.location.hash = '#/chat'
                 }}
-                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:opacity-90 rounded-xl font-bold text-white shadow-lg transition-all"
+                className="w-full sm:w-auto px-6 py-3 bg-signal-pos hover:opacity-90 rounded-sharp font-bold text-white shadow-lg transition-all"
               >
                 Chat with De-Genny
               </button>
               <button
                 onClick={onBack}
-                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-green-600 to-yellow-500 hover:opacity-90 rounded-xl font-bold text-white shadow-lg transition-all"
+                className="w-full sm:w-auto px-6 py-3 bg-signal-pos hover:opacity-90 rounded-sharp font-bold text-white shadow-lg transition-all"
               >
                 Full Pick Generator
               </button>

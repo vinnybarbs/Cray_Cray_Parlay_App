@@ -89,7 +89,7 @@ const BetslipBuilder = () => {
       <div className="bg-slate-800 border-b border-slate-700 px-6 py-4 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg p-2">
+            <div className="bg-signal-pos rounded-sharp p-2">
               <Sparkles className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -109,7 +109,7 @@ const BetslipBuilder = () => {
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((msg, idx) => (
             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[80%] ${msg.role === 'user' ? 'bg-blue-600' : msg.isError ? 'bg-red-900/30 border border-red-500/50' : 'bg-slate-800'} rounded-2xl px-5 py-3 shadow-lg`}>
+              <div className={`max-w-[80%] ${msg.role === 'user' ? 'bg-blue-600' : msg.isError ? 'bg-signal-neg-dim/30 border border-signal-neg/50' : 'bg-slate-800'} rounded-sharp px-5 py-3 shadow-lg`}>
                 {/* Message Content */}
                 <div className="whitespace-pre-wrap text-sm leading-relaxed">
                   {msg.content}
@@ -119,7 +119,7 @@ const BetslipBuilder = () => {
                 {msg.picks && msg.picks.length > 0 && (
                   <div className="mt-4 space-y-2">
                     {msg.picks.map((pick, i) => (
-                      <div key={i} className="bg-slate-900/50 rounded-lg p-3 border border-slate-700">
+                      <div key={i} className="bg-slate-900/50 rounded-sharp p-3 border border-slate-700">
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-semibold text-white">{pick.pick}</div>
@@ -135,7 +135,7 @@ const BetslipBuilder = () => {
 
                     {/* Combined Odds */}
                     {msg.picks.length > 1 && (
-                      <div className="bg-gradient-to-r from-purple-900/30 to-blue-900/30 rounded-lg p-3 border border-purple-500/30 mt-3">
+                      <div className="bg-ink-850 rounded-sharp p-3 border border-ink-700 mt-3">
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-medium">Combined Parlay Odds</span>
                           <span className="text-lg font-bold text-purple-300">{calculateCombinedOdds(msg.picks)}</span>
@@ -153,7 +153,7 @@ const BetslipBuilder = () => {
                         href={msg.deepLinks.draftkings}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between bg-green-600 hover:bg-green-500 rounded-lg px-4 py-3 font-semibold transition-colors group"
+                        className="flex items-center justify-between bg-green-600 hover:bg-green-500 rounded-sharp px-4 py-3 font-semibold transition-colors group"
                       >
                         <span className="flex items-center space-x-2">
                           <ExternalLink className="w-4 h-4" />
@@ -167,7 +167,7 @@ const BetslipBuilder = () => {
                         href={msg.deepLinks.fanduel}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between bg-blue-600 hover:bg-blue-500 rounded-lg px-4 py-3 font-semibold transition-colors group"
+                        className="flex items-center justify-between bg-blue-600 hover:bg-blue-500 rounded-sharp px-4 py-3 font-semibold transition-colors group"
                       >
                         <span className="flex items-center space-x-2">
                           <ExternalLink className="w-4 h-4" />
@@ -190,7 +190,7 @@ const BetslipBuilder = () => {
           {/* Loading Indicator */}
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-slate-800 rounded-2xl px-5 py-3 shadow-lg">
+              <div className="bg-slate-800 rounded-sharp px-5 py-3 shadow-lg">
                 <div className="flex items-center space-x-2 text-slate-400">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span className="text-sm">Analyzing picks...</span>
@@ -206,7 +206,7 @@ const BetslipBuilder = () => {
       {/* Input Bar */}
       <div className="bg-slate-800 border-t border-slate-700 px-6 py-4 sticky bottom-0">
         <div className="max-w-4xl mx-auto flex items-end space-x-3">
-          <div className="flex-1 bg-slate-900 rounded-xl border border-slate-700 focus-within:border-blue-500 transition-colors">
+          <div className="flex-1 bg-slate-900 rounded-sharp border border-slate-700 focus-within:border-signal-pos transition-colors">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -220,7 +220,7 @@ const BetslipBuilder = () => {
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-xl p-3 transition-colors"
+            className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-sharp p-3 transition-colors"
           >
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

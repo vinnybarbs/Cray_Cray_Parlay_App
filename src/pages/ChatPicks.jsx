@@ -15,7 +15,7 @@ function ChatMessage({ role, content }) {
   if (role === 'user') {
     return (
       <div className="flex justify-end mb-3">
-        <div className="bg-yellow-600 text-white rounded-2xl rounded-br-sm px-4 py-3 max-w-[80%] text-sm leading-relaxed">
+        <div className="bg-signal-pos-dim text-white rounded-sharp rounded-br-sm px-4 py-3 max-w-[80%] text-sm leading-relaxed">
           {content}
         </div>
       </div>
@@ -24,7 +24,7 @@ function ChatMessage({ role, content }) {
 
   return (
     <div className="flex justify-start mb-3">
-      <div className="bg-gray-800 border border-gray-700 text-gray-100 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap">
+      <div className="bg-ink-900 border border-ink-700 text-ink-100 rounded-sharp rounded-bl-sm px-4 py-3 max-w-[85%] text-sm leading-relaxed whitespace-pre-wrap">
         {content}
       </div>
     </div>
@@ -97,15 +97,15 @@ export default function ChatPicks({ onBack }) {
   return (
     <div className="flex flex-col" style={{ height: '100dvh', minHeight: '100dvh' }}>
       {/* Header - big tap target for back */}
-      <header className="flex-shrink-0 flex items-center px-3 py-2 bg-gray-800 border-b border-gray-700 safe-top">
+      <header className="flex-shrink-0 flex items-center px-3 py-2 bg-ink-900 border-b border-ink-700 safe-top">
         <button
           onClick={onBack}
-          className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white text-xl transition-colors"
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-ink-800 hover:bg-ink-700 active:bg-ink-600 text-white text-xl transition-colors"
           aria-label="Go back"
         >
           &larr;
         </button>
-        <h1 className="flex-1 text-center text-base font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent pr-10">
+        <h1 className="flex-1 text-center text-base font-bold text-signal-pos pr-10">
           Try asking De-Genny anything!
         </h1>
       </header>
@@ -115,8 +115,8 @@ export default function ChatPicks({ onBack }) {
         {messages.length === 0 && (
           <div className="text-center mt-6">
             <div className="text-4xl mb-3">🎰</div>
-            <h2 className="text-lg font-bold text-gray-300 mb-2">What are you feeling?</h2>
-            <p className="text-gray-500 text-sm mb-5">
+            <h2 className="text-lg font-bold text-ink-200 mb-2">What are you feeling?</h2>
+            <p className="text-ink-400 text-sm mb-5">
               Tell me what you're looking for and I'll search our database for the best plays.
             </p>
             <div className="flex flex-wrap gap-2 justify-center max-w-lg mx-auto px-2">
@@ -124,7 +124,7 @@ export default function ChatPicks({ onBack }) {
                 <button
                   key={i}
                   onClick={() => sendMessage(s)}
-                  className="px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg text-sm text-gray-300 hover:bg-gray-700 active:bg-gray-600 hover:border-yellow-500 transition-colors"
+                  className="px-3 py-2.5 bg-ink-900 border border-ink-700 rounded-sharp text-sm text-ink-200 hover:bg-ink-800 active:bg-ink-700 hover:border-signal-pos transition-colors"
                 >
                   {s}
                 </button>
@@ -139,22 +139,22 @@ export default function ChatPicks({ onBack }) {
 
         {loading && (
           <div className="flex justify-start mb-3">
-            <div className="bg-gray-800 border border-gray-700 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[85%]">
+            <div className="bg-ink-900 border border-ink-700 rounded-sharp rounded-bl-sm px-4 py-3 max-w-[85%]">
               <div className="flex items-center gap-2 mb-1.5">
                 <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div className="w-1.5 h-1.5 bg-signal-pos rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 bg-signal-pos rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 bg-signal-pos rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
-                <span className="text-xs font-semibold text-yellow-400">De-Genny is researching...</span>
+                <span className="text-xs font-semibold text-signal-pos">De-Genny is researching...</span>
               </div>
-              <div className="space-y-0.5 text-[10px] text-gray-400">
+              <div className="space-y-0.5 text-[10px] text-ink-300">
                 {loadingPhase >= 0 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Searching odds database</div>}
                 {loadingPhase >= 1 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Checking injury reports</div>}
                 {loadingPhase >= 2 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Pulling recent scores & standings</div>}
                 {loadingPhase >= 3 && <div className="flex items-center gap-1"><span className="text-green-400">✓</span> Reading news & analysis</div>}
-                {loadingPhase >= 4 && <div className="flex items-center gap-1"><span className="text-yellow-400 animate-pulse">◉</span> Forming picks from intel...</div>}
-                {loadingPhase >= 5 && <div className="flex items-center gap-1"><span className="text-yellow-400 animate-pulse">◉</span> Almost done...</div>}
+                {loadingPhase >= 4 && <div className="flex items-center gap-1"><span className="text-signal-pos animate-pulse">◉</span> Forming picks from intel...</div>}
+                {loadingPhase >= 5 && <div className="flex items-center gap-1"><span className="text-signal-pos animate-pulse">◉</span> Almost done...</div>}
               </div>
             </div>
           </div>
@@ -164,7 +164,7 @@ export default function ChatPicks({ onBack }) {
       </div>
 
       {/* Input - pinned to bottom, respects mobile keyboard */}
-      <form onSubmit={handleSubmit} className="flex-shrink-0 px-3 py-2 bg-gray-800 border-t border-gray-700 safe-bottom">
+      <form onSubmit={handleSubmit} className="flex-shrink-0 px-3 py-2 bg-ink-900 border-t border-ink-700 safe-bottom">
         <div className="flex gap-2">
           <input
             ref={inputRef}
@@ -174,17 +174,17 @@ export default function ChatPicks({ onBack }) {
             placeholder="Ask about odds, picks, matchups..."
             disabled={loading}
             autoComplete="off"
-            className="flex-1 min-w-0 bg-gray-700 border border-gray-600 rounded-xl px-4 py-3 text-base text-white placeholder-gray-400 focus:outline-none focus:border-yellow-500 disabled:opacity-50"
+            className="flex-1 min-w-0 bg-ink-800 border border-ink-600 rounded-sharp px-4 py-3 text-base text-white placeholder-gray-400 focus:outline-none focus:border-signal-pos disabled:opacity-50"
           />
           <button
             type="submit"
             disabled={!input.trim() || loading}
-            className="flex-shrink-0 px-5 py-3 bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-bold rounded-xl text-sm disabled:opacity-50 disabled:cursor-not-allowed active:from-yellow-700 active:to-orange-700 transition-colors"
+            className="flex-shrink-0 px-5 py-3 bg-signal-pos text-white font-bold rounded-sharp text-sm disabled:opacity-50 disabled:cursor-not-allowed active:bg-signal-pos-dim transition-colors"
           >
             Send
           </button>
         </div>
-        <p className="text-center text-gray-600 text-xs mt-1">For entertainment only. Gamble responsibly.</p>
+        <p className="text-center text-ink-500 text-xs mt-1">For entertainment only. Gamble responsibly.</p>
       </form>
     </div>
   )

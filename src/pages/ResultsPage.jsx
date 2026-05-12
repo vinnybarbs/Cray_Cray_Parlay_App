@@ -6,19 +6,19 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp
 
 function StatCard({ label, value, sub, color = 'yellow' }) {
   const colorMap = {
-    yellow: 'from-yellow-500 to-orange-500',
-    green: 'from-green-500 to-emerald-500',
-    red: 'from-red-500 to-pink-500',
-    blue: 'from-blue-500 to-cyan-500',
-    gray: 'from-gray-500 to-gray-600'
+    yellow: 'text-signal-pos',
+    green:  'text-emerald-400',
+    red:    'text-signal-neg',
+    blue:   'text-sky-400',
+    gray:   'text-ink-300',
   }
   return (
-    <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-      <p className="text-gray-400 text-xs uppercase tracking-wide">{label}</p>
-      <p className={`text-2xl font-bold bg-gradient-to-r ${colorMap[color]} bg-clip-text text-transparent`}>
+    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+      <p className="font-mono text-[10px] text-ink-400 uppercase tracking-[0.14em]">{label}</p>
+      <p className={`font-mono text-2xl font-semibold tabular-nums ${colorMap[color]}`}>
         {value}
       </p>
-      {sub && <p className="text-gray-500 text-xs mt-1">{sub}</p>}
+      {sub && <p className="font-mono text-[11px] text-ink-400 mt-1 tabular-nums">{sub}</p>}
     </div>
   )
 }
@@ -26,7 +26,7 @@ function StatCard({ label, value, sub, color = 'yellow' }) {
 function BreakdownList({ items }) {
   const entries = Object.entries(items || {})
   if (entries.length === 0) {
-    return <p className="text-gray-500 text-xs mb-4">No data for this period.</p>
+    return <p className="text-ink-400 text-xs mb-4">No data for this period.</p>
   }
   return (
     <div className="space-y-2 mb-2">
@@ -34,12 +34,12 @@ function BreakdownList({ items }) {
         const decided = stats.wins + stats.losses
         const wr = decided > 0 ? ((stats.wins / decided) * 100).toFixed(1) : 'N/A'
         return (
-          <div key={label} className="flex items-center justify-between bg-gray-800 rounded-lg px-4 py-2 border border-gray-700">
-            <span className="text-sm text-gray-300">{label}</span>
+          <div key={label} className="flex items-center justify-between bg-ink-900 rounded-sharp px-4 py-2 border border-ink-700">
+            <span className="text-sm text-ink-200">{label}</span>
             <div className="flex items-center gap-4 text-xs">
               <span className="text-green-400">{stats.wins}W</span>
-              <span className="text-red-400">{stats.losses}L</span>
-              <span className="text-yellow-400 font-bold">{wr}{wr !== 'N/A' ? '%' : ''}</span>
+              <span className="text-signal-neg">{stats.losses}L</span>
+              <span className="text-signal-pos font-bold">{wr}{wr !== 'N/A' ? '%' : ''}</span>
             </div>
           </div>
         )
@@ -52,14 +52,14 @@ function ParlayRow({ parlay, legs }) {
   const [expanded, setExpanded] = useState(false)
   const outcomeColor = {
     won: 'text-green-400',
-    lost: 'text-red-400',
-    push: 'text-yellow-400',
-    pending: 'text-gray-400'
+    lost: 'text-signal-neg',
+    push: 'text-signal-pos',
+    pending: 'text-ink-300'
   }
   const outcome = parlay.final_outcome || parlay.status || 'pending'
 
   return (
-    <div className="bg-gray-800 rounded-lg border border-gray-700 mb-3">
+    <div className="bg-ink-900 rounded-sharp border border-ink-700 mb-3">
       <button
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-4 py-3 text-left"
@@ -69,22 +69,22 @@ function ParlayRow({ parlay, legs }) {
             <span className={`font-bold text-sm uppercase ${outcomeColor[outcome]}`}>
               {outcome === 'pending' ? '⏳' : outcome === 'won' ? '✅' : outcome === 'lost' ? '❌' : '🔄'} {outcome}
             </span>
-            <span className="text-gray-500 text-xs">{parlay.total_legs} legs</span>
-            <span className="text-gray-500 text-xs">{parlay.generate_mode || ''}</span>
+            <span className="text-ink-400 text-xs">{parlay.total_legs} legs</span>
+            <span className="text-ink-400 text-xs">{parlay.generate_mode || ''}</span>
           </div>
-          <p className="text-gray-400 text-xs mt-1">
+          <p className="text-ink-300 text-xs mt-1">
             {new Date(parlay.created_at).toLocaleDateString()} &middot; {parlay.combined_odds} odds &middot; ${parlay.potential_payout?.toFixed(0) || '?'} payout
           </p>
         </div>
-        <span className="text-gray-500">{expanded ? '▲' : '▼'}</span>
+        <span className="text-ink-400">{expanded ? '▲' : '▼'}</span>
       </button>
       {expanded && legs && (
         <div className="px-4 pb-3 space-y-2">
           {legs.map((leg, i) => (
-            <div key={i} className="flex items-center justify-between text-sm border-t border-gray-700 pt-2">
+            <div key={i} className="flex items-center justify-between text-sm border-t border-ink-700 pt-2">
               <div>
-                <span className="text-gray-300">{leg.pick || leg.pick_description}</span>
-                <span className="text-gray-500 ml-2 text-xs">{leg.sport} &middot; {leg.odds}</span>
+                <span className="text-ink-200">{leg.pick || leg.pick_description}</span>
+                <span className="text-ink-400 ml-2 text-xs">{leg.sport} &middot; {leg.odds}</span>
               </div>
               <span className={`text-xs font-bold ${outcomeColor[leg.outcome || 'pending']}`}>
                 {(leg.outcome || 'pending').toUpperCase()}
@@ -234,29 +234,29 @@ export default function ResultsPage({ onBack }) {
   const userWinRate = userWins + userLosses > 0 ? ((userWins / (userWins + userLosses)) * 100).toFixed(1) : '--'
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-ink-950 text-white">
       {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 bg-gray-800 border-b border-gray-700">
-        <button onClick={onBack} className="text-gray-400 hover:text-white text-sm">&larr; Back</button>
-        <h1 className="text-lg font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+      <header className="flex items-center justify-between px-4 py-3 bg-ink-900 border-b border-ink-700">
+        <button onClick={onBack} className="text-ink-300 hover:text-white text-sm">&larr; Back</button>
+        <h1 className="text-lg font-bold text-signal-pos">
           Results & Performance
         </h1>
-        <button onClick={triggerSettlement} className="text-xs text-gray-500 hover:text-yellow-400">
+        <button onClick={triggerSettlement} className="text-xs text-ink-400 hover:text-signal-pos">
           Refresh
         </button>
       </header>
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-700">
+      <div className="flex border-b border-ink-700">
         <button
           onClick={() => setTab('my-bets')}
-          className={`flex-1 py-3 text-sm font-medium ${tab === 'my-bets' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500'}`}
+          className={`flex-1 py-3 text-sm font-medium ${tab === 'my-bets' ? 'text-signal-pos border-b-2 border-signal-pos' : 'text-ink-400'}`}
         >
           My Bets
         </button>
         <button
           onClick={() => setTab('model')}
-          className={`flex-1 py-3 text-sm font-medium ${tab === 'model' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500'}`}
+          className={`flex-1 py-3 text-sm font-medium ${tab === 'model' ? 'text-signal-pos border-b-2 border-signal-pos' : 'text-ink-400'}`}
         >
           AI Model Performance
         </button>
@@ -264,7 +264,7 @@ export default function ResultsPage({ onBack }) {
 
       <div className="px-4 py-4 max-w-2xl mx-auto">
         {loading ? (
-          <div className="text-center py-12 text-gray-500">Loading...</div>
+          <div className="text-center py-12 text-ink-400">Loading...</div>
         ) : tab === 'my-bets' ? (
           <>
             {/* User Stats */}
@@ -276,13 +276,13 @@ export default function ResultsPage({ onBack }) {
             </div>
 
             {userPending > 0 && (
-              <p className="text-gray-500 text-xs mb-4">{userPending} parlay(s) still pending settlement</p>
+              <p className="text-ink-400 text-xs mb-4">{userPending} parlay(s) still pending settlement</p>
             )}
 
             {!isAuthenticated ? (
-              <p className="text-center text-gray-500 py-8">Sign in to see your betting history</p>
+              <p className="text-center text-ink-400 py-8">Sign in to see your betting history</p>
             ) : parlays.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No locked parlays yet. Lock some picks to start tracking!</p>
+              <p className="text-center text-ink-400 py-8">No locked parlays yet. Lock some picks to start tracking!</p>
             ) : (
               parlays.map(p => (
                 <ParlayRow key={p.id} parlay={p} legs={parlayLegs[p.id] || []} />
@@ -303,8 +303,8 @@ export default function ResultsPage({ onBack }) {
                   onClick={() => setModelPeriod(opt.key)}
                   className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                     modelPeriod === opt.key
-                      ? 'bg-yellow-400 text-gray-900 border-yellow-400'
-                      : 'bg-transparent text-gray-400 border-gray-600 hover:border-yellow-400 hover:text-yellow-400'
+                      ? 'bg-signal-pos text-ink-950 border-signal-pos'
+                      : 'bg-transparent text-ink-300 border-ink-600 hover:border-signal-pos hover:text-signal-pos'
                   }`}
                 >
                   {opt.label}
@@ -328,19 +328,19 @@ export default function ResultsPage({ onBack }) {
                 </div>
 
                 {/* By Sport */}
-                <h3 className="text-sm font-semibold text-gray-300 mb-3 mt-6">By Sport</h3>
+                <h3 className="text-sm font-semibold text-ink-200 mb-3 mt-6">By Sport</h3>
                 <BreakdownList items={modelStats.bySport} />
 
                 {/* By Bet Type */}
-                <h3 className="text-sm font-semibold text-gray-300 mb-3 mt-6">By Bet Type</h3>
+                <h3 className="text-sm font-semibold text-ink-200 mb-3 mt-6">By Bet Type</h3>
                 <BreakdownList items={modelStats.byBetType} />
 
                 {/* By Mode */}
-                <h3 className="text-sm font-semibold text-gray-300 mb-3 mt-6">By Generation Mode</h3>
+                <h3 className="text-sm font-semibold text-ink-200 mb-3 mt-6">By Generation Mode</h3>
                 <BreakdownList items={modelStats.byMode} />
               </>
             ) : (
-              <p className="text-center text-gray-500 py-8">No resolved AI predictions yet for this period.</p>
+              <p className="text-center text-ink-400 py-8">No resolved AI predictions yet for this period.</p>
             )}
           </>
         )}

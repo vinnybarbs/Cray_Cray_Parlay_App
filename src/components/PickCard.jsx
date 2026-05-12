@@ -87,7 +87,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
 
   const getConfidenceColor = (confidence) => {
     if (confidence >= 8) return 'text-green-400'
-    if (confidence >= 6) return 'text-yellow-400'
+    if (confidence >= 6) return 'text-signal-pos'
     return 'text-orange-400'
   }
 
@@ -98,22 +98,22 @@ export default function PickCard({ pick, onAdd, isAdded }) {
   }
 
   return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-all">
+    <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700 hover:border-ink-600 transition-all">
       {/* Header: Game Info */}
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
-          <div className="text-xs text-gray-400 mb-1">
+          <div className="text-xs text-ink-300 mb-1">
             {formatDate(pick.commenceTime || pick.gameDate)} • {pick.sport}
           </div>
-          <div className="text-sm font-semibold text-gray-200">
+          <div className="text-sm font-semibold text-ink-100">
             {pick.awayTeam} @ {pick.homeTeam}
           </div>
           {pick.matchupSnapshot && (
-            <div className="mt-1 text-[11px] text-gray-300 bg-gray-900/60 rounded px-2 py-1 border border-gray-700">
+            <div className="mt-1 text-[11px] text-ink-200 bg-ink-950/60 rounded px-2 py-1 border border-ink-700">
               <div className="flex justify-between gap-4">
                 <div className="flex-1">
                   <div className="text-[11px] font-semibold truncate">{pick.matchupSnapshot.away.team}</div>
-                  <div className="text-[10px] text-gray-400">
+                  <div className="text-[10px] text-ink-300">
                     {pick.matchupSnapshot.away.record}
                     {pick.matchupSnapshot.away.pct != null && ` • ${(pick.matchupSnapshot.away.pct * 100).toFixed(1)}%`}
                     {typeof pick.matchupSnapshot.away.diff === 'number' && ` • DIFF ${pick.matchupSnapshot.away.diff > 0 ? '+' : ''}${pick.matchupSnapshot.away.diff}`}
@@ -122,7 +122,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
                 </div>
                 <div className="flex-1 text-right">
                   <div className="text-[11px] font-semibold truncate">{pick.matchupSnapshot.home.team}</div>
-                  <div className="text-[10px] text-gray-400">
+                  <div className="text-[10px] text-ink-300">
                     {pick.matchupSnapshot.home.record}
                     {pick.matchupSnapshot.home.pct != null && ` • ${(pick.matchupSnapshot.home.pct * 100).toFixed(1)}%`}
                     {typeof pick.matchupSnapshot.home.diff === 'number' && ` • DIFF ${pick.matchupSnapshot.home.diff > 0 ? '+' : ''}${pick.matchupSnapshot.home.diff}`}
@@ -133,16 +133,16 @@ export default function PickCard({ pick, onAdd, isAdded }) {
             </div>
           )}
         </div>
-        <div className={`text-xs font-bold px-2 py-1 rounded ${getConfidenceColor(pick.confidence)} bg-gray-900`}>
+        <div className={`text-xs font-bold px-2 py-1 rounded ${getConfidenceColor(pick.confidence)} bg-ink-950`}>
           {pick.confidence}/10
         </div>
       </div>
 
       {/* Pick Details */}
-      <div className="mb-3 p-3 bg-gray-900 rounded">
+      <div className="mb-3 p-3 bg-ink-950 rounded">
         <div className="flex justify-between items-start mb-2">
           <div className="flex-1">
-            <div className="text-xs text-gray-400 mb-1">{pick.betType}</div>
+            <div className="text-xs text-ink-300 mb-1">{pick.betType}</div>
             <div className="text-base font-bold text-white leading-tight">
               {propMeta ? (
                 <span>{propMeta.direction} — {propMeta.coreText}</span>
@@ -167,7 +167,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
 
         {/* Show line for totals when displayed separately */}
         {!propMeta && pick.betType === 'Total' && pick.point !== undefined && pick.point !== null && (
-          <div className="text-xs text-gray-400 mt-1">
+          <div className="text-xs text-ink-300 mt-1">
             Total: {pick.point}
           </div>
         )}
@@ -177,14 +177,14 @@ export default function PickCard({ pick, onAdd, isAdded }) {
       <div className="mb-3">
         <div className="flex items-center gap-2 mb-2">
           <span className="text-blue-400 text-xs">🎯</span>
-          <div className="text-xs font-semibold text-gray-300">Analytical Edge:</div>
+          <div className="text-xs font-semibold text-ink-200">Analytical Edge:</div>
           {pick.edgeType && (
             <span className={`text-xs px-2 py-0.5 rounded ${
               pick.edgeType === 'line_value' ? 'bg-green-900/50 text-green-300' :
-              pick.edgeType === 'situational' ? 'bg-yellow-900/50 text-yellow-300' :
+              pick.edgeType === 'situational' ? 'bg-signal-pos-dim/50 text-signal-pos/80' :
               pick.edgeType === 'information' ? 'bg-blue-900/50 text-blue-300' :
               pick.edgeType === 'contrarian' ? 'bg-purple-900/50 text-purple-300' :
-              'bg-gray-900/50 text-gray-300'
+              'bg-ink-950/50 text-ink-200'
             }`}>
               {pick.edgeType.replace('_', ' ').toUpperCase()}
             </span>
@@ -192,7 +192,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         </div>
         
         {/* Short tagline - always visible */}
-        <div className="text-xs text-gray-300 mb-2">
+        <div className="text-xs text-ink-200 mb-2">
           {getShortTagline(pick)}
         </div>
         
@@ -200,13 +200,13 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         <div className="flex gap-2 mb-2">
           <button
             onClick={() => setShowFullAnalysis(!showFullAnalysis)}
-            className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:text-blue-300 hover:bg-blue-600/30 text-xs rounded border border-blue-500/30 transition-all"
+            className="px-3 py-1 bg-blue-600/20 text-blue-400 hover:text-blue-300 hover:bg-blue-600/30 text-xs rounded border shadow-hairline transition-all"
           >
             {showFullAnalysis ? '▲ Hide Full Analysis' : '▼ Read Full Analysis'}
           </button>
           <button
             onClick={copyAnalysis}
-            className="px-3 py-1 bg-gray-700/50 text-gray-300 hover:text-white hover:bg-gray-600/50 text-xs rounded border border-gray-600/30 transition-all"
+            className="px-3 py-1 bg-ink-800/50 text-ink-200 hover:text-white hover:bg-ink-700/50 text-xs rounded border border-ink-600/30 transition-all"
           >
             {copied ? '✓ Copied!' : '📋 Share Pick'}
           </button>
@@ -214,20 +214,20 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         
         {/* Detailed analysis - expandable */}
         {showFullAnalysis && (
-          <div className="mt-3 p-4 bg-gray-900/70 rounded-lg border border-blue-500/30">
+          <div className="mt-3 p-4 bg-ink-950/70 rounded-sharp border shadow-hairline">
             <div className="flex items-center justify-between mb-3">
               <span className="text-blue-400 text-sm font-semibold">🎯 Analytical Edge Analysis</span>
               {((pick.factCheckScore ?? pick.fact_check_score) ?? pick.fact_check_score) != null && (
                 <span className={`text-xs px-2 py-0.5 rounded flex items-center gap-1 ${
                   (pick.factCheckScore ?? pick.fact_check_score) >= 7 ? 'bg-green-900/50 text-green-300 border border-green-700/50' :
-                  (pick.factCheckScore ?? pick.fact_check_score) >= 5 ? 'bg-yellow-900/50 text-yellow-300 border border-yellow-700/50' :
-                  'bg-red-900/50 text-red-300 border border-red-700/50'
+                  (pick.factCheckScore ?? pick.fact_check_score) >= 5 ? 'bg-signal-pos-dim/50 text-signal-pos/80 border border-signal-pos/40/50' :
+                  'bg-signal-neg-dim/50 text-signal-neg border border-signal-neg/40/50'
                 }`}>
                   {(pick.factCheckScore ?? pick.fact_check_score) >= 7 ? '✓' : (pick.factCheckScore ?? pick.fact_check_score) >= 5 ? '⚠' : '✗'} Fact-check: {(pick.factCheckScore ?? pick.fact_check_score)}/10
                 </span>
               )}
             </div>
-            <div className="text-sm text-gray-200 leading-relaxed mb-3">
+            <div className="text-sm text-ink-100 leading-relaxed mb-3">
               {getDetailedAnalysis(pick)}
             </div>
             
@@ -260,8 +260,8 @@ export default function PickCard({ pick, onAdd, isAdded }) {
         onClick={() => onAdd(pick)}
         className={`w-full py-2 rounded font-semibold text-sm transition-all ${
           isAdded
-            ? 'bg-gray-700 text-gray-200 hover:bg-gray-600'
-            : 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white'
+            ? 'bg-ink-800 text-ink-100 hover:bg-ink-700'
+            : 'bg-signal-pos hover:bg-signal-pos/90 text-white'
         }`}
       >
         {isAdded ? '✓ Added to Parlay (tap to remove)' : '+ Add to Parlay'}

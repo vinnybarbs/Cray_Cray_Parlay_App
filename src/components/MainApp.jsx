@@ -18,16 +18,16 @@ const DEFAULT_SUGGESTION_COUNT = 20
 // CheckboxGroup component for sport/bet type selection
 const CheckboxGroup = ({ label, options, selectedOptions, onToggle }) => (
   <div>
-    <label className="text-gray-200 text-sm font-semibold block mb-3">{label}</label>
+    <label className="text-ink-100 text-sm font-semibold block mb-3">{label}</label>
     <div className="flex flex-wrap gap-2">
       {options.map((opt) => (
         <button
           key={opt}
           onClick={() => onToggle(opt)}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`px-4 py-2 rounded-sharp text-sm font-medium transition-all ${
             selectedOptions.includes(opt)
-              ? 'bg-yellow-500 text-gray-900'
-              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              ? 'bg-signal-pos text-ink-950'
+              : 'bg-ink-800 text-ink-200 hover:bg-ink-700'
           }`}
         >
           {opt}
@@ -49,10 +49,10 @@ const AIAgentsWorkflow = () => {
 
   return (
     <div className="max-w-2xl mx-auto mt-8 mb-8 px-4">
-      <div className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 shadow-2xl">
+      <div className="bg-ink-900 rounded-sharp p-4 md:p-6 border border-ink-700 shadow-2xl">
         {/* Header */}
         <div className="text-center mb-8 md:mb-12">
-          <h2 className="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 mb-2">
+          <h2 className="text-2xl md:text-3xl font-extrabold text-signal-pos mb-2">
             How AI Agents Work:
           </h2>
         </div>
@@ -63,24 +63,24 @@ const AIAgentsWorkflow = () => {
           <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 400" style={{ zIndex: 1 }}>
             <defs>
               <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <polygon points="0 0, 6 3, 0 6" fill="#eab308" />
+                <polygon points="0 0, 6 3, 0 6" fill="#f5a524" />
               </marker>
             </defs>
             
             {/* Clean shorter curved arrows that avoid text - responsive positioning */}
-            <path d="M 192 96 Q 180 124 164 144" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" />
-            <path d="M 144 168 Q 128 200 144 232" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.2s' }} />
-            <path d="M 176 264 Q 200 280 224 264" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.4s' }} />
-            <path d="M 256 232 Q 272 200 256 168" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.6s' }} />
-            <path d="M 236 144 Q 220 124 208 96" fill="none" stroke="#eab308" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.8s' }} />
+            <path d="M 192 96 Q 180 124 164 144" fill="none" stroke="#f5a524" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" />
+            <path d="M 144 168 Q 128 200 144 232" fill="none" stroke="#f5a524" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.2s' }} />
+            <path d="M 176 264 Q 200 280 224 264" fill="none" stroke="#f5a524" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.4s' }} />
+            <path d="M 256 232 Q 272 200 256 168" fill="none" stroke="#f5a524" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.6s' }} />
+            <path d="M 236 144 Q 220 124 208 96" fill="none" stroke="#f5a524" strokeWidth="2" markerEnd="url(#arrow)" className="animate-pulse" style={{ animationDelay: '0.8s' }} />
           </svg>
 
           {/* Degenerate Gambler - Top Center */}
           <div className="absolute" style={{ top: '5%', left: '50%', transform: 'translateX(-50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <h3 className="font-bold text-xs md:text-sm text-yellow-400 mb-1">Degenerate</h3>
-              <p className="text-xs text-yellow-400 text-center mb-2">(You)</p>
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-gray-700 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+              <h3 className="font-bold text-xs md:text-sm text-signal-pos mb-1">Degenerate</h3>
+              <p className="text-xs text-signal-pos text-center mb-2">(You)</p>
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-ink-800 flex items-center justify-center shadow-xl border-2 border-signal-pos overflow-hidden">
                 <img 
                   src={characterImages.degenerate} 
                   alt="Degenerate Gambler" 
@@ -97,7 +97,7 @@ const AIAgentsWorkflow = () => {
           {/* Carol - Left Side */}
           <div className="absolute" style={{ top: '30%', left: '20%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-purple-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-purple-400 flex items-center justify-center shadow-xl border-2 border-signal-pos overflow-hidden">
                 <img 
                   src={characterImages.carol} 
                   alt="Carol the Coordinator" 
@@ -115,7 +115,7 @@ const AIAgentsWorkflow = () => {
           {/* Odd-Job - Bottom Left */}
           <div className="absolute" style={{ bottom: '20%', left: '20%', transform: 'translate(-50%, 50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-yellow-700 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-signal-pos-dim flex items-center justify-center shadow-xl border-2 border-signal-pos overflow-hidden">
                 <img 
                   src={characterImages.oddjob} 
                   alt="Odd-Job" 
@@ -126,14 +126,14 @@ const AIAgentsWorkflow = () => {
                   }}
                 />
               </div>
-              <h3 className="font-bold text-xs md:text-sm text-yellow-400 mt-1 text-center whitespace-nowrap">Odd-Job the Oddsmaker</h3>
+              <h3 className="font-bold text-xs md:text-sm text-signal-pos mt-1 text-center whitespace-nowrap">Odd-Job the Oddsmaker</h3>
             </div>
           </div>
 
           {/* Andy - Right Side */}
           <div className="absolute" style={{ top: '30%', right: '20%', transform: 'translate(50%, -50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-green-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-green-400 flex items-center justify-center shadow-xl border-2 border-signal-pos overflow-hidden">
                 <img 
                   src={characterImages.andy} 
                   alt="Andy the Analyst" 
@@ -151,7 +151,7 @@ const AIAgentsWorkflow = () => {
           {/* Randy - Bottom Right */}
           <div className="absolute" style={{ bottom: '20%', right: '20%', transform: 'translate(50%, 50%)', zIndex: 10 }}>
             <div className="flex flex-col items-center">
-              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-blue-400 flex items-center justify-center shadow-xl border-2 border-yellow-500 overflow-hidden">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-blue-400 flex items-center justify-center shadow-xl border-2 border-signal-pos overflow-hidden">
                 <img 
                   src={characterImages.randy} 
                   alt="Randy the Researcher" 
@@ -169,71 +169,71 @@ const AIAgentsWorkflow = () => {
 
         {/* Behind the Scenes Section */}
         <div className="mt-12 space-y-4">
-          <h3 className="text-xl md:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500 text-center mb-6">
+          <h3 className="text-xl md:text-2xl font-bold text-signal-pos text-center mb-6">
             Behind the Scenes 🎬
           </h3>
           
           <div className="grid md:grid-cols-2 gap-4">
             {/* Fresh Odds Card */}
-            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+            <div className="bg-ink-900/60 rounded-sharp p-4 border border-ink-700">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">📊</span>
-                <h4 className="font-bold text-yellow-400">Fresh Odds Every Hour</h4>
+                <h4 className="font-bold text-signal-pos">Fresh Odds Every Hour</h4>
               </div>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-ink-200">
                 Odd-Job pulls live lines from multiple sportsbooks every hour, so you're always working with the latest odds. No stale data here.
               </p>
             </div>
 
             {/* Real-Time News Card */}
-            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+            <div className="bg-ink-900/60 rounded-sharp p-4 border border-ink-700">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">📰</span>
                 <h4 className="font-bold text-blue-400">Real-Time News</h4>
               </div>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-ink-200">
                 Randy monitors 17 sports news sources (ESPN, CBS, Yahoo, Bleacher Report) every 3 hours. Fresh injury reports, player news, and trends.
               </p>
             </div>
 
             {/* Smart Extraction Card */}
-            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+            <div className="bg-ink-900/60 rounded-sharp p-4 border border-ink-700">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">🤖</span>
                 <h4 className="font-bold text-purple-400">Smart News Extraction</h4>
               </div>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-ink-200">
                 Not just headlines—the system extracts actual facts: "Player X out 4 weeks (ankle)", "Team Y 8-2 ATS". Real intel with timestamps.
               </p>
             </div>
 
             {/* Stats Refresh Card */}
-            <div className="bg-gray-800/60 rounded-lg p-4 border border-gray-700">
+            <div className="bg-ink-900/60 rounded-sharp p-4 border border-ink-700">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">📈</span>
                 <h4 className="font-bold text-green-400">Stats That Matter</h4>
               </div>
-              <p className="text-sm text-gray-300">
+              <p className="text-sm text-ink-200">
                 Team records, player stats, and historical trends all cached and ready. Andy uses real numbers, not guesses.
               </p>
             </div>
           </div>
 
           {/* How Data Flows */}
-          <div className="mt-6 bg-gray-800/40 rounded-lg p-4 border border-gray-700">
-            <h4 className="font-semibold text-yellow-400 mb-3 text-center">⚡ Lightning Fast Data Pipeline</h4>
+          <div className="mt-6 bg-ink-900/40 rounded-sharp p-4 border border-ink-700">
+            <h4 className="font-semibold text-signal-pos mb-3 text-center">⚡ Lightning Fast Data Pipeline</h4>
             <div className="flex items-center justify-center gap-2 text-xs md:text-sm flex-wrap">
               <span className="text-blue-400 font-semibold">News Feeds</span>
-              <span className="text-gray-500">→</span>
+              <span className="text-ink-400">→</span>
               <span className="text-purple-400 font-semibold">Fact Extraction</span>
-              <span className="text-gray-500">→</span>
-              <span className="text-yellow-400 font-semibold">Fresh Odds</span>
-              <span className="text-gray-500">→</span>
+              <span className="text-ink-400">→</span>
+              <span className="text-signal-pos font-semibold">Fresh Odds</span>
+              <span className="text-ink-400">→</span>
               <span className="text-green-400 font-semibold">AI Analysis</span>
-              <span className="text-gray-500">→</span>
-              <span className="text-red-400 font-semibold">Your Pick</span>
+              <span className="text-ink-400">→</span>
+              <span className="text-signal-neg font-semibold">Your Pick</span>
             </div>
-            <p className="text-xs text-gray-400 text-center mt-3">
+            <p className="text-xs text-ink-300 text-center mt-3">
               Everything updates automatically. You just show up and gamble responsibly (or don't, we're not your dad).
             </p>
           </div>
@@ -241,7 +241,7 @@ const AIAgentsWorkflow = () => {
 
         {/* Bottom tagline */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500 italic">
+          <p className="text-xs text-ink-400 italic">
             Five AI agents working harder than your therapist to justify your gambling addiction
           </p>
         </div>
@@ -314,14 +314,14 @@ const AnalysisLoadingScreen = ({ sports, betTypes, elapsed }) => {
   return (
     <div className="max-w-2xl mx-auto mt-6 space-y-4">
       {/* Main card */}
-      <div className="rounded-2xl bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border border-gray-700 overflow-hidden shadow-2xl">
+      <div className="rounded-sharp bg-ink-900 border border-ink-700 overflow-hidden shadow-2xl">
         {/* Header with animated gradient bar */}
-        <div className="relative h-1.5 bg-gray-700 overflow-hidden">
+        <div className="relative h-1.5 bg-ink-800 overflow-hidden">
           <div
-            className="absolute inset-y-0 left-0 bg-gradient-to-r from-yellow-500 via-green-400 to-yellow-500 transition-all duration-1000 ease-out"
+            className="absolute inset-y-0 left-0 bg-signal-pos transition-all duration-1000 ease-out"
             style={{ width: `${progressPct}%` }}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+          <div className="absolute inset-0 bg-signal-pos/10 animate-pulse" />
         </div>
 
         <div className="p-5">
@@ -329,9 +329,9 @@ const AnalysisLoadingScreen = ({ sports, betTypes, elapsed }) => {
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-              <span className="text-sm font-bold text-gray-200 tracking-wide uppercase">AI Analysis Engine</span>
+              <span className="text-sm font-bold text-ink-100 tracking-wide uppercase">AI Analysis Engine</span>
             </div>
-            <span className="text-xs font-mono text-gray-500">{elapsed}s</span>
+            <span className="text-xs font-mono text-ink-400">{elapsed}s</span>
           </div>
 
           {/* Step list */}
@@ -343,22 +343,22 @@ const AnalysisLoadingScreen = ({ sports, betTypes, elapsed }) => {
               return (
                 <div
                   key={idx}
-                  className={`flex items-center gap-3 py-1.5 px-3 rounded-lg transition-all duration-500 ${
-                    isActive ? 'bg-yellow-500/10 border border-yellow-500/30' :
+                  className={`flex items-center gap-3 py-1.5 px-3 rounded-sharp transition-all duration-500 ${
+                    isActive ? 'bg-signal-pos/10 border border-signal-pos/30' :
                     isDone ? 'opacity-60' : 'opacity-30'
                   }`}
                 >
                   <span className="text-base w-6 text-center">
                     {isDone ? <span className="text-green-400">&#10003;</span> : step.icon}
                   </span>
-                  <span className={`text-sm flex-1 ${isActive ? 'text-yellow-300 font-medium' : isDone ? 'text-gray-400' : 'text-gray-600'}`}>
+                  <span className={`text-sm flex-1 ${isActive ? 'text-signal-pos/80 font-medium' : isDone ? 'text-ink-300' : 'text-ink-500'}`}>
                     {step.label}
                   </span>
                   {isActive && (
                     <div className="flex gap-0.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <div className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <div className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   )}
                   {isDone && <span className="text-xs text-green-500 font-mono">{step.duration}s</span>}
@@ -369,25 +369,25 @@ const AnalysisLoadingScreen = ({ sports, betTypes, elapsed }) => {
 
           {/* Live log terminal */}
           {logLines.length > 0 && (
-            <div className="bg-black/50 rounded-lg p-3 mb-4 border border-gray-700/50 font-mono text-xs max-h-24 overflow-hidden">
+            <div className="bg-black/50 rounded-sharp p-3 mb-4 border border-ink-700/50 font-mono text-xs max-h-24 overflow-hidden">
               {logLines.slice(-4).map((line, i) => (
                 <div key={i} className="text-green-400/80 leading-relaxed">
-                  <span className="text-gray-600 mr-2">&gt;</span>{line.text}
+                  <span className="text-ink-500 mr-2">&gt;</span>{line.text}
                 </div>
               ))}
               <div className="text-green-400 animate-pulse mt-0.5">
-                <span className="text-gray-600 mr-2">&gt;</span>
+                <span className="text-ink-500 mr-2">&gt;</span>
                 <span className="inline-block w-2 h-3 bg-green-400/60 animate-pulse" />
               </div>
             </div>
           )}
 
           {/* Fun fact rotator */}
-          <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/5 border border-blue-500/10">
+          <div className="flex items-start gap-2 p-3 rounded-sharp bg-blue-500/5 border border-signal-pos/10">
             <span className="text-base mt-0.5">{funFacts[funFact].icon}</span>
             <div>
               <div className="text-xs text-blue-300/60 font-semibold uppercase tracking-wider mb-0.5">Did you know?</div>
-              <div className="text-sm text-gray-300 leading-snug">{funFacts[funFact].text}</div>
+              <div className="text-sm text-ink-200 leading-snug">{funFacts[funFact].text}</div>
             </div>
           </div>
         </div>
@@ -792,58 +792,58 @@ export default function MainApp() {
   const payout = calculatePayout()
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white font-sans pt-4 px-4 pb-24 md:pb-6">
+    <div className="min-h-screen bg-ink-950 text-white font-sans pt-4 px-4 pb-24 md:pb-6">
       {/* Header */}
-      <header className="flex flex-col items-center justify-center py-6 mb-6 bg-gray-800 rounded-2xl shadow-2xl relative">
+      <header className="flex flex-col items-center justify-center py-6 mb-6 bg-ink-900 rounded-sharp shadow-2xl relative">
         <div className="absolute top-4 left-4">
           <div className="relative">
             <button
               onClick={() => setShowNavMenu(!showNavMenu)}
-              className="px-3 py-1 text-sm bg-gray-700 hover:bg-gray-600 rounded-lg border border-gray-600 text-gray-200"
+              className="px-3 py-1 text-sm bg-ink-800 hover:bg-ink-700 rounded-sharp border border-ink-600 text-ink-100"
             >
               Menu ▾
             </button>
             {showNavMenu && (
-              <div className="absolute mt-2 w-44 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-20">
+              <div className="absolute mt-2 w-44 bg-ink-900 border border-ink-700 rounded-sharp shadow-lg z-20">
                 <button
                   onClick={() => { setShowDashboard(true); setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
                 >
                   Dashboard
                 </button>
                 <button
                   onClick={() => { setShowHowItWorks(true); setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
                 >
                   How It Works
                 </button>
                 <button
                   onClick={() => { setShowWeeklySuggestions(true); setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
                 >
                   Suggestions This Week
                 </button>
                 <button
                   onClick={() => { setShowDigest(true); setShowNavMenu(false); window.location.hash = '#/digest'; }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
+                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800 border-t border-ink-700"
                 >
                   📊 Daily Digest
                 </button>
                 <button
                   onClick={() => { if (!isAuthenticated) { setShowAuth(true); } else { setShowChatPicks(true); } setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
                 >
                   🤖 Chat with De-Genny
                 </button>
                 <button
                   onClick={() => { setShowResults(true); setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
+                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
                 >
                   📊 Results & Performance
                 </button>
                 <button
                   onClick={() => { setShowBetslipBuilder(true); setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 border-t border-gray-700"
+                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800 border-t border-ink-700"
                 >
                   🔗 Betslip Builder
                 </button>
@@ -851,15 +851,15 @@ export default function MainApp() {
             )}
           </div>
         </div>
-        <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-red-500">
+        <h1 className="text-4xl font-extrabold tracking-tight mt-2 text-signal-pos">
           Cray Cray
         </h1>
-        <p className="text-xl font-medium text-gray-300">for Parlays</p>
+        <p className="text-xl font-medium text-ink-200">for Parlays</p>
         <div className="mt-4 flex flex-col items-center space-y-2">
-          <div className="w-24 h-24 rounded-full border-2 border-yellow-400 flex flex-col items-center justify-center text-xs">
-            <span className="text-gray-400">Model</span>
-            <span className="text-lg font-bold text-yellow-400">{modelStatsByPeriod[modelPeriod] != null ? `${modelStatsByPeriod[modelPeriod]}%` : '--'}</span>
-            <span className="text-[10px] text-gray-500 px-1 text-center">Success Rate</span>
+          <div className="w-24 h-24 rounded-full border-2 border-signal-pos flex flex-col items-center justify-center text-xs">
+            <span className="text-ink-300">Model</span>
+            <span className="text-lg font-bold text-signal-pos">{modelStatsByPeriod[modelPeriod] != null ? `${modelStatsByPeriod[modelPeriod]}%` : '--'}</span>
+            <span className="text-[10px] text-ink-400 px-1 text-center">Success Rate</span>
           </div>
           <div className="flex gap-1">
             {[
@@ -872,8 +872,8 @@ export default function MainApp() {
                 onClick={() => setModelPeriod(opt.key)}
                 className={`px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
                   modelPeriod === opt.key
-                    ? 'bg-yellow-400 text-gray-900 border-yellow-400'
-                    : 'bg-transparent text-gray-400 border-gray-600 hover:border-yellow-400 hover:text-yellow-400'
+                    ? 'bg-signal-pos text-ink-950 border-signal-pos'
+                    : 'bg-transparent text-ink-300 border-ink-600 hover:border-signal-pos hover:text-signal-pos'
                 }`}
               >
                 {opt.label}
@@ -888,13 +888,13 @@ export default function MainApp() {
             <>
               <button
                 onClick={() => setShowDashboard(true)}
-                className="text-sm text-gray-300 hover:text-yellow-400"
+                className="text-sm text-ink-200 hover:text-signal-pos"
               >
                 Dashboard
               </button>
               <button
                 onClick={signOut}
-                className="text-sm text-gray-400 hover:text-white"
+                className="text-sm text-ink-300 hover:text-white"
               >
                 Sign Out
               </button>
@@ -917,22 +917,22 @@ export default function MainApp() {
             if (!isAuthenticated) { setShowAuth(true); return; }
             setShowChatPicks(true);
           }}
-          className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 hover:from-purple-700 hover:via-pink-700 hover:to-orange-600 rounded-xl font-bold text-lg text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
+          className="w-full py-4 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-bold text-lg text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
         >
           🤖 Chat with De-Genny — Tell Me What You're Feeling!
         </button>
-        <p className="text-center text-gray-500 text-xs mt-1">{isAuthenticated ? 'Chat with AI to get personalized picks based on real data' : 'Sign in to chat with De-Genny'}</p>
+        <p className="text-center text-ink-400 text-xs mt-1">{isAuthenticated ? 'Chat with AI to get personalized picks based on real data' : 'Sign in to chat with De-Genny'}</p>
       </div>
 
       {/* Daily Digest CTA */}
       <div className="max-w-2xl mx-auto mb-6">
         <button
           onClick={() => { setShowDigest(true); window.location.hash = '#/digest'; }}
-          className="w-full py-3 bg-gradient-to-r from-blue-700 to-cyan-600 hover:from-blue-600 hover:to-cyan-500 rounded-xl font-bold text-base text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+          className="w-full py-3 bg-ink-700 hover:bg-ink-600 rounded-sharp font-bold text-base text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
         >
           📊 Daily Digest — Today's Games, Picks & Results
         </button>
-        <p className="text-center text-gray-500 text-xs mt-1">Morning briefing: top picks, injuries, yesterday's recap, 7-day model stats</p>
+        <p className="text-center text-ink-400 text-xs mt-1">Morning briefing: top picks, injuries, yesterday's recap, 7-day model stats</p>
       </div>
 
       {/* Configuration */}
@@ -953,8 +953,8 @@ export default function MainApp() {
         </div>
 
         <div>
-          <label className="text-gray-200 text-sm font-semibold block mb-3">
-            3. Game Date Range: <span className="text-yellow-400 text-lg font-bold">{dateRange === 1 ? '1 Day' : `${dateRange} Days`}</span>
+          <label className="text-ink-100 text-sm font-semibold block mb-3">
+            3. Game Date Range: <span className="text-signal-pos text-lg font-bold">{dateRange === 1 ? '1 Day' : `${dateRange} Days`}</span>
           </label>
           <input
             type="range"
@@ -962,9 +962,9 @@ export default function MainApp() {
             max="4"
             value={dateRange}
             onChange={(e) => setDateRange(parseInt(e.target.value))}
-            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-yellow-500"
+            className="w-full h-2 bg-ink-800 rounded-sharp appearance-none cursor-pointer accent-yellow-500"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-ink-400 mt-1">
             <span>1 Day</span>
             <span>4 Days</span>
           </div>
@@ -972,16 +972,16 @@ export default function MainApp() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="text-gray-200 text-sm font-semibold block mb-3">4. Generate Mode</label>
+            <label className="text-ink-100 text-sm font-semibold block mb-3">4. Generate Mode</label>
             <div className="flex gap-2">
               {generationModes.map(mode => (
                 <button
                   key={mode}
                   onClick={() => setGenerationMode(mode)}
-                  className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  className={`flex-1 px-4 py-2 rounded-sharp text-sm font-medium transition-all ${
                     generationMode === mode
-                      ? 'bg-yellow-500 text-gray-900'
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      ? 'bg-signal-pos text-ink-950'
+                      : 'bg-ink-800 text-ink-200 hover:bg-ink-700'
                   }`}
                 >
                   {mode}
@@ -991,11 +991,11 @@ export default function MainApp() {
           </div>
 
           <div>
-            <label className="text-gray-200 text-sm font-semibold block mb-3">5. Sportsbook</label>
+            <label className="text-ink-100 text-sm font-semibold block mb-3">5. Sportsbook</label>
             <select
               value={oddsPlatform}
               onChange={(e) => setOddsPlatform(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white"
+              className="w-full bg-ink-800 border border-ink-600 rounded-sharp px-4 py-2 text-white"
             >
               {sportsbooks.map(book => (
                 <option key={book} value={book}>{book}</option>
@@ -1005,7 +1005,7 @@ export default function MainApp() {
         </div>
 
         <div>
-          <label className="text-gray-200 text-sm font-semibold block mb-3">
+          <label className="text-ink-100 text-sm font-semibold block mb-3">
             6. How big's your unit? <span className="text-green-400 font-bold">${unitSize}</span>
           </label>
           <div className="flex gap-2">
@@ -1013,10 +1013,10 @@ export default function MainApp() {
               <button
                 key={amount}
                 onClick={() => setUnitSize(amount)}
-                className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                className={`flex-1 px-4 py-2 rounded-sharp text-sm font-medium transition-all ${
                   unitSize === amount
-                    ? 'bg-green-500 text-gray-900'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                    ? 'bg-green-500 text-ink-950'
+                    : 'bg-ink-800 text-ink-200 hover:bg-ink-700'
                 }`}
               >
                 ${amount}
@@ -1028,27 +1028,27 @@ export default function MainApp() {
         <button
           onClick={fetchSuggestions}
           disabled={loading || selectedSports.length === 0 || selectedBetTypes.length === 0}
-          className={`w-full py-4 mt-4 font-bold text-lg rounded-xl shadow-2xl transition duration-300 transform active:scale-95 ${
+          className={`w-full py-4 mt-4 font-bold text-lg rounded-sharp shadow-2xl transition duration-300 transform active:scale-95 ${
             loading
-              ? 'bg-gradient-to-r from-gray-600 to-gray-700 cursor-not-allowed animate-pulse'
+              ? 'bg-ink-800 cursor-not-allowed animate-pulse'
               : selectedSports.length === 0 || selectedBetTypes.length === 0
-                ? 'bg-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-green-500 to-yellow-500 hover:from-green-600 hover:to-yellow-600'
+                ? 'bg-ink-600 cursor-not-allowed'
+                : 'bg-signal-pos hover:bg-signal-pos/90'
           }`}
         >
           {loading ? (
             <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin h-5 w-5 text-signal-pos" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="text-gray-300">Analyzing... {elapsed}s</span>
+              <span className="text-ink-200">Analyzing... {elapsed}s</span>
             </span>
           ) : 'Get AI Suggestions'}
         </button>
 
-        {selectedSports.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one sport</p>}
-        {selectedBetTypes.length === 0 && <p className="text-xs text-center text-red-400">⚠️ Select at least one bet type</p>}
+        {selectedSports.length === 0 && <p className="text-xs text-center text-signal-neg">⚠️ Select at least one sport</p>}
+        {selectedBetTypes.length === 0 && <p className="text-xs text-center text-signal-neg">⚠️ Select at least one bet type</p>}
       </div>
 
       {/* Progress Display */}
@@ -1058,18 +1058,18 @@ export default function MainApp() {
 
       {/* Error Display */}
       {error && (
-        <div className="max-w-2xl mx-auto mt-6 bg-red-900 border border-red-700 rounded-lg p-4">
-          <p className="text-red-200">❌ {error}</p>
+        <div className="max-w-2xl mx-auto mt-6 bg-signal-neg-dim border border-signal-neg/40 rounded-sharp p-4">
+          <p className="text-signal-neg">❌ {error}</p>
         </div>
       )}
 
       {/* Smart Alert for Limited Data */}
       {alert && (
         <div className="max-w-2xl mx-auto mt-6">
-          <div className={`p-4 rounded-lg border-2 ${
+          <div className={`p-4 rounded-sharp border-2 ${
             alert.severity === 'warning' 
               ? 'bg-orange-900/30 border-orange-500 text-orange-200'
-              : 'bg-blue-900/30 border-blue-500 text-blue-200'
+              : 'bg-blue-900/30 border-signal-pos text-blue-200'
           }`}>
             <div className="flex items-start gap-3">
               <span className="text-2xl">
@@ -1094,10 +1094,10 @@ export default function MainApp() {
       {/* Suggestions */}
       {suggestions.length > 0 && (
         <div className="max-w-2xl mx-auto mt-8">
-          <h2 className="text-2xl font-bold mb-4 text-yellow-400">
+          <h2 className="text-2xl font-bold mb-4 text-signal-pos">
             AI Suggestions ({suggestions.length})
           </h2>
-          <p className="text-sm text-gray-400 mb-4">
+          <p className="text-sm text-ink-300 mb-4">
             Tap picks to add them to your parlay builder below
           </p>
 
@@ -1119,23 +1119,23 @@ export default function MainApp() {
 
       {/* Parlay Builder */}
       {selectedPicks.length > 0 && (
-        <div className="max-w-2xl mx-auto mt-8 bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <h2 className="text-xl font-bold text-yellow-400 mb-4">
+        <div className="max-w-2xl mx-auto mt-8 bg-ink-900 rounded-sharp p-6 border border-ink-700">
+          <h2 className="text-xl font-bold text-signal-pos mb-4">
             Your Parlay ({selectedPicks.length} picks)
           </h2>
 
           <div className="space-y-2 mb-4">
             {selectedPicks.map((pick, index) => (
-              <div key={pick.id} className="flex justify-between items-center p-2 bg-gray-900 rounded">
+              <div key={pick.id} className="flex justify-between items-center p-2 bg-ink-950 rounded">
                 <div className="flex-1">
-                  <div className="text-xs text-gray-400">Leg {index + 1}</div>
+                  <div className="text-xs text-ink-300">Leg {index + 1}</div>
                   <div className="text-sm font-semibold">{pick.pick}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="text-lg font-bold text-green-400">{pick.odds}</div>
                   <button
                     onClick={() => togglePickSelection(pick)}
-                    className="text-xs px-2 py-1 rounded bg-red-900/60 text-red-200 hover:bg-red-800 border border-red-700"
+                    className="text-xs px-2 py-1 rounded bg-signal-neg-dim/60 text-signal-neg hover:bg-signal-neg-dim border border-signal-neg/40"
                   >
                     ✕ Remove
                   </button>
@@ -1145,25 +1145,25 @@ export default function MainApp() {
           </div>
 
           {payout && (
-            <div className="bg-gradient-to-r from-green-900/30 to-blue-900/30 rounded-lg p-4 mb-4 border border-green-700">
+            <div className="bg-ink-850 rounded-sharp p-4 mb-4 border border-ink-700">
               <div className="text-center mb-3">
-                <div className="text-xs text-gray-400 mb-1">Combined Odds</div>
-                <div className="text-2xl font-bold text-yellow-400">
+                <div className="text-xs text-ink-300 mb-1">Combined Odds</div>
+                <div className="text-2xl font-bold text-signal-pos">
                   {payout.combinedOdds}
                 </div>
               </div>
 
-              <div className="border-t border-gray-700 pt-3 space-y-2 text-sm">
+              <div className="border-t border-ink-700 pt-3 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Unit Size:</span>
+                  <span className="text-ink-300">Unit Size:</span>
                   <span className="text-white font-semibold">${unitSize}.00</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Potential Profit:</span>
+                  <span className="text-ink-300">Potential Profit:</span>
                   <span className="text-green-400 font-semibold">+${payout.profit}</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold border-t border-gray-700 pt-2">
-                  <span className="text-gray-300">Total Payout:</span>
+                <div className="flex justify-between text-lg font-bold border-t border-ink-700 pt-2">
+                  <span className="text-ink-200">Total Payout:</span>
                   <span className="text-green-400">${payout.payout}</span>
                 </div>
               </div>
@@ -1176,7 +1176,7 @@ export default function MainApp() {
       {(selectedPicks.length > 0 || lockMessage) && (
         <div className="fixed inset-x-0 bottom-0 z-40">
           <div className="max-w-2xl mx-auto px-4 pb-3">
-            <div className="bg-gray-900/95 border border-gray-700 rounded-t-2xl shadow-2xl px-3 py-2 space-y-2">
+            <div className="bg-ink-950/95 border border-ink-700 rounded-t-2xl shadow-2xl px-3 py-2 space-y-2">
               {lockMessage && selectedPicks.length === 0 && (
                 <div className="w-full text-center text-xs px-2 py-1 rounded-md bg-green-900/80 border border-green-500 text-green-100">
                   {lockMessage}
@@ -1184,12 +1184,12 @@ export default function MainApp() {
               )}
               {selectedPicks.length > 0 && (
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 text-xs text-gray-300">
-                    <div className="font-semibold text-yellow-400">
+                  <div className="flex-1 text-xs text-ink-200">
+                    <div className="font-semibold text-signal-pos">
                       {selectedPicks.length} pick{selectedPicks.length > 1 ? 's' : ''} parlay
                     </div>
                     {payout && (
-                      <div className="flex justify-between text-[11px] text-gray-400 mt-1">
+                      <div className="flex justify-between text-[11px] text-ink-300 mt-1">
                         <span>Combined: {payout.combinedOdds}</span>
                         <span>Payout: ${payout.payout}</span>
                       </div>
@@ -1198,10 +1198,10 @@ export default function MainApp() {
                   <button
                     onClick={handleLockBuild}
                     disabled={!isAuthenticated || selectedPicks.length === 0 || locking}
-                    className={`px-4 py-2 rounded-lg font-bold text-sm whitespace-nowrap ${
+                    className={`px-4 py-2 rounded-sharp font-bold text-sm whitespace-nowrap ${
                       !isAuthenticated || selectedPicks.length === 0 || locking
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white'
+                        ? 'bg-ink-700 text-ink-300 cursor-not-allowed'
+                        : 'bg-signal-pos hover:bg-signal-pos/90 text-white'
                     }`}
                   >
                     {locking ? 'Locking...' : '🔒 Lock Build'}
@@ -1224,12 +1224,12 @@ export default function MainApp() {
 
       {showHowItWorks && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-gray-700 p-6">
+          <div className="bg-ink-950 rounded-sharp max-w-3xl w-full max-h-[90vh] overflow-y-auto border border-ink-700 p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-yellow-400">How It Works</h2>
+              <h2 className="text-xl font-bold text-signal-pos">How It Works</h2>
               <button
                 onClick={() => setShowHowItWorks(false)}
-                className="text-gray-400 hover:text-white text-2xl"
+                className="text-ink-300 hover:text-white text-2xl"
               >
                 ✕
               </button>
@@ -1241,27 +1241,27 @@ export default function MainApp() {
 
       {showWeeklySuggestions && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+          <div className="bg-ink-900 rounded-sharp p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-yellow-400">Suggestions This Week</h2>
+              <h2 className="text-xl font-bold text-signal-pos">Suggestions This Week</h2>
               <button
                 onClick={() => setShowWeeklySuggestions(false)}
-                className="text-gray-400 hover:text-white text-2xl"
+                className="text-ink-300 hover:text-white text-2xl"
               >
                 ✕
               </button>
             </div>
-            <p className="text-gray-300">Coming soon: View all suggested picks from the last 7 days.</p>
+            <p className="text-ink-200">Coming soon: View all suggested picks from the last 7 days.</p>
           </div>
         </div>
       )}
 
       {/* Betslip Builder - Full Screen */}
       {showBetslipBuilder && (
-        <div className="fixed inset-0 bg-gray-900 z-50">
+        <div className="fixed inset-0 bg-ink-950 z-50">
           <button
             onClick={() => setShowBetslipBuilder(false)}
-            className="absolute top-4 right-4 z-50 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-700"
+            className="absolute top-4 right-4 z-50 bg-ink-900 hover:bg-ink-800 text-white px-4 py-2 rounded-sharp border border-ink-700"
           >
             ✕ Close
           </button>
@@ -1271,21 +1271,21 @@ export default function MainApp() {
 
       {/* Chat Picks - Full Screen Dedicated Page */}
       {showChatPicks && (
-        <div className="fixed inset-0 bg-gray-900 z-50">
+        <div className="fixed inset-0 bg-ink-950 z-50">
           <ChatPicks onBack={() => setShowChatPicks(false)} />
         </div>
       )}
 
       {/* Results Page - Full Screen */}
       {showResults && (
-        <div className="fixed inset-0 bg-gray-900 z-50 overflow-auto">
+        <div className="fixed inset-0 bg-ink-950 z-50 overflow-auto">
           <ResultsPage onBack={() => setShowResults(false)} />
         </div>
       )}
 
       {/* Admin Dashboard - Full Screen, accessible via /#/admin */}
       {showAdmin && (
-        <div className="fixed inset-0 bg-gray-950 z-50 overflow-auto">
+        <div className="fixed inset-0 bg-ink-950 z-50 overflow-auto">
           <AdminDashboard onBack={() => {
             setShowAdmin(false);
             window.location.hash = '';
@@ -1295,7 +1295,7 @@ export default function MainApp() {
 
       {/* Daily Digest - Full Screen, accessible via /#/digest */}
       {showDigest && (
-        <div className="fixed inset-0 bg-gray-900 z-50 overflow-auto">
+        <div className="fixed inset-0 bg-ink-950 z-50 overflow-auto">
           <DailyDigest onBack={() => {
             setShowDigest(false);
             window.location.hash = '';

@@ -79,12 +79,12 @@ export default function Dashboard({ onClose }) {
   const getStatusBadge = (status) => {
     const normalizedStatus = status?.toLowerCase()
     const badges = {
-      pending: 'bg-yellow-900 text-yellow-300',
+      pending: 'bg-signal-pos-dim text-signal-pos/80',
       win: 'bg-green-900 text-green-300',
       won: 'bg-green-900 text-green-300',
-      loss: 'bg-red-900 text-red-300', 
-      lost: 'bg-red-900 text-red-300',
-      push: 'bg-gray-700 text-gray-300'
+      loss: 'bg-signal-neg-dim text-signal-neg', 
+      lost: 'bg-signal-neg-dim text-signal-neg',
+      push: 'bg-ink-800 text-ink-200'
     }
     return badges[normalizedStatus] || badges.pending
   }
@@ -199,13 +199,13 @@ export default function Dashboard({ onClose }) {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden border border-gray-700">
+      <div className="bg-ink-950 rounded-sharp max-w-4xl w-full max-h-[90vh] overflow-hidden border border-ink-700">
         {/* Header */}
-        <div className="bg-gray-800 p-6 border-b border-gray-700 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-yellow-400">Your Dashboard</h2>
+        <div className="bg-ink-900 p-6 border-b border-ink-700 flex justify-between items-center">
+          <h2 className="text-2xl font-bold text-signal-pos">Your Dashboard</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white text-2xl"
+            className="text-ink-300 hover:text-white text-2xl"
           >
             ✕
           </button>
@@ -213,28 +213,28 @@ export default function Dashboard({ onClose }) {
 
         {/* Stats Summary */}
         {stats && (
-          <div className="p-6 bg-gray-800/50 border-b border-gray-700">
+          <div className="p-6 bg-ink-900/50 border-b border-ink-700">
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-white">{stats.total}</div>
-                <div className="text-xs text-gray-400">Total Parlays</div>
+                <div className="text-xs text-ink-300">Total Parlays</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-400">{stats.wins}</div>
-                <div className="text-xs text-gray-400">Wins</div>
+                <div className="text-xs text-ink-300">Wins</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-red-400">{stats.losses}</div>
-                <div className="text-xs text-gray-400">Losses</div>
+                <div className="text-2xl font-bold text-signal-neg">{stats.losses}</div>
+                <div className="text-xs text-ink-300">Losses</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-400">{stats.pending}</div>
-                <div className="text-xs text-gray-400">Pending</div>
+                <div className="text-2xl font-bold text-signal-pos">{stats.pending}</div>
+                <div className="text-xs text-ink-300">Pending</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-400">{stats.winRate}%</div>
-                <div className="text-xs text-gray-400">Win Rate</div>
-                <div className="mt-1 text-[10px] text-gray-500 px-2">
+                <div className="text-2xl font-bold text-signal-pos">{stats.winRate}%</div>
+                <div className="text-xs text-ink-300">Win Rate</div>
+                <div className="mt-1 text-[10px] text-ink-400 px-2">
                   Ask the model how to improve <span className="italic">(under construction)</span>
                 </div>
               </div>
@@ -245,11 +245,11 @@ export default function Dashboard({ onClose }) {
         {/* Parlays List */}
         <div className="p-6 overflow-y-auto max-h-[60vh]">
           {loading ? (
-            <div className="text-center py-12 text-gray-400">
+            <div className="text-center py-12 text-ink-300">
               Loading your parlays...
             </div>
           ) : parlays.length === 0 ? (
-            <div className="text-center py-12 text-gray-400">
+            <div className="text-center py-12 text-ink-300">
               <p>No parlays yet. Start building!</p>
             </div>
           ) : (
@@ -257,11 +257,11 @@ export default function Dashboard({ onClose }) {
               {parlays.map(parlay => (
                 <div
                   key={parlay.id}
-                  className="bg-gray-800 rounded-lg p-4 border border-gray-700 hover:border-gray-600 transition-all"
+                  className="bg-ink-900 rounded-sharp p-4 border border-ink-700 hover:border-ink-600 transition-all"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <div className="text-sm text-gray-400">
+                      <div className="text-sm text-ink-300">
                         {new Date(parlay.created_at).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
@@ -279,7 +279,7 @@ export default function Dashboard({ onClose }) {
                         {deriveParlayOutcome(parlay).toUpperCase()}
                       </span>
                       {parlay.is_lock_bet && (
-                        <span className="text-yellow-400 text-xs">🔒 LOCK</span>
+                        <span className="text-signal-pos text-xs">🔒 LOCK</span>
                       )}
                       {parlay.is_lock_bet && (
                         <div className="flex gap-2">
@@ -292,7 +292,7 @@ export default function Dashboard({ onClose }) {
                           </button>
                           <button
                             onClick={() => handleDeleteParlay(parlay.id)}
-                            className="text-xs text-red-400 hover:text-red-200 transition-colors"
+                            className="text-xs text-signal-neg hover:text-signal-neg/80 transition-colors"
                           >
                             🗑 Delete
                           </button>
@@ -303,31 +303,31 @@ export default function Dashboard({ onClose }) {
 
                   <div className="grid grid-cols-2 gap-4 mb-3 text-sm">
                     <div>
-                      <span className="text-gray-400">Odds:</span>
+                      <span className="text-ink-300">Odds:</span>
                       <span className="text-white font-semibold ml-2">{parlay.combined_odds}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Unit Size:</span>
+                      <span className="text-ink-300">Unit Size:</span>
                       <span className="text-blue-400 font-semibold ml-2">${parlay.bet_amount || '100'}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Payout:</span>
+                      <span className="text-ink-300">Payout:</span>
                       <span className="text-green-400 font-semibold ml-2">${parlay.potential_payout}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Generate Mode:</span>
+                      <span className="text-ink-300">Generate Mode:</span>
                       <span className="text-white ml-2">{parlay.generate_mode || parlay.risk_level}</span>
                     </div>
                     <div>
-                      <span className="text-gray-400">Book:</span>
+                      <span className="text-ink-300">Book:</span>
                       <span className="text-white ml-2">{parlay.sportsbook}</span>
                     </div>
                   </div>
 
                   {/* Compact locked picks display (new flow, with leg outcomes) */}
                   {parlay.metadata && Array.isArray(parlay.metadata.locked_picks) && parlay.metadata.locked_picks.length > 0 && (
-                    <div className="border-t border-gray-700 pt-3 mt-3">
-                      <div className="text-xs text-gray-400 mb-2">Locked Picks:</div>
+                    <div className="border-t border-ink-700 pt-3 mt-3">
+                      <div className="text-xs text-ink-300 mb-2">Locked Picks:</div>
                       <div className="space-y-1">
                         {parlay.metadata.locked_picks.map((leg, index) => {
                           const propMeta = parseLockedPlayerProp(leg)
@@ -345,10 +345,10 @@ export default function Dashboard({ onClose }) {
                           return (
                             <div key={index} className="flex justify-between items-center text-xs">
                               <div className="flex-1">
-                                <div className="text-gray-300">
+                                <div className="text-ink-200">
                                   {leg.awayTeam} @ {leg.homeTeam}
                                 </div>
-                                <div className="text-gray-400">
+                                <div className="text-ink-300">
                                   {leg.betType}: {propMeta ? `${propMeta.direction} — ${propMeta.coreText}` : leg.pick}
                                   {leg.point != null && leg.betType === 'Spread' && (
                                     <span> {leg.point > 0 ? `+${leg.point}` : leg.point}</span>
