@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
 
@@ -56,6 +56,34 @@ function formatFullDate(isoString) {
     month: 'long',
     day: 'numeric',
   })
+}
+
+// ─── Locked-Picks context ────────────────────────────────────────────────────
+// Single source of truth for which picks the user has locked on the digest.
+// Provided by <DailyDigest>, consumed by GameCard, PickOfTheDay, SportSection's
+// Quick Parlay button, and LockedPicksBar. Centralizing here means the existing
+// localStorage hand-off to BetslipBuilder happens in exactly one place (the
+// sticky bar's "Build Parlay" click), not five.
+
+const LockedPicksContext = createContext(null)
+
+function pickIdFor(game) {
+  return `${game.home_team}-${game.away_team}-${game.recommended_side || 'pick'}`
+}
+
+function buildLockedPayload(game, sport) {
+  return {
+    id: pickIdFor(game),
+    sport,
+    homeTeam: game.home_team,
+    awayTeam: game.away_team,
+    pick: game.recommended_pick,
+    betType: game.recommended_side || 'Moneyline/Spread',
+    odds: -110,
+    confidence: game.edge_score || 7,
+    reasoning: game.analysis_snippet || '',
+    gameDate: game.game_date,
+  }
 }
 
 function edgeBadgeClass(score) {
@@ -694,8 +722,10 @@ function MarketTabs({ game }) {
 
 // ─── GameCard ───────────────────────────────────────────────────────────────
 
-function GameCard({ game, gameKey, onDeepResearch }) {
+function GameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
+  const { isLocked, toggleLock } = useContext(LockedPicksContext)
+  const locked = isLocked(game)
 
   // Signed edge in pp for the recommended side. When the math returned a real
   // pick, this reflects that bet's edge. When it didn't (no-edge game), we
@@ -772,17 +802,30 @@ function GameCard({ game, gameKey, onDeepResearch }) {
         )}
       </div>
 
-      {/* Deep Research button */}
-      {gameKey && (
-        <div className="px-4 pb-4 pt-0">
+      {/* Action row — Lock pick (primary) + Deep Research (secondary). The Lock
+          button only renders if the math actually returned a pick to lock. */}
+      <div className="px-4 pb-4 pt-0 flex gap-2">
+        {game.recommended_pick && (
+          <button
+            onClick={() => toggleLock(game, sport)}
+            className={`flex-1 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] rounded-sharp transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+              locked
+                ? 'bg-signal-pos text-ink-950 hover:bg-signal-pos/90 font-bold'
+                : 'bg-ink-850 text-ink-200 hover:bg-ink-800 shadow-hairline hover:shadow-hairline-bright'
+            }`}
+          >
+            {locked ? <><span>✓</span> Locked</> : <><span className="text-signal-pos">+</span> Lock pick</>}
+          </button>
+        )}
+        {gameKey && (
           <button
             onClick={() => onDeepResearch(game, gameKey)}
-            className="w-full py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-300 hover:text-ink-100 bg-ink-850 hover:bg-ink-800 rounded-sharp shadow-hairline hover:shadow-hairline-bright transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+            className="flex-1 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-300 hover:text-ink-100 bg-ink-850 hover:bg-ink-800 rounded-sharp shadow-hairline hover:shadow-hairline-bright transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
           >
-            <span className="text-signal-pos">+</span> Deep Research
+            <span className="text-signal-pos">+</span> Research
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
@@ -826,9 +869,10 @@ function InjurySection({ content }) {
 
 // ─── SportSection ────────────────────────────────────────────────────────────
 
-function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch }) {
+function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch, upcomingCount }) {
   const [expanded, setExpanded] = useState(isDefaultExpanded)
   const meta = getSportMeta(sport)
+  const { lockMany } = useContext(LockedPicksContext)
 
   // Split games by whether the math returned an actionable pick. "On the
   // bubble" surfaces games where the model considered the matchup but every
@@ -851,28 +895,14 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
     return game.game_key || null
   }
 
-  const buildQuickParlay = (e) => {
+  // Stage the section's top picks into the locked-picks queue. The sticky bar
+  // takes it from there; we no longer write localStorage or navigate inline —
+  // that keeps the BetslipBuilder hand-off in a single place.
+  const lockTopPicks = (e) => {
     e.stopPropagation()
-    const picks = topGames
-      .filter(g => g.recommended_pick)
-      .map(g => ({
-        sport,
-        homeTeam: g.home_team,
-        awayTeam: g.away_team,
-        pick: g.recommended_pick,
-        betType: g.recommended_side || 'Moneyline/Spread',
-        odds: -110,
-        confidence: g.edge_score || 7,
-        reasoning: g.analysis_snippet || '',
-        gameDate: g.game_date,
-        id: `${g.home_team}-${g.away_team}-digest`,
-      }))
-    if (picks.length === 0) return
-    try {
-      localStorage.setItem('digest_parlay_picks', JSON.stringify(picks))
-    } catch (e) { /* storage unavailable */ }
-    window.location.hash = '/'
+    lockMany(topGames, sport)
   }
+  const lockableTopCount = topGames.filter(g => g.recommended_pick).length
 
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
@@ -889,6 +919,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               <p className="font-mono text-[11px] text-ink-400 tabular-nums">
                 {pickGames.length} pick{pickGames.length !== 1 ? 's' : ''}
                 {bubbleGames.length > 0 && <span className="text-ink-500"> · {bubbleGames.length} on the bubble</span>}
+                {upcomingCount > 0 && <span className="text-ink-500"> · {upcomingCount} next 24h</span>}
                 {!expanded && topSignedPp != null && (
                   <span className="ml-2 text-ink-500">
                     · Top: <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>
@@ -898,13 +929,14 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             </div>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Quick Parlay button — only when expanded */}
-            {expanded && topGames.some(g => g.recommended_pick) && (
+            {/* Lock top picks — only when expanded. Stages the section's top
+                picks into the locked-picks queue; the sticky bar takes it from there. */}
+            {expanded && lockableTopCount > 0 && (
               <button
-                onClick={buildQuickParlay}
+                onClick={lockTopPicks}
                 className="px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.12em] rounded-sharp bg-signal-pos hover:bg-signal-pos/90 text-ink-950 transition-all active:scale-[0.98]"
               >
-                Quick Parlay
+                + Lock top {lockableTopCount}
               </button>
             )}
             {/* Chevron */}
@@ -956,6 +988,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                     key={`${game.home_team}-${game.away_team}-${i}`}
                     game={game}
                     gameKey={getGameKey(game)}
+                    sport={sport}
                     onDeepResearch={onDeepResearch}
                   />
                 ))}
@@ -1006,6 +1039,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                     key={`${game.home_team}-${game.away_team}-bubble-${i}`}
                     game={game}
                     gameKey={getGameKey(game)}
+                    sport={sport}
                     onDeepResearch={onDeepResearch}
                   />
                 ))}
@@ -1017,6 +1051,80 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
           <InjurySection content={injuryEntry?.content} />
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── PickOfTheDay ────────────────────────────────────────────────────────────
+// The single highest-edge tile across all sports today, featured prominently
+// above the sport sections. This IS the "first Sharp Take seen" aha moment for
+// new users — without it, they'd have to expand sport accordions to find the
+// best play. With it, the value prop lands on first scroll.
+
+function PickOfTheDay({ pick }) {
+  const { isLocked, toggleLock } = useContext(LockedPicksContext)
+  if (!pick) return null
+  const { game, sport, signedPp } = pick
+  const tier = edgeTier(signedPp)
+  const sportMeta = getSportMeta(sport)
+  const arrow = signedPp > 0 ? '▲' : '▼'
+  const pp = formatPp(signedPp)
+  const locked = isLocked(game)
+
+  return (
+    <div className="bg-ink-900 rounded-sharp overflow-hidden shadow-hairline-pos">
+      {/* Top bar — featured label + sport context */}
+      <div className="flex items-center justify-between px-5 py-2 bg-signal-pos-dim/25 border-b border-signal-pos-dim/60">
+        <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
+          ★ Pick of the Day
+        </span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-300">
+          {sportMeta.emoji} {sportMeta.label}
+        </span>
+      </div>
+
+      <div className="p-5 md:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="font-mono text-sm text-ink-300 tracking-tight tabular-nums">
+              {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
+              {game.game_date && <span className="text-ink-500"> · {toMountainTime(game.game_date)} MT</span>}
+            </div>
+            <div className="mt-2 font-mono text-2xl md:text-3xl font-bold text-signal-pos tabular-nums tracking-tight leading-tight">
+              {game.recommended_pick}
+            </div>
+          </div>
+
+          {/* Edge stat block — sized larger than a regular EdgeChip */}
+          <div className={`flex flex-col items-end leading-tight flex-shrink-0 rounded-sharp ${tier.bg} px-3 py-2`}>
+            <div className={`font-mono text-2xl font-bold ${tier.color} tabular-nums tracking-tight`}>
+              <span className="mr-1">{arrow}</span>{pp}
+            </div>
+            <div className={`font-mono text-[10px] uppercase tracking-[0.14em] ${tier.color} mt-0.5`}>{tier.label}</div>
+            {tier.subtitle && (
+              <div className="text-[10px] text-ink-400 lowercase italic leading-none">{tier.subtitle}</div>
+            )}
+          </div>
+        </div>
+
+        {/* Analysis snippet — surfaces De-Genny's voice on the featured pick */}
+        {game.analysis_snippet && (
+          <p className="mt-4 text-sm text-ink-300 leading-relaxed line-clamp-3">
+            {game.analysis_snippet}
+          </p>
+        )}
+
+        <button
+          onClick={() => toggleLock(game, sport)}
+          className={`mt-4 w-full sm:w-auto px-5 py-2.5 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-sm transition-all active:scale-[0.98] ${
+            locked
+              ? 'bg-ink-850 shadow-hairline text-ink-200 hover:bg-ink-800'
+              : 'bg-signal-pos hover:bg-signal-pos/90 text-ink-950'
+          }`}
+        >
+          {locked ? '✓ Locked — unlock' : '+ Lock this pick'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -1284,6 +1392,40 @@ export default function DailyDigest({ onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
+  const [lockedPicks, setLockedPicks] = useState([])
+
+  // Locked-picks API consumed via context by tiles, the PoD CTA, and the sticky bar.
+  // The localStorage write only happens at buildParlay() — until then the locks are
+  // a session-scoped queue, which keeps the BetslipBuilder hand-off predictable.
+  const lockedPicksApi = useMemo(() => ({
+    lockedPicks,
+    count: lockedPicks.length,
+    isLocked: (game) => lockedPicks.some(p => p.id === pickIdFor(game)),
+    toggleLock: (game, sport) => {
+      const id = pickIdFor(game)
+      setLockedPicks(prev => prev.find(p => p.id === id)
+        ? prev.filter(p => p.id !== id)
+        : [...prev, buildLockedPayload(game, sport)]
+      )
+    },
+    lockMany: (games, sport) => {
+      setLockedPicks(prev => {
+        const existing = new Set(prev.map(p => p.id))
+        const additions = games
+          .filter(g => g.recommended_pick && !existing.has(pickIdFor(g)))
+          .map(g => buildLockedPayload(g, sport))
+        return additions.length ? [...prev, ...additions] : prev
+      })
+    },
+    clearAll: () => setLockedPicks([]),
+    buildParlay: () => {
+      if (lockedPicks.length === 0) return
+      try {
+        localStorage.setItem('digest_parlay_picks', JSON.stringify(lockedPicks))
+      } catch (e) { /* storage unavailable */ }
+      window.location.hash = '/'
+    },
+  }), [lockedPicks])
 
   const fetchDigest = useCallback(async () => {
     setLoading(true)
@@ -1313,6 +1455,54 @@ export default function DailyDigest({ onBack }) {
   const totalGames = sportSections.reduce((sum, [, games]) => sum + games.length, 0)
   const totalSports = sportSections.length
 
+  // Count tiles by tier so we can render a count-first hero ("12 Sharp Takes today").
+  // Cheaper than rendering every tile twice — derived once per data refresh.
+  const tierCounts = useMemo(() => {
+    const c = { sharpTakes: 0, strongPlays: 0, plays: 0, leans: 0, traps: 0 }
+    if (!data?.gamesBySport) return c
+    for (const games of Object.values(data.gamesBySport)) {
+      for (const g of games) {
+        const pp = edgePpForSide(g.edges, g.recommended_side)
+        if (pp == null) continue
+        if (pp < 0) c.traps++
+        else if (pp >= 10) c.sharpTakes++
+        else if (pp >= 7) c.strongPlays++
+        else if (pp >= 4) c.plays++
+        else if (pp >= 2) c.leans++
+      }
+    }
+    return c
+  }, [data])
+
+  // Pick of the Day — the single highest-edge tile across all sports today.
+  // We only feature a pick if it cleared the Play tier (≥ 4pp) AND has a real
+  // recommended_pick string. Otherwise the callout hides, which is the honest
+  // move on a quiet board.
+  const pickOfTheDay = useMemo(() => {
+    if (!data?.gamesBySport) return null
+    let best = null
+    for (const [sport, games] of Object.entries(data.gamesBySport)) {
+      for (const g of games) {
+        const pp = edgePpForSide(g.edges, g.recommended_side)
+        if (pp == null || pp < 4) continue
+        if (!g.recommended_pick) continue
+        if (!best || pp > best.signedPp) {
+          best = { game: g, sport, signedPp: pp }
+        }
+      }
+    }
+    return best
+  }, [data])
+
+  // 30d hit-rate for the hero trust anchor — prefer 30d, fall back to 7d, then all-time.
+  const heroHitRate = data?.modelAccuracy?.last_30d?.overall?.winRate != null
+    ? { rate: data.modelAccuracy.last_30d.overall.winRate, label: '30d' }
+    : data?.modelAccuracy?.last_7d?.overall?.winRate != null
+      ? { rate: data.modelAccuracy.last_7d.overall.winRate, label: '7d' }
+      : data?.modelAccuracy?.all?.overall?.winRate != null
+        ? { rate: data.modelAccuracy.all.overall.winRate, label: 'all-time' }
+        : null
+
   const handleOpenDeepResearch = useCallback((game, gameKey) => {
     setDeepResearchTarget({ game, gameKey })
   }, [])
@@ -1322,6 +1512,7 @@ export default function DailyDigest({ onBack }) {
   }, [])
 
   return (
+    <LockedPicksContext.Provider value={lockedPicksApi}>
     <div className="min-h-screen bg-ink-950 text-white font-sans">
       {/* Top nav bar */}
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
@@ -1341,43 +1532,65 @@ export default function DailyDigest({ onBack }) {
         </button>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      <div className={`max-w-5xl mx-auto px-4 py-6 space-y-6 ${lockedPicks.length > 0 ? 'pb-32' : ''}`}>
 
         {/* Hero header */}
-        <div className="bg-ink-900 rounded-sharp border border-ink-700 p-6 md:p-8 shadow-2xl">
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold text-signal-pos leading-tight">
-                Daily Digest
-              </h1>
-              <p className="text-ink-300 text-sm mt-1">
-                {data ? formatFullDate(null) : 'Loading...'}
-              </p>
+        <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
+          {/* Top meta row: today's date + 30d model hit-rate (trust anchor) */}
+          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
+            <span>{data ? formatFullDate(null) : 'Loading...'}</span>
+            {heroHitRate && (
+              <span>
+                Model · <span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span> · {heroHitRate.label}
+              </span>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            {/* Count-first headline — math-derived, instantly tells you what's actionable today */}
+              {data ? (
+                tierCounts.sharpTakes > 0 ? (
+                  <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
+                    <span className="text-signal-pos">{tierCounts.sharpTakes}</span> Sharp Take{tierCounts.sharpTakes !== 1 ? 's' : ''}
+                    {tierCounts.strongPlays > 0 && (
+                      <span className="text-ink-400"> · </span>
+                    )}
+                    {tierCounts.strongPlays > 0 && (
+                      <span><span className="text-signal-pos">{tierCounts.strongPlays}</span> <span className="text-ink-200">Strong</span></span>
+                    )}
+                  </h1>
+                ) : tierCounts.strongPlays > 0 ? (
+                  <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
+                    <span className="text-signal-pos">{tierCounts.strongPlays}</span> Strong Play{tierCounts.strongPlays !== 1 ? 's' : ''}
+                  </h1>
+                ) : (
+                  <h1 className="font-mono text-2xl md:text-3xl font-bold tracking-tight text-ink-100 leading-tight">
+                    Quiet board — no tiles cleared 7pp today
+                  </h1>
+                )
+              ) : (
+                <h1 className="font-mono text-3xl md:text-4xl font-bold text-ink-300">…</h1>
+              )}
+
+              {/* Secondary tier counts + traps to fade */}
               {data && (
-                <p className="text-ink-200 mt-2 font-medium">
-                  {totalGames} analyzed game{totalGames !== 1 ? 's' : ''} across {totalSports} sport{totalSports !== 1 ? 's' : ''} today
+                <p className="text-sm mt-2 font-mono tabular-nums text-ink-300">
+                  {tierCounts.plays > 0 && <span><span className="text-signal-pos">{tierCounts.plays}</span> Play{tierCounts.plays !== 1 ? 's' : ''}</span>}
+                  {tierCounts.plays > 0 && tierCounts.leans > 0 && <span className="text-ink-600"> · </span>}
+                  {tierCounts.leans > 0 && <span><span className="text-signal-pos/70">{tierCounts.leans}</span> Lean{tierCounts.leans !== 1 ? 's' : ''}</span>}
+                  {(tierCounts.plays > 0 || tierCounts.leans > 0) && tierCounts.traps > 0 && <span className="text-ink-600"> · </span>}
+                  {tierCounts.traps > 0 && <span><span className="text-signal-neg">{tierCounts.traps}</span> Trap{tierCounts.traps !== 1 ? 's' : ''} to fade</span>}
                 </p>
               )}
-              {data?.firstGameTime && <Countdown targetIso={data.firstGameTime} />}
-            </div>
 
-            {/* Upcoming game counts */}
-            {data && Object.keys(data.upcomingCounts).length > 0 && (
-              <div className="bg-ink-950/60 rounded-sharp border border-ink-700 px-4 py-3">
-                <div className="text-xs text-ink-400 uppercase tracking-widest mb-2 font-semibold">De-Genny's 24-Hr Game Analysis</div>
-                <div className="space-y-1">
-                  {Object.entries(data.upcomingCounts).map(([sport, count]) => {
-                    const meta = getSportMeta(sport)
-                    return (
-                      <div key={sport} className="flex items-center justify-between gap-6 text-sm">
-                        <span className="text-ink-200">{meta.emoji} {meta.label}</span>
-                        <span className="font-bold text-white">{count}</span>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+              {/* System explainer for first-time users */}
+              {data && (
+                <p className="text-ink-400 text-xs mt-3 font-mono leading-relaxed">
+                  {totalGames} game{totalGames !== 1 ? 's' : ''} graded across {totalSports} sport{totalSports !== 1 ? 's' : ''}. Math picks the side. De-Genny narrates.
+                </p>
+              )}
+
+              {data?.firstGameTime && <Countdown targetIso={data.firstGameTime} />}
           </div>
         </div>
 
@@ -1411,6 +1624,10 @@ export default function DailyDigest({ onBack }) {
               <YesterdayRecap results={data.yesterdayResults} />
             )}
 
+            {/* Pick of the Day — the single best edge across all sports, featured
+                above the accordions so new users see the aha moment on first scroll. */}
+            {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} />}
+
             {/* Golf tournament leaderboard */}
             {data.golf && <GolfLeaderboard golf={data.golf} />}
 
@@ -1421,31 +1638,30 @@ export default function DailyDigest({ onBack }) {
                 <p className="text-ink-500 text-sm mt-2">Check back later or run the Pick Generator to generate analysis.</p>
               </div>
             ) : (
-              sportSections.map(([sport, games]) => (
+              sportSections.map(([sport, games], i) => (
                 <SportSection
                   key={sport}
                   sport={sport}
                   games={games}
                   injuries={data.injuries}
-                  isDefaultExpanded={false}
+                  isDefaultExpanded={i === 0}
                   onDeepResearch={handleOpenDeepResearch}
+                  upcomingCount={data.upcomingCounts?.[sport] || 0}
                 />
               ))
             )}
 
-            {/* Bottom CTA */}
-            <div className="bg-ink-900 rounded-sharp border border-ink-700 p-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+            {/* Bottom CTA — primary action (Chat) gets the amber fill; secondary (Generator) stays ghost so the eye lands on the primary */}
+            <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
-                onClick={() => {
-                  window.location.hash = '#/chat'
-                }}
-                className="w-full sm:w-auto px-6 py-3 bg-signal-pos hover:opacity-90 rounded-sharp font-bold text-white shadow-lg transition-all"
+                onClick={() => { window.location.hash = '#/chat' }}
+                className="w-full sm:w-auto px-6 py-3 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-sm text-ink-950 transition-all active:scale-[0.98]"
               >
                 Chat with De-Genny
               </button>
               <button
                 onClick={onBack}
-                className="w-full sm:w-auto px-6 py-3 bg-signal-pos hover:opacity-90 rounded-sharp font-bold text-white shadow-lg transition-all"
+                className="w-full sm:w-auto px-6 py-3 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-mono font-medium uppercase tracking-[0.12em] text-sm text-ink-200 transition-all active:scale-[0.98]"
               >
                 Full Pick Generator
               </button>
@@ -1463,6 +1679,48 @@ export default function DailyDigest({ onBack }) {
           onLockPick={() => {}}
         />
       )}
+
+      {/* Sticky locked-picks bar — visible whenever the user has staged ≥ 1 pick.
+          Pinned to viewport bottom; the parent container reserves pb-32 to avoid overlap. */}
+      <LockedPicksBar />
+    </div>
+    </LockedPicksContext.Provider>
+  )
+}
+
+// ─── LockedPicksBar ──────────────────────────────────────────────────────────
+// Fixed-bottom bar that shows when the user has locked any picks from the digest.
+// "Build Parlay" finalizes: writes locked picks to localStorage so the
+// BetslipBuilder reads them on next load, then routes back to the main app.
+
+function LockedPicksBar() {
+  const { lockedPicks, clearAll, buildParlay } = useContext(LockedPicksContext)
+  if (lockedPicks.length === 0) return null
+  return (
+    <div className="fixed bottom-0 inset-x-0 z-40 bg-ink-900/95 backdrop-blur border-t border-signal-pos-dim shadow-[0_-8px_24px_rgba(0,0,0,0.5)] safe-bottom">
+      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="font-mono text-sm tabular-nums">
+            <span className="text-signal-pos font-bold">{lockedPicks.length}</span>
+            <span className="text-ink-200"> pick{lockedPicks.length !== 1 ? 's' : ''} locked</span>
+          </div>
+          <div className="font-mono text-[10px] text-ink-400 truncate mt-0.5">
+            {lockedPicks.map(p => p.pick).join(' · ')}
+          </div>
+        </div>
+        <button
+          onClick={clearAll}
+          className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 hover:text-ink-200 px-3 py-2 transition-colors"
+        >
+          Clear
+        </button>
+        <button
+          onClick={buildParlay}
+          className="px-5 py-2.5 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-sm text-ink-950 transition-all active:scale-[0.98] flex-shrink-0"
+        >
+          Build Parlay →
+        </button>
+      </div>
     </div>
   )
 }
