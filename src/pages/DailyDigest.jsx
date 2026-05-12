@@ -1478,14 +1478,25 @@ export default function DailyDigest({ onBack }) {
   // We only feature a pick if it cleared the Play tier (≥ 4pp) AND has a real
   // recommended_pick string. Otherwise the callout hides, which is the honest
   // move on a quiet board.
+  //
+  // Sanity guardrail: refuse to feature a moneyline pick whose implied market
+  // probability is below ~25% (i.e., odds longer than +300). Filed Issue:
+  // the tennis edge-calc path produces ~47% model prob for clear underdogs,
+  // so without this guard PoD surfaces +2500 longshots with claimed +40pp edges.
+  // Until the math is fixed, the headline pick at least won't be a sucker bet.
   const pickOfTheDay = useMemo(() => {
     if (!data?.gamesBySport) return null
+    const POD_MAX_ML_ODDS = 300
     let best = null
     for (const [sport, games] of Object.entries(data.gamesBySport)) {
       for (const g of games) {
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp == null || pp < 4) continue
         if (!g.recommended_pick) continue
+        if (g.recommended_side === 'home_ml' || g.recommended_side === 'away_ml') {
+          const ml = g.recommended_side === 'home_ml' ? g.moneyline_home : g.moneyline_away
+          if (ml != null && ml > POD_MAX_ML_ODDS) continue
+        }
         if (!best || pp > best.signedPp) {
           best = { game: g, sport, signedPp: pp }
         }
