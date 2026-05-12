@@ -65,6 +65,48 @@ function edgeBadgeClass(score) {
   return 'bg-gray-700 text-gray-400 border border-gray-600'
 }
 
+// 5-tier label scheme from signed edge in percentage points.
+// We deliberately avoid the word "Lock" — it recreates the
+// "guaranteed-win" mental model the old 10/10 edge_score caused.
+// Negative edges get their own tier so we never silently dress them up.
+function edgeTier(signedPp) {
+  if (signedPp == null || Number.isNaN(signedPp)) return { label: '—', color: 'text-gray-500', bg: 'bg-gray-800 border-gray-700' }
+  if (signedPp < 0) return { label: 'Trap', color: 'text-red-300', bg: 'bg-red-900/40 border-red-800/60' }
+  if (signedPp < 2)  return { label: 'Skip',        color: 'text-gray-400',   bg: 'bg-gray-800 border-gray-700' }
+  if (signedPp < 4)  return { label: 'Lean',        color: 'text-yellow-300', bg: 'bg-yellow-900/40 border-yellow-700/60' }
+  if (signedPp < 7)  return { label: 'Play',        color: 'text-lime-300',   bg: 'bg-lime-900/40 border-lime-700/60' }
+  if (signedPp < 10) return { label: 'Strong Play', color: 'text-green-300',  bg: 'bg-green-900/50 border-green-700/60' }
+  return                   { label: 'Sharp Take',   color: 'text-emerald-300', bg: 'bg-emerald-900/60 border-emerald-600' }
+}
+
+function formatPp(signedPp) {
+  if (signedPp == null) return null
+  const v = Number(signedPp)
+  if (Number.isNaN(v)) return null
+  return `${v >= 0 ? '+' : ''}${v.toFixed(1)}pp`
+}
+
+// Convert the game.edges dict (signed fractions) into pp for a given side key.
+function edgePpForSide(edges, side) {
+  if (!edges || side == null) return null
+  const v = edges[side]
+  if (v == null) return null
+  return Number((v * 100).toFixed(1))
+}
+
+// Build a readable pick label for one side using market context already on the game row.
+function sidePickText(game, side) {
+  switch (side) {
+    case 'home_ml':     return game.moneyline_home != null ? `${game.home_team} ML ${game.moneyline_home > 0 ? '+' : ''}${game.moneyline_home}` : `${game.home_team} ML`
+    case 'away_ml':     return game.moneyline_away != null ? `${game.away_team} ML ${game.moneyline_away > 0 ? '+' : ''}${game.moneyline_away}` : `${game.away_team} ML`
+    case 'home_spread': return game.spread != null ? `${game.home_team} ${game.spread > 0 ? '+' : ''}${game.spread}` : `${game.home_team} spread`
+    case 'away_spread': return game.spread != null ? `${game.away_team} ${(-game.spread) > 0 ? '+' : ''}${-game.spread}` : `${game.away_team} spread`
+    case 'over':        return game.total != null ? `Over ${game.total}` : 'Over'
+    case 'under':       return game.total != null ? `Under ${game.total}` : 'Under'
+    default:            return side
+  }
+}
+
 function winRateColor(rate) {
   if (rate == null) return 'text-gray-400'
   if (rate >= 60) return 'text-green-400'
@@ -515,18 +557,136 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
   )
 }
 
+// ─── EdgeChip ────────────────────────────────────────────────────────────────
+// Replaces the old "Edge X.0" badge. Shows signed pp + tier label so a "Sharp
+// Take" reads as a model take with documented hit-rate range, not as 10/10
+// confidence in a coin flip.
+
+function EdgeChip({ signedPp, size = 'md' }) {
+  const tier = edgeTier(signedPp)
+  const pp = formatPp(signedPp)
+  const padding = size === 'sm' ? 'px-2 py-1' : 'px-3 py-2'
+  const ppSize = size === 'sm' ? 'text-xs' : 'text-base'
+  return (
+    <div className={`rounded-lg border ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}>
+      <div className={`font-bold ${ppSize} ${tier.color}`}>{pp ?? '—'}</div>
+      <div className={`text-[10px] uppercase tracking-wider ${tier.color} opacity-80`}>{tier.label}</div>
+    </div>
+  )
+}
+
+// ─── MarketTabs ──────────────────────────────────────────────────────────────
+// One row per market (ML / Spread / Total). Each row shows both sides with
+// signed edges. Math-recommended side is highlighted. Below ±2pp we render
+// the value muted so users see "no edge" rather than mistaking 0.4pp for a play.
+
+function MarketRow({ label, sides, recommendedSide }) {
+  const hasAnyEdge = sides.some(s => s.signedPp != null)
+  return (
+    <div className="rounded-lg bg-gray-800/60 border border-gray-700/60 p-2">
+      <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">{label}</div>
+      <div className="space-y-1">
+        {sides.map(s => {
+          const tier = edgeTier(s.signedPp)
+          const isPick = s.side === recommendedSide
+          const muted = s.signedPp == null || Math.abs(s.signedPp) < 2
+          return (
+            <div key={s.side} className="flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 min-w-0">
+                {isPick && <span className="text-yellow-400" title="Model pick">⭐</span>}
+                <span className={`truncate ${isPick ? 'text-yellow-300 font-semibold' : 'text-gray-300'}`}>
+                  {s.text}
+                </span>
+              </div>
+              <span className={`flex-shrink-0 font-mono text-[11px] ${muted ? 'text-gray-500' : tier.color}`}>
+                {hasAnyEdge ? (formatPp(s.signedPp) ?? '—') : '—'}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function MarketTabs({ game }) {
+  const { edges, recommended_side } = game
+  const defaultTab = recommended_side?.startsWith('over') || recommended_side?.startsWith('under')
+    ? 'total'
+    : recommended_side?.endsWith('_spread')
+      ? 'spread'
+      : 'ml'
+  const [tab, setTab] = useState(defaultTab)
+
+  const tabs = [
+    { id: 'ml',     label: 'Moneyline', show: game.moneyline_home != null || edges?.home_ml != null },
+    { id: 'spread', label: 'Spread',    show: game.spread != null        || edges?.home_spread != null },
+    { id: 'total',  label: 'Total',     show: game.total != null         || edges?.over != null },
+  ].filter(t => t.show)
+
+  // If the previously-chosen tab is no longer available (no market for it),
+  // fall back to whatever's first.
+  const activeTab = tabs.find(t => t.id === tab) ? tab : tabs[0]?.id
+
+  if (!tabs.length) return null
+
+  const sidesByTab = {
+    ml: [
+      { side: 'home_ml', text: sidePickText(game, 'home_ml'), signedPp: edgePpForSide(edges, 'home_ml') },
+      { side: 'away_ml', text: sidePickText(game, 'away_ml'), signedPp: edgePpForSide(edges, 'away_ml') },
+    ],
+    spread: [
+      { side: 'home_spread', text: sidePickText(game, 'home_spread'), signedPp: edgePpForSide(edges, 'home_spread') },
+      { side: 'away_spread', text: sidePickText(game, 'away_spread'), signedPp: edgePpForSide(edges, 'away_spread') },
+    ],
+    total: [
+      { side: 'over',  text: sidePickText(game, 'over'),  signedPp: edgePpForSide(edges, 'over') },
+      { side: 'under', text: sidePickText(game, 'under'), signedPp: edgePpForSide(edges, 'under') },
+    ],
+  }
+
+  return (
+    <div>
+      <div className="flex gap-1 mb-2">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-2 py-1 text-[11px] font-semibold rounded transition-colors ${
+              activeTab === t.id
+                ? 'bg-gray-700 text-white'
+                : 'bg-gray-900 text-gray-500 hover:text-gray-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <MarketRow
+        label={tabs.find(t => t.id === activeTab)?.label || ''}
+        sides={sidesByTab[activeTab] || []}
+        recommendedSide={recommended_side}
+      />
+    </div>
+  )
+}
+
 // ─── GameCard ───────────────────────────────────────────────────────────────
 
 function GameCard({ game, gameKey, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
-  const edge = game.edge_score != null ? Number(game.edge_score).toFixed(1) : null
+
+  // Signed edge in pp for the recommended side. When the math returned a real
+  // pick, this reflects that bet's edge. When it didn't (no-edge game), we
+  // fall back to null so the chip renders "—".
+  const signedPp = edgePpForSide(game.edges, game.recommended_side)
 
   return (
     <div className="bg-gray-900 rounded-xl border border-gray-700 overflow-hidden flex flex-col">
       <div className="p-4 flex-1">
         {/* Matchup header */}
         <div className="flex items-start justify-between gap-3 mb-3">
-          <div>
+          <div className="min-w-0">
             <div className="font-semibold text-white text-sm leading-tight">
               {game.away_team} <span className="text-gray-500">@</span> {game.home_team}
             </div>
@@ -541,41 +701,24 @@ function GameCard({ game, gameKey, onDeepResearch }) {
               <div className="text-xs text-gray-600 mt-0.5">{toMountainTime(game.game_date)} MT</div>
             )}
           </div>
-          {edge != null && (
-            <span className={`px-2 py-1 rounded-lg text-xs font-bold flex-shrink-0 ${edgeBadgeClass(game.edge_score)}`}>
-              Edge {edge}
-            </span>
-          )}
+          <EdgeChip signedPp={signedPp} />
         </div>
 
         {/* Recommended pick */}
-        {game.recommended_pick && (
+        {game.recommended_pick ? (
           <div className="bg-gray-800 rounded-lg px-3 py-2 mb-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Top Pick</div>
+            <div className="text-xs text-gray-500 uppercase tracking-wide mb-0.5">Model Pick</div>
             <div className="text-yellow-400 font-semibold text-sm">{game.recommended_pick}</div>
-            {game.recommended_side && (
-              <div className="text-xs text-gray-400 mt-0.5">{game.recommended_side}</div>
-            )}
+          </div>
+        ) : (
+          <div className="bg-gray-800/40 rounded-lg px-3 py-2 mb-3 border border-dashed border-gray-700">
+            <div className="text-xs text-gray-500">No model edge — every market &lt; 2pp</div>
           </div>
         )}
 
-        {/* Lines */}
-        <div className="flex flex-wrap gap-2 mb-3">
-          {game.spread != null && (
-            <span className="text-xs bg-gray-800 rounded px-2 py-1 text-gray-300">
-              Spread: {game.spread > 0 ? '+' : ''}{game.spread}
-            </span>
-          )}
-          {game.total != null && (
-            <span className="text-xs bg-gray-800 rounded px-2 py-1 text-gray-300">
-              O/U: {game.total}
-            </span>
-          )}
-          {game.moneyline_home != null && (
-            <span className="text-xs bg-gray-800 rounded px-2 py-1 text-gray-300">
-              ML: {game.moneyline_home > 0 ? '+' : ''}{game.moneyline_home} / {game.moneyline_away > 0 ? '+' : ''}{game.moneyline_away}
-            </span>
-          )}
+        {/* Per-market tabs */}
+        <div className="mb-3">
+          <MarketTabs game={game} />
         </div>
 
         {/* Analysis snippet (expandable) */}
@@ -665,12 +808,22 @@ function InjurySection({ content }) {
 function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch }) {
   const [expanded, setExpanded] = useState(isDefaultExpanded)
   const meta = getSportMeta(sport)
-  // Top 3 by edge score (already sorted desc from API)
-  const topGames = games.slice(0, 3)
-  const extraGames = games.slice(3)
+
+  // Split games by whether the math returned an actionable pick. "On the
+  // bubble" surfaces games where the model considered the matchup but every
+  // market sat below the +2pp threshold — kept visible (so users see we're
+  // not forcing picks) but separated from the actionable list.
+  const ppFor = (g) => edgePpForSide(g.edges, g.recommended_side)
+  const pickGames = games.filter(g => g.recommended_pick && (ppFor(g) ?? 0) >= 2)
+  const bubbleGames = games.filter(g => !pickGames.includes(g))
+
+  // Top 3 actionable picks for the collapsed preview / top tile grid.
+  const topGames = pickGames.slice(0, 3)
+  const extraGames = pickGames.slice(3)
   const injuryCode = ANALYSIS_SPORT_TO_CODE[sport] || sport
   const injuryEntry = injuries[injuryCode]
-  const topEdge = games[0]?.edge_score != null ? Number(games[0].edge_score).toFixed(1) : null
+  const topSignedPp = pickGames[0] ? ppFor(pickGames[0]) : null
+  const topTier = edgeTier(topSignedPp)
 
   // Use game_key from the DB directly (returned by /api/digest)
   function getGameKey(game) {
@@ -713,10 +866,11 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             <div>
               <h2 className="text-lg font-bold text-white">{meta.label}</h2>
               <p className="text-xs text-gray-400">
-                {games.length} game{games.length !== 1 ? 's' : ''} with analysis
-                {!expanded && topEdge && (
+                {pickGames.length} pick{pickGames.length !== 1 ? 's' : ''}
+                {bubbleGames.length > 0 && <span className="text-gray-600"> · {bubbleGames.length} on the bubble</span>}
+                {!expanded && topSignedPp != null && (
                   <span className="ml-2 text-gray-500">
-                    · Top edge: <span className={`font-semibold ${Number(topEdge) >= 8 ? 'text-green-400' : Number(topEdge) >= 6 ? 'text-yellow-400' : 'text-gray-400'}`}>{topEdge}</span>
+                    · Top: <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>
                   </span>
                 )}
               </p>
@@ -740,24 +894,28 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         </div>
       </button>
 
-      {/* Collapsed preview — top 3 picks as compact rows */}
+      {/* Collapsed preview — top 3 actionable picks as compact rows */}
       {!expanded && topGames.length > 0 && (
         <div className="px-6 py-3 space-y-2">
-          {topGames.map((game, i) => (
-            <div key={i} className="flex items-center justify-between gap-3 text-sm">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 ${edgeBadgeClass(game.edge_score)}`}>
-                  {Number(game.edge_score).toFixed(1)}
+          {topGames.map((game, i) => {
+            const pp = ppFor(game)
+            const tier = edgeTier(pp)
+            return (
+              <div key={i} className="flex items-center justify-between gap-3 text-sm">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold flex-shrink-0 border ${tier.bg} ${tier.color}`}>
+                    {formatPp(pp) ?? '—'}
+                  </span>
+                  <span className="text-gray-300 truncate">{game.away_team} @ {game.home_team}</span>
+                </div>
+                <span className="text-yellow-400 text-xs font-semibold flex-shrink-0 truncate max-w-[140px]">
+                  {game.recommended_pick || '—'}
                 </span>
-                <span className="text-gray-300 truncate">{game.away_team} @ {game.home_team}</span>
               </div>
-              <span className="text-yellow-400 text-xs font-semibold flex-shrink-0 truncate max-w-[140px]">
-                {game.recommended_pick || '—'}
-              </span>
-            </div>
-          ))}
-          {games.length > 3 && (
-            <p className="text-[11px] text-gray-600 text-center pt-1">Tap to see all {games.length} games</p>
+            )
+          })}
+          {pickGames.length > 3 && (
+            <p className="text-[11px] text-gray-600 text-center pt-1">Tap to see all {pickGames.length} picks</p>
           )}
         </div>
       )}
@@ -765,43 +923,73 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
       {/* Expanded body — full tiles */}
       {expanded && (
         <div className="p-6">
-          <h3 className="text-xs uppercase tracking-widest text-gray-500 mb-3 font-semibold">
-            Top Picks by Edge Score
-          </h3>
-
-          {/* Top 3 tiles */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {topGames.map((game, i) => (
-              <GameCard
-                key={`${game.home_team}-${game.away_team}-${i}`}
-                game={game}
-                gameKey={getGameKey(game)}
-                onDeepResearch={onDeepResearch}
-              />
-            ))}
-          </div>
-
-          {/* Additional games (beyond top 3) */}
-          {extraGames.length > 0 && (
+          {pickGames.length > 0 ? (
             <>
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 border-t border-gray-700" />
-                <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
-                  {extraGames.length} more {meta.label} game{extraGames.length !== 1 ? 's' : ''}
-                </span>
-                <div className="flex-1 border-t border-gray-700" />
-              </div>
+              <h3 className="text-xs uppercase tracking-widest text-gray-500 mb-3 font-semibold">
+                Picks · ranked by model edge
+              </h3>
+              {/* Top 3 tiles */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {extraGames.map((game, i) => (
+                {topGames.map((game, i) => (
                   <GameCard
-                    key={`${game.home_team}-${game.away_team}-extra-${i}`}
+                    key={`${game.home_team}-${game.away_team}-${i}`}
                     game={game}
                     gameKey={getGameKey(game)}
                     onDeepResearch={onDeepResearch}
                   />
                 ))}
               </div>
+
+              {/* Additional picks beyond top 3 */}
+              {extraGames.length > 0 && (
+                <>
+                  <div className="flex items-center gap-3 my-4">
+                    <div className="flex-1 border-t border-gray-700" />
+                    <span className="text-xs text-gray-600 font-medium whitespace-nowrap">
+                      {extraGames.length} more {meta.label} pick{extraGames.length !== 1 ? 's' : ''}
+                    </span>
+                    <div className="flex-1 border-t border-gray-700" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {extraGames.map((game, i) => (
+                      <GameCard
+                        key={`${game.home_team}-${game.away_team}-extra-${i}`}
+                        game={game}
+                        gameKey={getGameKey(game)}
+                        onDeepResearch={onDeepResearch}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
             </>
+          ) : (
+            <div className="rounded-lg bg-gray-900/40 border border-dashed border-gray-700 px-4 py-6 text-center text-sm text-gray-500">
+              No actionable picks for {meta.label} today — the model considered every game and didn't find an edge ≥ 2pp.
+            </div>
+          )}
+
+          {/* On the bubble — games we analyzed but didn't recommend */}
+          {bubbleGames.length > 0 && (
+            <details className="mt-6 group">
+              <summary className="cursor-pointer list-none flex items-center gap-2 select-none">
+                <span className="text-xs uppercase tracking-widest text-gray-500 font-semibold">
+                  On the bubble
+                </span>
+                <span className="text-[11px] text-gray-600">{bubbleGames.length} game{bubbleGames.length !== 1 ? 's' : ''} · model has no edge</span>
+                <span className="ml-auto text-gray-500 text-xs group-open:rotate-180 transition-transform">▼</span>
+              </summary>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {bubbleGames.map((game, i) => (
+                  <GameCard
+                    key={`${game.home_team}-${game.away_team}-bubble-${i}`}
+                    game={game}
+                    gameKey={getGameKey(game)}
+                    onDeepResearch={onDeepResearch}
+                  />
+                ))}
+              </div>
+            </details>
           )}
 
           {/* Injuries */}
