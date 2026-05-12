@@ -613,8 +613,14 @@ function EdgeChip({ signedPp, size = 'md' }) {
   const arrow = isPos ? '▲' : isNeg ? '▼' : '·'
   const padding = size === 'sm' ? 'px-2 py-1' : 'px-2.5 py-1.5'
   const ppSize = size === 'sm' ? 'text-[11px]' : 'text-sm'
+  const ppTooltip = pp != null
+    ? `${pp} · ${tier.label} — gap between the model's win-probability and the book's implied probability, in percentage points`
+    : 'No model edge available for this side'
   return (
-    <div className={`rounded-sharp ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}>
+    <div
+      className={`rounded-sharp ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}
+      title={ppTooltip}
+    >
       <div className={`font-mono font-semibold ${ppSize} ${tier.color} tabular-nums tracking-tight`}>
         <span className="mr-0.5">{arrow}</span>{pp ?? '—'}
       </div>
@@ -648,7 +654,10 @@ function MarketRow({ sides, recommendedSide }) {
                   {s.text}
                 </span>
               </div>
-              <span className={`flex-shrink-0 font-mono text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}>
+              <span
+                className={`flex-shrink-0 font-mono text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}
+                title={s.signedPp != null ? `${formatPp(s.signedPp)} · ${tier.label}` : 'No model edge for this side'}
+              >
                 {hasAnyEdge ? (formatPp(s.signedPp) ?? '—') : '—'}
               </span>
             </div>
@@ -1393,6 +1402,7 @@ export default function DailyDigest({ onBack }) {
   const [error, setError] = useState(null)
   const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
   const [lockedPicks, setLockedPicks] = useState([])
+  const [legendOpen, setLegendOpen] = useState(false)
 
   // Locked-picks API consumed via context by tiles, the PoD CTA, and the sticky bar.
   // The localStorage write only happens at buildParlay() — until then the locks are
@@ -1536,14 +1546,23 @@ export default function DailyDigest({ onBack }) {
 
         {/* Hero header */}
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
-          {/* Top meta row: today's date + 30d model hit-rate (trust anchor) */}
-          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
-            <span>{data ? formatFullDate(null) : 'Loading...'}</span>
-            {heroHitRate && (
-              <span>
-                Model · <span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span> · {heroHitRate.label}
-              </span>
-            )}
+          {/* Top meta row: today's date + 30d model hit-rate (trust anchor) + edge legend trigger */}
+          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3 gap-3">
+            <span className="truncate">{data ? formatFullDate(null) : 'Loading...'}</span>
+            <div className="flex items-center gap-4 flex-shrink-0">
+              {heroHitRate && (
+                <span>
+                  Model · <span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span> · {heroHitRate.label}
+                </span>
+              )}
+              <button
+                onClick={() => setLegendOpen(true)}
+                className="text-ink-400 hover:text-signal-pos transition-colors flex items-center gap-1"
+                title="What do these pp numbers and tier labels mean?"
+              >
+                <span className="text-signal-pos">ⓘ</span> How edges work
+              </button>
+            </div>
           </div>
 
           <div className="min-w-0">
@@ -1680,11 +1699,102 @@ export default function DailyDigest({ onBack }) {
         />
       )}
 
+      {/* Edge legend modal — teach-once explainer for pp + tier ladder. */}
+      <EdgeLegendModal open={legendOpen} onClose={() => setLegendOpen(false)} />
+
       {/* Sticky locked-picks bar — visible whenever the user has staged ≥ 1 pick.
           Pinned to viewport bottom; the parent container reserves pb-32 to avoid overlap. */}
       <LockedPicksBar />
     </div>
     </LockedPicksContext.Provider>
+  )
+}
+
+// ─── EdgeLegendModal ─────────────────────────────────────────────────────────
+// Teach-once explainer triggered from the hero's "ⓘ How edges work" button.
+// Defines pp and shows the full tier ladder so users don't have to infer the
+// system from individual tiles. Dismissible via X / click-outside / Escape.
+
+function EdgeLegendModal({ open, onClose }) {
+  useEffect(() => {
+    if (!open) return
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.body.style.overflow = 'hidden'
+    window.addEventListener('keydown', handler)
+    return () => {
+      document.body.style.overflow = ''
+      window.removeEventListener('keydown', handler)
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+
+  const tiers = [
+    { range: '≥ 10pp', label: 'Sharp Take',  sub: 'sharp take',  cls: 'text-signal-pos font-semibold' },
+    { range: '7–10pp', label: 'Strong Play', sub: 'hammer it',   cls: 'text-signal-pos font-semibold' },
+    { range: '4–7pp',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
+    { range: '2–4pp',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
+    { range: '0–2pp',  label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
+    { range: '< 0pp',  label: 'Trap',        sub: 'fade it',     cls: 'text-signal-neg font-semibold' },
+  ]
+
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 bg-ink-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="bg-ink-900 shadow-hairline rounded-sharp max-w-lg w-full max-h-[90vh] overflow-y-auto"
+      >
+        <div className="flex items-center justify-between px-5 py-3 border-b border-ink-700">
+          <h2 className="font-mono text-sm font-semibold uppercase tracking-[0.14em] text-ink-100">
+            How edges work
+          </h2>
+          <button
+            onClick={onClose}
+            className="font-mono text-ink-400 hover:text-ink-100 transition-colors px-2"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div>
+            <div className="font-mono text-[10px] text-signal-pos uppercase tracking-[0.18em] mb-1.5">
+              pp = percentage points
+            </div>
+            <p className="text-ink-200 text-sm leading-relaxed">
+              The signed gap between what our model thinks each side wins, and what the book is implying with its odds. Bigger gap = more disagreement with the book = the headline edge on the tile.
+            </p>
+            <p className="text-ink-300 text-xs leading-relaxed mt-2 font-mono">
+              Example: <span className="tabular-nums text-signal-pos">+6.2pp</span> on a Strong Play means the model thinks that side wins 6.2 percentage points more often than the −110 line implies.
+            </p>
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] text-signal-pos uppercase tracking-[0.18em] mb-2">
+              Tier ladder
+            </div>
+            <div className="font-mono text-xs space-y-1.5 tabular-nums">
+              {tiers.map(t => (
+                <div key={t.label} className="grid grid-cols-[68px_1fr_110px] gap-3 items-baseline">
+                  <span className={t.cls}>{t.range}</span>
+                  <span className={t.cls}>{t.label}</span>
+                  <span className="text-ink-400 italic lowercase">{t.sub}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-ink-700">
+            <p className="text-ink-300 text-xs leading-relaxed font-mono">
+              Math picks the side. De-Genny narrates. We publish negative edges too — that's why <span className="text-signal-neg">Trap</span> exists.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
