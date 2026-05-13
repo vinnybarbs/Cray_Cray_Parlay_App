@@ -402,7 +402,7 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
 };
 
 export default function MainApp() {
-  const { user, isAuthenticated, signOut } = useAuth()
+  const { user, isAuthenticated, signOut, loading: authLoading } = useAuth()
   const [showAuth, setShowAuth] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
@@ -797,6 +797,22 @@ export default function MainApp() {
 
   const payout = calculatePayout()
 
+  // While AuthContext is hydrating the Supabase session, isAuthenticated is
+  // briefly false — which would render Landing for a returning user before
+  // immediately swapping to the app shell. Block that flicker with a minimal
+  // splash until auth resolves. Vince reported this 2026-05-12: "all I can
+  // load is the last page... new one for split sec then reverts."
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-ink-950 flex items-center justify-center">
+        <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-ink-400 flex items-center gap-2">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />
+          Loading
+        </div>
+      </div>
+    )
+  }
+
   // Unauthenticated visitors at root see the marketing landing. Once they sign
   // in or click into one of the deep-link surfaces (digest/chat/etc.), the
   // landing yields and the normal app shell shows underneath.
@@ -805,7 +821,10 @@ export default function MainApp() {
   if (showLanding) {
     return (
       <>
-        <Landing onStartTrial={() => setShowAuth(true)} />
+        <Landing
+          onStartTrial={() => setShowAuth(true)}
+          onSignIn={() => setShowAuth(true)}
+        />
         {showAuth && <Auth onClose={() => setShowAuth(false)} />}
       </>
     )

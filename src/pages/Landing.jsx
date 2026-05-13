@@ -39,7 +39,7 @@ const TERMINAL_CSS = `
 }
 `
 
-export default function Landing({ onStartTrial }) {
+export default function Landing({ onStartTrial, onSignIn }) {
   const [stats, setStats] = useState(null)
   const [tierStats, setTierStats] = useState(null)
 
@@ -87,8 +87,8 @@ export default function Landing({ onStartTrial }) {
     <div className="min-h-screen bg-ink-950 text-ink-100 font-mono antialiased">
       <style>{TERMINAL_CSS}</style>
       <Ticker />
-      <Nav onStartTrial={onStartTrial} scrollTo={scrollTo} />
-      <Hero stats={stats} onStartTrial={onStartTrial} onSeePick={scrollTo('snapshot')} />
+      <Nav onStartTrial={onStartTrial} onSignIn={onSignIn} scrollTo={scrollTo} />
+      <Hero stats={stats} onStartTrial={onStartTrial} onSignIn={onSignIn} onSeePick={scrollTo('snapshot')} />
       <EdgeScorecard />
       <ExecutionFlow />
       <SnapshotTerminal tierStats={tierStats} />
@@ -141,7 +141,7 @@ function Ticker() {
 
 // ─── Nav ───────────────────────────────────────────────────────────────────
 
-function Nav({ onStartTrial, scrollTo }) {
+function Nav({ onStartTrial, onSignIn, scrollTo }) {
   return (
     <header className="sticky top-0 z-30 bg-ink-950/90 backdrop-blur-md border-b border-ink-800">
       <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
@@ -163,6 +163,15 @@ function Nav({ onStartTrial, scrollTo }) {
           <button onClick={scrollTo('terms')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
             Pricing
           </button>
+          {/* Sign in — separate from Start trial so returning users don't have to
+              parse a trial CTA when they just want to log in. Both routes hit the
+              same Auth modal which handles signup + signin flows. */}
+          <button
+            onClick={onSignIn}
+            className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-100 hover:text-signal-pos transition-colors px-2 py-1.5"
+          >
+            Sign in
+          </button>
           <button
             onClick={onStartTrial}
             className="text-[10px] font-bold uppercase tracking-[0.18em] bg-signal-pos text-ink-950 px-3 py-1.5 rounded-sharp hover:bg-signal-pos/90 transition-colors"
@@ -177,7 +186,7 @@ function Nav({ onStartTrial, scrollTo }) {
 
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
-function Hero({ stats, onStartTrial, onSeePick }) {
+function Hero({ stats, onStartTrial, onSignIn, onSeePick }) {
   const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : '—'
   const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : '1,000+'
 
@@ -219,6 +228,17 @@ function Hero({ stats, onStartTrial, onSeePick }) {
               See today's free pick →
             </button>
           </div>
+
+          {/* Sign in affordance for returning users — small but findable */}
+          <p className="mt-5 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
+            Already have an account?{' '}
+            <button
+              onClick={onSignIn}
+              className="text-signal-pos hover:underline transition-colors"
+            >
+              Sign in →
+            </button>
+          </p>
         </div>
 
         {/* RIGHT: stat-strip panel — looks like a terminal readout */}
