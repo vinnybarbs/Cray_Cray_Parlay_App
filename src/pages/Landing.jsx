@@ -636,10 +636,6 @@ function TrackRecord({ sportStats, tierStats }) {
             </p>
           </div>
         )}
-
-        <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-ink-500">
-          // ≥55% = amber · 50-55% = neutral · &lt;50% = crimson · no cherry-picking
-        </p>
       </div>
     </section>
   )
