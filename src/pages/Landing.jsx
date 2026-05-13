@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+
+// API_BASE matches the rest of the app — Railway in prod, env override locally.
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
 
 // ─── Landing — public marketing surface ────────────────────────────────────
 // Concept: "Trading terminal as marketing page." Bloomberg-severity layout
@@ -43,37 +45,23 @@ export default function Landing({ onStartTrial, onSignIn }) {
   const [stats, setStats] = useState(null)
   const [tierStats, setTierStats] = useState(null)
 
+  // Fetch via /api/public-stats so anon visitors can see the Track Record.
+  // Direct supabase-js read was blocked by RLS on mv_model_accuracy (the
+  // backend uses the service-role key to bypass RLS while keeping the
+  // underlying table locked down). 2026-05-12 fix.
   useEffect(() => {
-    if (!supabase) return
     let cancelled = false
     ;(async () => {
-      const { data: mvRows } = await supabase
-        .from('mv_model_accuracy')
-        .select('*')
-        .eq('period_bucket', 'last_30d')
-      if (cancelled || !mvRows) return
-
-      const overall = mvRows.find(r => r.dimension_type === 'overall')
-      if (overall) {
-        const w = overall.won || 0
-        const l = overall.lost || 0
-        const p = overall.push || 0
-        setStats({
-          total: w + l + p,
-          wins: w,
-          losses: l,
-          hitRate: w + l > 0 ? Math.round((w / (w + l)) * 1000) / 10 : null,
-        })
-      }
-
-      const tierRows = mvRows.filter(r => r.dimension_type === 'tier')
-      if (tierRows.length > 0) {
-        setTierStats(tierRows.map(r => ({
-          tier: r.dimension_value,
-          wins: r.won || 0,
-          losses: r.lost || 0,
-          hitRate: (r.won + r.lost) > 0 ? ((r.won / (r.won + r.lost)) * 100).toFixed(1) : null,
-        })))
+      try {
+        const res = await fetch(`${API_BASE}/api/public-stats`)
+        if (!res.ok) return
+        const json = await res.json()
+        if (cancelled) return
+        if (json.overall) setStats(json.overall)
+        if (Array.isArray(json.tiers) && json.tiers.length > 0) setTierStats(json.tiers)
+      } catch (err) {
+        // Soft-fail: section renders its empty/loading state instead.
+        if (!cancelled) console.warn('public-stats fetch failed', err)
       }
     })()
     return () => { cancelled = true }

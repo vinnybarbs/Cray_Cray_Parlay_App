@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import Auth from './Auth'
 import Dashboard from './Dashboard'
@@ -432,6 +432,33 @@ export default function MainApp() {
     window.addEventListener('hashchange', checkHash);
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
+
+  // Auto-route freshly signed-in users from Landing → Daily Digest.
+  // Vince reported 2026-05-12: "upon sign in I am essentially directed to our
+  // old site." The old MainApp form view is jarring after the new Sharp-Quant
+  // Landing. DailyDigest has been CRO'd to match the new aesthetic and is the
+  // natural post-login destination.
+  //
+  // prevAuthRef tracks the prior isAuthenticated value. On the false → true
+  // transition (i.e., actual sign-in event), if the user is at root with no
+  // panel hash, we route them to the digest. Page reloads while already
+  // logged in are not affected.
+  const prevAuthRef = useRef(null); // null = haven't observed auth state yet
+  useEffect(() => {
+    if (authLoading) return;
+    if (prevAuthRef.current === null) {
+      prevAuthRef.current = isAuthenticated;
+      return;
+    }
+    if (!prevAuthRef.current && isAuthenticated) {
+      const hash = window.location.hash;
+      if (!hash || hash === '#' || hash === '#/') {
+        setShowDigest(true);
+        window.location.hash = '#/digest';
+      }
+    }
+    prevAuthRef.current = isAuthenticated;
+  }, [authLoading, isAuthenticated]);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...",
