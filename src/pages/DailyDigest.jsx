@@ -1070,7 +1070,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 // new users — without it, they'd have to expand sport accordions to find the
 // best play. With it, the value prop lands on first scroll.
 
-function PickOfTheDay({ pick, tierCounts, totalGames }) {
+function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
   const { isLocked, toggleLock } = useContext(LockedPicksContext)
   const [expanded, setExpanded] = useState(false)
   if (!pick) return null
@@ -1093,6 +1093,18 @@ function PickOfTheDay({ pick, tierCounts, totalGames }) {
 
   // Rank context — "highest of N graded today" gives the headline its bite.
   const totalSignalPicks = (tierCounts?.sharpTakes || 0) + (tierCounts?.strongPlays || 0) + (tierCounts?.plays || 0) + (tierCounts?.leans || 0)
+
+  // Track record across same-tier picks (last 30 days). Combines Sharp Take +
+  // Strong Play when both are present so a low-volume sport still has signal.
+  // Hidden until ≥10 settled — small samples mislead more than they help.
+  const trackRecord = (() => {
+    const ts = tierStats?.sharpTake
+    if (!ts) return null
+    const w = ts.won || 0
+    const l = ts.lost || 0
+    if (w + l < 10) return null
+    return { w, l, rate: ((w / (w + l)) * 100).toFixed(1) }
+  })()
 
   return (
     <div className="bg-ink-900 rounded-sharp overflow-hidden shadow-hairline-pos">
@@ -1129,6 +1141,26 @@ function PickOfTheDay({ pick, tierCounts, totalGames }) {
             )}
           </div>
         </div>
+
+        {/* Sharp Take track record — last 30d hit rate for same-tier picks.
+            Hidden until ≥10 settled (see trackRecord derivation above). The
+            point isn't to celebrate the model — it's to show the receipt. */}
+        {trackRecord && (
+          <div className="mt-3 flex items-center justify-between bg-ink-850 shadow-hairline rounded-sharp px-3 py-2 gap-3">
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300">
+              Sharp Take · last 30 days
+            </span>
+            <span className="font-mono text-sm tabular-nums flex-shrink-0">
+              <span className="text-signal-pos font-semibold">{trackRecord.w}W</span>
+              <span className="text-ink-500 mx-1">·</span>
+              <span className="text-ink-400">{trackRecord.l}L</span>
+              <span className="text-ink-500 mx-1">·</span>
+              <span className={parseFloat(trackRecord.rate) >= 55 ? 'text-signal-pos font-semibold' : 'text-ink-200'}>
+                {trackRecord.rate}%
+              </span>
+            </span>
+          </div>
+        )}
 
         {/* Why this pick — rank context + model-vs-market in human terms */}
         <div className="mt-4 bg-ink-850 shadow-hairline rounded-sharp px-3 py-2.5">
@@ -1463,6 +1495,10 @@ export default function DailyDigest({ onBack }) {
   const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
   const [lockedPicks, setLockedPicks] = useState([])
   const [legendOpen, setLegendOpen] = useState(false)
+  // Sharp Take / Strong Play hit-rate over last 30d — surfaces below the
+  // featured pick to anchor the picks-actually-win narrative ("don't trust
+  // me, trust the receipt").
+  const [tierStats, setTierStats] = useState(null)
 
   // Locked-picks API consumed via context by tiles, the PoD CTA, and the sticky bar.
   // The localStorage write only happens at buildParlay() — until then the locks are
@@ -1518,6 +1554,24 @@ export default function DailyDigest({ onBack }) {
   useEffect(() => {
     fetchDigest()
   }, [fetchDigest])
+
+  // Fetch tier hit-rate once per mount. Drives the Sharp Take track record
+  // badge on PickOfTheDay. Cheap query (≤6 rows from a materialized view).
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    ;(async () => {
+      const { data: rows } = await supabase
+        .from('mv_model_accuracy')
+        .select('*')
+        .eq('period_bucket', 'last_30d')
+        .eq('dimension_type', 'tier')
+      if (cancelled || !rows) return
+      const byTier = (name) => rows.find(r => r.dimension_value === name) || null
+      setTierStats({ sharpTake: byTier('Sharp Take'), strongPlay: byTier('Strong Play') })
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   const sportSections = data
     ? Object.entries(data.gamesBySport)
@@ -1708,7 +1762,7 @@ export default function DailyDigest({ onBack }) {
 
             {/* Pick of the Day — the single best edge across all sports, featured
                 above the accordions so new users see the aha moment on first scroll. */}
-            {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} tierCounts={tierCounts} totalGames={totalGames} />}
+            {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} tierCounts={tierCounts} totalGames={totalGames} tierStats={tierStats} />}
 
             {/* Golf tournament leaderboard */}
             {data.golf && <GolfLeaderboard golf={data.golf} />}

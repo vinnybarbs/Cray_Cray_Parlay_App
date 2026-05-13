@@ -1,0 +1,854 @@
+import React, { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
+
+// ─── Landing — public marketing surface ────────────────────────────────────
+// Concept: "Trading terminal as marketing page." Bloomberg-severity layout
+// reframes every section as a terminal artifact — ticker, scorecard, execution
+// flow, disclosure, term sheet, filings. Sharp-Quant tokens only; no new
+// colors or fonts. Hero copy is the locked villain frame (2026-05-12).
+
+const TERMINAL_CSS = `
+@keyframes ticker-scroll {
+  0% { transform: translate3d(0,0,0); }
+  100% { transform: translate3d(-50%,0,0); }
+}
+@keyframes hairline-draw {
+  0% { transform: scaleX(0); transform-origin: left; }
+  100% { transform: scaleX(1); transform-origin: left; }
+}
+@keyframes signal-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.ticker-track { animation: ticker-scroll 80s linear infinite; }
+.signal-dot { animation: signal-pulse 2.4s ease-in-out infinite; }
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+}
+.scanline-bg {
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(255,255,255,0.008) 3px,
+    rgba(255,255,255,0.008) 4px
+  );
+}
+`
+
+export default function Landing({ onStartTrial }) {
+  const [stats, setStats] = useState(null)
+  const [tierStats, setTierStats] = useState(null)
+
+  useEffect(() => {
+    if (!supabase) return
+    let cancelled = false
+    ;(async () => {
+      const { data: mvRows } = await supabase
+        .from('mv_model_accuracy')
+        .select('*')
+        .eq('period_bucket', 'last_30d')
+      if (cancelled || !mvRows) return
+
+      const overall = mvRows.find(r => r.dimension_type === 'overall')
+      if (overall) {
+        const w = overall.won || 0
+        const l = overall.lost || 0
+        const p = overall.push || 0
+        setStats({
+          total: w + l + p,
+          wins: w,
+          losses: l,
+          hitRate: w + l > 0 ? Math.round((w / (w + l)) * 1000) / 10 : null,
+        })
+      }
+
+      const tierRows = mvRows.filter(r => r.dimension_type === 'tier')
+      if (tierRows.length > 0) {
+        setTierStats(tierRows.map(r => ({
+          tier: r.dimension_value,
+          wins: r.won || 0,
+          losses: r.lost || 0,
+          hitRate: (r.won + r.lost) > 0 ? ((r.won / (r.won + r.lost)) * 100).toFixed(1) : null,
+        })))
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const scrollTo = (id) => () => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  return (
+    <div className="min-h-screen bg-ink-950 text-ink-100 font-mono antialiased">
+      <style>{TERMINAL_CSS}</style>
+      <Ticker />
+      <Nav onStartTrial={onStartTrial} scrollTo={scrollTo} />
+      <Hero stats={stats} onStartTrial={onStartTrial} onSeePick={scrollTo('snapshot')} />
+      <EdgeScorecard />
+      <ExecutionFlow />
+      <SnapshotTerminal tierStats={tierStats} />
+      <TrackRecord tierStats={tierStats} />
+      <Disclosure />
+      <TermSheet onStartTrial={onStartTrial} />
+      <Filings />
+      <Footer />
+    </div>
+  )
+}
+
+// ─── Ticker — top scrolling edge feed ──────────────────────────────────────
+
+function Ticker() {
+  const items = [
+    { side: '▲', pp: '+8.2', label: 'NBA · BOS −4.5',   tone: 'pos' },
+    { side: '▼', pp: '−12.4', label: 'NHL · NYR ML',     tone: 'neg' },
+    { side: '▲', pp: '+6.1', label: 'MLB · LAD +1.5',    tone: 'pos' },
+    { side: '▲', pp: '+5.8', label: 'NCAAB · KAN −3.5',  tone: 'pos' },
+    { side: '▼', pp: '−7.2', label: 'NFL · KC ML',       tone: 'neg' },
+    { side: '▲', pp: '+4.3', label: 'NBA · DEN O 224.5', tone: 'pos' },
+    { side: '▼', pp: '−9.1', label: 'NCAAF · ALA −10.5', tone: 'neg' },
+    { side: '▲', pp: '+11.6', label: 'MLB · NYY ML',     tone: 'pos' },
+    { side: '▲', pp: '+3.7', label: 'NHL · TOR U 5.5',   tone: 'pos' },
+    { side: '▼', pp: '−5.4', label: 'UFC · FAV ML',      tone: 'neg' },
+  ]
+  const row = [...items, ...items] // doubled for seamless loop
+  return (
+    <div className="bg-ink-950 border-b border-ink-800 overflow-hidden relative">
+      <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-ink-950 to-transparent z-10 pointer-events-none" />
+      <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-ink-950 to-transparent z-10 pointer-events-none" />
+      <div className="absolute top-1.5 left-3 flex items-center gap-2 z-20 bg-ink-950 pr-3">
+        <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
+        <span className="text-[9px] uppercase tracking-[0.20em] text-ink-400">Live edges · today</span>
+      </div>
+      <div className="flex whitespace-nowrap py-1.5 pt-7 ticker-track">
+        {row.map((it, i) => (
+          <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px] tabular-nums">
+            <span className={it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}>{it.side}</span>
+            <span className={`font-semibold ${it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}`}>{it.pp}pp</span>
+            <span className="text-ink-300">{it.label}</span>
+            <span className="text-ink-700">│</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Nav ───────────────────────────────────────────────────────────────────
+
+function Nav({ onStartTrial, scrollTo }) {
+  return (
+    <header className="sticky top-0 z-30 bg-ink-950/90 backdrop-blur-md border-b border-ink-800">
+      <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
+        <button onClick={scrollTo('top')} className="flex items-baseline gap-2 group">
+          <span className="text-sm font-bold uppercase tracking-[0.18em] text-ink-100 group-hover:text-signal-pos transition-colors">
+            Cray Cray
+          </span>
+          <span className="text-[9px] uppercase tracking-[0.24em] text-signal-pos">
+            ▌ for parlays
+          </span>
+        </button>
+        <nav className="flex items-center gap-1 md:gap-5">
+          <button onClick={scrollTo('flow')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
+            How
+          </button>
+          <button onClick={scrollTo('track')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
+            Track record
+          </button>
+          <button onClick={scrollTo('terms')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
+            Pricing
+          </button>
+          <button
+            onClick={onStartTrial}
+            className="text-[10px] font-bold uppercase tracking-[0.18em] bg-signal-pos text-ink-950 px-3 py-1.5 rounded-sharp hover:bg-signal-pos/90 transition-colors"
+          >
+            [ Start trial ]
+          </button>
+        </nav>
+      </div>
+    </header>
+  )
+}
+
+// ─── Hero ──────────────────────────────────────────────────────────────────
+
+function Hero({ stats, onStartTrial, onSeePick }) {
+  const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : '—'
+  const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : '1,000+'
+
+  return (
+    <section id="top" className="relative grid-bg border-b border-ink-800 overflow-hidden">
+      <div className="scanline-bg absolute inset-0 pointer-events-none" />
+      <div className="relative max-w-6xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28 grid md:grid-cols-12 gap-10 md:gap-12 items-center">
+
+        {/* LEFT: copy stack */}
+        <div className="md:col-span-7">
+          <SectionLabel>$ ./edge --today</SectionLabel>
+
+          <h1 className="font-sans font-bold text-[2.5rem] md:text-[4.25rem] leading-[0.95] tracking-[-0.025em] text-ink-100 mt-5">
+            Your book won't tell you<br />
+            which side is <span className="italic text-ink-300">the trap.</span>
+            <span className="block mt-2 text-signal-pos">
+              <span className="text-ink-700">▌</span> We will.
+            </span>
+          </h1>
+
+          <p className="mt-8 text-ink-300 text-base leading-relaxed max-w-xl">
+            <span className="text-ink-100 font-medium">Math-graded picks</span> for every game.
+            Per-side edges in plus/minus points. <span className="text-signal-pos">Including the negative ones.</span>
+          </p>
+
+          <div className="mt-10 flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={onStartTrial}
+              className="group inline-flex items-center justify-center gap-3 bg-signal-pos text-ink-950 text-xs font-bold uppercase tracking-[0.18em] px-6 py-4 rounded-sharp hover:bg-signal-pos/90 transition-colors"
+            >
+              <span>[ Start free trial</span>
+              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+              <span>]</span>
+            </button>
+            <button
+              onClick={onSeePick}
+              className="inline-flex items-center justify-center gap-2 text-ink-100 text-xs font-bold uppercase tracking-[0.18em] px-6 py-4 rounded-sharp shadow-hairline hover:shadow-hairline-bright transition-shadow"
+            >
+              See today's free pick →
+            </button>
+          </div>
+        </div>
+
+        {/* RIGHT: stat-strip panel — looks like a terminal readout */}
+        <div className="md:col-span-5">
+          <div className="bg-ink-900 shadow-hairline rounded-sharp">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-ink-800">
+              <span className="text-[9px] uppercase tracking-[0.20em] text-ink-400">
+                $ status · last 30d
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
+                <span className="text-[9px] uppercase tracking-[0.18em] text-signal-pos">LIVE</span>
+              </span>
+            </div>
+            <dl className="divide-y divide-ink-800">
+              <StatRow label="Hit rate" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
+              <StatRow label="Picks graded" value={weeklyCount} tone="neutral" />
+              <StatRow label="Markets covered" value="ML · Spread · Total" tone="neutral" small />
+              <StatRow label="Affiliate parent" value="None" tone="pos" small />
+            </dl>
+          </div>
+          <div className="mt-3 flex justify-between text-[9px] uppercase tracking-[0.20em] text-ink-500 px-1">
+            <span>// source: mv_model_accuracy</span>
+            <span>// refresh: hourly</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function StatRow({ label, value, tone = 'neutral', big = false, small = false }) {
+  const valueColor = tone === 'pos' ? 'text-signal-pos' : tone === 'neg' ? 'text-signal-neg' : 'text-ink-100'
+  const valueSize = big ? 'text-3xl md:text-4xl' : small ? 'text-sm' : 'text-xl'
+  return (
+    <div className="flex items-center justify-between px-4 py-3 gap-3">
+      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400 flex-shrink-0">{label}</dt>
+      <dd className={`font-bold tabular-nums ${valueColor} ${valueSize} tracking-tight text-right`}>{value}</dd>
+    </div>
+  )
+}
+
+// ─── EdgeScorecard — competitors graded with our own tier system ──────────
+
+function EdgeScorecard() {
+  const rows = [
+    {
+      name: 'Action Network',
+      pp: '−8.2',
+      side: '▼',
+      tier: 'Trap',
+      tone: 'neg',
+      reason: 'Owned by a publicly-traded sportsbook affiliate (Better Collective). Structurally cannot warn you off a book without dismantling its parent\'s revenue model.',
+    },
+    {
+      name: 'OddsJam',
+      pp: '+0.4',
+      side: '·',
+      tier: 'Skip',
+      tone: 'neutral',
+      reason: '$99–199/mo. Their own reviewers admit Gold doesn\'t pay off below ~$2K/mo in volume — locks out >80% of recreational bettors.',
+    },
+    {
+      name: 'Pikkit',
+      pp: '+1.1',
+      side: '▲',
+      tier: 'Lean',
+      tone: 'neutral',
+      reason: 'Grades you after the bet (CLV). Different shelf — they measure history, we publish the decision. Complementary, not competitive.',
+    },
+    {
+      name: 'Cray Cray for Parlays',
+      pp: '+9.6',
+      side: '▲',
+      tier: 'Strong Play',
+      tone: 'pos',
+      reason: 'No affiliate parent. Per-side edges including negative ones. Trap label is the differentiator the rest structurally can\'t copy.',
+    },
+  ]
+  return (
+    <section className="border-b border-ink-800">
+      <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
+        <SectionLabel>$ competitors_graded.csv</SectionLabel>
+        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
+          We graded them with <span className="text-signal-pos">our own system.</span>
+        </h2>
+        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
+          Every other picks app has a structural reason it can't tell you which side is the trap. So we ran the same math on <span className="text-ink-100">them.</span>
+        </p>
+
+        <div className="mt-12">
+          {/* Header row */}
+          <div className="hidden md:grid grid-cols-[1fr_140px_140px] gap-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 pb-2 border-b border-ink-800">
+            <span>Vendor</span>
+            <span className="text-right">Edge (signed)</span>
+            <span className="text-right">Grade</span>
+          </div>
+
+          {rows.map((r, i) => {
+            const ppColor = r.tone === 'pos' ? 'text-signal-pos' : r.tone === 'neg' ? 'text-signal-neg' : 'text-ink-300'
+            const grdColor = r.tone === 'pos' ? 'text-signal-pos' : r.tone === 'neg' ? 'text-signal-neg' : 'text-ink-400'
+            const isUs = r.name.startsWith('Cray')
+            return (
+              <div
+                key={i}
+                className={`relative py-6 md:py-7 border-b border-ink-800 ${isUs ? 'bg-signal-pos-dim/10' : ''}`}
+              >
+                {isUs && (
+                  <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-signal-pos" aria-hidden="true" />
+                )}
+                <div className="grid md:grid-cols-[1fr_140px_140px] gap-2 md:gap-4 items-baseline">
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2 flex-wrap">
+                      <span className={`text-lg md:text-xl font-bold tracking-tight ${isUs ? 'text-ink-100' : 'text-ink-100'}`}>
+                        {r.name}
+                      </span>
+                      {isUs && (
+                        <span className="text-[9px] uppercase tracking-[0.20em] text-signal-pos">
+                          ★ us
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-sm text-ink-300 leading-relaxed max-w-xl">{r.reason}</p>
+                  </div>
+                  <div className="md:text-right tabular-nums font-bold text-xl">
+                    <span className={ppColor}>{r.side} {r.pp}<span className="text-[11px] ml-0.5">pp</span></span>
+                  </div>
+                  <div className="md:text-right">
+                    <span className={`text-xs font-bold uppercase tracking-[0.18em] ${grdColor}`}>
+                      {r.tier}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500">
+          // Edges illustrative. Methodology: our own per-side edge calc, applied to each competitor's positioning.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+// ─── ExecutionFlow — How it works, reframed as a trade flow ────────────────
+
+function ExecutionFlow() {
+  const steps = [
+    {
+      n: '01',
+      title: 'Math grades every game',
+      body: 'Per-side edge calculator runs against ML, spread, and total. Computes model probability, compares to the book\'s implied. Gap = signed pp.',
+      meta: [
+        ['// source', 'The Odds API · ESPN'],
+        ['// math',   'lib/services/edge-calculator.js'],
+        ['// output', 'signed_pp · tier'],
+      ],
+    },
+    {
+      n: '02',
+      title: 'De-Genny narrates',
+      body: 'Once math has picked the side, the LLM writes the rationale in plain English. The AI explains. It does not pick.',
+      meta: [
+        ['// engine',  'Anthropic Claude'],
+        ['// role',    'narration only'],
+        ['// guard',   'no hallucinated stats'],
+      ],
+    },
+    {
+      n: '03',
+      title: 'You lock and build',
+      body: 'Stack the sides you like. One tap hands you a deep-linked betslip to your sportsbook. We never hold money or see your account.',
+      meta: [
+        ['// books',   'DraftKings · FanDuel'],
+        ['// holds',   'we hold nothing'],
+        ['// gate',    '+21'],
+      ],
+    },
+  ]
+  return (
+    <section id="flow" className="border-b border-ink-800 bg-ink-950">
+      <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
+        <SectionLabel>$ ./how_it_works</SectionLabel>
+        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
+          Three steps. <span className="text-ink-400">No vibes.</span>
+        </h2>
+
+        <div className="mt-14 grid md:grid-cols-3 gap-6 md:gap-4 relative">
+          {/* connector line on desktop */}
+          <div className="hidden md:block absolute top-[28px] left-[8.33%] right-[8.33%] h-px bg-ink-800" aria-hidden="true" />
+          {steps.map((s, i) => (
+            <div key={s.n} className="relative">
+              <div className="flex items-center gap-3 mb-5">
+                <span className="relative z-10 bg-ink-950 pr-3 text-3xl md:text-4xl font-bold tabular-nums text-signal-pos tracking-tight">
+                  {s.n}
+                </span>
+                <span className="text-[10px] uppercase tracking-[0.18em] text-ink-500">step</span>
+              </div>
+              <h3 className="font-sans font-semibold text-xl text-ink-100 mb-3 tracking-tight">
+                {s.title}
+              </h3>
+              <p className="text-sm text-ink-300 leading-relaxed mb-5">
+                {s.body}
+              </p>
+              <dl className="space-y-1.5 text-[10px] uppercase tracking-[0.14em]">
+                {s.meta.map(([k, v]) => (
+                  <div key={k} className="flex gap-3 items-baseline">
+                    <dt className="text-ink-500 flex-shrink-0">{k}</dt>
+                    <dd className="text-ink-200 normal-case tracking-normal text-[11px]">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── SnapshotTerminal — example PoD as a terminal screenshot ──────────────
+
+function SnapshotTerminal({ tierStats }) {
+  const sharpTake = tierStats?.find(t => t.tier === 'Sharp Take')
+  const decided = sharpTake ? sharpTake.wins + sharpTake.losses : 0
+  const tr = decided >= 10 ? sharpTake : null
+
+  return (
+    <section id="snapshot" className="border-b border-ink-800 bg-ink-950">
+      <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
+        <SectionLabel>$ edge_snapshot --market=nba --date=today</SectionLabel>
+        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
+          A pick as it would appear<br />
+          on a <span className="text-signal-pos">live edge tile.</span>
+        </h2>
+        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
+          Same format as every actual pick in the digest. The example below is illustrative — the live Pick of the Day refreshes every morning at 8 AM ET.
+        </p>
+
+        <div className="mt-12 bg-ink-900 shadow-hairline-pos rounded-sharp">
+          {/* terminal title bar */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-signal-pos-dim/40 bg-ink-950">
+            <div className="flex items-center gap-2.5">
+              <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
+              <span className="text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
+                ★ pick of the day
+              </span>
+            </div>
+            <span className="text-[10px] uppercase tracking-[0.14em] text-ink-400 tabular-nums">
+              NBA · tonight 7:30 PM ET
+            </span>
+          </div>
+
+          <div className="grid md:grid-cols-[1fr_auto] gap-5 px-5 md:px-7 py-6">
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 tabular-nums">
+                Boston Celtics @ Miami Heat · Spread
+              </div>
+              <h3 className="font-sans font-bold text-3xl md:text-4xl text-signal-pos tabular-nums tracking-tight mt-2">
+                BOS −4.5
+              </h3>
+            </div>
+            <div className="flex flex-col items-start md:items-end bg-signal-pos-dim/20 rounded-sharp px-4 py-3">
+              <div className="text-3xl md:text-4xl font-bold tabular-nums text-signal-pos tracking-tight">
+                ▲ +8.2<span className="text-sm ml-0.5">pp</span>
+              </div>
+              <div className="text-[10px] uppercase tracking-[0.18em] text-signal-pos mt-1">
+                Strong Play
+              </div>
+              <div className="text-[10px] italic lowercase text-ink-400 mt-0.5">
+                hammer it
+              </div>
+            </div>
+          </div>
+
+          {/* why this pick — tabular */}
+          <div className="border-t border-ink-800">
+            <div className="px-5 md:px-7 py-2 bg-ink-950 border-b border-ink-800">
+              <span className="text-[9px] uppercase tracking-[0.20em] text-signal-pos">
+                ▌ why this pick
+              </span>
+            </div>
+            <dl className="divide-y divide-ink-800">
+              <FactRow label="Model cover prob"  value="62.1%" tone="pos" />
+              <FactRow label="Book implied"      value="53.9%" tone="neutral" />
+              <FactRow label="Gap"               value="+8.2pp" tone="pos" />
+              <FactRow label="Heat defense"      value="6th-worst vs >.580 road clubs" tone="neutral" />
+              <FactRow label="Injury risk"       value="None reported · live 6:00 PM ET" tone="neutral" />
+            </dl>
+          </div>
+
+          {/* track record strip */}
+          {tr && (
+            <div className="border-t border-ink-800 px-5 md:px-7 py-3 flex items-center justify-between bg-ink-950 gap-3">
+              <span className="text-[10px] uppercase tracking-[0.18em] text-ink-400">
+                Sharp Take · last 30d
+              </span>
+              <span className="tabular-nums text-sm flex-shrink-0">
+                <span className="text-signal-pos font-bold">{tr.wins}W</span>
+                <span className="text-ink-700 mx-1.5">·</span>
+                <span className="text-ink-400">{tr.losses}L</span>
+                <span className="text-ink-700 mx-1.5">·</span>
+                <span className={parseFloat(tr.hitRate) >= 55 ? 'text-signal-pos font-bold' : 'text-ink-200'}>
+                  {tr.hitRate}%
+                </span>
+              </span>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 text-center">
+          // The actual board renders 20-80 tiles per day across every covered sport.
+        </p>
+      </div>
+    </section>
+  )
+}
+
+function FactRow({ label, value, tone }) {
+  const valColor = tone === 'pos' ? 'text-signal-pos' : tone === 'neg' ? 'text-signal-neg' : 'text-ink-100'
+  return (
+    <div className="px-5 md:px-7 py-2.5 grid grid-cols-[1fr_auto] gap-3 items-baseline">
+      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400">{label}</dt>
+      <dd className={`text-sm tabular-nums font-medium ${valColor}`}>{value}</dd>
+    </div>
+  )
+}
+
+// ─── TrackRecord — proof, with CSS-only sparkline bars ─────────────────────
+
+function TrackRecord({ tierStats }) {
+  const order = ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Skip']
+  const sorted = tierStats
+    ? [...tierStats].sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))
+    : []
+
+  return (
+    <section id="track" className="border-b border-ink-800 bg-ink-950">
+      <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
+        <SectionLabel>$ ./hit_rate --period=30d --source=mv_model_accuracy</SectionLabel>
+        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
+          The receipts. <span className="text-ink-400">Per tier. Updated hourly.</span>
+        </h2>
+        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
+          Most picks apps cherry-pick wins. We publish every tier — including the negative ones. If a tier dips below 50%, you see it.
+        </p>
+
+        {sorted.length > 0 ? (
+          <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp">
+            <div className="grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-2.5 bg-ink-950 border-b border-ink-800 text-[10px] uppercase tracking-[0.18em] text-ink-400">
+              <span>Tier</span>
+              <span className="text-right">Settled</span>
+              <span>Hit rate</span>
+              <span className="text-right">%</span>
+            </div>
+            {sorted.map((t, i) => {
+              const settled = t.wins + t.losses
+              const rate = parseFloat(t.hitRate)
+              const isPos = rate >= 55
+              const isNeg = rate < 50
+              const color = isPos ? 'text-signal-pos' : isNeg ? 'text-signal-neg' : 'text-ink-100'
+              const barColor = isPos ? 'bg-signal-pos' : isNeg ? 'bg-signal-neg' : 'bg-ink-400'
+              return (
+                <div key={t.tier} className={`grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
+                  <span className="text-ink-100 font-medium">{t.tier}</span>
+                  <span className="text-right text-ink-400 tabular-nums text-sm">{settled.toLocaleString()}</span>
+                  {/* sparkline-bar */}
+                  <div className="relative h-1.5 bg-ink-800 rounded-sharp overflow-hidden">
+                    <div className="absolute inset-y-0 left-1/2 w-px bg-ink-700" />
+                    <div
+                      className={`absolute top-0 bottom-0 ${barColor}`}
+                      style={{
+                        width: `${Math.min(100, Math.abs(rate))}%`,
+                        left: 0,
+                      }}
+                    />
+                  </div>
+                  <span className={`text-right text-base tabular-nums font-bold ${color}`}>
+                    {t.hitRate}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp px-5 py-8 text-center">
+            <p className="text-ink-300 text-sm">Loading hit-rate data…</p>
+            <p className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mt-2">
+              // Refreshes after every settlement run
+            </p>
+          </div>
+        )}
+
+        <p className="mt-5 text-[10px] uppercase tracking-[0.18em] text-ink-500">
+          // ≥55% = amber · 50-55% = neutral · &lt;50% = crimson · no cherry-picking
+        </p>
+      </div>
+    </section>
+  )
+}
+
+// ─── Disclosure — regulatory-filing aesthetic for the credibility wedge ──
+
+function Disclosure() {
+  return (
+    <section className="border-b border-ink-800 bg-ink-950">
+      <div className="max-w-3xl mx-auto px-5 py-20 md:py-24">
+        <SectionLabel>§ disclosure · 2026.05</SectionLabel>
+        <div className="mt-8 bg-ink-900 shadow-hairline rounded-sharp px-6 py-8 md:px-10 md:py-10">
+          <h2 className="font-sans font-bold text-xl md:text-2xl text-ink-100 tracking-[-0.01em] leading-relaxed">
+            On affiliate revenue and conflict of interest
+          </h2>
+          <div className="mt-6 space-y-4 text-sm text-ink-200 leading-relaxed">
+            <p>
+              <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 1.</span>
+              Cray Cray for Parlays receives <span className="text-signal-pos font-medium">no affiliate commissions</span> for sending users to sportsbooks. We are not owned by or financially affiliated with any sportsbook, sportsbook affiliate, or operator of betting markets.
+            </p>
+            <p>
+              <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 2.</span>
+              We do not place wagers on behalf of users. We do not hold money. We do not see your sportsbook account credentials. Deep links open the user's own sportsbook session.
+            </p>
+            <p>
+              <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 3.</span>
+              Our entire business is grading games against the public market and publishing the result — <span className="text-signal-pos font-medium">including the bets we believe you should NOT make.</span> The Trap label is the differentiator no affiliate-owned publication can adopt without dismantling its parent's revenue model.
+            </p>
+          </div>
+          <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500 pt-6 border-t border-ink-800">
+            // Filed publicly. Read the math: <span className="text-ink-300 normal-case tracking-normal">lib/services/edge-calculator.js</span>
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── TermSheet — pricing as signed-document layout ─────────────────────────
+
+function TermSheet({ onStartTrial }) {
+  const included = [
+    'Daily digest across every sport · ML / spread / total',
+    'Per-side edges, signed and tier-graded',
+    'Negative edges visible (Trap label)',
+    'De-Genny chat for picks on demand',
+    'One-tap parlay builder · DraftKings & FanDuel deep links',
+    'Settlement tracking · every pick graded after the game',
+    'Hit rate by tier and sport · refreshed hourly',
+  ]
+  return (
+    <section id="terms" className="border-b border-ink-800 bg-ink-950">
+      <div className="max-w-3xl mx-auto px-5 py-20 md:py-28">
+        <SectionLabel>§ terms · pro_access</SectionLabel>
+        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05]">
+          Pricing.
+        </h2>
+        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
+          One tier. Trial first. Pay nothing until you've actually seen a Sharp Take hit.
+        </p>
+
+        <div className="mt-12 bg-ink-900 shadow-hairline-pos rounded-sharp">
+          <div className="flex items-center justify-between px-5 py-2.5 border-b border-signal-pos-dim/40 bg-ink-950">
+            <span className="text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
+              ▌ term sheet
+            </span>
+            <span className="text-[10px] uppercase tracking-[0.18em] text-ink-400">
+              effective immediately
+            </span>
+          </div>
+
+          <dl className="divide-y divide-ink-800">
+            <TermRow label="Plan"            value="PRO ACCESS" />
+            <TermRow label="Price"           value={<><span className="text-3xl text-ink-100">$19.99</span> <span className="text-ink-400 text-sm">/ month</span></>} big />
+            <TermRow label="Free trial"      value="7 days · no card required" tone="pos" />
+            <TermRow label="Billing"         value="Monthly · no annual commitment" />
+            <TermRow label="Cancellation"    value="Anytime · self-serve · no email needed" />
+          </dl>
+
+          <div className="border-t border-ink-800 px-5 md:px-7 py-5">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-3">
+              ▌ included
+            </div>
+            <ul className="space-y-2">
+              {included.map((f, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-sm text-ink-200">
+                  <span className="text-signal-pos flex-shrink-0 mt-0.5">▸</span>
+                  <span>{f}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="border-t border-ink-800 px-5 md:px-7 py-5 bg-ink-950">
+            <button
+              onClick={onStartTrial}
+              className="group w-full md:w-auto inline-flex items-center justify-center gap-3 bg-signal-pos text-ink-950 text-xs font-bold uppercase tracking-[0.18em] px-8 py-4 rounded-sharp hover:bg-signal-pos/90 transition-colors"
+            >
+              <span>[ Execute trial</span>
+              <span className="transition-transform group-hover:translate-x-0.5">→</span>
+              <span>]</span>
+            </button>
+            <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-ink-500">
+              // No credit card required to start. We send one email when the trial ends.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function TermRow({ label, value, tone = 'neutral', big = false }) {
+  const valColor = tone === 'pos' ? 'text-signal-pos' : tone === 'neg' ? 'text-signal-neg' : 'text-ink-100'
+  return (
+    <div className="px-5 md:px-7 py-3.5 grid grid-cols-[140px_1fr] md:grid-cols-[200px_1fr] gap-3 items-baseline">
+      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400">{label}</dt>
+      <dd className={`tabular-nums ${valColor} ${big ? 'text-2xl font-bold tracking-tight' : 'text-sm'}`}>
+        {value}
+      </dd>
+    </div>
+  )
+}
+
+// ─── Filings · Q&A — FAQ as 10-K Q&A document ─────────────────────────────
+
+function Filings() {
+  const items = [
+    {
+      q: 'What\'s a "Trap"?',
+      a: 'A pick with a negative per-side edge — meaning the model thinks the side wins less often than the book\'s line implies. Every other picks app hides these. We label them. "Trap" is the only honest reaction to a bad bet that looks tempting.',
+    },
+    {
+      q: 'Why publish negative edges? Doesn\'t that scare people off?',
+      a: 'Negative edges are most of the betting universe. If we only published positive ones, we\'d be lying about the shape of the market. The Trap label is the differentiator — it\'s the one thing every other picks app structurally can\'t show you.',
+    },
+    {
+      q: 'How is this different from Action Network or OddsJam?',
+      a: 'Action Network is owned by Better Collective, a publicly-traded sportsbook affiliate — they can\'t credibly warn you off a book. OddsJam targets $2K+ monthly bankroll arb bettors at $99–199/mo. We\'re built for the $50–500/mo bankroll that wants the math without the price tag — and we\'re the only picks app that shows you what NOT to bet.',
+    },
+    {
+      q: 'Is this gambling advice?',
+      a: 'No. It\'s information. We grade games using public data and publish the math. What you do with the picks is on you. We\'re not licensed as advice, we\'re not a sportsbook, we don\'t hold money. For entertainment and informational purposes only.',
+    },
+    {
+      q: 'Do I need to be 21?',
+      a: 'Yes. We\'re an info site about sports betting, which is a +21 activity in every US jurisdiction we know of. The +21 gate enforces it on first visit.',
+    },
+    {
+      q: 'Where does my data go?',
+      a: 'Email + (optionally) Google sign-in is all we collect to start. We don\'t share or sell. Locked picks live on your account so we can grade them later. Payment goes through Stripe directly — we never see your card.',
+    },
+  ]
+  const [open, setOpen] = useState(null)
+
+  return (
+    <section className="border-b border-ink-800 bg-ink-950">
+      <div className="max-w-3xl mx-auto px-5 py-20 md:py-24">
+        <SectionLabel>§ filings · q&amp;a</SectionLabel>
+        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05]">
+          Questions <span className="text-ink-400">on file.</span>
+        </h2>
+
+        <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp divide-y divide-ink-800">
+          {items.map((it, i) => {
+            const isOpen = open === i
+            const num = String(i + 1).padStart(2, '0')
+            return (
+              <div key={i}>
+                <button
+                  onClick={() => setOpen(isOpen ? null : i)}
+                  className="w-full flex items-start gap-4 px-5 md:px-6 py-5 text-left hover:bg-ink-850/40 transition-colors"
+                >
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-signal-pos tabular-nums flex-shrink-0 mt-1">
+                    Q.{num}
+                  </span>
+                  <span className="flex-1 font-sans text-base md:text-lg text-ink-100 font-medium tracking-tight">
+                    {it.q}
+                  </span>
+                  <span className="text-signal-pos text-lg flex-shrink-0 ml-2 leading-none">
+                    {isOpen ? '−' : '+'}
+                  </span>
+                </button>
+                {isOpen && (
+                  <div className="px-5 md:px-6 pb-6 pl-[60px] md:pl-[64px]">
+                    <div className="flex gap-4">
+                      <span className="text-[10px] uppercase tracking-[0.18em] text-ink-500 flex-shrink-0 hidden">
+                        A.{num}
+                      </span>
+                      <p className="text-sm text-ink-300 leading-relaxed">{it.a}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── Footer ───────────────────────────────────────────────────────────────
+
+function Footer() {
+  return (
+    <footer className="bg-ink-950">
+      <div className="max-w-6xl mx-auto px-5 py-10">
+        <div className="border-t border-ink-800 pt-8 grid md:grid-cols-[1fr_auto] gap-6 items-baseline">
+          <div className="space-y-2 text-[10px] uppercase tracking-[0.18em] text-ink-500 leading-relaxed">
+            <p>For entertainment and informational purposes only · not gambling advice · +21</p>
+            <p>
+              If you or someone you know has a gambling problem, call <span className="text-ink-300 normal-case tracking-normal">1-800-GAMBLER</span>
+            </p>
+          </div>
+          <div className="text-[10px] uppercase tracking-[0.18em] text-ink-700 md:text-right">
+            © 2026 Cray Cray for Parlays
+          </div>
+        </div>
+      </div>
+    </footer>
+  )
+}
+
+// ─── Shared: section label (looks like a terminal command) ────────────────
+
+function SectionLabel({ children }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="text-signal-pos text-[10px] uppercase tracking-[0.20em]">▌</span>
+      <span className="text-[10px] uppercase tracking-[0.20em] text-ink-400">{children}</span>
+    </div>
+  )
+}

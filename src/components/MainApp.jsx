@@ -8,6 +8,7 @@ import ChatPicks from '../pages/ChatPicks'
 import ResultsPage from '../pages/ResultsPage'
 import AdminDashboard from '../pages/AdminDashboard'
 import DailyDigest from '../pages/DailyDigest'
+import Landing from '../pages/Landing'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -795,6 +796,20 @@ export default function MainApp() {
   }
 
   const payout = calculatePayout()
+
+  // Unauthenticated visitors at root see the marketing landing. Once they sign
+  // in or click into one of the deep-link surfaces (digest/chat/etc.), the
+  // landing yields and the normal app shell shows underneath.
+  const showLanding = !isAuthenticated && !showDigest && !showChatPicks && !showBetslipBuilder && !showAdmin && !showResults
+
+  if (showLanding) {
+    return (
+      <>
+        <Landing onStartTrial={() => setShowAuth(true)} />
+        {showAuth && <Auth onClose={() => setShowAuth(false)} />}
+      </>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-ink-950 text-white font-sans pt-4 px-4 pb-24 md:pb-6">
