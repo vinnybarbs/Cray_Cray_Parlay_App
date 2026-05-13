@@ -44,6 +44,7 @@ const TERMINAL_CSS = `
 export default function Landing({ onStartTrial, onSignIn }) {
   const [stats, setStats] = useState(null)
   const [tierStats, setTierStats] = useState(null)
+  const [sportStats, setSportStats] = useState(null)
 
   // Fetch via /api/public-stats so anon visitors can see the Track Record.
   // Direct supabase-js read was blocked by RLS on mv_model_accuracy (the
@@ -59,6 +60,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
         if (cancelled) return
         if (json.overall) setStats(json.overall)
         if (Array.isArray(json.tiers) && json.tiers.length > 0) setTierStats(json.tiers)
+        if (Array.isArray(json.bySport) && json.bySport.length > 0) setSportStats(json.bySport)
       } catch (err) {
         // Soft-fail: section renders its empty/loading state instead.
         if (!cancelled) console.warn('public-stats fetch failed', err)
@@ -80,7 +82,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
       <EdgeScorecard />
       <ExecutionFlow />
       <SnapshotTerminal tierStats={tierStats} />
-      <TrackRecord tierStats={tierStats} />
+      <TrackRecord sportStats={sportStats} tierStats={tierStats} />
       <Disclosure />
       <TermSheet onStartTrial={onStartTrial} />
       <Filings />
@@ -558,42 +560,55 @@ function FactRow({ label, value, tone }) {
 }
 
 // ─── TrackRecord — proof, with CSS-only sparkline bars ─────────────────────
+// Renders the most-populated dimension from mv_model_accuracy. The MV has
+// `sport` rows (NBA/NFL/MLB/etc.) but no `tier` rows yet — so sport is the
+// public-facing breakdown. Tier-level lands when the MV materializes it.
 
-function TrackRecord({ tierStats }) {
+function TrackRecord({ sportStats, tierStats }) {
+  // Prefer tier breakdown when populated (future); fall back to sport (today).
+  const useTiers = Array.isArray(tierStats) && tierStats.length > 0
   const order = ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Skip']
-  const sorted = tierStats
+  const sortedTiers = useTiers
     ? [...tierStats].sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))
     : []
+  const sortedSports = Array.isArray(sportStats)
+    ? [...sportStats].sort((a, b) => parseFloat(b.hitRate || 0) - parseFloat(a.hitRate || 0))
+    : []
+  const rows = useTiers ? sortedTiers : sortedSports
+  const dimensionLabel = useTiers ? 'Tier' : 'Sport'
+  const dimensionKey = useTiers ? 'tier' : 'sport'
+  const headlineKicker = useTiers ? 'Per tier.' : 'Per sport.'
 
   return (
     <section id="track" className="border-b border-ink-800 bg-ink-950">
       <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
         <SectionLabel>$ ./hit_rate --period=30d --source=mv_model_accuracy</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          The receipts. <span className="text-ink-400">Per tier. Updated hourly.</span>
+          The receipts. <span className="text-ink-400">{headlineKicker} Updated hourly.</span>
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          Most picks apps cherry-pick wins. We publish every tier — including the negative ones. If a tier dips below 50%, you see it.
+          Most picks apps cherry-pick wins. We publish every {dimensionLabel.toLowerCase()} — including the losers. If a {dimensionLabel.toLowerCase()} dips below 50%, you see it.
         </p>
 
-        {sorted.length > 0 ? (
+        {rows.length > 0 ? (
           <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp">
             <div className="grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-2.5 bg-ink-950 border-b border-ink-800 text-[10px] uppercase tracking-[0.18em] text-ink-400">
-              <span>Tier</span>
+              <span>{dimensionLabel}</span>
               <span className="text-right">Settled</span>
               <span>Hit rate</span>
               <span className="text-right">%</span>
             </div>
-            {sorted.map((t, i) => {
-              const settled = t.wins + t.losses
-              const rate = parseFloat(t.hitRate)
+            {rows.map((row, i) => {
+              const settled = row.wins + row.losses
+              const rate = parseFloat(row.hitRate)
               const isPos = rate >= 55
               const isNeg = rate < 50
               const color = isPos ? 'text-signal-pos' : isNeg ? 'text-signal-neg' : 'text-ink-100'
               const barColor = isPos ? 'bg-signal-pos' : isNeg ? 'bg-signal-neg' : 'bg-ink-400'
+              const label = row[dimensionKey]
               return (
-                <div key={t.tier} className={`grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
-                  <span className="text-ink-100 font-medium">{t.tier}</span>
+                <div key={label} className={`grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
+                  <span className="text-ink-100 font-medium">{label}</span>
                   <span className="text-right text-ink-400 tabular-nums text-sm">{settled.toLocaleString()}</span>
                   {/* sparkline-bar */}
                   <div className="relative h-1.5 bg-ink-800 rounded-sharp overflow-hidden">
@@ -607,7 +622,7 @@ function TrackRecord({ tierStats }) {
                     />
                   </div>
                   <span className={`text-right text-base tabular-nums font-bold ${color}`}>
-                    {t.hitRate}%
+                    {row.hitRate}%
                   </span>
                 </div>
               )

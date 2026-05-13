@@ -47,6 +47,7 @@ module.exports = async (req, res) => {
     }
 
     const overallRow = (rows || []).find(r => r.dimension_type === 'overall');
+    const sportRows = (rows || []).filter(r => r.dimension_type === 'sport');
     const tierRows = (rows || []).filter(r => r.dimension_type === 'tier');
 
     const overall = overallRow ? (() => {
@@ -63,21 +64,26 @@ module.exports = async (req, res) => {
       };
     })() : null;
 
-    const tiers = tierRows.map(r => {
+    const shape = (rows, key) => rows.map(r => {
       const wins = r.won || 0;
       const losses = r.lost || 0;
       const decided = wins + losses;
       return {
-        tier: r.dimension_value,
+        [key]: r.dimension_value,
         wins,
         losses,
         hitRate: decided > 0 ? ((wins / decided) * 100).toFixed(1) : null,
       };
     });
 
+    // tier dimension is not yet materialized in mv_model_accuracy — return
+    // sport breakdown as the primary public-facing detail. Tier comes later.
+    const bySport = shape(sportRows, 'sport');
+    const tiers = shape(tierRows, 'tier'); // empty today; kept for forward compat
+
     // Cache 5 minutes at the CDN edge; mv_model_accuracy refreshes hourly.
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
-    res.status(200).json({ overall, tiers });
+    res.status(200).json({ overall, bySport, tiers });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
