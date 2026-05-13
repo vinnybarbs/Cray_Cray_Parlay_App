@@ -370,11 +370,11 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
               )}
             </div>
             <div className="flex items-center gap-3">
-              {analysis.edge_score != null && (
-                <span className={`px-3 py-1.5 rounded-sharp text-sm font-bold ${edgeBadgeClass(analysis.edge_score)}`}>
-                  Edge {Number(analysis.edge_score).toFixed(1)}
-                </span>
-              )}
+              {/* Use the same signed-pp + tier display as the tile, not the
+                  legacy 0-10 edge_score. Showing both on one screen confused
+                  users: "is it 12.3pp or 10/10?" The pp number is the truth;
+                  edge_score is a saturated derivative of the same data. */}
+              <EdgeChip signedPp={edgePpForSide(analysis.edges, analysis.recommended_side)} />
               {analysis.edge_movement && (
                 <span className="text-sm flex items-center gap-1 text-ink-300">
                   Movement: {edgeMovementIcon(analysis.edge_movement)}
