@@ -93,6 +93,12 @@ app.get('/api/health', (req, res) => {
 const { getDashboardStatus } = require('./api/dashboard-status');
 app.get('/api/dashboard-status', getDashboardStatus);
 
+// Public stats — anon-readable proxy over mv_model_accuracy so the Landing's
+// Track Record + hero hit-rate render for unauthenticated visitors without
+// loosening RLS on the underlying table.
+const publicStats = require('./api/public-stats');
+app.get('/api/public-stats', publicStats);
+
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath, {
