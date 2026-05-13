@@ -344,7 +344,7 @@ function EdgeScorecard() {
             return (
               <div
                 key={i}
-                className={`relative py-6 md:py-7 border-b border-ink-800 ${isUs ? 'bg-signal-pos-dim/10' : ''}`}
+                className={`relative py-6 md:py-7 pl-5 md:pl-6 border-b border-ink-800 ${isUs ? 'bg-signal-pos-dim/10' : ''}`}
               >
                 {isUs && (
                   <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-signal-pos" aria-hidden="true" />
