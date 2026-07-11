@@ -458,7 +458,7 @@ function ExecutionFlow() {
       title: 'De-Genny narrates',
       body: 'Once math has picked the side, the LLM writes the rationale in plain English. The AI explains. It does not pick.',
       meta: [
-        ['// engine',  'OpenAI GPT-4o mini · fine-tuned'],
+        ['// engine',  'fine-tuned on our own graded picks'],
         ['// role',    'narration only'],
         ['// guard',   'no hallucinated stats'],
       ],

@@ -285,7 +285,7 @@ const AnalysisLoadingScreen = ({ sports, betTypes, elapsed }) => {
     11: ['Loading pre-analyzed matchup intelligence...', 'Edge scores computed for upcoming games'],
     15: ['Pulling ESPN box scores for player averages...', 'Cross-referencing props vs recent stats...'],
     20: ['Identifying value discrepancies in lines...', 'Checking key factors: pace, rest, travel...'],
-    28: ['GPT-4o ranking picks by expected value...', 'Filtering for highest-conviction plays...'],
+    28: ['Ranking picks by expected value...', 'Filtering for highest-conviction plays...'],
     35: ['Deduplicating conflicting picks...', 'Final validation complete!'],
   };
 
