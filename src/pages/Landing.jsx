@@ -528,6 +528,7 @@ const TIER_SUBTITLES = {
 
 function SnapshotTerminal({ tierStats }) {
   const [pod, setPod] = useState(null)
+  const [showWork, setShowWork] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -544,6 +545,7 @@ function SnapshotTerminal({ tierStats }) {
 
   const pick = pod?.pick || null
   const quiet = pod?.quiet === true
+  const work = pod?.work || null
 
   const sharpTake = tierStats?.find(t => t.tier === 'Sharp Take')
   const decided = sharpTake ? sharpTake.wins + sharpTake.losses : 0
@@ -626,6 +628,66 @@ function SnapshotTerminal({ tierStats }) {
                   <FactRow label="Full rationale" value="In the digest · free trial" tone="neutral" />
                 </dl>
               </div>
+
+              {/* show the work — inputs + fired signals; weights stay ours */}
+              {work && (
+                <div className="border-t border-ink-800">
+                  <button
+                    onClick={() => setShowWork(v => !v)}
+                    className="w-full flex items-center justify-between px-5 md:px-7 py-3 text-left hover:bg-ink-950 transition-colors"
+                  >
+                    <span className="text-[10px] uppercase tracking-[0.20em] text-ink-300 font-semibold">
+                      {showWork ? '▾' : '▸'} Show the work
+                    </span>
+                    <span className="text-[9px] uppercase tracking-[0.14em] text-ink-500">
+                      the data behind this grade
+                    </span>
+                  </button>
+
+                  {showWork && (
+                    <div className="px-5 md:px-7 pb-5">
+                      <div className="grid grid-cols-3 gap-x-3 text-[11px] tabular-nums">
+                        <span className="text-[9px] uppercase tracking-[0.18em] text-ink-500 py-1.5" />
+                        <span className="text-[9px] uppercase tracking-[0.18em] text-ink-400 py-1.5 text-right truncate">{pick.awayTeam}</span>
+                        <span className="text-[9px] uppercase tracking-[0.18em] text-ink-400 py-1.5 text-right truncate">{pick.homeTeam}</span>
+                        {[
+                          ['Record', work.away.record, work.home.record],
+                          ['Point diff / game', work.away.pointDiffPerGame, work.home.pointDiffPerGame],
+                          ['Last 5', work.away.last5, work.home.last5],
+                          ['Last 10', work.away.last10, work.home.last10],
+                          ['Streak', work.away.streak, work.home.streak],
+                        ].filter(r => r[1] != null || r[2] != null).map(([label, a, h]) => (
+                          <React.Fragment key={label}>
+                            <span className="text-ink-400 py-1.5 border-t border-ink-800">{label}</span>
+                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{a ?? '—'}</span>
+                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{h ?? '—'}</span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+
+                      {work.signals?.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-[9px] uppercase tracking-[0.20em] text-ink-500 mb-2">
+                            Signals that fired
+                          </p>
+                          <ul className="space-y-1.5">
+                            {work.signals.map((s, i) => (
+                              <li key={i} className="flex items-baseline justify-between gap-3 text-[11px]">
+                                <span className="text-ink-200">{s.factor}</span>
+                                <span className="text-signal-pos flex-shrink-0">▲ {s.favors.split(' ').pop()}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <p className="mt-4 text-[9px] uppercase tracking-[0.16em] text-ink-500">
+                        // These are the inputs and which signals fired. The weights and the blend are the product.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </>
           ) : (
             <div className="px-5 md:px-7 py-10 text-center">

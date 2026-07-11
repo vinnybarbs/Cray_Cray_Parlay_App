@@ -61,6 +61,42 @@ module.exports = async (req, res) => {
       return;
     }
 
+    // "Show the work" payload — the INPUTS the model saw and WHICH signals
+    // fired, sanitized. Adjustment magnitudes, weights, and the blend stay
+    // server-side; publishing them would hand over the calculator.
+    let work = null;
+    try {
+      const { data: ga } = await supabase
+        .from('game_analysis')
+        .select('edge_factors')
+        .eq('sport', qualifying.sport)
+        .eq('home_team', qualifying.home_team)
+        .eq('away_team', qualifying.away_team)
+        .not('edges', 'is', null)
+        .order('generated_at', { ascending: false })
+        .limit(1);
+      const ef = ga?.[0]?.edge_factors;
+      if (ef) {
+        const teamInputs = (side) => ({
+          record: ef[`${side}Record`] ? `${ef[`${side}Record`].wins}-${ef[`${side}Record`].losses}` : null,
+          pointDiffPerGame: ef[`${side}PointDiff`] ?? null,
+          last5: ef[`${side}RecentForm`]?.last5 ?? null,
+          last10: ef.standings?.[side]?.last_10 ?? null,
+          streak: ef.standings?.[side]?.streak ?? null,
+        });
+        const signals = Array.isArray(ef.adjustments)
+          ? ef.adjustments
+              .filter(a => a && a.factor && a.impact != null && a.impact !== 0)
+              .slice(0, 6)
+              .map(a => ({
+                factor: a.factor,
+                favors: a.impact > 0 ? qualifying.home_team : qualifying.away_team,
+              }))
+          : [];
+        work = { home: teamInputs('home'), away: teamInputs('away'), signals };
+      }
+    } catch { /* work section is best-effort */ }
+
     res.status(200).json({
       quiet: false,
       pick: {
@@ -75,6 +111,7 @@ module.exports = async (req, res) => {
         modelProb: qualifying.model_prob != null ? Number(qualifying.model_prob) : null,
         impliedProb: qualifying.implied_prob != null ? Number(qualifying.implied_prob) : null,
       },
+      work,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
