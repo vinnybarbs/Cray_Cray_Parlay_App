@@ -315,7 +315,7 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
             </dl>
           </div>
           <div className="mt-3 flex justify-between text-[9px] uppercase tracking-[0.20em] text-ink-500 px-1">
-            <span>// source: mv_model_accuracy</span>
+            <span>// source: settlement ledger</span>
             <span>// refresh: after every settlement</span>
           </div>
         </div>
@@ -449,7 +449,7 @@ function ExecutionFlow() {
       body: 'Per-side edge calculator runs against ML, spread, and total. Computes model probability, compares to the book\'s implied. Gap = signed pp.',
       meta: [
         ['// source', 'The Odds API · ESPN'],
-        ['// math',   'lib/services/edge-calculator.js'],
+        ['// math',   'deterministic · same formula every game'],
         ['// output', 'signed_pp · tier'],
       ],
     },
@@ -767,7 +767,7 @@ function TrackRecord({ sportStats, tierStats }) {
   return (
     <section id="track" className="border-b border-ink-800 bg-ink-950">
       <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>$ ./hit_rate --period=30d --source=mv_model_accuracy</SectionLabel>
+        <SectionLabel>$ ./hit_rate --period=30d --source=settlement_ledger</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
           The receipts. <span className="text-ink-400">{headlineKicker} Updated after every settlement.</span>
         </h2>
@@ -858,7 +858,7 @@ function Disclosure() {
             </p>
           </div>
           <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500 pt-6 border-t border-ink-800">
-            // Filed publicly. Read the math: <span className="text-ink-300 normal-case tracking-normal">lib/services/edge-calculator.js</span>
+            // Every pick graded after the game. The record is the receipt.
           </p>
         </div>
       </div>
