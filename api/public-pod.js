@@ -11,7 +11,11 @@
 
 const { createClient } = require('@supabase/supabase-js');
 
-const POD_MIN_PP = 4;
+// Strong Play floor. Settled data through July 2026: picks under 7pp ran
+// 46-51% win, 10pp+ ran 60-65%. Now that edges are calibrated per market,
+// a published pp approximates real excess probability, and 7pp is the
+// lowest tier that has actually earned headline billing.
+const POD_MIN_PP = 7;
 // Longshot fence (restores the POD_MAX_ML_ODDS guard): a +2500 tennis
 // moneyline is not a credible headline pick even when the math likes it.
 const POD_MAX_ML_ODDS = 300;

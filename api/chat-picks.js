@@ -937,6 +937,7 @@ Return ONLY valid JSON array with this format:
           risk_level: 'medium',
           generate_mode: 'degenny_chat',
           actual_outcome: 'pending',
+          pipeline_version: 6,
           edge_pp: edgePp,
           edge_pp_raw: edgePpRaw,
           tier: tier

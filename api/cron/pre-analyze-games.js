@@ -1060,6 +1060,10 @@ async function runPreAnalysis(sportSlugs) {
                     risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
                     generate_mode: 'auto_digest',
                     actual_outcome: 'pending',
+                    // 6 = calibrated devig regime (edge_calibration multipliers
+                    // + real spread/total baselines). Calibration refresh only
+                    // trusts picks from this regime forward.
+                    pipeline_version: 6,
                     edge_pp: edgePp,
                     edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
                     tier: pickGrader.edgeTier(edgePp),

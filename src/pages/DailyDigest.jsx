@@ -1603,16 +1603,18 @@ export default function DailyDigest({ onBack }) {
   }, [data])
 
   // Pick of the Day — the single highest-edge tile across all sports today.
-  // We only feature a pick if it cleared the Play tier (≥ 4pp) AND has a real
-  // recommended_pick string. Otherwise the callout hides, which is the honest
-  // move on a quiet board.
+  // Featured only when it clears the Strong Play tier (>= 7pp) AND has a real
+  // recommended_pick string. Settled results showed sub-7pp picks running
+  // 46-51%, which is not headline material. Otherwise the callout hides,
+  // which is the honest move on a quiet board.
+  const POD_MIN_PP = 7
   const pickOfTheDay = useMemo(() => {
     if (!data?.gamesBySport) return null
     let best = null
     for (const [sport, games] of Object.entries(data.gamesBySport)) {
       for (const g of games) {
         const pp = edgePpForSide(g.edges, g.recommended_side)
-        if (pp == null || pp < 4) continue
+        if (pp == null || pp < POD_MIN_PP) continue
         if (!g.recommended_pick) continue
         if (!best || pp > best.signedPp) {
           best = { game: g, sport, signedPp: pp }
