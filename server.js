@@ -227,7 +227,8 @@ app.get('/debug/supabase', (req, res) => {
     const apiKeys = {
       'ODDS_API_KEY': process.env.ODDS_API_KEY,
       'OPENAI_API_KEY': process.env.OPENAI_API_KEY,
-      'SERPER_API_KEY': process.env.SERPER_API_KEY
+      'SERPER_API_KEY': process.env.SERPER_API_KEY,
+      'ANTHROPIC_API_KEY': process.env.ANTHROPIC_API_KEY
     };
 
     const config = {};
