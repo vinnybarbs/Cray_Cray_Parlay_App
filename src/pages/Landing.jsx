@@ -651,9 +651,9 @@ function SnapshotTerminal({ tierStats }) {
                         <span className="text-[9px] uppercase tracking-[0.18em] text-ink-400 py-1.5 text-right truncate">{pick.awayTeam}</span>
                         <span className="text-[9px] uppercase tracking-[0.18em] text-ink-400 py-1.5 text-right truncate">{pick.homeTeam}</span>
                         {[
-                          ['Record', work.away.record, work.home.record],
-                          ['Point diff / game', work.away.pointDiffPerGame, work.home.pointDiffPerGame],
-                          ['Last 5', work.away.last5, work.home.last5],
+                          ['Season record', work.away.seasonRecord, work.home.seasonRecord],
+                          ['Last 20 · model window', work.away.windowRecord, work.home.windowRecord],
+                          ['Point diff / game · last 20', work.away.pointDiffPerGame, work.home.pointDiffPerGame],
                           ['Last 10', work.away.last10, work.home.last10],
                           ['Streak', work.away.streak, work.home.streak],
                         ].filter(r => r[1] != null || r[2] != null).map(([label, a, h]) => (

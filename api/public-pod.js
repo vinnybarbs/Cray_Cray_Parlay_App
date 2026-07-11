@@ -77,10 +77,14 @@ module.exports = async (req, res) => {
         .limit(1);
       const ef = ga?.[0]?.edge_factors;
       if (ef) {
+        // Season record comes from ESPN standings — the authoritative W-L.
+        // The 20-game window from game_results is a recency stat and must
+        // be labeled as such: publishing it as "Record" showed the White
+        // Sox at 9-11 when they were 48-45 (July 2026 credibility bug).
         const teamInputs = (side) => ({
-          record: ef[`${side}Record`] ? `${ef[`${side}Record`].wins}-${ef[`${side}Record`].losses}` : null,
+          seasonRecord: ef.standings?.[side]?.record ?? null,
+          windowRecord: ef[`${side}Record`] ? `${ef[`${side}Record`].wins}-${ef[`${side}Record`].losses}` : null,
           pointDiffPerGame: ef[`${side}PointDiff`] ?? null,
-          last5: ef[`${side}RecentForm`]?.last5 ?? null,
           last10: ef.standings?.[side]?.last_10 ?? null,
           streak: ef.standings?.[side]?.streak ?? null,
         });
