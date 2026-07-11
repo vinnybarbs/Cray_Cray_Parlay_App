@@ -46,10 +46,8 @@ edges and settlement, or it is not claimed as covered. No silent middle.
 - ~~RLS pass on the exposed public tables~~ DONE 2026-07-11
   (migration 20260711110000_rls_lockdown.sql: 34 tables locked, ai_suggestions
   insert/update policies fixed, analytics grants tightened).
-- Enable leaked-password protection in the Supabase dashboard (Authentication,
-  Sign In / Providers, Email). Requires Pro plan; if the toggle is locked,
-  resolve the plan question first. Set minimum password length 8+ and
-  required character types while there (free-tier features).
+- ~~Enable leaked-password protection in Supabase Auth~~ DONE 2026-07-11
+  (Vince enabled it in the dashboard).
 - Update `seasonal_context` in ai_instructions in late August so NFL pick
   generation turns on in September.
 - Billing. The page sells $19.99/month with a 7-day trial and nothing
