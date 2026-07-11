@@ -45,6 +45,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
   const [stats, setStats] = useState(null)
   const [tierStats, setTierStats] = useState(null)
   const [sportStats, setSportStats] = useState(null)
+  const [sharpTake, setSharpTake] = useState(null)
 
   // Fetch via /api/public-stats so anon visitors can see the Track Record.
   // Direct supabase-js read was blocked by RLS on mv_model_accuracy (the
@@ -61,6 +62,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
         if (json.overall) setStats(json.overall)
         if (Array.isArray(json.tiers) && json.tiers.length > 0) setTierStats(json.tiers)
         if (Array.isArray(json.bySport) && json.bySport.length > 0) setSportStats(json.bySport)
+        if (json.sharpTakeAllTime) setSharpTake(json.sharpTakeAllTime)
       } catch (err) {
         // Soft-fail: section renders its empty/loading state instead.
         if (!cancelled) console.warn('public-stats fetch failed', err)
@@ -78,7 +80,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
       <style>{TERMINAL_CSS}</style>
       <Ticker />
       <Nav onStartTrial={onStartTrial} onSignIn={onSignIn} scrollTo={scrollTo} />
-      <Hero stats={stats} onStartTrial={onStartTrial} onSignIn={onSignIn} onSeePick={scrollTo('snapshot')} />
+      <Hero stats={stats} sharpTake={sharpTake} onStartTrial={onStartTrial} onSignIn={onSignIn} onSeePick={scrollTo('snapshot')} />
       <EdgeScorecard />
       <ExecutionFlow />
       <SnapshotTerminal tierStats={tierStats} />
@@ -224,9 +226,16 @@ function Nav({ onStartTrial, onSignIn, scrollTo }) {
 
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
-function Hero({ stats, onStartTrial, onSignIn, onSeePick }) {
+function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
   const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : '—'
   const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : '1,000+'
+  // The claim almost nobody else can make with receipts: top-tier picks,
+  // all-time record with ROI, straight from the settlement ledger. The API
+  // only sends it once the sample passes 100 decided picks, and it renders
+  // whatever the ledger says — good or bad.
+  const sharpTakeDisplay = sharpTake
+    ? `${sharpTake.hitRate}%${sharpTake.roiPct != null ? ` · ${sharpTake.roiPct >= 0 ? '+' : ''}${sharpTake.roiPct}% ROI` : ''}`
+    : null
 
   return (
     <section id="top" className="relative grid-bg border-b border-ink-800 overflow-hidden">
@@ -293,6 +302,13 @@ function Hero({ stats, onStartTrial, onSignIn, onSeePick }) {
             </div>
             <dl className="divide-y divide-ink-800">
               <StatRow label="Hit rate" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
+              {sharpTakeDisplay && (
+                <StatRow
+                  label={`Sharp Take · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
+                  value={sharpTakeDisplay}
+                  tone={sharpTake.hitRate >= 55 ? 'pos' : sharpTake.hitRate >= 50 ? 'neutral' : 'neg'}
+                />
+              )}
               <StatRow label="Picks graded" value={weeklyCount} tone="neutral" />
               <StatRow label="Markets covered" value="ML · Spread · Total" tone="neutral" small />
               <StatRow label="Affiliate parent" value="None" tone="pos" small />

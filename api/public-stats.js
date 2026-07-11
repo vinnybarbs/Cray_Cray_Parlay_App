@@ -39,16 +39,19 @@ module.exports = async (req, res) => {
     const { data: rows, error } = await supabase
       .from('mv_model_accuracy')
       .select('*')
-      .eq('period_bucket', 'last_30d');
+      .in('period_bucket', ['last_30d', 'all']);
 
     if (error) {
       res.status(500).json({ error: error.message });
       return;
     }
 
-    const overallRow = (rows || []).find(r => r.dimension_type === 'overall');
-    const sportRows = (rows || []).filter(r => r.dimension_type === 'sport');
-    const tierRows = (rows || []).filter(r => r.dimension_type === 'tier');
+    const allRows = (rows || []).filter(r => r.period_bucket === 'all');
+
+    const rows30 = (rows || []).filter(r => r.period_bucket === 'last_30d');
+    const overallRow = rows30.find(r => r.dimension_type === 'overall');
+    const sportRows = rows30.filter(r => r.dimension_type === 'sport');
+    const tierRows = rows30.filter(r => r.dimension_type === 'tier');
 
     const overall = overallRow ? (() => {
       const wins = overallRow.won || 0;
@@ -76,14 +79,27 @@ module.exports = async (req, res) => {
       };
     });
 
-    // tier dimension is not yet materialized in mv_model_accuracy — return
-    // sport breakdown as the primary public-facing detail. Tier comes later.
     const bySport = shape(sportRows, 'sport');
-    const tiers = shape(tierRows, 'tier'); // empty today; kept for forward compat
+    const tiers = shape(tierRows, 'tier');
 
-    // Cache 5 minutes at the CDN edge; mv_model_accuracy refreshes hourly.
+    // The hero claim: Sharp Take all-time record with ROI. Only published
+    // when the sample is real (100+ decided picks) — the number itself is
+    // whatever the ledger says, good or bad. That is the brand.
+    const stRow = allRows.find(r => r.dimension_type === 'tier' && r.dimension_value === 'Sharp Take');
+    let sharpTakeAllTime = null;
+    if (stRow && (stRow.won + stRow.lost) >= 100) {
+      const decided = stRow.won + stRow.lost;
+      sharpTakeAllTime = {
+        wins: stRow.won,
+        losses: stRow.lost,
+        hitRate: Math.round((stRow.won / decided) * 1000) / 10,
+        roiPct: stRow.roi_pct != null ? Math.round(Number(stRow.roi_pct) * 10) / 10 : null,
+      };
+    }
+
+    // Cache 5 minutes at the CDN edge; the MV refreshes after settlements.
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
-    res.status(200).json({ overall, bySport, tiers });
+    res.status(200).json({ overall, bySport, tiers, sharpTakeAllTime });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
