@@ -57,3 +57,16 @@ edges and settlement, or it is not claimed as covered. No silent middle.
   (starts at the 0.75 global multiplier until 80 settled picks per market).
 - First CLV report once a week of closing-line data accumulates
   (`v_pick_clv`, positive clv_pp means the pick beat the close).
+
+## From the legal audit (2026-07-11)
+
+- BLOCKER before charging money: migrate scores/standings/stats off unofficial
+  ESPN endpoints to a licensed source (The Odds API scores, SportsDataIO, or
+  similar). Disney ToU prohibits commercial use of scraped data. See
+  audit/60-legal-ip.md.
+- File trademark for the full name "Cray Cray for Parlays" (Class 41, expect
+  a PARLAYS disclaimer) after a one-hour clearance review. Register "The
+  House Ledger" mark alongside.
+- Trade-secret hygiene checklist from audit/60: NDAs with DTSA notice,
+  access controls, dated internal description of the secret, IP assignment
+  in contractor agreements. Never publish model internals.
