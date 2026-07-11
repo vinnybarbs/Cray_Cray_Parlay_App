@@ -23,24 +23,35 @@ async function storeAISuggestions(suggestions, options = {}) {
     const sessionId = `session_${Date.now()}_${options.userId || 'guest'}`;
     
     // Prepare suggestions for database
-    const suggestionRecords = suggestions.map(suggestion => ({
-      session_id: sessionId,
-      sport: suggestion.sport || 'NFL',
-      home_team: suggestion.homeTeam,
-      away_team: suggestion.awayTeam,
-      game_date: suggestion.gameDate || suggestion.commence_time,
-      espn_event_id: suggestion.espnEventId || null,
-      bet_type: suggestion.betType,
-      pick: suggestion.pick,
-      odds: suggestion.odds,
-      point: suggestion.point || null,
-      confidence: suggestion.confidence || null,
-      reasoning: suggestion.reasoning || null,
-      risk_level: options.riskLevel,
-      generate_mode: options.generateMode,
-      actual_outcome: 'pending',
-      user_id: options.userId || null
-    }));
+    const { edgeTier } = require('../lib/services/pick-grader.js');
+    const suggestionRecords = suggestions.map(suggestion => {
+      // annotatePicksWithEdges puts edgePp/signedEdge on picks that were
+      // graded against game_analysis.edges — snapshot it so the pick row
+      // carries its own edge even after the analysis cache regenerates.
+      const edgePp = suggestion.edgePp
+        ?? (suggestion.signedEdge != null ? Math.round(suggestion.signedEdge * 1000) / 10 : null);
+      return {
+        session_id: sessionId,
+        sport: suggestion.sport || 'NFL',
+        home_team: suggestion.homeTeam,
+        away_team: suggestion.awayTeam,
+        game_date: suggestion.gameDate || suggestion.commence_time,
+        espn_event_id: suggestion.espnEventId || null,
+        bet_type: suggestion.betType,
+        pick: suggestion.pick,
+        odds: suggestion.odds,
+        point: suggestion.point || null,
+        confidence: suggestion.confidence || null,
+        reasoning: suggestion.reasoning || null,
+        risk_level: options.riskLevel,
+        generate_mode: options.generateMode,
+        actual_outcome: 'pending',
+        user_id: options.userId || null,
+        edge_pp: edgePp,
+        edge_pp_raw: suggestion.edgePpRaw ?? edgePp,
+        tier: edgeTier(edgePp)
+      };
+    });
 
     // Insert suggestions one by one, skipping exact dupes (unique index prevents them)
     let inserted = 0;

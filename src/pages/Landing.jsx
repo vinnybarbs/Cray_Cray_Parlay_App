@@ -92,37 +92,85 @@ export default function Landing({ onStartTrial, onSignIn }) {
 }
 
 // ─── Ticker — top scrolling edge feed ──────────────────────────────────────
+// Real edges from /api/public-ticker (the old hardcoded demo array showed
+// NBA/NFL numbers in July — instant credibility killer for anyone who knows
+// sports). Off-season leagues scroll as coverage entries instead: covering
+// every league is the differentiator when most edge tools do one or two.
+
+const COVERED_LEAGUES = [
+  { key: 'MLB',    returns: 'Mar' },
+  { key: 'NBA',    returns: 'Oct' },
+  { key: 'NFL',    returns: 'Sept' },
+  { key: 'NHL',    returns: 'Oct' },
+  { key: 'NCAAB',  returns: 'Nov' },
+  { key: 'NCAAF',  returns: 'Aug' },
+  { key: 'MLS',    returns: 'Feb' },
+  { key: 'EPL',    returns: 'Aug' },
+  { key: 'Tennis', returns: 'Jan' },
+  { key: 'UFC',    returns: 'Jan' },
+]
 
 function Ticker() {
-  const items = [
-    { side: '▲', pp: '+8.2', label: 'NBA · BOS −4.5',   tone: 'pos' },
-    { side: '▼', pp: '−12.4', label: 'NHL · NYR ML',     tone: 'neg' },
-    { side: '▲', pp: '+6.1', label: 'MLB · LAD +1.5',    tone: 'pos' },
-    { side: '▲', pp: '+5.8', label: 'NCAAB · KAN −3.5',  tone: 'pos' },
-    { side: '▼', pp: '−7.2', label: 'NFL · KC ML',       tone: 'neg' },
-    { side: '▲', pp: '+4.3', label: 'NBA · DEN O 224.5', tone: 'pos' },
-    { side: '▼', pp: '−9.1', label: 'NCAAF · ALA −10.5', tone: 'neg' },
-    { side: '▲', pp: '+11.6', label: 'MLB · NYY ML',     tone: 'pos' },
-    { side: '▲', pp: '+3.7', label: 'NHL · TOR U 5.5',   tone: 'pos' },
-    { side: '▼', pp: '−5.4', label: 'UFC · FAV ML',      tone: 'neg' },
-  ]
+  const [feed, setFeed] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/public-ticker`)
+        if (!res.ok) return
+        const json = await res.json()
+        if (!cancelled) setFeed(json)
+      } catch { /* coverage-only fallback renders */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const liveItems = (feed?.items || []).map(it => ({
+    kind: 'edge',
+    side: it.pp >= 0 ? '▲' : '▼',
+    pp: `${it.pp >= 0 ? '+' : '−'}${Math.abs(it.pp).toFixed(1)}`,
+    label: `${it.sport} · ${it.label}`,
+    tone: it.pp >= 0 ? 'pos' : 'neg',
+  }))
+
+  const inSeason = new Set(feed?.inSeason || [])
+  const coverageItems = COVERED_LEAGUES
+    .filter(l => !liveItems.some(it => it.label.startsWith(`${l.key} ·`)))
+    .map(l => ({
+      kind: 'coverage',
+      label: inSeason.has(l.key) ? `${l.key} · in season · on the board` : `${l.key} · covered · back ${l.returns}`,
+    }))
+
+  // Live edges first, coverage entries woven after. With no live data at all
+  // the reel is coverage-only — never invented numbers.
+  const items = [...liveItems, ...coverageItems]
   const row = [...items, ...items] // doubled for seamless loop
+  const headline = liveItems.length > 0 ? 'Live edges · today' : `${COVERED_LEAGUES.length} leagues · one board`
+
   return (
     <div className="bg-ink-950 border-b border-ink-800 overflow-hidden relative">
       <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-ink-950 to-transparent z-10 pointer-events-none" />
       <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-ink-950 to-transparent z-10 pointer-events-none" />
       <div className="absolute top-1.5 left-3 flex items-center gap-2 z-20 bg-ink-950 pr-3">
         <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
-        <span className="text-[9px] uppercase tracking-[0.20em] text-ink-400">Live edges · today</span>
+        <span className="text-[9px] uppercase tracking-[0.20em] text-ink-400">{headline}</span>
       </div>
       <div className="flex whitespace-nowrap py-1.5 pt-7 ticker-track">
         {row.map((it, i) => (
-          <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px] tabular-nums">
-            <span className={it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}>{it.side}</span>
-            <span className={`font-semibold ${it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}`}>{it.pp}pp</span>
-            <span className="text-ink-300">{it.label}</span>
-            <span className="text-ink-700">│</span>
-          </span>
+          it.kind === 'edge' ? (
+            <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px] tabular-nums">
+              <span className={it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}>{it.side}</span>
+              <span className={`font-semibold ${it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}`}>{it.pp}pp</span>
+              <span className="text-ink-300">{it.label}</span>
+              <span className="text-ink-700">│</span>
+            </span>
+          ) : (
+            <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px]">
+              <span className="text-ink-500 uppercase tracking-[0.08em]">{it.label}</span>
+              <span className="text-ink-700">│</span>
+            </span>
+          )
         ))}
       </div>
     </div>
@@ -252,7 +300,7 @@ function Hero({ stats, onStartTrial, onSignIn, onSeePick }) {
           </div>
           <div className="mt-3 flex justify-between text-[9px] uppercase tracking-[0.20em] text-ink-500 px-1">
             <span>// source: mv_model_accuracy</span>
-            <span>// refresh: hourly</span>
+            <span>// refresh: after every settlement</span>
           </div>
         </div>
       </div>
@@ -394,7 +442,7 @@ function ExecutionFlow() {
       title: 'De-Genny narrates',
       body: 'Once math has picked the side, the LLM writes the rationale in plain English. The AI explains. It does not pick.',
       meta: [
-        ['// engine',  'Anthropic Claude'],
+        ['// engine',  'OpenAI GPT-4o mini · fine-tuned'],
         ['// role',    'narration only'],
         ['// guard',   'no hallucinated stats'],
       ],
@@ -451,23 +499,59 @@ function ExecutionFlow() {
   )
 }
 
-// ─── SnapshotTerminal — example PoD as a terminal screenshot ──────────────
+// ─── SnapshotTerminal — the real free Pick of the Day ──────────────────────
+// Served by /api/public-pod (highest edge_pp >= 4pp on the upcoming board,
+// longshot MLs fenced at +300). The old version rendered a hardcoded NBA
+// example under a "SEE TODAY'S FREE PICK" CTA — a promise the tile broke.
+// One real pick is the free tease; the full board stays behind the trial.
+
+const TIER_SUBTITLES = {
+  'Trap': 'fade it', 'Skip': 'pass on it', 'Lean': 'lean it',
+  'Play': 'play it', 'Strong Play': 'hammer it', 'Sharp Take': 'sharp take',
+}
 
 function SnapshotTerminal({ tierStats }) {
+  const [pod, setPod] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/public-pod`)
+        if (!res.ok) return
+        const json = await res.json()
+        if (!cancelled) setPod(json)
+      } catch { /* loading state stays up */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const pick = pod?.pick || null
+  const quiet = pod?.quiet === true
+
   const sharpTake = tierStats?.find(t => t.tier === 'Sharp Take')
   const decided = sharpTake ? sharpTake.wins + sharpTake.losses : 0
   const tr = decided >= 10 ? sharpTake : null
 
+  const gameTime = pick?.gameDate ? new Date(pick.gameDate).toLocaleString('en-US', {
+    weekday: 'short', hour: 'numeric', minute: '2-digit',
+    timeZone: 'America/New_York',
+  }) + ' ET' : null
+  const pp = pick?.edgePp != null ? Number(pick.edgePp) : null
+  const ppText = pp != null ? `${pp >= 0 ? '+' : '−'}${Math.abs(pp).toFixed(1)}` : null
+
   return (
     <section id="snapshot" className="border-b border-ink-800 bg-ink-950">
       <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>$ edge_snapshot --market=nba --date=today</SectionLabel>
+        <SectionLabel>$ edge_snapshot --date=today</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          A pick as it would appear<br />
-          on a <span className="text-signal-pos">live edge tile.</span>
+          Today's free pick,<br />
+          straight off the <span className="text-signal-pos">live board.</span>
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          Same format as every actual pick in the digest. The example below is illustrative — the live Pick of the Day refreshes every morning at 8 AM ET.
+          {quiet
+            ? 'The board is quiet today. When no game clears our Play threshold, we say so — we refuse to force a pick.'
+            : 'Same tile, same math as every pick in the paid digest. Refreshes with the morning board.'}
         </p>
 
         <div className="mt-12 bg-ink-900 shadow-hairline-pos rounded-sharp">
@@ -480,47 +564,67 @@ function SnapshotTerminal({ tierStats }) {
               </span>
             </div>
             <span className="text-[10px] uppercase tracking-[0.14em] text-ink-400 tabular-nums">
-              NBA · tonight 7:30 PM ET
+              {pick ? `${pick.sport} · ${gameTime}` : quiet ? 'no qualifying edge today' : 'loading board…'}
             </span>
           </div>
 
-          <div className="grid md:grid-cols-[1fr_auto] gap-5 px-5 md:px-7 py-6">
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 tabular-nums">
-                Boston Celtics @ Miami Heat · Spread
+          {pick ? (
+            <>
+              <div className="grid md:grid-cols-[1fr_auto] gap-5 px-5 md:px-7 py-6">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 tabular-nums">
+                    {pick.awayTeam} @ {pick.homeTeam} · {pick.betType}
+                  </div>
+                  <h3 className="font-sans font-bold text-3xl md:text-4xl text-signal-pos tabular-nums tracking-tight mt-2">
+                    {pick.pick}
+                  </h3>
+                </div>
+                <div className="flex flex-col items-start md:items-end bg-signal-pos-dim/20 rounded-sharp px-4 py-3">
+                  <div className="text-3xl md:text-4xl font-bold tabular-nums text-signal-pos tracking-tight">
+                    ▲ {ppText}<span className="text-sm ml-0.5">pp</span>
+                  </div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-signal-pos mt-1">
+                    {pick.tier}
+                  </div>
+                  <div className="text-[10px] italic lowercase text-ink-400 mt-0.5">
+                    {TIER_SUBTITLES[pick.tier] || ''}
+                  </div>
+                </div>
               </div>
-              <h3 className="font-sans font-bold text-3xl md:text-4xl text-signal-pos tabular-nums tracking-tight mt-2">
-                BOS −4.5
-              </h3>
-            </div>
-            <div className="flex flex-col items-start md:items-end bg-signal-pos-dim/20 rounded-sharp px-4 py-3">
-              <div className="text-3xl md:text-4xl font-bold tabular-nums text-signal-pos tracking-tight">
-                ▲ +8.2<span className="text-sm ml-0.5">pp</span>
-              </div>
-              <div className="text-[10px] uppercase tracking-[0.18em] text-signal-pos mt-1">
-                Strong Play
-              </div>
-              <div className="text-[10px] italic lowercase text-ink-400 mt-0.5">
-                hammer it
-              </div>
-            </div>
-          </div>
 
-          {/* why this pick — tabular */}
-          <div className="border-t border-ink-800">
-            <div className="px-5 md:px-7 py-2 bg-ink-950 border-b border-ink-800">
-              <span className="text-[9px] uppercase tracking-[0.20em] text-signal-pos">
-                ▌ why this pick
-              </span>
+              {/* why this pick — tabular */}
+              <div className="border-t border-ink-800">
+                <div className="px-5 md:px-7 py-2 bg-ink-950 border-b border-ink-800">
+                  <span className="text-[9px] uppercase tracking-[0.20em] text-signal-pos">
+                    ▌ why this pick
+                  </span>
+                </div>
+                <dl className="divide-y divide-ink-800">
+                  {pick.modelProb != null && (
+                    <FactRow label="Model win prob" value={`${(pick.modelProb * 100).toFixed(1)}%`} tone="pos" />
+                  )}
+                  {pick.impliedProb != null && (
+                    <FactRow label="Book implied" value={`${(pick.impliedProb * 100).toFixed(1)}%`} tone="neutral" />
+                  )}
+                  <FactRow label="Gap" value={`${ppText}pp`} tone="pos" />
+                  <FactRow label="Full rationale" value="In the digest · free trial" tone="neutral" />
+                </dl>
+              </div>
+            </>
+          ) : (
+            <div className="px-5 md:px-7 py-10 text-center">
+              <p className="text-ink-300 text-sm">
+                {quiet
+                  ? 'Quiet day — math says skip. No game on the board clears +4pp right now.'
+                  : 'Pulling today\'s board…'}
+              </p>
+              {quiet && (
+                <p className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mt-3">
+                  // A pick you shouldn't make is not a pick. Check back after the morning refresh.
+                </p>
+              )}
             </div>
-            <dl className="divide-y divide-ink-800">
-              <FactRow label="Model cover prob"  value="62.1%" tone="pos" />
-              <FactRow label="Book implied"      value="53.9%" tone="neutral" />
-              <FactRow label="Gap"               value="+8.2pp" tone="pos" />
-              <FactRow label="Heat defense"      value="6th-worst vs >.580 road clubs" tone="neutral" />
-              <FactRow label="Injury risk"       value="None reported · live 6:00 PM ET" tone="neutral" />
-            </dl>
-          </div>
+          )}
 
           {/* track record strip */}
           {tr && (
@@ -542,7 +646,7 @@ function SnapshotTerminal({ tierStats }) {
         </div>
 
         <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 text-center">
-          // The actual board renders 20-80 tiles per day across every covered sport.
+          // The full board renders a tile like this for every game with live markets, in every in-season league.
         </p>
       </div>
     </section>
@@ -565,16 +669,19 @@ function FactRow({ label, value, tone }) {
 // public-facing breakdown. Tier-level lands when the MV materializes it.
 
 function TrackRecord({ sportStats, tierStats }) {
-  // Prefer tier breakdown when populated (future); fall back to sport (today).
-  const useTiers = Array.isArray(tierStats) && tierStats.length > 0
-  const order = ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Skip']
-  const sortedTiers = useTiers
-    ? [...tierStats].sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))
-    : []
-  const sortedSports = Array.isArray(sportStats)
-    ? [...sportStats].sort((a, b) => parseFloat(b.hitRate || 0) - parseFloat(a.hitRate || 0))
-    : []
+  // Minimum-sample floor: a 100% hit rate on 3 picks reads as noise, not
+  // receipts. Rows under the floor are held back, and we say so.
+  const MIN_SETTLED = 25
+  const aboveFloor = (rows) => (rows || []).filter(r => (r.wins + r.losses) >= MIN_SETTLED)
+  const heldBack = (rows) => (rows || []).length - aboveFloor(rows).length
+
+  // Prefer tier breakdown when populated; fall back to sport.
+  const order = ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Skip', 'Trap']
+  const sortedTiers = aboveFloor(tierStats).sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))
+  const sortedSports = aboveFloor(sportStats).sort((a, b) => parseFloat(b.hitRate || 0) - parseFloat(a.hitRate || 0))
+  const useTiers = sortedTiers.length > 0
   const rows = useTiers ? sortedTiers : sortedSports
+  const heldBackCount = useTiers ? heldBack(tierStats) : heldBack(sportStats)
   const dimensionLabel = useTiers ? 'Tier' : 'Sport'
   const dimensionKey = useTiers ? 'tier' : 'sport'
   const headlineKicker = useTiers ? 'Per tier.' : 'Per sport.'
@@ -584,7 +691,7 @@ function TrackRecord({ sportStats, tierStats }) {
       <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
         <SectionLabel>$ ./hit_rate --period=30d --source=mv_model_accuracy</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          The receipts. <span className="text-ink-400">{headlineKicker} Updated hourly.</span>
+          The receipts. <span className="text-ink-400">{headlineKicker} Updated after every settlement.</span>
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
           Most picks apps cherry-pick wins. We publish every {dimensionLabel.toLowerCase()} — including the losers. If a {dimensionLabel.toLowerCase()} dips below 50%, you see it.
@@ -636,6 +743,12 @@ function TrackRecord({ sportStats, tierStats }) {
             </p>
           </div>
         )}
+
+        {rows.length > 0 && heldBackCount > 0 && (
+          <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 text-center">
+            // {heldBackCount} {dimensionLabel.toLowerCase()}{heldBackCount === 1 ? '' : 's'} under {25} settled picks held back until the sample is real.
+          </p>
+        )}
       </div>
     </section>
   )
@@ -685,7 +798,7 @@ function TermSheet({ onStartTrial }) {
     'De-Genny chat for picks on demand',
     'One-tap parlay builder · DraftKings & FanDuel deep links',
     'Settlement tracking · every pick graded after the game',
-    'Hit rate by tier and sport · refreshed hourly',
+    'Hit rate by tier and sport · refreshed after every settlement',
   ]
   return (
     <section id="terms" className="border-b border-ink-800 bg-ink-950">

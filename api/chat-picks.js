@@ -889,6 +889,36 @@ Return ONLY valid JSON array with this format:
       const gameDate = gameMatch?.[0]?.commence_time || null;
       const espnId = gameMatch?.[0]?.external_game_id || null;
 
+      // Grade the chat pick against the same per-side math the tiles use so
+      // the stored row carries its pp/tier snapshot like every other mode.
+      let edgePp = null, edgePpRaw = null, tier = null;
+      try {
+        const { sideForPick, edgeTier } = require('../lib/services/pick-grader.js');
+        const { data: ga } = await supabase
+          .from('game_analysis')
+          .select('edges, edges_raw')
+          .eq('sport', pick.sport)
+          .eq('home_team', pick.home_team)
+          .eq('away_team', pick.away_team)
+          .not('edges', 'is', null)
+          .order('generated_at', { ascending: false })
+          .limit(1);
+        const edges = ga?.[0]?.edges;
+        if (edges) {
+          const side = sideForPick(
+            { betType: pick.bet_type, pick: pick.pick },
+            { home_team: pick.home_team, away_team: pick.away_team }
+          );
+          const signed = side != null ? edges[side] : null;
+          if (signed != null) {
+            edgePp = Math.round(signed * 1000) / 10;
+            const raw = ga?.[0]?.edges_raw?.[side];
+            edgePpRaw = raw != null ? Math.round(raw * 1000) / 10 : edgePp;
+            tier = edgeTier(edgePp);
+          }
+        }
+      } catch { /* snapshot is best-effort — never block saving the pick */ }
+
       const { error } = await supabase
         .from('ai_suggestions')
         .insert({
@@ -906,7 +936,10 @@ Return ONLY valid JSON array with this format:
           reasoning: pick.reasoning || null,
           risk_level: 'medium',
           generate_mode: 'degenny_chat',
-          actual_outcome: 'pending'
+          actual_outcome: 'pending',
+          edge_pp: edgePp,
+          edge_pp_raw: edgePpRaw,
+          tier: tier
         });
       // Silently skip if exact dupe (unique index violation 23505)
       if (error && error.code === '23505') continue;

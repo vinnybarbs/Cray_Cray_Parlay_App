@@ -99,6 +99,14 @@ app.get('/api/dashboard-status', getDashboardStatus);
 const publicStats = require('./api/public-stats');
 app.get('/api/public-stats', publicStats);
 
+// Public ticker + free Pick of the Day — same anon-readable pattern. The
+// Landing ticker shows real edges (the hardcoded demo array is gone) and the
+// free-pick CTA resolves to an actual pick.
+const publicTicker = require('./api/public-ticker');
+app.get('/api/public-ticker', publicTicker);
+const publicPod = require('./api/public-pod');
+app.get('/api/public-pod', publicPod);
+
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath, {

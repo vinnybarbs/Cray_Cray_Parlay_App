@@ -989,6 +989,8 @@ async function runPreAnalysis(sportSlugs) {
             // so the chatbot + parlay generator can read the same math the
             // tile uses, without re-running calculateEdge.
             edges: edgeData ? edgeData.edges : null,
+            // Same dict before the ±15pp cap — calibration needs the raw signal.
+            edges_raw: edgeData ? edgeData.edgesRaw : null,
             // Merge factors + adjustments + confidence into edge_factors so the
             // fact sheet's edge.adjustments[] path resolves. Calculator returns
             // them as separate top-level keys on edgeData — flatten for storage.
@@ -1032,6 +1034,15 @@ async function runPreAnalysis(sportSlugs) {
 
                 const pickOdds = formatAmericanOdds(resolveOddsForPick(oddsCtx, result.recommended_side));
 
+                // Snapshot the edge that justified this pick. The analysis
+                // cache gets regenerated, so the pick row must carry its own
+                // pp/tier or win-rate-by-edge analysis becomes unprovable.
+                const sideEdge = edgeData?.edges?.[side] ?? null;
+                const sideEdgeRaw = edgeData?.edgesRaw?.[side] ?? sideEdge;
+                const edgePp = sideEdge != null ? Math.round(sideEdge * 1000) / 10 : null;
+                const isHomeMl = side === 'home_ml';
+                const isAwayMl = side === 'away_ml';
+
                 const { error: sugErr } = await supabase
                   .from('ai_suggestions')
                   .insert({
@@ -1048,7 +1059,14 @@ async function runPreAnalysis(sportSlugs) {
                     reasoning: result.analysis_snippet,
                     risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
                     generate_mode: 'auto_digest',
-                    actual_outcome: 'pending'
+                    actual_outcome: 'pending',
+                    edge_pp: edgePp,
+                    edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
+                    tier: pickGrader.edgeTier(edgePp),
+                    model_prob: isHomeMl ? edgeData?.homeWinProb ?? null
+                              : isAwayMl ? edgeData?.awayWinProb ?? null : null,
+                    implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null
+                                : isAwayMl ? edgeData?.impliedAwayProb ?? null : null
                   });
                 if (sugErr) {
                   console.warn(`  Auto-save pick result: ${sugErr.message}`);
