@@ -43,8 +43,9 @@ edges and settlement, or it is not claimed as covered. No silent middle.
 
 ## Standing pre-season items
 
-- RLS pass on the 32 exposed public tables before charging customers
-  (anon key ships in the frontend bundle).
+- ~~RLS pass on the exposed public tables~~ DONE 2026-07-11
+  (migration 20260711110000_rls_lockdown.sql: 34 tables locked, ai_suggestions
+  insert/update policies fixed, analytics grants tightened).
 - Update `seasonal_context` in ai_instructions in late August so NFL pick
   generation turns on in September.
 - Billing. The page sells $19.99/month with a 7-day trial and nothing
