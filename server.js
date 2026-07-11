@@ -428,6 +428,11 @@ app.post('/cron/sync-standings', syncStandings);
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);
 
+// Data-integrity agent sweep (Claude + web search): verifies records,
+// scouts injuries and weather, writes agent_intel. Needs ANTHROPIC_API_KEY.
+const dataIntegrity = require('./api/cron/data-integrity');
+app.post('/cron/data-integrity', dataIntegrity);
+
 // ATS backfill endpoint
 app.post('/cron/backfill-ats', async (req, res) => {
   try {

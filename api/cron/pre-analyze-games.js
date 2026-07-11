@@ -9,6 +9,7 @@ const { ApiSportsMulti } = require('../../lib/services/apisports-multi.js');
 const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
+const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 
@@ -876,7 +877,7 @@ async function runPreAnalysis(sportSlugs) {
         const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
         // Fetch context in parallel — DB queries + API-Sports + news
-        const [newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx] = await Promise.all([
+        const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, intelCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
           getInjuryContext(game.home_team, game.away_team),
           getRankingsContext(game.home_team, game.away_team),
@@ -884,8 +885,12 @@ async function runPreAnalysis(sportSlugs) {
           getRecentResults(game.away_team, game.sport),
           getPastAccuracy(game.sport),
           getApiSportsContext(game.home_team, game.away_team, game.sport),
-          getPlayerStatsContext(game.home_team, game.away_team, game.sport)
+          getPlayerStatsContext(game.home_team, game.away_team, game.sport),
+          // Web-verified injuries/weather/record warnings from the data
+          // integrity agent (empty string when no fresh intel exists).
+          getIntelContext(supabase, game.home_team, game.away_team)
         ]);
+        const newsCtx = `${newsCtxRaw || ''}${intelCtx || ''}` || null;
 
         // Get prior analysis for refinement loop
         const prior = priorAnalysisMap[game.game_key] || null;
