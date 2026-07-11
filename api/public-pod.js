@@ -39,17 +39,28 @@ module.exports = async (req, res) => {
   try {
     const { data: rows, error } = await supabase
       .from('ai_suggestions')
-      .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob')
+      .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob, created_at')
       .eq('generate_mode', 'auto_digest')
       .eq('actual_outcome', 'pending')
       .gt('game_date', new Date().toISOString())
       .gte('edge_pp', POD_MIN_PP)
-      .order('edge_pp', { ascending: false })
-      .limit(10);
+      .order('created_at', { ascending: false })
+      .limit(80);
 
     if (error) { res.status(500).json({ error: error.message }); return; }
 
-    const qualifying = (rows || []).find(r => {
+    // Only consider picks from the freshest digest generation. Analyses
+    // regenerate every few hours; an older pending pick can carry a bigger
+    // edge from a line or model state that no longer exists, and the free
+    // tile must match what the current board says.
+    let fresh = rows || [];
+    if (fresh.length > 0) {
+      const newest = new Date(fresh[0].created_at).getTime();
+      fresh = fresh.filter(r => newest - new Date(r.created_at).getTime() < 3 * 3600 * 1000);
+    }
+    fresh.sort((a, b) => Number(b.edge_pp) - Number(a.edge_pp));
+
+    const qualifying = fresh.find(r => {
       if (r.bet_type !== 'Moneyline') return true;
       const n = Number(String(r.odds || '').replace('+', ''));
       return Number.isNaN(n) || n <= POD_MAX_ML_ODDS;
