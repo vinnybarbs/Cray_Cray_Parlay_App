@@ -107,6 +107,11 @@ app.get('/api/public-ticker', publicTicker);
 const publicPod = require('./api/public-pod');
 app.get('/api/public-pod', publicPod);
 
+// Read-only analytics bundle for the weekly review routine (own secret,
+// stored in app_config — not CRON_SECRET).
+const reviewBundle = require('./api/review-bundle');
+app.get('/api/review-bundle', reviewBundle);
+
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath, {
