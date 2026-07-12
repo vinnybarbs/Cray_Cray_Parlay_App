@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
-  <!-- TrapHawk mark, concept "Terminal monogram": TH set in the house mono,
-       the line beneath with a center tick, pure Sharp-Quant. -->
-  <rect width="240" height="240" rx="28" fill="#0d0d0f"/>
-  <text x="120" y="146" text-anchor="middle" font-family="'JetBrains Mono','Menlo','Consolas',monospace" font-size="104" font-weight="700" letter-spacing="2"><tspan fill="#f5a524">T</tspan><tspan fill="#e7e5e4">H</tspan></text>
-  <line x1="56" y1="178" x2="184" y2="178" stroke="#3f3f46" stroke-width="6"/>
-  <line x1="120" y1="170" x2="120" y2="186" stroke="#f5a524" stroke-width="6"/>
-</svg>
