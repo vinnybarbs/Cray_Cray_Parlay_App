@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <!-- TrapHawk mark, concept "Origami head": angular falcon head in profile,
+       solid beak, deliberately no eye. -->
+  <rect width="240" height="240" rx="28" fill="#0d0d0f"/>
+  <polygon points="60,84 140,84 204,124 140,144 140,180 60,180" fill="none" stroke="#f5a524" stroke-width="8" stroke-linejoin="miter"/>
+  <polygon points="140,104 204,124 140,144" fill="#f5a524"/>
+  <line x1="60" y1="204" x2="180" y2="204" stroke="#3f3f46" stroke-width="6"/>
+  <line x1="120" y1="197" x2="120" y2="211" stroke="#f5a524" stroke-width="6"/>
+</svg>

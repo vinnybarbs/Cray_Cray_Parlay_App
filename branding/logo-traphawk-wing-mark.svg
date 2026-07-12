@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <!-- TrapHawk mark, concept "Wing bars": three sheared feathers that double
+       as a rising ledger chart over the line. -->
+  <rect width="240" height="240" rx="28" fill="#0d0d0f"/>
+  <polygon points="52,188 88,188 98,146 62,146" fill="#f5a524" opacity="0.45"/>
+  <polygon points="100,188 136,188 146,112 110,112" fill="#f5a524" opacity="0.7"/>
+  <polygon points="148,188 184,188 194,68 158,68" fill="#f5a524"/>
+  <line x1="40" y1="200" x2="200" y2="200" stroke="#52525b" stroke-width="6"/>
+</svg>

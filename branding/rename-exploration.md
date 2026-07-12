@@ -1,3 +1,17 @@
+# DECISION (2026-07-11, Vince)
+
+**TrapHawk. Confirmed.** Vince is buying traphawk.io and traphawk.ai himself.
+
+The original eye-in-brackets mark is rejected (read as an Egyptian eye, not a
+hawk). Round two concepts, all eye-free, live in this folder:
+logo-traphawk-stoop-*.svg (the dive striking the trap),
+logo-traphawk-wing-*.svg (feathers as a rising ledger),
+logo-traphawk-head-mark.svg (angular falcon profile),
+logo-traphawk-monogram-mark.svg (terminal TH).
+Mark selection pending. Rename rollout starts after the mark and domains land.
+
+---
+
 # Rename exploration: parent brand for the graded-picks business
 
 Date: July 11, 2026. Prepared for Vince. Scope per the brief. The company gets a new parent brand. "Cray Cray Parlays" is demoted to the parlay-builder feature name. "The House Ledger" stays as the name of the public settlement record no matter what. Every candidate below was tested against the sentence "Name. Every pick on The House Ledger."
