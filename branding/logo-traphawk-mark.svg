@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <!-- TrapHawk standalone mark. App icon / avatar scale. -->
+  <rect width="240" height="240" rx="28" fill="#0d0d0f"/>
+
+  <!-- targeting brackets -->
+  <g stroke="#52525b" stroke-width="5" fill="none" stroke-linecap="square">
+    <path d="M32 52 v-20 h20"/>
+    <path d="M188 32 h20 v20"/>
+    <path d="M208 188 v20 h-20"/>
+    <path d="M52 208 h-20 v-20"/>
+  </g>
+
+  <!-- hawk eye -->
+  <path d="M40 108 Q120 44 200 108 Q120 172 40 108 Z" fill="none" stroke="#f5a524" stroke-width="7" stroke-linejoin="round"/>
+  <path d="M120 84 L144 108 L120 132 L96 108 Z" fill="#f5a524"/>
+
+  <!-- the line being watched -->
+  <g stroke="#3f3f46" stroke-width="5">
+    <line x1="48" y1="186" x2="192" y2="186"/>
+    <line x1="76" y1="179" x2="76" y2="193"/>
+    <line x1="164" y1="179" x2="164" y2="193"/>
+  </g>
+  <line x1="120" y1="176" x2="120" y2="196" stroke="#f5a524" stroke-width="5"/>
+</svg>
