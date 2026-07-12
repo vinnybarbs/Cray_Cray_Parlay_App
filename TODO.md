@@ -60,10 +60,15 @@ edges and settlement, or it is not claimed as covered. No silent middle.
 
 ## From the legal audit (2026-07-11)
 
-- BLOCKER before charging money: migrate scores/standings/stats off unofficial
-  ESPN endpoints to a licensed source (The Odds API scores, SportsDataIO, or
-  similar). Disney ToU prohibits commercial use of scraped data. See
-  audit/60-legal-ip.md.
+- ESPN data migration: DEFERRED by decision (Vince, 2026-07-11). The audit
+  flagged unofficial ESPN endpoints as a blocker before charging money
+  (Disney ToU prohibits commercial use, see audit/60-legal-ip.md). Vince's
+  call: the exposure is contract/ToS risk, not illegality, and the public
+  endpoints stay in the backend for now as an accepted risk. Revisit if a
+  cease-and-desist arrives, an endpoint breaks mid-season, or revenue makes
+  the exposure worth pricing a licensed source (The Odds API scores,
+  SportsDataIO). The reliability risk (endpoints breaking during NFL season)
+  still argues for an eventual migration on engineering grounds.
 - File trademark for the full name "Cray Cray for Parlays" (Class 41, expect
   a PARLAYS disclaimer) after a one-hour clearance review. Register "The
   House Ledger" mark alongside.
