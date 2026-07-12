@@ -11,7 +11,7 @@ const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
-const { getClient: getClaude, MODELS } = require('../../lib/services/claude.js');
+const { getClient: getClaude, MODELS, extractJson } = require('../../lib/services/claude.js');
 
 // Map odds_cache sport slugs to display sport names
 const SLUG_TO_SPORT = {
@@ -494,7 +494,8 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
 }
 
 /**
- * Generate AI analysis for a single game using GPT-4o-mini
+ * Generate AI analysis for a single game. Returns the analysis fields on
+ * success, or { error } on failure so the caller can log the real reason.
  */
 async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null) {
   const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
@@ -661,7 +662,10 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
 
     const data = await claude.messages.create({
       model: MODELS.NARRATION,
-      max_tokens: 600,
+      // Sonnet narrations run 500-600 output tokens where gpt-4o-mini used
+      // ~150-200. The old 600 cap truncated most responses mid-JSON, so
+      // nearly every analysis parsed as null (broke the whole board 7/11).
+      max_tokens: 1500,
       // Narration only — the math already picked the side. Thinking stays
       // off to keep the per-game cost/latency profile of the old setup.
       thinking: { type: 'disabled' },
@@ -672,10 +676,10 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
     const usage = data.usage;
 
     if (!content) throw new Error('Empty response from Claude');
+    if (data.stop_reason === 'max_tokens') throw new Error(`Response truncated at max_tokens (${usage?.output_tokens} tokens)`);
 
-    // Parse JSON (strip markdown fences if present)
-    const jsonStr = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(jsonStr);
+    const parsed = extractJson(content);
+    if (!parsed || !parsed.analysis) throw new Error(`Unparseable model response: ${content.slice(0, 120)}`);
 
     // Pick is now math-derived — return it alongside the LLM's analysis text.
     // LLM is no longer allowed to change recommended_pick / recommended_side.
@@ -691,7 +695,9 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
     };
   } catch (err) {
     console.error(`AI analysis failed for ${game.game_key}:`, err.message);
-    return null;
+    // Surface the real reason to the caller — cron_job_logs used to record
+    // only "AI returned null", which hid a truncation bug for 12 hours.
+    return { error: err.message };
   }
 }
 
@@ -925,12 +931,13 @@ async function runPreAnalysis(sportSlugs) {
 
         const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior, edgeData, mathPick);
 
-        if (!result) {
-          console.warn(`  ⚠️ analyzeGame returned null for ${game.game_key}`);
-          errors.push(`${game.game_key}: AI returned null`);
+        if (!result || result.error) {
+          const reason = result?.error || 'AI returned null';
+          console.warn(`  ⚠️ analyzeGame failed for ${game.game_key}: ${reason}`);
+          errors.push(`${game.game_key}: ${reason}`);
         }
 
-        if (result) {
+        if (result && !result.error) {
           const record = {
             game_key: game.game_key,
             sport: sportDisplay,
@@ -1085,7 +1092,7 @@ async function runPreAnalysis(sportSlugs) {
           }
         }
 
-        // Small delay between OpenAI calls
+        // Small delay between model calls
         await new Promise(r => setTimeout(r, 500));
 
       } catch (err) {
@@ -1095,7 +1102,8 @@ async function runPreAnalysis(sportSlugs) {
     }
 
     const duration = Date.now() - startTime;
-    const estimatedCost = ((totalPromptTokens * 0.00000015) + (totalCompletionTokens * 0.0000006)).toFixed(4);
+    // Sonnet per-token rates ($3 in / $15 out per MTok)
+    const estimatedCost = ((totalPromptTokens * 0.000003) + (totalCompletionTokens * 0.000015)).toFixed(4);
 
     // Log results to cron_job_logs for admin dashboard visibility
     try {
