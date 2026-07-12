@@ -480,12 +480,12 @@ function ExecutionFlow() {
     },
     {
       n: '03',
-      title: 'You lock and build',
-      body: 'Stack the sides you like. One tap hands you a deep-linked betslip to your sportsbook. We never hold money or see your account.',
+      title: 'The machine builds the parlays',
+      body: 'Cross-game combos assembled from the highest-edge legs, published before the games and settled publicly after — win or lose. We never hold money or see your account.',
       meta: [
-        ['// books',   'DraftKings · FanDuel'],
+        ['// builds',  '2-leg + 3-leg daily · 4pp floor'],
+        ['// receipt', 'settled on The House Ledger'],
         ['// holds',   'we hold nothing'],
-        ['// gate',    '+21'],
       ],
     },
   ]
@@ -926,7 +926,7 @@ function TermSheet({ onStartTrial }) {
     'Per-side edges, signed and tier-graded',
     'Negative edges visible (Trap label)',
     'De-Genny chat for picks on demand',
-    'One-tap parlay builder · DraftKings & FanDuel deep links',
+    'Machine-built parlays · published and settled on The House Ledger',
     'Settlement tracking · every pick graded after the game',
     'Hit rate by tier and sport · refreshed after every settlement',
   ]

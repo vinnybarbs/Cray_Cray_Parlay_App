@@ -1,18 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import Dashboard from '../components/Dashboard'
-import { edgeTier, formatPp, edgePpForSide, buildLockedPayload, pickIdFor, TIERS } from '../lib/tiers'
-import { calculateParlay } from '../utils/oddsCalculations'
+import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
 
 // The Board — "give me picks for the sports I choose", rebuilt as a filtered
 // view of the same graded edge-tier data the digest serves (audit 40 §3).
 // One grading language (signed pp + six tiers), real odds on every row, no
-// second pick generator, no fake loading theater. The old form, its
-// Low/Medium/High vocabulary, 1-to-10 confidence, and the agent-cartoon
-// explainer are retired.
+// second pick generator, no fake loading theater. Picks are information —
+// the machine builds the parlays (see The House Ledger), so there is no
+// lock/queue/betslip apparatus here.
 
 const MIN_TIER_OPTIONS = [
   { key: 'all',    label: 'All picks',  min: -Infinity },
@@ -40,12 +38,11 @@ function formatOdds(odds) {
   return n > 0 ? `+${n}` : String(n)
 }
 
-function PickRow({ row, locked, onToggle }) {
+function PickRow({ row }) {
   const tier = edgeTier(row.pp)
   const odds = formatOdds(row.odds)
-  const lockable = !!row.game.recommended_pick && row.pp != null && row.pp >= 2
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 border-t border-ink-800 ${locked ? 'bg-signal-pos-dim/10' : ''}`}>
+    <div className="flex items-center gap-3 px-4 py-3 border-t border-ink-800">
       <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${tier.color} ${tier.bg}`}>
         {tier.label}
       </span>
@@ -62,22 +59,9 @@ function PickRow({ row, locked, onToggle }) {
           {row.game.game_date && <> · {toMountainTime(row.game.game_date)} MT</>}
         </div>
       </div>
-      {lockable ? (
-        <button
-          onClick={() => onToggle(row)}
-          className={`flex-shrink-0 px-3 py-1.5 rounded-sharp text-xs font-mono font-bold uppercase tracking-wider transition-all active:scale-95 ${
-            locked
-              ? 'bg-signal-pos text-ink-950'
-              : 'bg-ink-850 shadow-hairline text-ink-200 hover:bg-ink-800 hover:shadow-hairline-bright'
-          }`}
-        >
-          {locked ? '✓ In slip' : '+ Add'}
-        </button>
-      ) : (
-        <span className="flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-ink-500">
-          {row.pp != null && row.pp < 0 ? 'fade' : 'pass'}
-        </span>
-      )}
+      <span className={`flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider ${tier.color}`}>
+        {tier.subtitle}
+      </span>
     </div>
   )
 }
@@ -88,15 +72,10 @@ export default function GeneratorPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [showDashboard, setShowDashboard] = useState(false)
 
   // Filters
   const [selectedSports, setSelectedSports] = useState([]) // empty = all
   const [minTier, setMinTier] = useState('lean')
-
-  // Betslip queue — same payload and localStorage hand-off as the digest,
-  // so /betslip consumes it identically.
-  const [lockedPicks, setLockedPicks] = useState([])
 
   useEffect(() => {
     let cancelled = false
@@ -141,30 +120,6 @@ export default function GeneratorPage() {
     setSelectedSports(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
   }
 
-  const toggleLock = (row) => {
-    const id = pickIdFor(row.game)
-    setLockedPicks(prev => prev.find(p => p.id === id)
-      ? prev.filter(p => p.id !== id)
-      : [...prev, buildLockedPayload(row.game, row.sport)]
-    )
-  }
-
-  const buildBetslip = () => {
-    if (lockedPicks.length === 0) return
-    try {
-      localStorage.setItem('digest_parlay_picks', JSON.stringify(lockedPicks))
-    } catch (e) { /* storage unavailable */ }
-    navigate('/betslip')
-  }
-
-  // Combined odds preview only when every queued leg carries a real price.
-  const combined = useMemo(() => {
-    if (lockedPicks.length < 2) return null
-    const odds = lockedPicks.map(p => p.odds)
-    if (odds.some(o => o == null)) return null
-    try { return calculateParlay(odds, 100).combinedOdds } catch { return null }
-  }, [lockedPicks])
-
   if (!isAuthenticated) {
     return <Navigate to="/" replace />
   }
@@ -179,12 +134,12 @@ export default function GeneratorPage() {
           <button onClick={() => navigate('/digest')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Digest</button>
           <button onClick={() => navigate('/chat')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">De-Genny</button>
           <button onClick={() => navigate('/results')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Results</button>
-          <button onClick={() => setShowDashboard(true)} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Dashboard</button>
+          <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
           <button onClick={signOut} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Sign out</button>
         </div>
       </div>
 
-      <div className={`max-w-3xl mx-auto px-4 py-6 space-y-4 ${lockedPicks.length > 0 ? 'pb-32' : ''}`}>
+      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
 
         {/* Filters */}
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-4 space-y-3">
@@ -256,12 +211,7 @@ export default function GeneratorPage() {
               </div>
             ) : (
               rows.map(row => (
-                <PickRow
-                  key={pickIdFor(row.game)}
-                  row={row}
-                  locked={lockedPicks.some(p => p.id === pickIdFor(row.game))}
-                  onToggle={toggleLock}
-                />
+                <PickRow key={pickIdFor(row.game)} row={row} />
               ))
             )}
           </div>
@@ -274,37 +224,6 @@ export default function GeneratorPage() {
         )}
       </div>
 
-      {/* Sticky betslip bar */}
-      {lockedPicks.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-40">
-          <div className="max-w-3xl mx-auto px-4 pb-3">
-            <div className="bg-ink-950/95 border border-ink-700 rounded-t-2xl shadow-2xl px-4 py-3 flex items-center gap-3">
-              <div className="flex-1 text-xs text-ink-200">
-                <div className="font-semibold text-signal-pos font-mono">
-                  {lockedPicks.length} leg{lockedPicks.length > 1 ? 's' : ''} queued
-                </div>
-                {combined && (
-                  <div className="text-[11px] text-ink-300 mt-0.5 font-mono tabular-nums">Combined: {combined}</div>
-                )}
-              </div>
-              <button
-                onClick={() => setLockedPicks([])}
-                className="px-3 py-2 text-xs text-ink-400 hover:text-white transition-colors"
-              >
-                Clear
-              </button>
-              <button
-                onClick={buildBetslip}
-                className="px-4 py-2 rounded-sharp font-mono font-bold uppercase tracking-[0.1em] text-sm bg-signal-pos hover:bg-signal-pos/90 text-ink-950 transition-all active:scale-95"
-              >
-                Build betslip →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
     </div>
   )
 }

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } from 'react'
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, pickIdFor, buildLockedPayload } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide } from '../lib/tiers'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
 
@@ -59,15 +59,6 @@ function formatFullDate(isoString) {
     day: 'numeric',
   })
 }
-
-// ─── Locked-Picks context ────────────────────────────────────────────────────
-// Single source of truth for which picks the user has locked on the digest.
-// Provided by <DailyDigest>, consumed by GameCard, PickOfTheDay, SportSection's
-// Quick Parlay button, and LockedPicksBar. Centralizing here means the existing
-// localStorage hand-off to BetslipBuilder happens in exactly one place (the
-// sticky bar's "Build Parlay" click), not five.
-
-const LockedPicksContext = createContext(null)
 
 function edgeBadgeClass(score) {
   if (score == null) return 'bg-ink-800 text-ink-300'
@@ -181,7 +172,7 @@ function Countdown({ targetIso }) {
 
 // ─── Deep Research Modal ────────────────────────────────────────────────────
 
-function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
+function DeepResearchModal({ gameKey, game, onClose }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -224,29 +215,6 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = '' }
   }, [])
-
-  const handleLockPick = () => {
-    const pick = {
-      sport: game.sport || 'Unknown',
-      homeTeam: game.home_team,
-      awayTeam: game.away_team,
-      pick: game.recommended_pick,
-      betType: game.recommended_side || 'Moneyline/Spread',
-      odds: lockOddsFor(game),
-      model: game.model_used || null,
-      confidence: game.edge_score || 7,
-      reasoning: game.analysis_snippet || '',
-      gameDate: game.game_date,
-      id: `${game.home_team}-${game.away_team}-deep`,
-    }
-    try {
-      const existing = JSON.parse(localStorage.getItem('digest_parlay_picks') || '[]')
-      const deduped = existing.filter(p => p.id !== pick.id)
-      localStorage.setItem('digest_parlay_picks', JSON.stringify([...deduped, pick]))
-    } catch (e) { /* storage unavailable */ }
-    onLockPick && onLockPick(pick)
-    onClose()
-  }
 
   const analysis = data?.analysis || game
   const version = analysis.analysis_version
@@ -527,17 +495,6 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
           })()}
         </div>
 
-        {/* Modal footer — Lock Pick */}
-        {game.recommended_pick && (
-          <div className="flex-shrink-0 px-5 py-4 border-t border-ink-700 bg-ink-900">
-            <button
-              onClick={handleLockPick}
-              className="w-full py-3 rounded-sharp font-bold text-ink-950 text-sm bg-signal-pos hover:bg-signal-pos/90 shadow-lg transition-all active:scale-95"
-            >
-              Lock This Pick — {game.recommended_pick}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -676,8 +633,6 @@ function MarketTabs({ game }) {
 
 function GameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
-  const { isLocked, toggleLock } = useContext(LockedPicksContext)
-  const locked = isLocked(game)
 
   // Signed edge in pp for the recommended side. When the math returned a real
   // pick, this reflects that bet's edge. When it didn't (no-edge game), we
@@ -754,21 +709,9 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
         )}
       </div>
 
-      {/* Action row — Lock pick (primary) + Deep Research (secondary). The Lock
-          button only renders if the math actually returned a pick to lock. */}
+      {/* Action row — Deep Research. The pick itself is information, not a
+          button: the machine builds the parlays now. */}
       <div className="px-4 pb-4 pt-0 flex gap-2">
-        {game.recommended_pick && (
-          <button
-            onClick={() => toggleLock(game, sport)}
-            className={`flex-1 py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] rounded-sharp transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-              locked
-                ? 'bg-signal-pos text-ink-950 hover:bg-signal-pos/90 font-bold'
-                : 'bg-ink-850 text-ink-200 hover:bg-ink-800 shadow-hairline hover:shadow-hairline-bright'
-            }`}
-          >
-            {locked ? <><span>✓</span> Locked</> : <><span className="text-signal-pos">+</span> Lock pick</>}
-          </button>
-        )}
         {gameKey && (
           <button
             onClick={() => onDeepResearch(game, gameKey)}
@@ -824,7 +767,6 @@ function InjurySection({ content }) {
 function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch, upcomingCount }) {
   const [expanded, setExpanded] = useState(isDefaultExpanded)
   const meta = getSportMeta(sport)
-  const { lockMany } = useContext(LockedPicksContext)
 
   // Split games by whether the math returned an actionable pick. "On the
   // bubble" surfaces games where the model considered the matchup but every
@@ -846,15 +788,6 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   function getGameKey(game) {
     return game.game_key || null
   }
-
-  // Stage the section's top picks into the locked-picks queue. The sticky bar
-  // takes it from there; we no longer write localStorage or navigate inline —
-  // that keeps the BetslipBuilder hand-off in a single place.
-  const lockTopPicks = (e) => {
-    e.stopPropagation()
-    lockMany(topGames, sport)
-  }
-  const lockableTopCount = topGames.filter(g => g.recommended_pick).length
 
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
@@ -881,16 +814,6 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             </div>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Lock top picks — only when expanded. Stages the section's top
-                picks into the locked-picks queue; the sticky bar takes it from there. */}
-            {expanded && lockableTopCount > 0 && (
-              <button
-                onClick={lockTopPicks}
-                className="px-4 py-2 font-mono text-xs font-bold uppercase tracking-[0.12em] rounded-sharp bg-signal-pos hover:bg-signal-pos/90 text-ink-950 transition-all active:scale-[0.98]"
-              >
-                + Lock top {lockableTopCount}
-              </button>
-            )}
             {/* Chevron */}
             <span className="font-mono text-ink-400 text-xs select-none">
               {expanded ? '▲' : '▼'}
@@ -1014,7 +937,6 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 // best play. With it, the value prop lands on first scroll.
 
 function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
-  const { isLocked, toggleLock } = useContext(LockedPicksContext)
   const [expanded, setExpanded] = useState(false)
   if (!pick) return null
   const { game, sport, signedPp } = pick
@@ -1022,7 +944,6 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
   const sportMeta = getSportMeta(sport)
   const arrow = signedPp > 0 ? '▲' : '▼'
   const pp = formatPp(signedPp)
-  const locked = isLocked(game)
 
   // Surface the model's view in human terms when the data is on the row.
   // pre-analyze writes calc_*_prob and implied_*_prob alongside edges, but
@@ -1158,16 +1079,6 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
           </div>
         )}
 
-        <button
-          onClick={() => toggleLock(game, sport)}
-          className={`mt-4 w-full sm:w-auto px-5 py-2.5 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-sm transition-all active:scale-[0.98] ${
-            locked
-              ? 'bg-ink-850 shadow-hairline text-ink-200 hover:bg-ink-800'
-              : 'bg-signal-pos hover:bg-signal-pos/90 text-ink-950'
-          }`}
-        >
-          {locked ? '✓ Locked — unlock' : '+ Lock this pick'}
-        </button>
       </div>
     </div>
   )
@@ -1488,48 +1399,11 @@ export default function DailyDigest({ onBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
-  const [lockedPicks, setLockedPicks] = useState([])
   const [legendOpen, setLegendOpen] = useState(false)
   // Sharp Take / Strong Play hit-rate over last 30d — surfaces below the
   // featured pick to anchor the picks-actually-win narrative ("don't trust
   // me, trust the receipt").
   const [tierStats, setTierStats] = useState(null)
-
-  // Locked-picks API consumed via context by tiles, the PoD CTA, and the sticky bar.
-  // The localStorage write only happens at buildParlay() — until then the locks are
-  // a session-scoped queue, which keeps the BetslipBuilder hand-off predictable.
-  const lockedPicksApi = useMemo(() => ({
-    lockedPicks,
-    count: lockedPicks.length,
-    isLocked: (game) => lockedPicks.some(p => p.id === pickIdFor(game)),
-    toggleLock: (game, sport) => {
-      const id = pickIdFor(game)
-      setLockedPicks(prev => prev.find(p => p.id === id)
-        ? prev.filter(p => p.id !== id)
-        : [...prev, buildLockedPayload(game, sport)]
-      )
-    },
-    lockMany: (games, sport) => {
-      setLockedPicks(prev => {
-        const existing = new Set(prev.map(p => p.id))
-        const additions = games
-          .filter(g => g.recommended_pick && !existing.has(pickIdFor(g)))
-          .map(g => buildLockedPayload(g, sport))
-        return additions.length ? [...prev, ...additions] : prev
-      })
-    },
-    clearAll: () => setLockedPicks([]),
-    buildParlay: () => {
-      if (lockedPicks.length === 0) return
-      try {
-        localStorage.setItem('digest_parlay_picks', JSON.stringify(lockedPicks))
-      } catch (e) { /* storage unavailable */ }
-      // Route to BetslipBuilder via the hash route MainApp listens for.
-      // Previously sent users to '/' which dumped them on the parlay generator
-      // landing with the locked picks silently dropped on the floor.
-      window.location.hash = '#/betslip'
-    },
-  }), [lockedPicks])
 
   const fetchDigest = useCallback(async () => {
     setLoading(true)
@@ -1655,7 +1529,6 @@ export default function DailyDigest({ onBack }) {
   }, [])
 
   return (
-    <LockedPicksContext.Provider value={lockedPicksApi}>
     <div className="min-h-screen bg-ink-950 text-white font-sans">
       {/* Top nav bar — the digest is the authenticated home, so there is no
           "Back". Other surfaces are forward navigation. */}
@@ -1681,7 +1554,7 @@ export default function DailyDigest({ onBack }) {
         </button>
       </div>
 
-      <div className={`max-w-5xl mx-auto px-4 py-6 space-y-6 ${lockedPicks.length > 0 ? 'pb-32' : ''}`}>
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
 
         {/* Hero header */}
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
@@ -1835,7 +1708,6 @@ export default function DailyDigest({ onBack }) {
           gameKey={deepResearchTarget.gameKey}
           game={deepResearchTarget.game}
           onClose={handleCloseDeepResearch}
-          onLockPick={() => {}}
         />
       )}
 
@@ -1844,9 +1716,7 @@ export default function DailyDigest({ onBack }) {
 
       {/* Sticky locked-picks bar — visible whenever the user has staged ≥ 1 pick.
           Pinned to viewport bottom; the parent container reserves pb-32 to avoid overlap. */}
-      <LockedPicksBar />
     </div>
-    </LockedPicksContext.Provider>
   )
 }
 
@@ -1938,39 +1808,3 @@ function EdgeLegendModal({ open, onClose }) {
   )
 }
 
-// ─── LockedPicksBar ──────────────────────────────────────────────────────────
-// Fixed-bottom bar that shows when the user has locked any picks from the digest.
-// "Build Parlay" finalizes: writes locked picks to localStorage so the
-// BetslipBuilder reads them on next load, then routes back to the main app.
-
-function LockedPicksBar() {
-  const { lockedPicks, clearAll, buildParlay } = useContext(LockedPicksContext)
-  if (lockedPicks.length === 0) return null
-  return (
-    <div className="fixed bottom-0 inset-x-0 z-40 bg-ink-900/95 backdrop-blur border-t border-signal-pos-dim shadow-[0_-8px_24px_rgba(0,0,0,0.5)] safe-bottom">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="font-mono text-sm tabular-nums">
-            <span className="text-signal-pos font-bold">{lockedPicks.length}</span>
-            <span className="text-ink-200"> pick{lockedPicks.length !== 1 ? 's' : ''} locked</span>
-          </div>
-          <div className="font-mono text-[10px] text-ink-400 truncate mt-0.5">
-            {lockedPicks.map(p => p.pick).join(' · ')}
-          </div>
-        </div>
-        <button
-          onClick={clearAll}
-          className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 hover:text-ink-200 px-3 py-2 transition-colors"
-        >
-          Clear
-        </button>
-        <button
-          onClick={buildParlay}
-          className="px-5 py-2.5 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-sm text-ink-950 transition-all active:scale-[0.98] flex-shrink-0"
-        >
-          Build Parlay →
-        </button>
-      </div>
-    </div>
-  )
-}

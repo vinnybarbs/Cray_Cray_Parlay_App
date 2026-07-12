@@ -6,16 +6,13 @@ import Auth from './components/Auth'
 import DailyDigest from './pages/DailyDigest'
 import GeneratorPage from './pages/GeneratorPage'
 import ChatPicks from './pages/ChatPicks'
-import BetslipBuilder from './pages/BetslipBuilder'
 import ResultsPage from './pages/ResultsPage'
 import AdminDashboard from './pages/AdminDashboard'
 import HouseLedger from './pages/HouseLedger'
 
 // App-level router. HashRouter (mounted in main.jsx) keeps every pre-existing
-// #/digest-style URL and localStorage hand-off working unchanged: setting
-// window.location.hash = '#/betslip' anywhere still navigates, because the
-// router reads the same hash. The old MainApp flag-and-overlay navigation is
-// gone — browser Back/Forward now work everywhere.
+// #/digest-style URL working unchanged. The old MainApp flag-and-overlay
+// navigation is gone — browser Back/Forward now work everywhere.
 
 // While AuthContext hydrates the Supabase session, isAuthenticated is briefly
 // false — which would flash Landing (or bounce a deep link) for a returning
@@ -68,21 +65,6 @@ function ChatRoute() {
   )
 }
 
-function BetslipRoute() {
-  const navigate = useNavigate()
-  return (
-    <div className="min-h-screen bg-ink-950 relative">
-      <button
-        onClick={() => navigate('/digest')}
-        className="absolute top-4 right-4 z-50 bg-ink-900 hover:bg-ink-800 text-white px-4 py-2 rounded-sharp border border-ink-700"
-      >
-        ✕ Close
-      </button>
-      <BetslipBuilder />
-    </div>
-  )
-}
-
 function ResultsRoute() {
   const navigate = useNavigate()
   return <ResultsPage onBack={() => navigate('/digest')} />
@@ -104,7 +86,6 @@ export default function App() {
       <Route path="/digest" element={<DigestRoute />} />
       <Route path="/generator" element={<GeneratorPage />} />
       <Route path="/chat" element={<ChatRoute />} />
-      <Route path="/betslip" element={<BetslipRoute />} />
       <Route path="/results" element={<ResultsRoute />} />
       {/* The House Ledger is deliberately public — it IS the marketing. */}
       <Route path="/ledger" element={<HouseLedger />} />
