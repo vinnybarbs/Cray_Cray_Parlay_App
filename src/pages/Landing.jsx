@@ -358,60 +358,65 @@ function StatRow({ label, value, tone = 'neutral', big = false, small = false })
   )
 }
 
-// ─── EdgeScorecard — competitors graded with our own tier system ──────────
+// ─── EdgeScorecard — the receipts question, asked of everyone ─────────────
 
-// Editorial grades only — no invented pp values. The previous version styled
-// made-up signed edges ("−8.2pp") as data with a 10px "illustrative"
-// disclaimer; a skeptical bettor who caught that would discount the real
-// numbers elsewhere on the page (audit 40, medium 11). Tier labels are
-// opinion and presented as opinion.
+// One factual, checkable comparison instead of grades. The old version
+// assigned our tier vocabulary to competitors, which without numbers behind
+// it read as name-calling. This version asks the only question that sorts
+// the category — "show me every pick you published, graded, losses
+// included" — and answers it with verifiable facts. Ours links to the proof.
 function EdgeScorecard() {
   const rows = [
     {
       name: 'Action Network',
-      tier: 'Trap',
-      tone: 'neg',
       reason: 'Owned by a publicly-traded sportsbook affiliate (Better Collective). Structurally cannot warn you off a book without dismantling its parent\'s revenue model.',
+      price: '$24.99/mo',
+      record: 'None found',
+      recordSub: 'no graded house record published',
     },
     {
       name: 'OddsJam',
-      tier: 'Skip',
-      tone: 'neutral',
-      reason: '$99–498/mo. Their flagship math tools now sit in the ~$498 tier — locks out the recreational bettor entirely.',
+      reason: 'Owned by Gambling.com Group, another affiliate business. Flagship math tools now sit in the ~$498 tier — locks out the recreational bettor entirely.',
+      price: '$99–498/mo',
+      record: 'None found',
+      recordSub: 'free daily picks, no graded record',
     },
     {
       name: 'Pikkit',
-      tier: 'Lean',
-      tone: 'neutral',
-      reason: 'Grades you after the bet (CLV). Different shelf — they measure history, we publish the decision. Complementary, not competitive.',
+      reason: 'Grades you after the bet (CLV). Different shelf — they measure your history, we publish the decision. Complementary, not competitive.',
+      price: 'Free',
+      record: 'Yours, not theirs',
+      recordSub: 'tracks your bets, publishes no picks',
     },
     {
       name: 'Cray Cray for Parlays',
-      tier: 'Strong Play',
-      tone: 'pos',
-      reason: 'No affiliate parent. Per-side edges including negative ones. Trap label is the differentiator the rest structurally can\'t copy.',
+      reason: 'No affiliate parent. Per-side edges including negative ones, every pick timestamped before the game and settled after — losses, ROI, and units included.',
+      price: '$19.99/mo',
+      record: 'The House Ledger',
+      recordSub: 'every pick · graded · public',
+      link: true,
     },
   ]
   return (
     <section className="border-b border-ink-800">
       <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>$ competitors_graded.csv</SectionLabel>
+        <SectionLabel>$ diff --receipts us competitors/</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          We graded them with <span className="text-signal-pos">our own system.</span>
+          One question sorts this category: <span className="text-signal-pos">where's the graded record?</span>
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          Every other picks app has a structural reason it can't tell you which side is the trap. So we ran the same math on <span className="text-ink-100">them.</span>
+          Every pick, published before the game, settled after, losers included. Ask everyone the same question. Here's how it answers as of July 2026.
         </p>
 
         <div className="mt-12">
           {/* Header row */}
-          <div className="hidden md:grid grid-cols-[1fr_160px] gap-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 pb-2 border-b border-ink-800">
+          <div className="hidden md:grid grid-cols-[1fr_130px_210px] gap-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 pb-2 border-b border-ink-800">
             <span>Vendor</span>
-            <span className="text-right">Our grade</span>
+            <span className="text-right">Price</span>
+            <span className="text-right">Graded public record</span>
           </div>
 
           {rows.map((r, i) => {
-            const grdColor = r.tone === 'pos' ? 'text-signal-pos' : r.tone === 'neg' ? 'text-signal-neg' : 'text-ink-400'
             const isUs = r.name.startsWith('Cray')
             return (
               <div
@@ -421,10 +426,10 @@ function EdgeScorecard() {
                 {isUs && (
                   <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-signal-pos" aria-hidden="true" />
                 )}
-                <div className="grid md:grid-cols-[1fr_160px] gap-2 md:gap-4 items-baseline">
+                <div className="grid md:grid-cols-[1fr_130px_210px] gap-2 md:gap-4 items-baseline">
                   <div className="min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className={`text-lg md:text-xl font-bold tracking-tight ${isUs ? 'text-ink-100' : 'text-ink-100'}`}>
+                      <span className="text-lg md:text-xl font-bold tracking-tight text-ink-100">
                         {r.name}
                       </span>
                       {isUs && (
@@ -435,9 +440,24 @@ function EdgeScorecard() {
                     </div>
                     <p className="mt-2 text-sm text-ink-300 leading-relaxed max-w-xl">{r.reason}</p>
                   </div>
+                  <div className="md:text-right font-mono text-sm text-ink-200 tabular-nums">
+                    {r.price}
+                  </div>
                   <div className="md:text-right">
-                    <span className={`text-sm font-bold uppercase tracking-[0.18em] ${grdColor}`}>
-                      {r.tier}
+                    {r.link ? (
+                      <button
+                        onClick={() => { window.location.hash = '#/ledger' }}
+                        className="text-sm font-bold uppercase tracking-[0.14em] text-signal-pos hover:underline"
+                      >
+                        {r.record} →
+                      </button>
+                    ) : (
+                      <span className="text-sm font-bold uppercase tracking-[0.14em] text-ink-400">
+                        {r.record}
+                      </span>
+                    )}
+                    <span className="block text-[10px] text-ink-500 mt-0.5 normal-case tracking-normal">
+                      {r.recordSub}
                     </span>
                   </div>
                 </div>
@@ -447,7 +467,7 @@ function EdgeScorecard() {
         </div>
 
         <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500">
-          // Editorial grades — our opinion of each vendor's structural position, not a measured edge. Pricing verified July 2026.
+          // Facts checkable as of July 2026: ownership from public filings, pricing from live subscribe pages. Corrections welcome — that's the point.
         </p>
       </div>
     </section>
