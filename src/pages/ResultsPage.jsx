@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
+import { API_BASE_URL as API_BASE } from '../config'
 
 function StatCard({ label, value, sub, color = 'yellow' }) {
   const colorMap = {

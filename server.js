@@ -20,8 +20,8 @@ const progressClients = new Map(); // requestId -> [response objects]
 
 // Enhanced CORS for deployment
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL, 'https://your-deployed-app.com'] 
+  origin: process.env.NODE_ENV === 'production'
+    ? [process.env.FRONTEND_URL, 'https://traphawk.io', 'https://www.traphawk.io'].filter(Boolean)
     : true,
   credentials: true
 }));

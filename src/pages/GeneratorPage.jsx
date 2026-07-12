@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
+import { API_BASE_URL as API_BASE } from '../config'
 
 // The Board — "give me picks for the sports I choose", rebuilt as a filtered
 // view of the same graded edge-tier data the digest serves (audit 40 §3).

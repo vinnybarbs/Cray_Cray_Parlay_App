@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { edgeTier, formatPp, edgePpForSide } from '../lib/tiers'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
+import { API_BASE_URL as API_BASE } from '../config'
 
 const SPORT_META = {
   NBA:   { emoji: '🏀', label: 'NBA' },

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
+import { API_BASE_URL as API_BASE } from '../config'
 
 const STARTERS = [
   "What NCAAB games are on tonight?",

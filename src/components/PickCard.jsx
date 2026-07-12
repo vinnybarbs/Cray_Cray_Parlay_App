@@ -69,7 +69,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
       '',
       pick.reasoning || '',
       '',
-      '— via Cray Cray for Parlays'
+      '— via TrapHawk'
     ]
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
       setCopied(true)

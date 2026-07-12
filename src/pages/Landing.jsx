@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { tierRange } from '../lib/tiers'
 
 // API_BASE matches the rest of the app — Railway in prod, env override locally.
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
+import { API_BASE_URL as API_BASE } from '../config'
 
 // ─── Landing — public marketing surface ────────────────────────────────────
 // Concept: "Trading terminal as marketing page." Bloomberg-severity layout
@@ -390,7 +390,7 @@ function EdgeScorecard() {
       recordSub: 'tracks your bets, publishes no picks',
     },
     {
-      name: 'Cray Cray for Parlays',
+      name: 'TrapHawk',
       reason: 'No affiliate parent. Per-side edges including negative ones, every pick timestamped before the game and settled after — losses, ROI, and units included.',
       price: '$19.99/mo',
       record: 'The House Ledger',
@@ -418,7 +418,7 @@ function EdgeScorecard() {
           </div>
 
           {rows.map((r, i) => {
-            const isUs = r.name.startsWith('Cray')
+            const isUs = r.name === 'TrapHawk'
             return (
               <div
                 key={i}
@@ -919,7 +919,7 @@ function Disclosure() {
           <div className="mt-6 space-y-4 text-sm text-ink-200 leading-relaxed">
             <p>
               <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 1.</span>
-              Cray Cray for Parlays receives <span className="text-signal-pos font-medium">no affiliate commissions</span> for sending users to sportsbooks. We are not owned by or financially affiliated with any sportsbook, sportsbook affiliate, or operator of betting markets.
+              TrapHawk receives <span className="text-signal-pos font-medium">no affiliate commissions</span> for sending users to sportsbooks. We are not owned by or financially affiliated with any sportsbook, sportsbook affiliate, or operator of betting markets.
             </p>
             <p>
               <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 2.</span>
@@ -1117,7 +1117,7 @@ function Footer() {
             </p>
           </div>
           <div className="text-[10px] uppercase tracking-[0.18em] text-ink-700 md:text-right">
-            © 2026 Cray Cray for Parlays
+            © 2026 TrapHawk
           </div>
         </div>
       </div>

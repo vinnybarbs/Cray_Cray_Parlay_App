@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { edgeTier, tierRange, TIERS } from '../lib/tiers'
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
+import { API_BASE_URL as API_BASE } from '../config'
 
 // The House Ledger — the public, append-only settlement record. This page is
 // the product's proof asset and its FTC substantiation surface at the same
