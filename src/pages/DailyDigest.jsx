@@ -1153,62 +1153,65 @@ function GolfFieldBoard({ field }) {
 }
 
 function GolfLeaderboard({ golf }) {
-  const [expanded, setExpanded] = useState(false)
+  const [open, setOpen] = useState(false)
+  const [showFullBoard, setShowFullBoard] = useState(false)
   if (!golf) return null
 
-  const preview = golf.leaderboard?.slice(0, 5) || []
   const full = golf.leaderboard || []
-  const shown = expanded ? full : preview
+  const shown = showFullBoard ? full : full.slice(0, 5)
   const fields = golf.fields || []
+  const fieldSummary = fields.map(f => f.name).join(' · ')
 
   return (
-    <div className="bg-ink-900 rounded-sharp border border-ink-700 overflow-hidden">
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
       <button
-        onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-4 hover:bg-ink-850 transition-colors"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-ink-850 transition-colors text-left"
       >
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">⛳</span>
-          <div className="text-left">
-            <h3 className="text-lg font-bold text-white">{golf.tournament}</h3>
-            <p className="text-sm text-ink-300">{golf.status}{golf.venue ? ` — ${golf.venue}` : ''}</p>
-          </div>
+        <span className="text-lg">⛳</span>
+        <div className="min-w-0 flex-1">
+          <span className="text-sm font-semibold text-ink-100">Golf</span>
+          <span className="ml-2 text-xs text-ink-400 truncate">
+            {golf.tournament} · {golf.status}{fieldSummary ? ` · odds boards: ${fieldSummary}` : ''}
+          </span>
         </div>
-        <span className="text-ink-300 text-sm">{expanded ? '▲' : '▼'}</span>
+        <span className="text-ink-500 text-xs flex-shrink-0">{open ? '▲' : '▼'}</span>
       </button>
 
-      <div className="px-4 pb-4">
-        {/* Live leaderboard */}
-        {full.length > 0 && (
-          <div className="space-y-1">
-            <div className="flex items-center justify-between text-xs text-ink-400 px-2 mb-1">
-              <span>Pos</span>
-              <span className="flex-1 ml-3">Player</span>
-              <span className="w-16 text-right">Score</span>
-            </div>
-            {shown.map((p, i) => (
-              <div key={i} className={`flex items-center justify-between px-2 py-1.5 rounded ${i < 3 ? 'bg-ink-850' : ''}`}>
-                <span className={`w-6 text-sm font-bold ${i < 3 ? 'text-signal-pos' : 'text-ink-300'}`}>{p.position}</span>
-                <span className="flex-1 ml-2 text-sm text-white font-medium">{p.name}</span>
-                <span className={`w-16 text-right text-sm font-bold ${
-                  p.score?.toString().startsWith('-') ? 'text-green-400' : p.score === 'E' ? 'text-ink-200' : 'text-signal-neg'
-                }`}>{p.score}</span>
+      {open && (
+        <div className="px-4 pb-4 border-t border-ink-800">
+          {/* Live leaderboard */}
+          {full.length > 0 && (
+            <div className="space-y-1 mt-3">
+              <div className="flex items-center justify-between text-xs text-ink-400 px-2 mb-1">
+                <span>Pos</span>
+                <span className="flex-1 ml-3">Player</span>
+                <span className="w-16 text-right">Score</span>
               </div>
-            ))}
-            {full.length > 5 && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="w-full mt-1 text-center text-xs font-mono text-signal-pos/80 hover:text-signal-pos"
-              >
-                {expanded ? 'Show less' : `Show all ${full.length} players`}
-              </button>
-            )}
-          </div>
-        )}
+              {shown.map((p, i) => (
+                <div key={i} className={`flex items-center justify-between px-2 py-1.5 rounded ${i < 3 ? 'bg-ink-850' : ''}`}>
+                  <span className={`w-6 text-sm font-bold ${i < 3 ? 'text-signal-pos' : 'text-ink-300'}`}>{p.position}</span>
+                  <span className="flex-1 ml-2 text-sm text-white font-medium">{p.name}</span>
+                  <span className={`w-16 text-right text-sm font-bold ${
+                    p.score?.toString().startsWith('-') ? 'text-green-400' : p.score === 'E' ? 'text-ink-200' : 'text-signal-neg'
+                  }`}>{p.score}</span>
+                </div>
+              ))}
+              {full.length > 5 && (
+                <button
+                  onClick={() => setShowFullBoard(!showFullBoard)}
+                  className="w-full mt-1 text-center text-xs font-mono text-signal-pos/80 hover:text-signal-pos"
+                >
+                  {showFullBoard ? 'Show less' : `Show all ${full.length} players`}
+                </button>
+              )}
+            </div>
+          )}
 
-        {/* Researched field boards — one per tournament with live outright odds */}
-        {fields.map(f => <GolfFieldBoard key={f.key} field={f} />)}
-      </div>
+          {/* Researched field boards — one per tournament with live outright odds */}
+          {fields.map(f => <GolfFieldBoard key={f.key} field={f} />)}
+        </div>
+      )}
     </div>
   )
 }
@@ -1624,9 +1627,6 @@ export default function DailyDigest({ onBack }) {
                 the 7pp-bar copy makes no sense when there is nothing to grade. */}
             {!pickOfTheDay && totalGames > 0 && <QuietDayCard best={quietBest} trapCount={tierCounts.traps} />}
 
-            {/* Golf tournament leaderboard */}
-            {data.golf && <GolfLeaderboard golf={data.golf} />}
-
             {/* Sport sections — all start collapsed, show 3 game preview */}
             {sportSections.length === 0 ? (
               <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
@@ -1667,6 +1667,10 @@ export default function DailyDigest({ onBack }) {
                 />
               ))
             )}
+
+            {/* Golf — a side dish, not the main course. One collapsed line at
+                the bottom of the sports list; the field boards live inside. */}
+            {data.golf && <GolfLeaderboard golf={data.golf} />}
 
             {/* Bottom CTA — primary action (Chat) gets the amber fill; secondary (Generator) stays ghost so the eye lands on the primary */}
             <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 flex flex-col sm:flex-row items-center justify-center gap-3">
