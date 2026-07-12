@@ -12,7 +12,10 @@ const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
 const { getClient: getClaude, MODELS, extractJson } = require('../../lib/services/claude.js');
 
-// Map odds_cache sport slugs to display sport names
+// Map odds_cache sport slugs to display sport names. Tennis (and golf)
+// tournament keys ROTATE weekly and are discovered dynamically by the
+// refresh-odds edge function, so they resolve by prefix — never enumerate
+// tournaments here (the old static list went dark the Monday after Wimbledon).
 const SLUG_TO_SPORT = {
   americanfootball_nfl: 'NFL',
   americanfootball_ncaaf: 'NCAAF',
@@ -22,21 +25,15 @@ const SLUG_TO_SPORT = {
   baseball_mlb: 'MLB',
   soccer_epl: 'EPL',
   soccer_usa_mls: 'MLS',
-  mma_mixed_martial_arts: 'UFC',
-  tennis_atp_monte_carlo_masters: 'Tennis',
-  tennis_atp_madrid_open: 'Tennis',
-  tennis_atp_italian_open: 'Tennis',
-  tennis_atp_french_open: 'Tennis',
-  tennis_atp_wimbledon: 'Tennis',
-  tennis_atp_us_open: 'Tennis',
-  tennis_atp_aus_open_singles: 'Tennis',
-  tennis_wta_madrid_open: 'Tennis',
-  tennis_wta_italian_open: 'Tennis',
-  tennis_wta_french_open: 'Tennis',
-  tennis_wta_wimbledon: 'Tennis',
-  tennis_wta_us_open: 'Tennis',
-  tennis_wta_aus_open_singles: 'Tennis'
+  mma_mixed_martial_arts: 'UFC'
 };
+
+function slugToSport(slug) {
+  if (!slug) return slug;
+  if (slug.startsWith('tennis_')) return 'Tennis';
+  if (slug.startsWith('golf_')) return 'Golf';
+  return SLUG_TO_SPORT[slug] || slug;
+}
 
 /**
  * Build a game_key from team names + date
@@ -53,10 +50,19 @@ async function getUpcomingGames(sports) {
   const now = new Date().toISOString();
   const twoDaysOut = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
 
+  // Entries ending in '%' are prefix patterns (rotating tennis tournament
+  // keys); everything else is an exact slug. PostgREST or-filters use * as
+  // the wildcard.
+  const exact = sports.filter(s => !s.includes('%'));
+  const prefixes = sports.filter(s => s.includes('%'));
+  const orParts = [];
+  if (exact.length > 0) orParts.push(`sport.in.(${exact.map(s => `"${s}"`).join(',')})`);
+  for (const p of prefixes) orParts.push(`sport.like.${p.replace(/%/g, '*')}`);
+
   const { data, error } = await supabase
     .from('odds_cache')
     .select('sport, home_team, away_team, commence_time, market_type, outcomes, bookmaker')
-    .in('sport', sports)
+    .or(orParts.join(','))
     .gte('commence_time', now)
     .lte('commence_time', twoDaysOut)
     .order('commence_time', { ascending: true });
@@ -294,7 +300,7 @@ async function getRecentResults(teamName, sportSlug, limit = 5) {
   try {
     const mascot = teamName.split(' ').slice(-1)[0];
     // Map odds API slugs to game_results sport values
-    const sportName = SLUG_TO_SPORT[sportSlug] || sportSlug;
+    const sportName = slugToSport(sportSlug);
     
     let query = supabase
       .from('game_results')
@@ -357,7 +363,7 @@ async function getPastAccuracy(sport) {
  * Get Supabase DB stats: player_game_stats season averages for key players
  */
 async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
-  const sportName = SLUG_TO_SPORT[sportSlug];
+  const sportName = slugToSport(sportSlug);
   if (!sportName) return null;
 
   try {
@@ -430,7 +436,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
  * success, or { error } on failure so the caller can log the real reason.
  */
 async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null) {
-  const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
+  const sportDisplay = slugToSport(game.sport) || game.sport.toUpperCase();
 
   let contextParts = [];
   contextParts.push(`Sport: ${sportDisplay}`);
@@ -632,19 +638,16 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
   }
 }
 
-// All supported sports
-const TENNIS_SLUGS = [
-  'tennis_atp_monte_carlo_masters', 'tennis_atp_madrid_open', 'tennis_atp_italian_open',
-  'tennis_atp_french_open', 'tennis_atp_wimbledon', 'tennis_atp_us_open', 'tennis_atp_aus_open_singles',
-  'tennis_wta_madrid_open', 'tennis_wta_italian_open', 'tennis_wta_french_open',
-  'tennis_wta_wimbledon', 'tennis_wta_us_open', 'tennis_wta_aus_open_singles'
-];
-
+// All supported sports. Entries ending in '%' are prefix patterns resolved
+// against odds_cache at query time (tennis tournament keys rotate weekly).
+// Golf is deliberately absent: its markets are outright-winner fields, which
+// don't fit the h2h edge model — golf odds land in odds_cache for display,
+// not for pre-analysis.
 const ALL_SPORT_SLUGS = [
   'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
   'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
   'soccer_epl', 'soccer_usa_mls', 'mma_mixed_martial_arts',
-  ...TENNIS_SLUGS
+  'tennis_%'
 ];
 
 // Sport group mappings for staggered crons
@@ -656,7 +659,7 @@ const SPORT_GROUPS = {
   'epl': ['soccer_epl'],
   'mls': ['soccer_usa_mls'],
   'ufc': ['mma_mixed_martial_arts'],
-  'tennis': TENNIS_SLUGS,
+  'tennis': ['tennis_%'],
   'soccer': ['soccer_epl', 'soccer_usa_mls'],
   'football': ['americanfootball_nfl', 'americanfootball_ncaaf'],
   'all': ALL_SPORT_SLUGS
@@ -675,7 +678,7 @@ async function preAnalyzeGames(req, res) {
     return res.status(400).json({ error: `Unknown sport group: ${sportsParam}. Use: ${Object.keys(SPORT_GROUPS).join(', ')}` });
   }
 
-  const sportNames = sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join(', ');
+  const sportNames = sportSlugs.map(s => slugToSport(s)).join(', ');
   res.status(202).json({ status: 'accepted', message: `Pre-analysis started for ${sportNames}`, sports: sportSlugs });
 
   runPreAnalysis(sportSlugs).catch(err => console.error('❌ Pre-analysis background error:', err.message));
@@ -683,10 +686,10 @@ async function preAnalyzeGames(req, res) {
 
 async function runPreAnalysis(sportSlugs) {
   const startTime = Date.now();
-  const jobName = `pre-analyze-${[...new Set(sportSlugs.map(s => SLUG_TO_SPORT[s] || s))].join('-')}`;
+  const jobName = `pre-analyze-${[...new Set(sportSlugs.map(s => slugToSport(s)))].join('-')}`;
 
   try {
-    const sportNames = sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join(', ');
+    const sportNames = sportSlugs.map(s => slugToSport(s)).join(', ');
     console.log(`\n🧠 CRON: Pre-analyzing ${sportNames}...`);
 
     // Started marker — a run that dies mid-flight (deploy restart, crash)
@@ -823,7 +826,7 @@ async function runPreAnalysis(sportSlugs) {
     for (const game of batch) {
       try {
         const oddsCtx = extractOddsContext(game);
-        const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
+        const sportDisplay = slugToSport(game.sport) || game.sport.toUpperCase();
 
         // Fetch context in parallel — DB queries + API-Sports + news
         const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx] = await Promise.all([
@@ -1062,7 +1065,7 @@ async function runPreAnalysis(sportSlugs) {
     // Log results to cron_job_logs for admin dashboard visibility
     try {
       await supabase.from('cron_job_logs').insert({
-        job_name: `pre-analyze-${sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join('-')}`,
+        job_name: `pre-analyze-${sportSlugs.map(s => slugToSport(s)).join('-')}`,
         status: errors.length === 0 ? 'completed' : 'partial',
         details: JSON.stringify({
           games_found: games.length,

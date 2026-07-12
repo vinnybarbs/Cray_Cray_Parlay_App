@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
+import YesterdayBoard from '../components/YesterdayBoard'
 
 // The Board — "give me picks for the sports I choose", rebuilt as a filtered
 // view of the same graded edge-tier data the digest serves (audit 40 §3).
@@ -219,12 +220,10 @@ export default function GeneratorPage() {
                 On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
               </p>
             )}
-            <button
-              onClick={() => navigate('/ledger')}
-              className="mt-5 px-4 py-2 text-xs font-semibold bg-ink-850 hover:bg-ink-800 text-ink-200 rounded-sharp shadow-hairline transition-colors active:scale-95"
-            >
-              Browse The House Ledger
-            </button>
+            <YesterdayBoard />
+            <p className="text-xs text-ink-500 mt-4">
+              Meanwhile, every settled pick is on <button onClick={() => navigate('/ledger')} className="text-signal-pos hover:underline">The House Ledger</button>.
+            </p>
           </div>
         )}
 

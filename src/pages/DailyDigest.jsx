@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { edgeTier, formatPp, edgePpForSide } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
+import YesterdayBoard from '../components/YesterdayBoard'
 
 const SPORT_META = {
   NBA:   { emoji: '🏀', label: 'NBA' },
@@ -1687,6 +1688,7 @@ export default function DailyDigest({ onBack }) {
                     On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
                   </p>
                 )}
+                <YesterdayBoard />
                 <p className="text-xs text-ink-500 mt-4">
                   Meanwhile, every settled pick is on <button onClick={() => { window.location.hash = '#/ledger' }} className="text-signal-pos hover:underline">The House Ledger</button>.
                 </p>

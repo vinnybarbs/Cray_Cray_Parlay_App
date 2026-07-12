@@ -122,6 +122,11 @@ app.get('/api/review-bundle', reviewBundle);
 const pipelineHealth = require('./api/pipeline-health');
 app.get('/api/pipeline-health', pipelineHealth);
 
+// Yesterday's board — most recent published pick list with settled outcomes.
+// Public receipts, shown inside the dark-slate empty states.
+const boardHistory = require('./api/board-history');
+app.get('/api/board-history', boardHistory);
+
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath, {
