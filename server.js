@@ -117,6 +117,11 @@ app.get('/api/public-pod', publicPod);
 const reviewBundle = require('./api/review-bundle');
 app.get('/api/review-bundle', reviewBundle);
 
+// Read-only pipeline vitals for the daily 6am sanity-check routine (same
+// report_secret as review-bundle — reads aggregates, can't trigger jobs).
+const pipelineHealth = require('./api/pipeline-health');
+app.get('/api/pipeline-health', pipelineHealth);
+
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath, {
