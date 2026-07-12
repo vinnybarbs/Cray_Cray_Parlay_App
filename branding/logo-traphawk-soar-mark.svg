@@ -1,11 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
-  <!-- TrapHawk primary mark, from Vince's sketch: three rising wing-bars
-       climbing the ledger line, hawk head at the front like a period at the
-       end of the sentence. Solid silhouette, no eye. -->
+  <!-- TrapHawk primary mark: a hawk soaring in profile, single wing of
+       staggered stripes that read as a rising graph, head leveling out at
+       the top of the climb with a crescent beak. No eye. -->
   <rect width="240" height="240" rx="28" fill="#0d0d0f"/>
-  <rect x="38" y="192" width="170" height="9" fill="#52525b"/>
-  <polygon points="54,188 88,188 96,146 62,146" fill="#f5a524" opacity="0.4"/>
-  <polygon points="100,188 134,188 142,112 108,112" fill="#f5a524" opacity="0.65"/>
-  <polygon points="146,188 180,188 188,54 154,54" fill="#f5a524"/>
-  <path d="M184,196 L184,160 C184,146 194,138 206,138 C218,138 226,144 229,152 C234,153 238,157 238,162 C238,168 237,172 232,176 L226,166 C220,166 214,168 210,172 C206,180 204,188 204,196 Z" fill="#f5a524"/>
+  <path d="M54,158 L130,82 L190,82
+           C200,82 208,86 212,92
+           C221,97 225,106 222,114
+           C220,122 214,128 206,126
+           L204,120
+           C210,116 212,110 209,105
+           L192,104
+           L186,114 L180,104
+           L172,100 L130,100 L54,176 Z" fill="#f5a524"/>
+  <polygon points="50,204 50,190 114,126 114,140" fill="#f5a524" opacity="0.65"/>
+  <polygon points="66,210 66,198 102,162 102,174" fill="#f5a524" opacity="0.4"/>
 </svg>
