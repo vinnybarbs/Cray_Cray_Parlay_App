@@ -1213,73 +1213,6 @@ function GolfLeaderboard({ golf }) {
   )
 }
 
-// ─── YesterdayRecap ──────────────────────────────────────────────────────────
-
-function RecapCard({ sport, won, lost, picks }) {
-  const [expanded, setExpanded] = useState(false)
-  const total = won + lost
-  const rate = total > 0 ? Math.round((won / total) * 100) : null
-  const meta = getSportMeta(sport)
-  const visible = expanded ? picks : picks.slice(0, 4)
-
-  return (
-    <div className="bg-ink-950 rounded-sharp p-4 border border-ink-700">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span>{meta.emoji}</span>
-          <span className="font-semibold text-white text-sm">{meta.label}</span>
-        </div>
-        <span className={`text-sm font-bold ${winRateColor(rate)}`}>
-          {won}-{lost}{rate != null ? ` (${rate}%)` : ''}
-        </span>
-      </div>
-      <div className="space-y-1.5">
-        {visible.map((p, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <span className={`text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0 ${
-              p.outcome === 'won'
-                ? 'bg-green-900 text-green-300 border border-ink-700'
-                : 'bg-signal-neg-dim text-signal-neg border border-red-700'
-            }`}>
-              {p.outcome === 'won' ? 'W' : 'L'}
-            </span>
-            <span className="text-xs text-ink-300 truncate">
-              {p.pick || `${p.away_team} @ ${p.home_team}`}
-            </span>
-          </div>
-        ))}
-      </div>
-      {picks.length > 4 && (
-        <button
-          onClick={() => setExpanded(e => !e)}
-          className="mt-2 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-        >
-          {expanded ? 'Show less' : `Show all ${picks.length} picks`}
-        </button>
-      )}
-    </div>
-  )
-}
-
-function YesterdayRecap({ results }) {
-  const sports = Object.keys(results)
-  if (sports.length === 0) return null
-
-  return (
-    <div className="bg-ink-900 rounded-sharp border border-ink-700 overflow-hidden">
-      <div className="px-6 py-4 border-b border-ink-700">
-        <h2 className="text-lg font-bold text-white">Recent Results</h2>
-        <p className="text-xs text-ink-300 mt-0.5">Picks settled in the last 3 days</p>
-      </div>
-      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {sports.map(sport => (
-          <RecapCard key={sport} sport={sport} won={results[sport].won} lost={results[sport].lost} picks={results[sport].picks} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ─── ModelPerformance ────────────────────────────────────────────────────────
 
 function ModelPerformance({ accuracy }) {
@@ -1291,8 +1224,8 @@ function ModelPerformance({ accuracy }) {
   const sports = Object.entries(bySport || {}).sort((a, b) => (b[1].winRate || 0) - (a[1].winRate || 0))
   const betTypes = Object.entries(byBetType || {}).sort((a, b) => (b[1].winRate || 0) - (a[1].winRate || 0))
 
-  const periodLabel = period === 'last_7d' ? 'in the last 7 days'
-    : period === 'last_30d' ? 'in the last 30 days'
+  const periodLabel = period === 'last_7d' ? 'last 7 days'
+    : period === 'last_30d' ? 'last 30 days'
     : 'all time'
 
   const pills = [
@@ -1301,101 +1234,69 @@ function ModelPerformance({ accuracy }) {
     { key: 'all',      label: 'All' },
   ]
 
+  const rateColor = (r) => r >= 55 ? 'text-signal-pos' : r >= 50 ? 'text-ink-100' : 'text-signal-neg'
+  const barColor = (r) => r >= 55 ? 'bg-signal-pos/70' : r >= 50 ? 'bg-ink-400' : 'bg-signal-neg/70'
+
+  const StatRows = ({ title, entries, labelFor }) => (
+    <div>
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-2">{title}</p>
+      <div className="space-y-2.5">
+        {entries.map(([key, stats]) => (
+          <div key={key}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-sm text-ink-200 font-medium truncate">{labelFor(key)}</span>
+              <span className="font-mono text-xs text-ink-500 tabular-nums ml-auto">{stats.won}–{stats.lost}</span>
+              <span className={`font-mono text-sm font-bold tabular-nums w-12 text-right ${rateColor(stats.winRate)}`}>
+                {stats.winRate != null ? `${stats.winRate}%` : '—'}
+              </span>
+            </div>
+            <div className="h-1 mt-1 bg-ink-850 rounded-full overflow-hidden">
+              {stats.winRate != null && (
+                <div className={`h-full rounded-full ${barColor(stats.winRate)}`} style={{ width: `${Math.min(stats.winRate, 100)}%` }} />
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   return (
-    <div className="bg-ink-900 rounded-sharp border border-ink-700 overflow-hidden">
-      <div className="px-6 py-4 border-b border-ink-700 flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-white">Model Performance</h2>
-          <p className="text-xs text-ink-300 mt-0.5">{overall.total} picks settled {periodLabel}</p>
-        </div>
-        <div className="flex bg-ink-950 rounded-sharp p-0.5">
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+      <div className="px-4 py-3 bg-ink-950 flex items-center gap-3">
+        <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos">Model performance · settled picks only</span>
+        <div className="ml-auto flex bg-ink-900 rounded-sharp p-0.5 shadow-hairline">
           {pills.map(p => (
             <button
               key={p.key}
               onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${period === p.key ? 'bg-purple-600 text-white' : 'text-ink-300 hover:text-ink-100'}`}
+              className={`px-3 py-1 font-mono text-xs rounded-sharp transition-colors ${period === p.key ? 'bg-signal-pos text-ink-950 font-bold' : 'text-ink-400 hover:text-ink-100'}`}
             >{p.label}</button>
           ))}
         </div>
       </div>
-      <div className="p-6">
-        {/* Overall rate */}
-        {overall.winRate != null && (
-          <div className="text-center mb-6 pb-6 border-b border-ink-700">
-            <div className="text-xs text-ink-400 uppercase tracking-widest mb-1">Overall Win Rate</div>
-            <div className={`text-5xl font-extrabold ${winRateColor(overall.winRate)}`}>
-              {overall.winRate}%
-            </div>
-            <div className="text-sm text-ink-400 mt-1">
-              {overall.won}W — {overall.lost}L
-            </div>
-          </div>
-        )}
 
-        {/* Per-sport bars */}
-        {sports.length > 0 && (
-          <>
-            <div className="text-xs text-ink-400 uppercase tracking-widest mb-2">By Sport</div>
-            <div className="space-y-3 mb-6">
-              {sports.map(([sport, stats]) => {
-                const meta = getSportMeta(sport)
-                return (
-                  <div key={sport}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{meta.emoji}</span>
-                        <span className="text-sm text-ink-200 font-medium">{meta.label}</span>
-                        <span className="text-xs text-ink-500">({stats.won}W-{stats.lost}L)</span>
-                      </div>
-                      <span className={`text-sm font-bold ${winRateColor(stats.winRate)}`}>
-                        {stats.winRate != null ? `${stats.winRate}%` : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
-                      {stats.winRate != null && (
-                        <div
-                          className={`h-full rounded-full transition-all ${winRateBarColor(stats.winRate)}`}
-                          style={{ width: `${stats.winRate}%` }}
-                        />
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </>
-        )}
+      <div className="p-4 md:p-6">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-5">
+          <span className={`text-4xl font-bold font-mono tabular-nums ${rateColor(overall.winRate)}`}>
+            {overall.winRate != null ? `${overall.winRate}%` : '—'}
+          </span>
+          <span className="font-mono text-sm text-ink-300 tabular-nums">{overall.won}–{overall.lost}</span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">{overall.total} picks settled · {periodLabel}</span>
+        </div>
 
-        {/* Per-bet-type bars */}
-        {betTypes.length > 0 && (
-          <>
-            <div className="text-xs text-ink-400 uppercase tracking-widest mb-2">By Bet Type</div>
-            <div className="space-y-3">
-              {betTypes.map(([betType, stats]) => (
-                <div key={betType}>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-ink-200 font-medium">{betType}</span>
-                      <span className="text-xs text-ink-500">({stats.won}W-{stats.lost}L)</span>
-                    </div>
-                    <span className={`text-sm font-bold ${winRateColor(stats.winRate)}`}>
-                      {stats.winRate != null ? `${stats.winRate}%` : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="h-2 bg-ink-800 rounded-full overflow-hidden">
-                    {stats.winRate != null && (
-                      <div
-                        className={`h-full rounded-full transition-all ${winRateBarColor(stats.winRate)}`}
-                        style={{ width: `${stats.winRate}%` }}
-                      />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          {sports.length > 0 && <StatRows title="By sport" entries={sports} labelFor={(s) => getSportMeta(s).label} />}
+          {betTypes.length > 0 && <StatRows title="By bet type" entries={betTypes} labelFor={(b) => b} />}
+        </div>
       </div>
+
+      <button
+        onClick={() => { window.location.hash = '#/ledger' }}
+        className="w-full px-4 py-2.5 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 hover:text-signal-pos transition-colors text-left"
+      >
+        Units, ROI, and the tier table live on The House Ledger — every pick, losers included
+      </button>
     </div>
   )
 }
@@ -1710,9 +1611,10 @@ export default function DailyDigest({ onBack }) {
               <ModelPerformance accuracy={data.modelAccuracy} />
             )}
 
-            {/* Yesterday's Recap — right after performance */}
-            {Object.keys(data.yesterdayResults).length > 0 && (
-              <YesterdayRecap results={data.yesterdayResults} />
+            {/* Yesterday's board — the same settled receipts the dark-slate
+                card offers, one button away on normal days too. */}
+            {sportSections.length > 0 && (
+              <div className="-mt-2"><YesterdayBoard /></div>
             )}
 
             {/* Pick of the Day — the single best edge across all sports, featured

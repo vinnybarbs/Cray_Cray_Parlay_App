@@ -18,8 +18,9 @@ function OutcomeChip({ outcome }) {
   return <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
 }
 
-export default function YesterdayBoard() {
-  const [open, setOpen] = useState(false)
+export default function YesterdayBoard({ alwaysOpen = false }) {
+  const [open, setOpen] = useState(alwaysOpen)
+  const [openRow, setOpenRow] = useState(null)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -46,7 +47,7 @@ export default function YesterdayBoard() {
     return () => { cancelled = true }
   }, [open])
 
-  if (!open) {
+  if (!open && !alwaysOpen) {
     return (
       <button
         onClick={() => setOpen(true)}
@@ -62,6 +63,10 @@ export default function YesterdayBoard() {
     ? new Date(`${data.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
     : null
 
+  const fmtPublished = (iso) => iso
+    ? new Date(iso).toLocaleString('en-US', { timeZone: 'America/Denver', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' MT'
+    : null
+
   return (
     <div className="mt-5">
       {loading && <div className="h-20 bg-ink-850 rounded-sharp animate-pulse" />}
@@ -74,7 +79,7 @@ export default function YesterdayBoard() {
               <>
                 <span>{s.won}–{s.lost}{s.push > 0 ? `–${s.push}` : ''}</span>
                 {s.winRate != null && <span className={s.winRate >= 55 ? 'text-signal-pos' : s.winRate < 50 ? 'text-signal-neg' : ''}>{s.winRate}%</span>}
-                <span className={`tabular-nums ${s.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.units >= 0 ? '+' : ''}{s.units.toFixed(2)}u at 1u</span>
+                <span title="Profit measured in units, staking 1 unit per pick at the published odds" className={`tabular-nums cursor-help ${s.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.units >= 0 ? '+' : ''}{s.units.toFixed(2)}u at 1u a pick</span>
               </>
             )}
             <span className="ml-auto text-ink-600">losers included</span>
@@ -111,22 +116,38 @@ export default function YesterdayBoard() {
           ) : (
             data.picks.map((p, i) => {
               const tier = edgeTier(p.edge_pp)
+              const isOpen = openRow === i
               return (
-                <div key={i} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800">
-                  <span className={`flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${tier.color} ${tier.bg}`}>
-                    {tier.label}
-                  </span>
-                  <span className={`flex-shrink-0 w-14 text-right font-mono text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-                    {p.edge_pp != null ? formatPp(p.edge_pp) : '—'}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-ink-100 truncate">
-                      {p.pick}
-                      {p.odds && <span className="ml-2 font-mono text-xs text-ink-400">{p.odds}</span>}
+                <div key={i}>
+                  <button
+                    onClick={() => setOpenRow(isOpen ? null : i)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 border-t border-ink-800 text-left transition-colors ${isOpen ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}
+                  >
+                    <span className={`flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${tier.color} ${tier.bg}`}>
+                      {tier.label}
+                    </span>
+                    <span className={`flex-shrink-0 w-14 text-right font-mono text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
+                      {p.edge_pp != null ? formatPp(p.edge_pp) : '—'}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-ink-100 truncate">
+                        {p.pick}
+                        {p.odds && <span className="ml-2 font-mono text-xs text-ink-400">{p.odds}</span>}
+                      </div>
+                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
                     </div>
-                    <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
-                  </div>
-                  <OutcomeChip outcome={p.actual_outcome} />
+                    <OutcomeChip outcome={p.actual_outcome} />
+                  </button>
+                  {isOpen && (
+                    <div className="px-4 pb-3 pt-1 bg-ink-850/40 border-t border-ink-800/50">
+                      {p.reasoning
+                        ? <p className="text-xs text-ink-200 leading-relaxed max-w-2xl">{p.reasoning}</p>
+                        : <p className="text-xs text-ink-500">No written analysis was stored with this pick.</p>}
+                      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+                        {tier.label} · {tier.subtitle} · published {fmtPublished(p.created_at)} — before the game started
+                      </p>
+                    </div>
+                  )}
                 </div>
               )
             })
