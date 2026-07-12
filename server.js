@@ -349,6 +349,13 @@ app.post('/api/generate-parlay',
 const { chatPicksHandler } = require('./api/chat-picks');
 app.post('/api/chat-picks', generalRateLimiter.middleware(), chatPicksHandler);
 
+// Natural-language betslip parser → sportsbook deep links. Never routed on
+// Railway (only auto-routed on the old Vercel deploy), so the digest's
+// Build Parlay hand-off has been 404ing in production. Found 2026-07-11
+// while smoke-testing the Anthropic migration.
+const parseBetslipHandler = require('./api/parse-betslip');
+app.post('/api/parse-betslip', generalRateLimiter.middleware(), parseBetslipHandler);
+
 // Add suggest-picks endpoint for pick builder
 app.post('/api/suggest-picks',
   parlayRateLimiter.middleware(),
