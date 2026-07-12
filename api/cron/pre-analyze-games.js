@@ -25,6 +25,11 @@ const SLUG_TO_SPORT = {
   baseball_mlb: 'MLB',
   soccer_epl: 'EPL',
   soccer_usa_mls: 'MLS',
+  soccer_fifa_world_cup: 'World Cup',
+  soccer_fifa_world_cup_womens: 'World Cup',
+  soccer_uefa_champs_league: 'Champions League',
+  soccer_conmebol_copa_america: 'Copa America',
+  soccer_uefa_european_championship: 'Euros',
   mma_mixed_martial_arts: 'UFC'
 };
 
@@ -32,7 +37,9 @@ function slugToSport(slug) {
   if (!slug) return slug;
   if (slug.startsWith('tennis_')) return 'Tennis';
   if (slug.startsWith('golf_')) return 'Golf';
-  return SLUG_TO_SPORT[slug] || slug;
+  if (SLUG_TO_SPORT[slug]) return SLUG_TO_SPORT[slug];
+  if (slug.startsWith('soccer_')) return 'Soccer';
+  return slug;
 }
 
 /**
@@ -646,7 +653,7 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
 const ALL_SPORT_SLUGS = [
   'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
   'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
-  'soccer_epl', 'soccer_usa_mls', 'mma_mixed_martial_arts',
+  'soccer_%', 'mma_mixed_martial_arts',
   'tennis_%'
 ];
 
@@ -660,7 +667,8 @@ const SPORT_GROUPS = {
   'mls': ['soccer_usa_mls'],
   'ufc': ['mma_mixed_martial_arts'],
   'tennis': ['tennis_%'],
-  'soccer': ['soccer_epl', 'soccer_usa_mls'],
+  'soccer': ['soccer_%'],
+  'worldcup': ['soccer_fifa_world_cup'],
   'football': ['americanfootball_nfl', 'americanfootball_ncaaf'],
   'all': ALL_SPORT_SLUGS
 };
