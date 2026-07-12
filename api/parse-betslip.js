@@ -27,15 +27,19 @@ module.exports = async (req, res) => {
 
     console.log(`\n🤖 Parsing betslip request: "${message}"`);
 
-    // Step 1: Get available games from odds cache
-    const { data: cachedOdds, error: oddsError } = await supabase
+    // Step 1: Get available games from odds cache. Rows are one per
+    // (game, bookmaker, market_type) with an `outcomes` jsonb — this handler
+    // previously read a long-gone `odds_data` column and threw on every
+    // request, which is why the digest's Build Parlay hand-off 500'd.
+    const { data: oddsRows, error: oddsError } = await supabase
       .from('odds_cache')
-      .select('*')
+      .select('sport, game_id, external_game_id, commence_time, home_team, away_team, bookmaker, market_type, outcomes')
       .gte('commence_time', new Date().toISOString())
+      .in('market_type', ['h2h', 'spreads', 'totals'])
       .order('commence_time', { ascending: true })
-      .limit(50);
+      .limit(600);
 
-    if (oddsError || !cachedOdds || cachedOdds.length === 0) {
+    if (oddsError || !oddsRows || oddsRows.length === 0) {
       console.log('❌ No cached odds available');
       return res.json({
         success: false,
@@ -43,47 +47,66 @@ module.exports = async (req, res) => {
       });
     }
 
-    console.log(`  ✅ Found ${cachedOdds.length} available games in cache`);
+    // Group rows per game, preferring DraftKings prices when present.
+    const gamesByKey = new Map();
+    for (const row of oddsRows) {
+      const key = row.external_game_id || `${row.away_team}@${row.home_team}`;
+      if (!gamesByKey.has(key)) {
+        gamesByKey.set(key, {
+          sport: row.sport,
+          game_id: row.game_id,
+          commence_time: row.commence_time,
+          home_team: row.home_team,
+          away_team: row.away_team,
+          markets: {},
+        });
+      }
+      const g = gamesByKey.get(key);
+      const isDK = (row.bookmaker || '').toLowerCase() === 'draftkings';
+      const existing = g.markets[row.market_type];
+      if (!existing || (isDK && !existing.isDK)) {
+        let outcomes = row.outcomes;
+        if (typeof outcomes === 'string') {
+          try { outcomes = JSON.parse(outcomes); } catch { outcomes = []; }
+        }
+        g.markets[row.market_type] = { outcomes: outcomes || [], isDK };
+      }
+    }
+    const cachedGames = [...gamesByKey.values()].slice(0, 50);
+    console.log(`  ✅ Found ${cachedGames.length} available games in cache`);
 
     // Step 2: Build context for AI about available games
-    const gamesContext = cachedOdds.map(game => {
-      const odds = game.odds_data;
-      const bookmaker = odds.bookmakers?.[0];
-      const markets = bookmaker?.markets || [];
-      
-      let marketInfo = [];
-      
-      // Moneyline
-      const mlMarket = markets.find(m => m.key === 'h2h');
-      if (mlMarket) {
-        const awayML = mlMarket.outcomes?.find(o => o.name === odds.away_team);
-        const homeML = mlMarket.outcomes?.find(o => o.name === odds.home_team);
+    const gamesContext = cachedGames.map(game => {
+      const marketInfo = [];
+
+      const ml = game.markets.h2h?.outcomes;
+      if (ml) {
+        const awayML = ml.find(o => o.name === game.away_team);
+        const homeML = ml.find(o => o.name === game.home_team);
         if (awayML && homeML) {
-          marketInfo.push(`ML: ${odds.away_team} ${awayML.price}, ${odds.home_team} ${homeML.price}`);
+          marketInfo.push(`ML: ${game.away_team} ${awayML.price}, ${game.home_team} ${homeML.price}`);
         }
       }
-      
-      // Spread
-      const spreadMarket = markets.find(m => m.key === 'spreads');
-      if (spreadMarket) {
-        const awaySpread = spreadMarket.outcomes?.find(o => o.name === odds.away_team);
-        const homeSpread = spreadMarket.outcomes?.find(o => o.name === odds.home_team);
+
+      const spreads = game.markets.spreads?.outcomes;
+      if (spreads) {
+        const awaySpread = spreads.find(o => o.name === game.away_team);
+        const homeSpread = spreads.find(o => o.name === game.home_team);
         if (awaySpread && homeSpread) {
-          marketInfo.push(`Spread: ${odds.away_team} ${awaySpread.point} (${awaySpread.price}), ${odds.home_team} ${homeSpread.point} (${homeSpread.price})`);
+          marketInfo.push(`Spread: ${game.away_team} ${awaySpread.point} (${awaySpread.price}), ${game.home_team} ${homeSpread.point} (${homeSpread.price})`);
         }
       }
-      
-      // Total
-      const totalMarket = markets.find(m => m.key === 'totals');
-      if (totalMarket) {
-        const over = totalMarket.outcomes?.find(o => o.name === 'Over');
-        const under = totalMarket.outcomes?.find(o => o.name === 'Under');
+
+      const totals = game.markets.totals?.outcomes;
+      if (totals) {
+        const over = totals.find(o => o.name === 'Over');
+        const under = totals.find(o => o.name === 'Under');
         if (over && under) {
           marketInfo.push(`Total: Over ${over.point} (${over.price}), Under ${under.point} (${under.price})`);
         }
       }
-      
-      return `${odds.away_team} @ ${odds.home_team} - ${marketInfo.join(' | ')}`;
+
+      return `${game.away_team} @ ${game.home_team} - ${marketInfo.join(' | ')}`;
     }).join('\n');
 
     // Step 3: Use AI to parse the request
@@ -147,12 +170,10 @@ Response format:
 
     // Step 4: Enrich picks with full data from cache
     const enrichedPicks = parsed.picks.map(pick => {
-      // Find the game in cache
-      const game = cachedOdds.find(g => {
-        const odds = g.odds_data;
-        return pick.game.includes(odds.away_team) && pick.game.includes(odds.home_team);
-      });
-      
+      const game = cachedGames.find(g =>
+        pick.game && pick.game.includes(g.away_team) && pick.game.includes(g.home_team)
+      );
+
       if (game) {
         return {
           ...pick,
