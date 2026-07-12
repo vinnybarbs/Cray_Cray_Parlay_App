@@ -1087,6 +1087,71 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
 
 // ─── GolfLeaderboard ─────────────────────────────────────────────────────────
 
+function fmtGolfPrice(price) {
+  if (price == null) return '—'
+  const n = Number(price)
+  return n > 0 ? `+${n}` : String(n)
+}
+
+function GolfFieldBoard({ field }) {
+  const [expanded, setExpanded] = useState(false)
+  const [openNote, setOpenNote] = useState(null)
+  const players = field.players || []
+  const shown = expanded ? players : players.slice(0, 10)
+
+  return (
+    <div className="mt-4">
+      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-2">
+        <span className="text-ink-200">{field.name}</span>
+        <span>· outright market, field of {players.length}</span>
+      </div>
+      <div className="flex items-center gap-3 px-2 py-1.5 text-[10px] font-mono uppercase tracking-[0.14em] text-ink-500">
+        <span className="flex-1">Player</span>
+        <span className="w-14 text-right">Best</span>
+        <span className="w-14 text-right">Win %</span>
+        <span className="w-16 text-right">vs fair</span>
+      </div>
+      <div className="space-y-0.5">
+        {shown.map((p, i) => (
+          <div key={i}>
+            <button
+              onClick={() => setOpenNote(openNote === i ? null : i)}
+              className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-sharp text-left transition-colors ${openNote === i ? 'bg-ink-850' : 'hover:bg-ink-850/60'}`}
+            >
+              <span className="flex-1 min-w-0 text-sm text-ink-100 font-medium truncate">
+                {p.name}
+                {p.position && <span className="ml-2 font-mono text-[10px] text-signal-pos">P{p.position} {p.score}</span>}
+              </span>
+              <span className="w-14 text-right font-mono text-xs text-ink-200 tabular-nums">{fmtGolfPrice(p.best_price)}</span>
+              <span className="w-14 text-right font-mono text-xs text-ink-400 tabular-nums">{p.consensus_prob != null ? `${(p.consensus_prob * 100).toFixed(1)}%` : '—'}</span>
+              <span className={`w-16 text-right font-mono text-xs tabular-nums ${p.value_pp > 0 ? 'text-signal-pos' : p.value_pp < 0 ? 'text-signal-neg' : 'text-ink-500'}`}>
+                {p.value_pp != null ? `${p.value_pp > 0 ? '+' : ''}${p.value_pp.toFixed(1)}pp` : ''}
+              </span>
+            </button>
+            {openNote === i && p.note && (
+              <p className="px-2 pb-2 pt-1 text-xs text-ink-300 leading-relaxed">{p.note}</p>
+            )}
+            {openNote === i && !p.note && (
+              <p className="px-2 pb-2 pt-1 text-xs text-ink-500">No research note for this player yet — deeper in the field than the analysis covers.</p>
+            )}
+          </div>
+        ))}
+      </div>
+      {players.length > 10 && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full mt-2 text-center text-xs font-mono text-signal-pos/80 hover:text-signal-pos"
+        >
+          {expanded ? 'Show less' : `Show the full field (${players.length})`}
+        </button>
+      )}
+      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600">
+        // devigged from live books · "vs fair" = best available price against the blended fair number · not a graded pick
+      </p>
+    </div>
+  )
+}
+
 function GolfLeaderboard({ golf }) {
   const [expanded, setExpanded] = useState(false)
   if (!golf) return null
@@ -1094,6 +1159,7 @@ function GolfLeaderboard({ golf }) {
   const preview = golf.leaderboard?.slice(0, 5) || []
   const full = golf.leaderboard || []
   const shown = expanded ? full : preview
+  const fields = golf.fields || []
 
   return (
     <div className="bg-ink-900 rounded-sharp border border-ink-700 overflow-hidden">
@@ -1112,43 +1178,36 @@ function GolfLeaderboard({ golf }) {
       </button>
 
       <div className="px-4 pb-4">
-        {/* Leaderboard */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between text-xs text-ink-400 px-2 mb-1">
-            <span>Pos</span>
-            <span className="flex-1 ml-3">Player</span>
-            <span className="w-16 text-right">Score</span>
-            {golf.outrightOdds && <span className="w-16 text-right">Odds</span>}
-          </div>
-          {shown.map((p, i) => {
-            const odds = golf.outrightOdds?.find(o =>
-              o.name.toLowerCase().includes(p.name.split(' ').slice(-1)[0].toLowerCase())
-            )
-            return (
+        {/* Live leaderboard */}
+        {full.length > 0 && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs text-ink-400 px-2 mb-1">
+              <span>Pos</span>
+              <span className="flex-1 ml-3">Player</span>
+              <span className="w-16 text-right">Score</span>
+            </div>
+            {shown.map((p, i) => (
               <div key={i} className={`flex items-center justify-between px-2 py-1.5 rounded ${i < 3 ? 'bg-ink-850' : ''}`}>
                 <span className={`w-6 text-sm font-bold ${i < 3 ? 'text-signal-pos' : 'text-ink-300'}`}>{p.position}</span>
                 <span className="flex-1 ml-2 text-sm text-white font-medium">{p.name}</span>
                 <span className={`w-16 text-right text-sm font-bold ${
                   p.score?.toString().startsWith('-') ? 'text-green-400' : p.score === 'E' ? 'text-ink-200' : 'text-signal-neg'
                 }`}>{p.score}</span>
-                {golf.outrightOdds && (
-                  <span className="w-16 text-right text-xs text-ink-300">
-                    {odds ? `+${odds.odds}` : ''}
-                  </span>
-                )}
               </div>
-            )
-          })}
-        </div>
-
-        {full.length > 5 && (
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="w-full mt-2 text-center text-sm text-purple-400 hover:text-purple-300"
-          >
-            {expanded ? 'Show less' : `Show all ${full.length} players`}
-          </button>
+            ))}
+            {full.length > 5 && (
+              <button
+                onClick={() => setExpanded(!expanded)}
+                className="w-full mt-1 text-center text-xs font-mono text-signal-pos/80 hover:text-signal-pos"
+              >
+                {expanded ? 'Show less' : `Show all ${full.length} players`}
+              </button>
+            )}
+          </div>
         )}
+
+        {/* Researched field boards — one per tournament with live outright odds */}
+        {fields.map(f => <GolfFieldBoard key={f.key} field={f} />)}
       </div>
     </div>
   )

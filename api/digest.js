@@ -236,28 +236,31 @@ async function getDigest(req, res) {
           };
         });
 
-        // Get outright odds from odds_cache if available
-        const { data: oddsData } = await supabase
-          .from('odds_cache')
-          .select('outcomes, bookmaker')
-          .eq('sport', 'golf_masters_tournament_winner')
-          .eq('market_type', 'outrights')
-          .limit(1);
+        // Researched field boards (devigged odds + notes) from analyze-golf.
+        // One entry per tournament that currently has outright odds.
+        const { data: fieldRows } = await supabase
+          .from('golf_field')
+          .select('tournament_key, tournament_name, player_name, prices, best_price, best_book, consensus_prob, value_pp, espn_position, espn_score, research_note, generated_at')
+          .order('consensus_prob', { ascending: false });
 
-        let topOdds = null;
-        if (oddsData?.[0]?.outcomes) {
-          const outcomes = typeof oddsData[0].outcomes === 'string'
-            ? JSON.parse(oddsData[0].outcomes)
-            : oddsData[0].outcomes;
-          topOdds = outcomes
-            .sort((a, b) => {
-              // Sort favorites first (lowest positive or most negative)
-              const aPrice = a.price || 99999;
-              const bPrice = b.price || 99999;
-              return aPrice - bPrice;
-            })
-            .slice(0, 15)
-            .map(o => ({ name: o.name, odds: o.price }));
+        const fieldsByKey = {};
+        for (const r of (fieldRows || [])) {
+          (fieldsByKey[r.tournament_key] ??= {
+            key: r.tournament_key,
+            name: r.tournament_name,
+            generated_at: r.generated_at,
+            players: [],
+          }).players.push({
+            name: r.player_name,
+            prices: r.prices,
+            best_price: r.best_price,
+            best_book: r.best_book,
+            consensus_prob: r.consensus_prob != null ? Number(r.consensus_prob) : null,
+            value_pp: r.value_pp != null ? Number(r.value_pp) : null,
+            position: r.espn_position,
+            score: r.espn_score,
+            note: r.research_note,
+          });
         }
 
         return {
@@ -265,7 +268,7 @@ async function getDigest(req, res) {
           status: event.status?.type?.description || 'In Progress',
           venue: comp.venue?.fullName || null,
           leaderboard: players,
-          outrightOdds: topOdds
+          fields: Object.values(fieldsByKey),
         };
       } catch (err) {
         console.warn('Golf fetch error:', err.message);

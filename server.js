@@ -127,6 +127,10 @@ app.get('/api/pipeline-health', pipelineHealth);
 const boardHistory = require('./api/board-history');
 app.get('/api/board-history', boardHistory);
 
+// Golf field analysis — devig outrights + research notes into golf_field.
+const analyzeGolf = require('./api/cron/analyze-golf');
+app.post('/cron/analyze-golf', analyzeGolf);
+
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath, {
@@ -146,6 +150,27 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api') || req.path.startsWith('/debug') || req.path.startsWith('/cron')) return next();
   // otherwise serve the built frontend
   res.sendFile(path.join(distPath, 'index.html'));
+});
+
+// Debug: what The Odds API currently lists as active (tennis/golf rotate
+// weekly — this is what refresh-odds discovery sees). Free call, no quota.
+app.get('/debug/active-sports', async (req, res) => {
+  const ODDS_KEY = process.env.ODDS_API_KEY;
+  if (!ODDS_KEY) return res.json({ error: 'No ODDS_API_KEY' });
+  try {
+    const r = await fetch(`https://api.the-odds-api.com/v4/sports/?apiKey=${ODDS_KEY}`);
+    const list = await r.json();
+    if (!Array.isArray(list)) return res.json({ status: r.status, body: list });
+    const active = list.filter(s => s.active).map(s => s.key);
+    res.json({
+      status: r.status,
+      tennis: active.filter(k => k.startsWith('tennis_')),
+      golf: active.filter(k => k.startsWith('golf_')),
+      totalActive: active.length,
+    });
+  } catch (err) {
+    res.json({ error: err.message });
+  }
 });
 
 // Debug endpoint to test Odds API directly
