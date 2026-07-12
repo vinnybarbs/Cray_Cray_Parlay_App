@@ -369,16 +369,27 @@ async function deepResearch(req, res) {
       return data || [];
     });
 
-    // 4. Current odds lines for this matchup
+    // 4. Current odds lines for this matchup. odds_cache stores one row per
+    // (market, bookmaker) with prices inside the outcomes JSON — there are no
+    // spread/total/moneyline columns (this query silently returned nothing
+    // for months by selecting them).
     const oddsResult = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('odds_cache')
-        .select('market_type, home_team, away_team, spread, total, moneyline_home, moneyline_away, bookmaker, commence_time')
+        .select('market_type, outcomes, bookmaker, commence_time')
         .eq('home_team', home_team)
         .eq('away_team', away_team)
         .order('market_type');
       if (error) throw error;
-      return data || [];
+      return (data || []).map(row => ({
+        market: row.market_type,
+        bookmaker: row.bookmaker,
+        outcomes: (row.outcomes || []).map(o => ({
+          name: o.name,
+          price: o.price,
+          ...(o.point != null ? { point: o.point } : {}),
+        })),
+      }));
     });
 
     // 5. Last 5 games for each team from game_results

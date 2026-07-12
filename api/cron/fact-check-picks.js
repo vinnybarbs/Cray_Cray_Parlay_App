@@ -177,10 +177,13 @@ Respond in this exact JSON format:
 }`;
 
   // Verification is a judgment call — Sonnet over the utility tier.
+  // 2000 tokens: sonnet enumerating every claim overran the old 1000 cap,
+  // truncating the JSON mid-array — same failure mode that killed
+  // pre-analyze on 7/12. Keep headroom on any json: true call.
   const parsed = await complete({
     model: MODELS.NARRATION,
     messages: [{ role: 'user', content: prompt }],
-    maxTokens: 1000,
+    maxTokens: 2000,
     json: true,
   });
   if (!parsed) throw new Error('Fact-check model returned no parseable JSON');

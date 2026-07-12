@@ -6,7 +6,6 @@
 // Endpoint: POST /cron/pre-analyze-games
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
-const { ApiSportsMulti } = require('../../lib/services/apisports-multi.js');
 const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
@@ -355,73 +354,6 @@ async function getPastAccuracy(sport) {
 }
 
 /**
- * Get API-Sports enrichment (standings, season stats, H2H) for NFL/NBA/NHL/MLB
- * NCAAB uses ESPN instead (no API-Sports basketball college endpoint)
- */
-async function getApiSportsContext(homeTeam, awayTeam, sportSlug) {
-  const sportName = SLUG_TO_SPORT[sportSlug];
-  if (!sportName || sportName === 'NCAAB') return null; // NCAAB uses ESPN
-
-  const apiClient = new ApiSportsMulti();
-  if (!apiClient.apiKey) return null;
-
-  try {
-    const parts = [];
-
-    // 1. Standings — get W-L, conference rank, points differential
-    const standingsData = await apiClient.getStandings(sportName);
-    if (standingsData?.response?.length > 0) {
-      const homeMascot = homeTeam.split(' ').slice(-1)[0].toLowerCase();
-      const awayMascot = awayTeam.split(' ').slice(-1)[0].toLowerCase();
-
-      for (const s of standingsData.response) {
-        const teamName = (s.team?.name || '').toLowerCase();
-        const isHome = teamName.includes(homeMascot);
-        const isAway = teamName.includes(awayMascot);
-
-        if (isHome || isAway) {
-          const label = isHome ? homeTeam : awayTeam;
-          const w = s.won || s.win?.total || 0;
-          const l = s.lost || s.loss?.total || 0;
-          const ptsFor = s.points?.for || 0;
-          const ptsAgainst = s.points?.against || 0;
-          const diff = ptsFor - ptsAgainst;
-          const conf = s.conference?.name || s.group?.name || '';
-          const streak = s.streak ? ` (streak: ${s.streak})` : '';
-
-          parts.push(`[API-Sports] ${label}: ${w}-${l} ${conf}${streak}, PF/PA: ${ptsFor}/${ptsAgainst} (${diff >= 0 ? '+' : ''}${diff})`);
-        }
-      }
-    }
-
-    // 2. Today's games — check if there's a live/upcoming entry with odds
-    if (sportName === 'NFL') {
-      // NFL has odds endpoint on API-Sports (DraftKings/FanDuel via their feed)
-      const today = new Date().toISOString().split('T')[0];
-      const gamesData = await apiClient.getGamesByDate(sportName, today);
-      if (gamesData?.response?.length > 0) {
-        const homeMascot = homeTeam.split(' ').slice(-1)[0].toLowerCase();
-        for (const g of gamesData.response) {
-          const hName = (g.teams?.home?.name || '').toLowerCase();
-          if (hName.includes(homeMascot)) {
-            const venue = g.game?.venue?.name || '';
-            const weather = g.game?.weather?.description || '';
-            if (venue) parts.push(`[API-Sports] Venue: ${venue}`);
-            if (weather) parts.push(`[API-Sports] Weather: ${weather}`);
-            break;
-          }
-        }
-      }
-    }
-
-    return parts.length > 0 ? parts.join('\n') : null;
-  } catch (err) {
-    console.warn(`API-Sports enrichment failed for ${sportSlug}:`, err.message);
-    return null;
-  }
-}
-
-/**
  * Get Supabase DB stats: player_game_stats season averages for key players
  */
 async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
@@ -497,7 +429,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
  * Generate AI analysis for a single game. Returns the analysis fields on
  * success, or { error } on failure so the caller can log the real reason.
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null) {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null) {
   const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -533,7 +465,6 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   if (homeTrend) contextParts.push(`${game.home_team} last ${homeTrend.games.length}: ${homeTrend.record} — ${homeTrend.games.join('; ')}`);
   if (awayTrend) contextParts.push(`${game.away_team} last ${awayTrend.games.length}: ${awayTrend.record} — ${awayTrend.games.join('; ')}`);
 
-  if (apiSportsCtx) contextParts.push(`Standings/Stats:\n${apiSportsCtx}`);
   if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
@@ -895,14 +826,13 @@ async function runPreAnalysis(sportSlugs) {
         const sportDisplay = SLUG_TO_SPORT[game.sport] || game.sport.toUpperCase();
 
         // Fetch context in parallel — DB queries + API-Sports + news
-        const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, intelCtx] = await Promise.all([
+        const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
           getInjuryContext(game.home_team, game.away_team),
           getRankingsContext(game.home_team, game.away_team),
           getRecentResults(game.home_team, game.sport),
           getRecentResults(game.away_team, game.sport),
           getPastAccuracy(game.sport),
-          getApiSportsContext(game.home_team, game.away_team, game.sport),
           getPlayerStatsContext(game.home_team, game.away_team, game.sport),
           // Web-verified injuries/weather/record warnings from the data
           // integrity agent (empty string when no fresh intel exists).
@@ -949,7 +879,7 @@ async function runPreAnalysis(sportSlugs) {
           console.log(`  ⚪ No-edge game — every market < +2pp`);
         }
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, apiSportsCtx, playerStatsCtx, playbook, prior, edgeData, mathPick);
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick);
 
         if (!result || result.error) {
           const reason = result?.error || 'AI returned null';

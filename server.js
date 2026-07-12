@@ -143,52 +143,6 @@ app.use((req, res, next) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-// Debug endpoint for roster cache stats
-app.get('/debug/roster-cache', (req, res) => {
-  try {
-    const rosterCache = require('./lib/services/roster-cache');
-    const stats = rosterCache.getStats();
-    const hasKey = !!(process.env.APISPORTS_API_KEY || process.env.API_SPORTS_KEY);
-    
-    res.json({
-      status: 'ok',
-      apiKey: hasKey ? 'configured' : 'missing',
-      apiKeyName: process.env.APISPORTS_API_KEY ? 'APISPORTS_API_KEY' : (process.env.API_SPORTS_KEY ? 'API_SPORTS_KEY' : 'none'),
-      cache: stats,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      message: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Debug endpoint for NFL Stats service
-app.get('/debug/nfl-stats', (req, res) => {
-  try {
-    const nflStats = require('./lib/services/nfl-stats');
-    const stats = nflStats.getStats();
-    const hasKey = !!(process.env.APISPORTS_API_KEY || process.env.API_SPORTS_KEY);
-    
-    res.json({
-      status: 'ok',
-      service: 'NFL Stats',
-      apiKey: hasKey ? 'configured' : 'missing',
-      stats: stats,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      status: 'error',
-      error: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
 // Debug endpoint to test Odds API directly
 app.get('/debug/odds-test', async (req, res) => {
   const ODDS_KEY = process.env.ODDS_API_KEY;
@@ -402,9 +356,7 @@ app.get('/api/lessons', getLessons);
 app.get('/api/performance-summary', getPerformanceSummary);
 
 // Add API-Sports sync endpoints
-const { syncApiSports, getSyncStatus } = require('./api/sync-apisports');
-app.post('/api/sync-apisports', syncApiSports);
-app.get('/api/sync-apisports/status', getSyncStatus);
+
 
 // Add user parlay management endpoints
 const { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } = require('./api/user-parlays');
