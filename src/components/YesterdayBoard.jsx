@@ -144,7 +144,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                         ? <p className="text-xs text-ink-200 leading-relaxed max-w-2xl">{p.reasoning}</p>
                         : <p className="text-xs text-ink-500">No written analysis was stored with this pick.</p>}
                       <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
-                        {tier.label} · {tier.subtitle} · published {fmtPublished(p.created_at)} — before the game started
+                        {tier.label}{tier.subtitle && tier.subtitle.toLowerCase() !== tier.label.toLowerCase() ? ` · ${tier.subtitle}` : ''} · published {fmtPublished(p.created_at)} — before the game started
                       </p>
                     </div>
                   )}
