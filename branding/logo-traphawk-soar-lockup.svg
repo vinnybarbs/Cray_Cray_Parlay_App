@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" width="640" height="180">
   <rect width="640" height="180" rx="12" fill="#0d0d0f"/>
-  <line x1="44" y1="132" x2="152" y2="132" stroke="#52525b" stroke-width="4"/>
-  <polygon points="52,126 76,126 83,99 59,99" fill="#f5a524" opacity="0.45"/>
-  <polygon points="84,126 108,126 115,73 91,73" fill="#f5a524" opacity="0.7"/>
-  <polygon points="116,126 140,126 147,46 123,46" fill="#f5a524"/>
-  <polygon points="123,46 124,26 141,20 166,34 156,38 147,46" fill="#f5a524"/>
+  <rect x="42" y="126" width="112" height="6" fill="#52525b"/>
+  <polygon points="52,123 75,123 80,95 57,95" fill="#f5a524" opacity="0.4"/>
+  <polygon points="83,123 106,123 111,72 88,72" fill="#f5a524" opacity="0.65"/>
+  <polygon points="114,123 137,123 142,33 119,33" fill="#f5a524"/>
+  <polygon points="137,131 138,110 152,105 165,115 158,119 154,123 155,131" fill="#f5a524"/>
   <text x="196" y="98" font-family="'JetBrains Mono','Menlo','Consolas',monospace" font-size="54" font-weight="700" letter-spacing="2"><tspan fill="#f5a524">TRAP</tspan><tspan fill="#e7e5e4">HAWK</tspan></text>
   <text x="198" y="134" font-family="'JetBrains Mono','Menlo','Consolas',monospace" font-size="13" letter-spacing="5.5" fill="#71717a">EVERY PICK ON THE HOUSE LEDGER</text>
 </svg>

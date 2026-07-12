@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="240" height="240">
+  <!-- TrapHawk mark, from Vince's sketch: a hawk soaring rightward along the
+       baseline, head low at the front, wing feathers sweeping up behind it
+       as a rising bar graph. Three shades of the brand amber, no eye. -->
+  <rect width="240" height="240" rx="28" fill="#0d0d0f"/>
+  <rect x="38" y="192" width="168" height="9" fill="#52525b"/>
+  <polygon points="54,188 88,188 96,146 62,146" fill="#f5a524" opacity="0.4"/>
+  <polygon points="100,188 134,188 142,112 108,112" fill="#f5a524" opacity="0.65"/>
+  <polygon points="146,188 180,188 188,54 154,54" fill="#f5a524"/>
+  <polygon points="180,199 181,168 202,161 221,176 210,181 204,188 206,199" fill="#f5a524"/>
+</svg>
