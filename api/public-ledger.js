@@ -68,17 +68,25 @@ async function getPublicLedger(req, res) {
 
   try {
     // Every settled house pick. auto_digest is the published-daily pipeline —
-    // picks written by the analysis cron before games start.
+    // picks written by the analysis cron before games start. Supabase caps a
+    // select at 1,000 rows, so page until exhausted — the headline number
+    // claims the full history and must actually cover it.
     const settledPicks = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('ai_suggestions')
-        .select('id, sport, bet_type, pick, odds, edge_pp, tier, game_date, created_at, resolved_at, actual_outcome')
-        .like('session_id', 'auto_digest%')
-        .in('actual_outcome', ['won', 'lost', 'push'])
-        .order('resolved_at', { ascending: false })
-        .limit(1500);
-      if (error) throw error;
-      return data || [];
+      const all = [];
+      const PAGE = 1000;
+      for (let page = 0; page < 20; page++) {
+        const { data, error } = await supabase
+          .from('ai_suggestions')
+          .select('id, sport, bet_type, pick, odds, edge_pp, tier, game_date, created_at, resolved_at, actual_outcome')
+          .like('session_id', 'auto_digest%')
+          .in('actual_outcome', ['won', 'lost', 'push'])
+          .order('resolved_at', { ascending: false })
+          .range(page * PAGE, page * PAGE + PAGE - 1);
+        if (error) throw error;
+        all.push(...(data || []));
+        if (!data || data.length < PAGE) break;
+      }
+      return all;
     }) || [];
 
     // Today's published-but-unsettled picks, so the ledger shows the picks
