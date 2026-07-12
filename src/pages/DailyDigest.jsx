@@ -72,6 +72,17 @@ function pickIdFor(game) {
   return `${game.home_team}-${game.away_team}-${game.recommended_side || 'pick'}`
 }
 
+// Real odds for the recommended side. recommended_odds is captured at
+// analysis time server-side; rows analyzed before that column existed still
+// carry ML prices on the row. When no real price is known we send null —
+// never a made-up -110, downstream lock records feed the settlement ledger.
+function lockOddsFor(game) {
+  if (game.recommended_odds != null) return game.recommended_odds
+  if (game.recommended_side === 'home_ml') return game.moneyline_home ?? null
+  if (game.recommended_side === 'away_ml') return game.moneyline_away ?? null
+  return null
+}
+
 function buildLockedPayload(game, sport) {
   return {
     id: pickIdFor(game),
@@ -80,7 +91,8 @@ function buildLockedPayload(game, sport) {
     awayTeam: game.away_team,
     pick: game.recommended_pick,
     betType: game.recommended_side || 'Moneyline/Spread',
-    odds: -110,
+    odds: lockOddsFor(game),
+    model: game.model_used || null,
     confidence: game.edge_score || 7,
     reasoning: game.analysis_snippet || '',
     gameDate: game.game_date,
@@ -291,7 +303,8 @@ function DeepResearchModal({ gameKey, game, onClose, onLockPick }) {
       awayTeam: game.away_team,
       pick: game.recommended_pick,
       betType: game.recommended_side || 'Moneyline/Spread',
-      odds: -110,
+      odds: lockOddsFor(game),
+      model: game.model_used || null,
       confidence: game.edge_score || 7,
       reasoning: game.analysis_snippet || '',
       gameDate: game.game_date,

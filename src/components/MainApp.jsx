@@ -489,6 +489,9 @@ export default function MainApp() {
 
   // Suggestions state
   const [suggestions, setSuggestions] = useState([])
+  // Model reported by /api/suggest-picks metadata. Stamped on lock records so
+  // the ledger records what actually generated the picks (never hardcoded).
+  const [pickModel, setPickModel] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [alert, setAlert] = useState(null)
@@ -642,6 +645,7 @@ export default function MainApp() {
       if (data.success && data.suggestions) {
         console.log('✅ Received suggestions:', data.suggestions.length, data.suggestions);
         setSuggestions(data.suggestions)
+        setPickModel(data.metadata?.model || (data.fromCache ? 'cached' : null))
         
         // Set alert if provided
         if (data.alert) {
@@ -732,7 +736,9 @@ export default function MainApp() {
         .from('parlays')
         .insert({
           user_id: user.id,
-          ai_model: 'gpt-4o-mini',
+          // Column is NOT NULL; 'unknown' is honest when the server didn't
+          // report a model (old cached responses), a fake model name is not.
+          ai_model: pickModel || 'unknown',
           generate_mode: generateMode,
           sportsbook: oddsPlatform,
           preference_type: preferenceType,

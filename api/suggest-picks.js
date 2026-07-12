@@ -1,4 +1,5 @@
 const { MultiAgentCoordinator } = require('../lib/agents/coordinator.js');
+const { ANALYST_MODEL } = require('../lib/agents/analyst-agent.js');
 const { logger } = require('../shared/logger.js');
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
 const { toMountainTime, formatGameTime, getCurrentMountainTime } = require('../lib/timezone-utils.js');
@@ -1498,7 +1499,7 @@ async function suggestPicksHandler(req, res) {
               type: 'info',
               message: `Showing ${cachedSuggestions.length} recent picks from cache — live generation had no results`
             },
-            metadata: { fromCache: true, cachedCount: cachedSuggestions.length }
+            metadata: { model: 'cached', fromCache: true, cachedCount: cachedSuggestions.length }
           });
         }
       } catch (cacheErr) {
@@ -1616,6 +1617,9 @@ async function suggestPicksHandler(req, res) {
       suggestions: finalSuggestions,
       sessionId, // Include session ID for tracking
       metadata: {
+        // What generated these picks. The client stamps this on lock records
+        // (parlays.ai_model) — never hardcode a model name client-side.
+        model: ANALYST_MODEL,
         requestedSuggestions: numSuggestions,
         returnedSuggestions: finalSuggestions.length,
         totalGenerated: allSuggestions.length,

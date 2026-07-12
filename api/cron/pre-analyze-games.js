@@ -962,6 +962,10 @@ async function runPreAnalysis(sportSlugs) {
                         ?? result.edge_score_llm_fallback ?? null,
             recommended_pick: result.recommended_pick,
             recommended_side: result.recommended_side,
+            // Real price of the recommended side at analysis time. The digest
+            // lock payload reads this — it must never fall back to a made-up
+            // -110, the ledger records it.
+            recommended_odds: resolveOddsForPick(oddsCtx, result.recommended_side) ?? null,
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,

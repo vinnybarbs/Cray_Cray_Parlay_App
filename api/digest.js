@@ -40,7 +40,7 @@ async function getDigest(req, res) {
       const { data, error } = await supabase
         .from('game_analysis')
         .select(
-          'game_key, home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, sport, analysis_version, edge_movement, what_changed, edges'
+          'game_key, home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, recommended_odds, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, sport, analysis_version, edge_movement, what_changed, edges, model_used'
         )
         .eq('stale', false)
         .gt('expires_at', new Date().toISOString())
@@ -320,7 +320,7 @@ async function deepResearch(req, res) {
       const { data, error } = await supabase
         .from('game_analysis')
         .select(
-          'home_team, away_team, game_date, sport, edge_score, edge_movement, analysis_snippet, key_factors, what_changed, prior_analysis, analysis_version, recommended_pick, recommended_side, spread, total, moneyline_home, moneyline_away, home_record, away_record, edges'
+          'home_team, away_team, game_date, sport, edge_score, edge_movement, analysis_snippet, key_factors, what_changed, prior_analysis, analysis_version, recommended_pick, recommended_side, recommended_odds, spread, total, moneyline_home, moneyline_away, home_record, away_record, edges, model_used'
         )
         .eq('game_key', game_key)
         .maybeSingle();
