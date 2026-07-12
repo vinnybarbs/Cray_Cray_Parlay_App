@@ -1500,6 +1500,58 @@ function ModelPerformance({ accuracy }) {
   )
 }
 
+// ─── QuietDayCard — fallback hero when nothing clears the feature bar ────────
+// The bar stays at 7pp; on a quiet slate the honest move is to say so and
+// hand the user a next step, not to leave a hole where the hero was.
+
+function QuietDayCard({ best, trapCount }) {
+  const tier = best ? edgeTier(best.signedPp) : null
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
+      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
+        $ pick_of_the_day --min-edge=7pp
+      </div>
+      <h2 className="text-xl md:text-2xl font-bold text-ink-100 leading-tight">
+        No featured pick today.
+      </h2>
+      <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
+        Nothing on the board cleared the 7-point feature bar, and we don't
+        lower the bar on quiet days — that discipline is what the record is
+        built on. Here's what's still worth your time:
+      </p>
+      <div className="mt-5 space-y-3">
+        {best && (
+          <div className="flex items-start gap-3 bg-ink-850 rounded-sharp p-4 shadow-hairline">
+            <span className={`px-2 py-0.5 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${tier.color} ${tier.bg}`}>
+              {tier.label}
+            </span>
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-ink-100">
+                {best.game.recommended_pick}
+                <span className="text-signal-pos/80 ml-2 font-mono text-xs">{formatPp(best.signedPp)}</span>
+              </div>
+              <div className="text-xs text-ink-400 mt-0.5">
+                {best.sport} · {best.game.away_team} @ {best.game.home_team} · best edge on a quiet board, below our feature bar — size it accordingly
+              </div>
+            </div>
+          </div>
+        )}
+        {trapCount > 0 && (
+          <p className="text-sm text-ink-300">
+            <span className="text-signal-neg font-bold font-mono">{trapCount}</span> Trap{trapCount !== 1 ? 's' : ''} on the board below — knowing what <span className="text-ink-100">not</span> to bet is half the product.
+          </p>
+        )}
+        <button
+          onClick={() => { window.location.hash = '#/chat' }}
+          className="px-5 py-2.5 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-mono font-medium uppercase tracking-[0.12em] text-xs text-ink-200 transition-all active:scale-[0.98]"
+        >
+          Ask De-Genny what's worth a look →
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function DailyDigest({ onBack }) {
@@ -1637,6 +1689,25 @@ export default function DailyDigest({ onBack }) {
     return best
   }, [data])
 
+  // Quiet-day fallback: the best sub-feature-bar edge, so a first session on
+  // a quiet board still has a next step instead of a missing hero (audit 40,
+  // funnel leak 5). Never dressed up as a Pick of the Day — labeled honestly.
+  const quietBest = useMemo(() => {
+    if (!data?.gamesBySport || pickOfTheDay) return null
+    let best = null
+    for (const [sport, games] of Object.entries(data.gamesBySport)) {
+      for (const g of games) {
+        const pp = edgePpForSide(g.edges, g.recommended_side)
+        if (pp == null || pp < 2) continue
+        if (!g.recommended_pick) continue
+        if (!best || pp > best.signedPp) {
+          best = { game: g, sport, signedPp: pp }
+        }
+      }
+    }
+    return best
+  }, [data, pickOfTheDay])
+
   // 30d hit-rate for the hero trust anchor — prefer 30d, fall back to 7d, then all-time.
   const heroHitRate = data?.modelAccuracy?.last_30d?.overall?.winRate != null
     ? { rate: data.modelAccuracy.last_30d.overall.winRate, label: '30d' }
@@ -1657,19 +1728,19 @@ export default function DailyDigest({ onBack }) {
   return (
     <LockedPicksContext.Provider value={lockedPicksApi}>
     <div className="min-h-screen bg-ink-950 text-white font-sans">
-      {/* Top nav bar */}
+      {/* Top nav bar — the digest is the authenticated home, so there is no
+          "Back". Other surfaces are forward navigation. */}
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="text-sm text-ink-300 hover:text-white flex items-center gap-1.5 transition-colors"
-        >
-          ← Back
-        </button>
-        <span className="text-ink-700">|</span>
         <span className="text-sm font-semibold text-ink-200">Daily Digest</span>
         <button
-          onClick={fetchDigest}
+          onClick={onBack}
           className="ml-auto px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+        >
+          Generator
+        </button>
+        <button
+          onClick={fetchDigest}
+          className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           {loading ? '...' : '↻ Refresh'}
         </button>
@@ -1779,6 +1850,7 @@ export default function DailyDigest({ onBack }) {
             {/* Pick of the Day — the single best edge across all sports, featured
                 above the accordions so new users see the aha moment on first scroll. */}
             {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} tierCounts={tierCounts} totalGames={totalGames} tierStats={tierStats} />}
+            {!pickOfTheDay && <QuietDayCard best={quietBest} trapCount={tierCounts.traps} />}
 
             {/* Golf tournament leaderboard */}
             {data.golf && <GolfLeaderboard golf={data.golf} />}

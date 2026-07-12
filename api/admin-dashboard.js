@@ -1,13 +1,43 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../shared/logger');
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET || 'admin123';
+// Admin access = a signed-in Supabase user whose email is on the allowlist.
+// The old scheme (shared secret in the query string, defaulting to admin123,
+// hardcoded in the client bundle) was flagged by the product audit — anyone
+// reading the JS source could open the dashboard.
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'vincemorello12@gmail.com')
+  .split(',')
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
   return createClient(url, key);
+}
+
+// Verify the caller's Supabase JWT and check the allowlist. Returns the user
+// on success, or null after writing the error response.
+async function requireAdmin(req, res, supabase) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+  if (!token) {
+    res.status(401).json({ error: 'Unauthorized', message: 'Sign in required' });
+    return null;
+  }
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) {
+    res.status(401).json({ error: 'Unauthorized', message: 'Invalid session' });
+    return null;
+  }
+  const email = (data.user.email || '').toLowerCase();
+  if (!ADMIN_EMAILS.includes(email)) {
+    logger.warn('Non-admin attempted admin dashboard', { email });
+    res.status(403).json({ error: 'Forbidden' });
+    return null;
+  }
+  return data.user;
 }
 
 async function safeQuery(fn) {
@@ -20,14 +50,13 @@ async function safeQuery(fn) {
 }
 
 async function getAdminDashboard(req, res) {
-  if (req.query.secret !== ADMIN_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
   const supabase = getSupabase();
   if (!supabase) {
     return res.status(500).json({ error: 'Supabase not configured' });
   }
+
+  const adminUser = await requireAdmin(req, res, supabase);
+  if (!adminUser) return;
 
   try {
     // --- 1. Cron Health: from pg_cron's own run details (ALL jobs) ---

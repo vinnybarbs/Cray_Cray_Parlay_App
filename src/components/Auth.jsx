@@ -8,6 +8,10 @@ export default function Auth({ onClose }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // Signup succeeded but Supabase requires email confirmation — the user has
+  // no session yet. Closing the modal here silently dropped them back on the
+  // landing page with no explanation (audit 40, funnel leak 2).
+  const [confirmationSent, setConfirmationSent] = useState(false)
   const { signIn, signUp } = useAuth()
 
   const handleGoogleSignIn = async () => {
@@ -17,37 +21,20 @@ export default function Auth({ onClose }) {
     }
 
     try {
-      // Get the correct redirect URL based on environment
-      const getRedirectUrl = () => {
-        const origin = window.location.origin
-        console.log('Current origin:', origin) // Debug log
-        
-        // OAuth redirect should go to port 3001 for local development
-        if (origin.includes('localhost')) {
-          return 'http://localhost:3001/'
-        }
-        
-        // For production (Vercel/Railway)  
-        return `${origin}/`
-      }
-
-      const redirectTo = getRedirectUrl()
-      console.log('OAuth redirect URL:', redirectTo) // Debug log
-
+      // The OAuth round trip must return to wherever the app is actually
+      // served — origin covers localhost and production alike.
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: redirectTo
+          redirectTo: `${window.location.origin}/`
         }
       })
-      
+
       if (error) {
-        console.error('OAuth error:', error) // Debug log
         setError(error.message)
       }
       // User will be redirected to Google, then back to app
     } catch (err) {
-      console.error('Sign in error:', err) // Debug log
       setError(err.message)
     }
   }
@@ -58,12 +45,16 @@ export default function Auth({ onClose }) {
     setLoading(true)
 
     try {
-      const { error } = isSignUp 
+      const { data, error } = isSignUp
         ? await signUp(email, password)
         : await signIn(email, password)
 
       if (error) {
         setError(error.message)
+      } else if (isSignUp && data && !data.session) {
+        // Account created, confirmation email pending — no session until the
+        // user clicks the link. Show them what to do instead of vanishing.
+        setConfirmationSent(true)
       } else {
         if (onClose) onClose()
       }
@@ -72,6 +63,33 @@ export default function Auth({ onClose }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (confirmationSent) {
+    return (
+      <div className="fixed inset-0 bg-ink-950/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="bg-ink-900 rounded-sharp shadow-hairline p-8 max-w-md w-full mx-4 text-center">
+          <div className="text-3xl mb-4">📬</div>
+          <h2 className="font-mono text-xl font-semibold uppercase tracking-[0.08em] text-ink-100 mb-3">
+            Check your email
+          </h2>
+          <p className="text-sm text-ink-300 leading-relaxed mb-2">
+            We sent a confirmation link to
+          </p>
+          <p className="font-mono text-sm text-signal-pos mb-4 break-all">{email}</p>
+          <p className="text-xs text-ink-400 leading-relaxed mb-6">
+            Click the link to activate your account, then come back and sign
+            in. If it isn't in your inbox within a minute, check spam.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 font-mono font-medium uppercase tracking-[0.12em] text-sm transition-colors"
+          >
+            Got it
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

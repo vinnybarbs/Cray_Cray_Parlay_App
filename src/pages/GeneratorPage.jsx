@@ -1,14 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
+import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import Auth from './Auth'
-import Dashboard from './Dashboard'
-import PickCard from './PickCard'
-import BetslipBuilder from '../pages/BetslipBuilder'
-import ChatPicks from '../pages/ChatPicks'
-import ResultsPage from '../pages/ResultsPage'
-import AdminDashboard from '../pages/AdminDashboard'
-import DailyDigest from '../pages/DailyDigest'
-import Landing from '../pages/Landing'
+import Auth from '../components/Auth'
+import Dashboard from '../components/Dashboard'
+import PickCard from '../components/PickCard'
 import { supabase } from '../lib/supabaseClient'
 import { calculateParlay } from '../utils/oddsCalculations'
 
@@ -401,64 +396,19 @@ const PhaseProgress = ({ loading, progress, timings, phaseData }) => {
   return null;
 };
 
-export default function MainApp() {
-  const { user, isAuthenticated, signOut, loading: authLoading } = useAuth()
+// Legacy interactive pick generator, extracted from the old MainApp shell.
+// Routing, the landing page, and the auth splash now live in App.jsx —
+// this file is only the generator page. Slated for a rebuild as a filtered
+// view of the digest's edge-tier data (audit 40 §3); until then it keeps
+// the old form behavior intact at /generator.
+export default function GeneratorPage() {
+  const { user, isAuthenticated, signOut } = useAuth()
+  const navigate = useNavigate()
   const [showAuth, setShowAuth] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [showNavMenu, setShowNavMenu] = useState(false);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
-  const [showWeeklySuggestions, setShowWeeklySuggestions] = useState(false);
-  const [showBetslipBuilder, setShowBetslipBuilder] = useState(false);
-  const [showChatPicks, setShowChatPicks] = useState(false);
-  const [showResults, setShowResults] = useState(false);
-  const [showAdmin, setShowAdmin] = useState(false);
-  const [showDigest, setShowDigest] = useState(false);
-
-  // Open admin dashboard when navigating to /#/admin
-  // Open daily digest when navigating to /#/digest
-  // Open betslip builder when navigating to /#/betslip
-  //   — the digest's "Build Parlay" sticky bar sends users here with picks
-  //   pre-staged in localStorage.digest_parlay_picks. Without this route the
-  //   build-parlay flow dead-ends on the MainApp landing page.
-  useEffect(() => {
-    const checkHash = () => {
-      if (window.location.hash === '#/admin') setShowAdmin(true);
-      if (window.location.hash === '#/digest') setShowDigest(true);
-      if (window.location.hash === '#/chat') { setShowChatPicks(true); setShowDigest(false); }
-      if (window.location.hash === '#/betslip') { setShowBetslipBuilder(true); setShowDigest(false); }
-    };
-    checkHash();
-    window.addEventListener('hashchange', checkHash);
-    return () => window.removeEventListener('hashchange', checkHash);
-  }, []);
-
-  // Auto-route freshly signed-in users from Landing → Daily Digest.
-  // Vince reported 2026-05-12: "upon sign in I am essentially directed to our
-  // old site." The old MainApp form view is jarring after the new Sharp-Quant
-  // Landing. DailyDigest has been CRO'd to match the new aesthetic and is the
-  // natural post-login destination.
-  //
-  // prevAuthRef tracks the prior isAuthenticated value. On the false → true
-  // transition (i.e., actual sign-in event), if the user is at root with no
-  // panel hash, we route them to the digest. Page reloads while already
-  // logged in are not affected.
-  const prevAuthRef = useRef(null); // null = haven't observed auth state yet
-  useEffect(() => {
-    if (authLoading) return;
-    if (prevAuthRef.current === null) {
-      prevAuthRef.current = isAuthenticated;
-      return;
-    }
-    if (!prevAuthRef.current && isAuthenticated) {
-      const hash = window.location.hash;
-      if (!hash || hash === '#' || hash === '#/') {
-        setShowDigest(true);
-        window.location.hash = '#/digest';
-      }
-    }
-    prevAuthRef.current = isAuthenticated;
-  }, [authLoading, isAuthenticated]);
 
   const loadingMessages = [
     "Consulting with Vegas insiders...",
@@ -830,37 +780,10 @@ export default function MainApp() {
 
   const payout = calculatePayout()
 
-  // While AuthContext is hydrating the Supabase session, isAuthenticated is
-  // briefly false — which would render Landing for a returning user before
-  // immediately swapping to the app shell. Block that flicker with a minimal
-  // splash until auth resolves. Vince reported this 2026-05-12: "all I can
-  // load is the last page... new one for split sec then reverts."
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-ink-950 flex items-center justify-center">
-        <div className="font-mono text-[10px] uppercase tracking-[0.20em] text-ink-400 flex items-center gap-2">
-          <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />
-          Loading
-        </div>
-      </div>
-    )
-  }
-
-  // Unauthenticated visitors at root see the marketing landing. Once they sign
-  // in or click into one of the deep-link surfaces (digest/chat/etc.), the
-  // landing yields and the normal app shell shows underneath.
-  const showLanding = !isAuthenticated && !showDigest && !showChatPicks && !showBetslipBuilder && !showAdmin && !showResults
-
-  if (showLanding) {
-    return (
-      <>
-        <Landing
-          onStartTrial={() => setShowAuth(true)}
-          onSignIn={() => setShowAuth(true)}
-        />
-        {showAuth && <Auth onClose={() => setShowAuth(false)} />}
-      </>
-    )
+  // The generator is an authenticated surface. App.jsx has already resolved
+  // the auth state by the time any route renders, so a bare redirect is safe.
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />
   }
 
   return (
@@ -890,31 +813,25 @@ export default function MainApp() {
                   How It Works
                 </button>
                 <button
-                  onClick={() => { setShowWeeklySuggestions(true); setShowNavMenu(false); }}
-                  className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
-                >
-                  Suggestions This Week
-                </button>
-                <button
-                  onClick={() => { setShowDigest(true); setShowNavMenu(false); window.location.hash = '#/digest'; }}
+                  onClick={() => navigate('/digest')}
                   className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800 border-t border-ink-700"
                 >
                   📊 Daily Digest
                 </button>
                 <button
-                  onClick={() => { if (!isAuthenticated) { setShowAuth(true); } else { setShowChatPicks(true); } setShowNavMenu(false); }}
+                  onClick={() => navigate('/chat')}
                   className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
                 >
                   🤖 Chat with De-Genny
                 </button>
                 <button
-                  onClick={() => { setShowResults(true); setShowNavMenu(false); }}
+                  onClick={() => navigate('/results')}
                   className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800"
                 >
                   📊 Results & Performance
                 </button>
                 <button
-                  onClick={() => { setShowBetslipBuilder(true); setShowNavMenu(false); }}
+                  onClick={() => navigate('/betslip')}
                   className="block w-full text-left px-4 py-2 text-sm text-ink-100 hover:bg-ink-800 border-t border-ink-700"
                 >
                   🔗 Betslip Builder
@@ -985,21 +902,18 @@ export default function MainApp() {
       {/* Ask the Degen AI - Prominent CTA */}
       <div className="max-w-2xl mx-auto mb-4">
         <button
-          onClick={() => {
-            if (!isAuthenticated) { setShowAuth(true); return; }
-            setShowChatPicks(true);
-          }}
+          onClick={() => navigate('/chat')}
           className="w-full py-4 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-bold text-lg text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]"
         >
           🤖 Chat with De-Genny — Tell Me What You're Feeling!
         </button>
-        <p className="text-center text-ink-400 text-xs mt-1">{isAuthenticated ? 'Chat with AI to get personalized picks based on real data' : 'Sign in to chat with De-Genny'}</p>
+        <p className="text-center text-ink-400 text-xs mt-1">Chat with AI to get personalized picks based on real data</p>
       </div>
 
       {/* Daily Digest CTA */}
       <div className="max-w-2xl mx-auto mb-6">
         <button
-          onClick={() => { setShowDigest(true); window.location.hash = '#/digest'; }}
+          onClick={() => navigate('/digest')}
           className="w-full py-3 bg-ink-700 hover:bg-ink-600 rounded-sharp font-bold text-base text-white shadow-lg transition-all hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
         >
           📊 Daily Digest — Today's Games, Picks & Results
@@ -1311,69 +1225,6 @@ export default function MainApp() {
         </div>
       )}
 
-      {showWeeklySuggestions && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-ink-900 rounded-sharp p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-signal-pos">Suggestions This Week</h2>
-              <button
-                onClick={() => setShowWeeklySuggestions(false)}
-                className="text-ink-300 hover:text-white text-2xl"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="text-ink-200">Coming soon: View all suggested picks from the last 7 days.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Betslip Builder - Full Screen */}
-      {showBetslipBuilder && (
-        <div className="fixed inset-0 bg-ink-950 z-50">
-          <button
-            onClick={() => setShowBetslipBuilder(false)}
-            className="absolute top-4 right-4 z-50 bg-ink-900 hover:bg-ink-800 text-white px-4 py-2 rounded-sharp border border-ink-700"
-          >
-            ✕ Close
-          </button>
-          <BetslipBuilder />
-        </div>
-      )}
-
-      {/* Chat Picks - Full Screen Dedicated Page */}
-      {showChatPicks && (
-        <div className="fixed inset-0 bg-ink-950 z-50">
-          <ChatPicks onBack={() => setShowChatPicks(false)} />
-        </div>
-      )}
-
-      {/* Results Page - Full Screen */}
-      {showResults && (
-        <div className="fixed inset-0 bg-ink-950 z-50 overflow-auto">
-          <ResultsPage onBack={() => setShowResults(false)} />
-        </div>
-      )}
-
-      {/* Admin Dashboard - Full Screen, accessible via /#/admin */}
-      {showAdmin && (
-        <div className="fixed inset-0 bg-ink-950 z-50 overflow-auto">
-          <AdminDashboard onBack={() => {
-            setShowAdmin(false);
-            window.location.hash = '';
-          }} />
-        </div>
-      )}
-
-      {/* Daily Digest - Full Screen, accessible via /#/digest */}
-      {showDigest && (
-        <div className="fixed inset-0 bg-ink-950 z-50 overflow-auto">
-          <DailyDigest onBack={() => {
-            setShowDigest(false);
-            window.location.hash = '';
-          }} />
-        </div>
-      )}
     </div>
   )
 }

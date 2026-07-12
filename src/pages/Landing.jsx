@@ -128,13 +128,26 @@ function Ticker() {
     return () => { cancelled = true }
   }, [])
 
-  const liveItems = (feed?.items || []).map(it => ({
+  const rawItems = (feed?.items || []).map(it => ({
     kind: 'edge',
+    ppVal: it.pp,
     side: it.pp >= 0 ? '▲' : '▼',
     pp: `${it.pp >= 0 ? '+' : '−'}${Math.abs(it.pp).toFixed(1)}`,
     label: `${it.sport} · ${it.label}`,
     tone: it.pp >= 0 ? 'pos' : 'neg',
   }))
+
+  // Lead with the strongest positive edge and alternate signs from there.
+  // The API returns edges by magnitude, which on a Trap-heavy slate opened
+  // the reel with six consecutive red entries — a wall of losses as the
+  // very first thing a visitor scans (audit 40, medium 9).
+  const pos = rawItems.filter(it => it.ppVal >= 0).sort((a, b) => b.ppVal - a.ppVal)
+  const neg = rawItems.filter(it => it.ppVal < 0).sort((a, b) => a.ppVal - b.ppVal)
+  const liveItems = []
+  for (let i = 0; i < Math.max(pos.length, neg.length); i++) {
+    if (pos[i]) liveItems.push(pos[i])
+    if (neg[i]) liveItems.push(neg[i])
+  }
 
   const inSeason = new Set(feed?.inSeason || [])
   const coverageItems = COVERED_LEAGUES
@@ -276,6 +289,12 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
             </button>
           </div>
 
+          {/* The single strongest friction-killer, directly under the CTA —
+              previously buried in the pricing section (audit 40, medium 10). */}
+          <p className="mt-3 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
+            7 days free · <span className="text-signal-pos">no card required</span>
+          </p>
+
           {/* Sign in affordance for returning users — small but findable */}
           <p className="mt-5 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
             Already have an account?{' '}
@@ -337,36 +356,33 @@ function StatRow({ label, value, tone = 'neutral', big = false, small = false })
 
 // ─── EdgeScorecard — competitors graded with our own tier system ──────────
 
+// Editorial grades only — no invented pp values. The previous version styled
+// made-up signed edges ("−8.2pp") as data with a 10px "illustrative"
+// disclaimer; a skeptical bettor who caught that would discount the real
+// numbers elsewhere on the page (audit 40, medium 11). Tier labels are
+// opinion and presented as opinion.
 function EdgeScorecard() {
   const rows = [
     {
       name: 'Action Network',
-      pp: '−8.2',
-      side: '▼',
       tier: 'Trap',
       tone: 'neg',
       reason: 'Owned by a publicly-traded sportsbook affiliate (Better Collective). Structurally cannot warn you off a book without dismantling its parent\'s revenue model.',
     },
     {
       name: 'OddsJam',
-      pp: '+0.4',
-      side: '·',
       tier: 'Skip',
       tone: 'neutral',
-      reason: '$99–199/mo. Their own reviewers admit Gold doesn\'t pay off below ~$2K/mo in volume — locks out >80% of recreational bettors.',
+      reason: '$99–498/mo. Their flagship math tools now sit in the ~$498 tier — locks out the recreational bettor entirely.',
     },
     {
       name: 'Pikkit',
-      pp: '+1.1',
-      side: '▲',
       tier: 'Lean',
       tone: 'neutral',
       reason: 'Grades you after the bet (CLV). Different shelf — they measure history, we publish the decision. Complementary, not competitive.',
     },
     {
       name: 'Cray Cray for Parlays',
-      pp: '+9.6',
-      side: '▲',
       tier: 'Strong Play',
       tone: 'pos',
       reason: 'No affiliate parent. Per-side edges including negative ones. Trap label is the differentiator the rest structurally can\'t copy.',
@@ -385,14 +401,12 @@ function EdgeScorecard() {
 
         <div className="mt-12">
           {/* Header row */}
-          <div className="hidden md:grid grid-cols-[1fr_140px_140px] gap-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 pb-2 border-b border-ink-800">
+          <div className="hidden md:grid grid-cols-[1fr_160px] gap-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 pb-2 border-b border-ink-800">
             <span>Vendor</span>
-            <span className="text-right">Edge (signed)</span>
-            <span className="text-right">Grade</span>
+            <span className="text-right">Our grade</span>
           </div>
 
           {rows.map((r, i) => {
-            const ppColor = r.tone === 'pos' ? 'text-signal-pos' : r.tone === 'neg' ? 'text-signal-neg' : 'text-ink-300'
             const grdColor = r.tone === 'pos' ? 'text-signal-pos' : r.tone === 'neg' ? 'text-signal-neg' : 'text-ink-400'
             const isUs = r.name.startsWith('Cray')
             return (
@@ -403,7 +417,7 @@ function EdgeScorecard() {
                 {isUs && (
                   <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-signal-pos" aria-hidden="true" />
                 )}
-                <div className="grid md:grid-cols-[1fr_140px_140px] gap-2 md:gap-4 items-baseline">
+                <div className="grid md:grid-cols-[1fr_160px] gap-2 md:gap-4 items-baseline">
                   <div className="min-w-0">
                     <div className="flex items-baseline gap-2 flex-wrap">
                       <span className={`text-lg md:text-xl font-bold tracking-tight ${isUs ? 'text-ink-100' : 'text-ink-100'}`}>
@@ -417,11 +431,8 @@ function EdgeScorecard() {
                     </div>
                     <p className="mt-2 text-sm text-ink-300 leading-relaxed max-w-xl">{r.reason}</p>
                   </div>
-                  <div className="md:text-right tabular-nums font-bold text-xl">
-                    <span className={ppColor}>{r.side} {r.pp}<span className="text-[11px] ml-0.5">pp</span></span>
-                  </div>
                   <div className="md:text-right">
-                    <span className={`text-xs font-bold uppercase tracking-[0.18em] ${grdColor}`}>
+                    <span className={`text-sm font-bold uppercase tracking-[0.18em] ${grdColor}`}>
                       {r.tier}
                     </span>
                   </div>
@@ -432,7 +443,7 @@ function EdgeScorecard() {
         </div>
 
         <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500">
-          // Edges illustrative. Methodology: our own per-side edge calc, applied to each competitor's positioning.
+          // Editorial grades — our opinion of each vendor's structural position, not a measured edge. Pricing verified July 2026.
         </p>
       </div>
     </section>
@@ -786,14 +797,26 @@ function TrackRecord({ sportStats, tierStats }) {
             {rows.map((row, i) => {
               const settled = row.wins + row.losses
               const rate = parseFloat(row.hitRate)
-              const isPos = rate >= 55
-              const isNeg = rate < 50
+              const label = row[dimensionKey]
+              // Trap is graded on the pick it warns AGAINST — a low hit rate
+              // there is the model working, not failing. Styling it in the
+              // same red as a losing tier undercut the pitch (audit 40,
+              // high 3): invert the coloring and say so.
+              const isTrap = label === 'Trap'
+              const isPos = isTrap ? rate < 50 : rate >= 55
+              const isNeg = isTrap ? rate >= 50 : rate < 50
               const color = isPos ? 'text-signal-pos' : isNeg ? 'text-signal-neg' : 'text-ink-100'
               const barColor = isPos ? 'bg-signal-pos' : isNeg ? 'bg-signal-neg' : 'bg-ink-400'
-              const label = row[dimensionKey]
               return (
                 <div key={label} className={`grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
-                  <span className="text-ink-100 font-medium">{label}</span>
+                  <span className="text-ink-100 font-medium">
+                    {label}
+                    {isTrap && (
+                      <span className="block text-[10px] font-normal text-ink-400 mt-0.5">
+                        picks we said to fade — low is the model working
+                      </span>
+                    )}
+                  </span>
                   <span className="text-right text-ink-400 tabular-nums text-sm">{settled.toLocaleString()}</span>
                   {/* sparkline-bar */}
                   <div className="relative h-1.5 bg-ink-800 rounded-sharp overflow-hidden">
@@ -825,6 +848,17 @@ function TrackRecord({ sportStats, tierStats }) {
         {rows.length > 0 && heldBackCount > 0 && (
           <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 text-center">
             // {heldBackCount} {dimensionLabel.toLowerCase()}{heldBackCount === 1 ? '' : 's'} under {25} settled picks held back until the sample is real.
+          </p>
+        )}
+
+        {useTiers && rows.length > 0 && (
+          <p className="mt-6 text-xs text-ink-400 max-w-2xl leading-relaxed">
+            How to read this: tiers are ranked by edge size, so the middle
+            tiers carry small edges by definition and hover near break-even —
+            that's the honest shape of the market, not a bug. The money tier
+            is <span className="text-signal-pos">Sharp Take</span>, and Trap
+            is scored on the picks it told you to avoid, where a low number
+            means the warning was right.
           </p>
         )}
       </div>

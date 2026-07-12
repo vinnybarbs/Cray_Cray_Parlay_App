@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabaseClient'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
-const ADMIN_SECRET = 'admin123'
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 
@@ -529,10 +529,21 @@ export default function AdminDashboard({ onBack }) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API_BASE}/api/admin/dashboard?secret=${ADMIN_SECRET}&period=${period}`)
+      // Admin auth is the caller's own Supabase session — the server checks
+      // the JWT against its ADMIN_EMAILS allowlist. No shared secret.
+      const { data: sessionData } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null } }
+      const token = sessionData?.session?.access_token
+      if (!token) {
+        throw new Error('Sign in with an admin account to view this page')
+      }
+      const res = await fetch(`${API_BASE}/api/admin/dashboard?period=${period}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        throw new Error(body.error || `HTTP ${res.status}`)
+        throw new Error(body.message || body.error || `HTTP ${res.status}`)
       }
       const json = await res.json()
       setData(json)
