@@ -202,7 +202,7 @@ export default function GeneratorPage() {
         {!loading && !error && allRows.length === 0 && (
           <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
             <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
-              $ slate_status --next
+              Slate status
             </div>
             <h2 className="text-xl font-bold text-ink-100 leading-tight">The slate is dark.</h2>
             <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
@@ -251,7 +251,7 @@ export default function GeneratorPage() {
 
         {!loading && !error && allRows.length > 0 && (
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500 text-center">
-            // same math as the digest · picks below 2pp are shown so you know what to skip, not to bet
+            same math as the digest · picks below 2pp are shown so you know what to skip, not to bet
           </p>
         )}
       </div>

@@ -69,7 +69,12 @@ function ParlayCard({ parlay }) {
         ))}
       </div>
       <div className="mt-3 pt-2 border-t border-ink-800 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
-        combined edge +{Number(parlay.combined_edge_pp).toFixed(1)}pp · published {fmtDateTime(parlay.created_at)} MT
+        {parlay.model_win_prob != null ? (
+          <>model {(Number(parlay.model_win_prob) * 100).toFixed(1)}% to hit · fair {(Number(parlay.fair_win_prob) * 100).toFixed(1)}% · edge +{Number(parlay.combined_edge_pp).toFixed(1)}pp</>
+        ) : (
+          <>combined edge +{Number(parlay.combined_edge_pp).toFixed(1)}pp</>
+        )}
+        {' '}· published {fmtDateTime(parlay.created_at)} MT
         {parlay.settled_at && <> · settled {fmtDateTime(parlay.settled_at)} MT</>}
       </div>
     </div>
@@ -121,7 +126,7 @@ export default function HouseLedger() {
 
         {/* Hero */}
         <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-3">$ cat house_ledger --all-time --source=settlement_pipeline</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-3">The house ledger · all-time · straight from settlement</p>
           <h1 className="font-sans font-bold text-3xl md:text-4xl text-ink-100 tracking-[-0.02em] leading-tight">
             Every pick. Published before. Settled after.
           </h1>
@@ -196,7 +201,7 @@ export default function HouseLedger() {
             {/* Machine-built parlays */}
             {data.parlays?.length > 0 && (
               <div>
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">$ ./machine_parlays --house-built</h2>
+                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Machine-built parlays</h2>
                 <p className="text-sm text-ink-300 mb-4 max-w-2xl">
                   Parlays the machine assembles from its own highest-edge legs, cross-game only, published before the first pitch and settled here win or lose.
                 </p>
@@ -209,7 +214,7 @@ export default function HouseLedger() {
             {/* Open picks — publish-before-start proof */}
             {data.openPicks?.length > 0 && (
               <div>
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">$ tail ledger --open</h2>
+                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Open picks · published, not yet settled</h2>
                 <p className="text-sm text-ink-300 mb-4">On the record now, games not started. Timestamps are the receipt.</p>
                 <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
                   {data.openPicks.map(p => (
@@ -228,7 +233,7 @@ export default function HouseLedger() {
             {/* Settled picks feed */}
             {data.picks?.length > 0 && (
               <div>
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">$ tail ledger --settled -n {data.picks.length}</h2>
+                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Settled picks · latest {data.picks.length}</h2>
                 <p className="text-sm text-ink-300 mb-4">Most recent settlements first. The full history stands behind the headline number.</p>
                 <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
                   {data.picks.map(p => {

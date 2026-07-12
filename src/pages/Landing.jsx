@@ -262,7 +262,7 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
 
         {/* LEFT: copy stack */}
         <div className="md:col-span-7">
-          <SectionLabel>$ ./edge --today</SectionLabel>
+          <SectionLabel>Today's edge</SectionLabel>
 
           <h1 className="font-sans font-bold text-[2.5rem] md:text-[4.25rem] leading-[0.95] tracking-[-0.025em] text-ink-100 mt-5">
             Your book won't tell you<br />
@@ -317,7 +317,7 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
           <div className="bg-ink-900 shadow-hairline rounded-sharp">
             <div className="flex items-center justify-between px-4 py-2 border-b border-ink-800">
               <span className="text-[9px] uppercase tracking-[0.20em] text-ink-400">
-                $ status · last 30d
+                Status · last 30 days
               </span>
               <span className="flex items-center gap-1.5">
                 <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
@@ -339,8 +339,8 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
             </dl>
           </div>
           <div className="mt-3 flex justify-between text-[9px] uppercase tracking-[0.20em] text-ink-500 px-1">
-            <span>// source: settlement ledger</span>
-            <span>// refresh: after every settlement</span>
+            <span>source: settlement ledger</span>
+            <span>refresh: after every settlement</span>
           </div>
         </div>
       </div>
@@ -401,7 +401,7 @@ function EdgeScorecard() {
   return (
     <section className="border-b border-ink-800">
       <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>$ diff --receipts us competitors/</SectionLabel>
+        <SectionLabel>Receipts · us against the field</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
           One question sorts this category: <span className="text-signal-pos">where's the graded record?</span>
         </h2>
@@ -513,7 +513,7 @@ function ExecutionFlow() {
   return (
     <section id="flow" className="border-b border-ink-800 bg-ink-950">
       <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>$ ./how_it_works</SectionLabel>
+        <SectionLabel>How it works</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
           Three steps. <span className="text-ink-400">No vibes.</span>
         </h2>
@@ -597,7 +597,7 @@ function SnapshotTerminal({ tierStats }) {
   return (
     <section id="snapshot" className="border-b border-ink-800 bg-ink-950">
       <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>$ edge_snapshot --date=today</SectionLabel>
+        <SectionLabel>Edge snapshot · today</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
           Today's free pick,<br />
           straight off the <span className="text-signal-pos">live board.</span>
@@ -803,7 +803,7 @@ function TrackRecord({ sportStats, tierStats }) {
   return (
     <section id="track" className="border-b border-ink-800 bg-ink-950">
       <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>$ ./hit_rate --period=30d --source=settlement_ledger</SectionLabel>
+        <SectionLabel>Hit rate · last 30 days · from the settlement ledger</SectionLabel>
         <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
           The receipts. <span className="text-ink-400">{headlineKicker} Updated after every settlement.</span>
         </h2>

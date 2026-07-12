@@ -24,15 +24,19 @@ module.exports = async function boardHistory(req, res) {
     const requested = String(req.query.date || '').trim();
     let date = /^\d{4}-\d{2}-\d{2}$/.test(requested) ? requested : null;
     if (!date) {
-      for (let offset = 0; offset <= 7; offset++) {
-        const candidate = new Date(Date.now() - offset * 24 * 3600e3).toISOString().split('T')[0];
-        const { count } = await supabase
-          .from('ai_suggestions')
-          .select('id', { count: 'exact', head: true })
-          .eq('session_id', `auto_digest_${candidate}`);
-        if (count > 0) { date = candidate; break; }
-      }
-      if (!date) date = new Date(Date.now() - 24 * 3600e3).toISOString().split('T')[0];
+      // Session ids sort lexically as dates, so one query finds the newest
+      // day with picks (was 8 serial count queries — slow enough that the
+      // button felt dead).
+      const candidates = Array.from({ length: 8 }, (_, i) =>
+        `auto_digest_${new Date(Date.now() - i * 24 * 3600e3).toISOString().split('T')[0]}`);
+      const { data: latest } = await supabase
+        .from('ai_suggestions')
+        .select('session_id')
+        .in('session_id', candidates)
+        .order('session_id', { ascending: false })
+        .limit(1);
+      date = latest?.[0]?.session_id?.replace('auto_digest_', '')
+        || new Date(Date.now() - 24 * 3600e3).toISOString().split('T')[0];
     }
 
     const { data, error } = await supabase

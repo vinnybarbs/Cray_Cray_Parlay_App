@@ -1146,7 +1146,7 @@ function GolfFieldBoard({ field }) {
         </button>
       )}
       <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600">
-        // devigged from live books · "vs fair" = best available price against the blended fair number · not a graded pick
+        devigged from live books · "vs fair" compares the best available price to the blended fair number · not a graded pick
       </p>
     </div>
   )
@@ -1409,7 +1409,7 @@ function QuietDayCard({ best, trapCount }) {
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
       <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
-        $ pick_of_the_day --min-edge=7pp
+        Pick of the day · 7pp feature bar
       </div>
       <h2 className="text-xl md:text-2xl font-bold text-ink-100 leading-tight">
         No featured pick today.
@@ -1729,7 +1729,7 @@ export default function DailyDigest({ onBack }) {
             {sportSections.length === 0 ? (
               <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
                 <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
-                  $ slate_status --next
+                  Slate status
                 </div>
                 <h2 className="text-xl md:text-2xl font-bold text-ink-100 leading-tight">The slate is dark.</h2>
                 <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">

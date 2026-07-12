@@ -162,12 +162,31 @@ app.get('/debug/active-sports', async (req, res) => {
     const list = await r.json();
     if (!Array.isArray(list)) return res.json({ status: r.status, body: list });
     const active = list.filter(s => s.active).map(s => s.key);
-    res.json({
+    const out = {
       status: r.status,
       tennis: active.filter(k => k.startsWith('tennis_')),
       golf: active.filter(k => k.startsWith('golf_')),
       totalActive: active.length,
-    });
+    };
+    // ?probe=<sport_key>: fetch that key's odds with and without our
+    // bookmaker filter, to see whether DK/FD simply don't carry it.
+    const probe = String(req.query.probe || '').trim();
+    if (/^[a-z0-9_]+$/.test(probe)) {
+      const markets = probe.startsWith('golf_') ? 'outrights' : 'h2h';
+      const base = `https://api.the-odds-api.com/v4/sports/${probe}/odds/?apiKey=${ODDS_KEY}&regions=us&markets=${markets}&oddsFormat=american`;
+      const [withBooks, allBooks] = await Promise.all([
+        fetch(`${base}&bookmakers=draftkings,fanduel`).then(async x => ({ status: x.status, body: await x.json() })).catch(e => ({ error: e.message })),
+        fetch(base).then(async x => ({ status: x.status, body: await x.json() })).catch(e => ({ error: e.message })),
+      ]);
+      const summarize = (resp) => resp.error ? resp : {
+        status: resp.status,
+        events: Array.isArray(resp.body) ? resp.body.length : null,
+        firstEventBooks: Array.isArray(resp.body) && resp.body[0] ? (resp.body[0].bookmakers || []).map(b => b.key) : null,
+        raw: Array.isArray(resp.body) ? undefined : resp.body,
+      };
+      out.probe = { key: probe, dkFdOnly: summarize(withBooks), anyBook: summarize(allBooks) };
+    }
+    res.json(out);
   } catch (err) {
     res.json({ error: err.message });
   }

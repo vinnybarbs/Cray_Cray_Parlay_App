@@ -31,16 +31,55 @@ function decimalToAmerican(dec) {
   return dec >= 2 ? Math.round((dec - 1) * 100) : Math.round(-100 / (dec - 1));
 }
 
-// Combine a set of legs into parlay pricing.
+// American odds to raw implied probability (includes the book's margin).
+function americanToProb(price) {
+  const n = Number(price);
+  if (!Number.isFinite(n) || n === 0) return null;
+  return n > 0 ? 100 / (n + 100) : -n / (-n + 100);
+}
+
+// Combine a set of legs into parlay pricing and probability.
+//
+// Leg edges do NOT add across a parlay. Each leg's edge_pp is a probability
+// gap (model win prob minus fair win prob), and parlay probabilities
+// MULTIPLY, so the honest combined numbers are:
+//   model win prob = product of per-leg model probs
+//   fair win prob  = product of per-leg fair (devigged) probs
+//   combined edge  = the difference in pp, always far smaller than the sum
+//                    of leg edges. The payout leverage shows up in expected
+//                    ROI (model prob x decimal payout - 1), not in the pp.
+// The old sum (11 + 15 + 15 = "41pp") overstated the parlay wildly.
 function combineLegs(legs) {
   const combinedDecimal = legs.reduce(
     (acc, leg) => acc * americanToDecimal(parseInt(leg.odds, 10)),
     1
   );
   const combinedOdds = decimalToAmerican(combinedDecimal);
-  const combinedEdgePp =
-    Math.round(legs.reduce((acc, leg) => acc + Number(leg.edge_pp), 0) * 10) / 10;
-  return { combinedDecimal, combinedOdds, combinedEdgePp };
+
+  let modelProb = 1;
+  let fairProb = 1;
+  for (const leg of legs) {
+    const raw = americanToProb(parseInt(leg.odds, 10));
+    // Fair prob: the devigged number stored with the pick when we have it
+    // (ML picks), else strip a standard ~4.5% two-way margin off the price.
+    const fair = leg.implied_prob != null ? Number(leg.implied_prob) : raw * 0.955;
+    const model = leg.model_prob != null
+      ? Number(leg.model_prob)
+      : Math.min(0.99, fair + Number(leg.edge_pp) / 100);
+    modelProb *= model;
+    fairProb *= fair;
+  }
+
+  const combinedEdgePp = Math.round((modelProb - fairProb) * 1000) / 10;
+  const evPct = Math.round((modelProb * combinedDecimal - 1) * 1000) / 10;
+  return {
+    combinedDecimal,
+    combinedOdds,
+    combinedEdgePp,
+    modelProb: Math.round(modelProb * 10000) / 10000,
+    fairProb: Math.round(fairProb * 10000) / 10000,
+    evPct,
+  };
 }
 
 async function buildHouseParlays(req, res) {
@@ -60,7 +99,7 @@ async function buildHouseParlays(req, res) {
     // Candidate legs come from the house's own digest picks for today.
     const { data: candidates, error } = await supabase
       .from('ai_suggestions')
-      .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier')
+      .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob')
       .eq('session_id', sessionId)
       .eq('actual_outcome', 'pending')
       .gte('edge_pp', MIN_EDGE_PP)
@@ -116,7 +155,7 @@ async function buildHouseParlays(req, res) {
         tier: row.tier
       }));
 
-      const { combinedDecimal, combinedOdds, combinedEdgePp } = combineLegs(legs);
+      const { combinedDecimal, combinedOdds, combinedEdgePp, modelProb, fairProb, evPct } = combineLegs(legsPool.slice(0, size));
 
       const record = {
         parlay_date: today,
@@ -125,6 +164,9 @@ async function buildHouseParlays(req, res) {
         combined_odds: combinedOdds,
         combined_decimal: combinedDecimal,
         combined_edge_pp: combinedEdgePp,
+        model_win_prob: modelProb,
+        fair_win_prob: fairProb,
+        ev_pct: evPct,
         status: 'pending'
       };
 
@@ -138,7 +180,7 @@ async function buildHouseParlays(req, res) {
 
       built++;
       parlays.push(record);
-      logger.info(`Built ${size}-leg house parlay for ${today} at ${combinedOdds} (${combinedEdgePp}pp edge)`);
+      logger.info(`Built ${size}-leg house parlay for ${today} at ${combinedOdds} (model ${Math.round(modelProb * 1000) / 10}% vs fair ${Math.round(fairProb * 1000) / 10}%, +${combinedEdgePp}pp, EV ${evPct}%)`);
     }
 
     const duration = Date.now() - startTime;

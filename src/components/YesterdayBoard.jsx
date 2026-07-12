@@ -25,10 +25,13 @@ export default function YesterdayBoard() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (!open || data || loading) return
+    // Depend on `open` alone. Including loading/data re-ran the effect on
+    // the setLoading(true) render, whose cleanup cancelled the in-flight
+    // fetch — the response was thrown away and the skeleton pulsed forever.
+    if (!open) return
     let cancelled = false
+    setLoading(true)
     ;(async () => {
-      setLoading(true)
       try {
         const res = await fetch(`${API_BASE}/api/board-history`)
         if (!res.ok) throw new Error(`Server error ${res.status}`)
@@ -41,7 +44,7 @@ export default function YesterdayBoard() {
       }
     })()
     return () => { cancelled = true }
-  }, [open, data, loading])
+  }, [open])
 
   if (!open) {
     return (
