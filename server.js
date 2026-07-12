@@ -93,6 +93,11 @@ app.get('/api/health', (req, res) => {
 const { getDashboardStatus } = require('./api/dashboard-status');
 app.get('/api/dashboard-status', getDashboardStatus);
 
+// The House Ledger — public append-only settlement record (picks + machine
+// parlays + per-tier ROI). Anon-readable by design.
+const { getPublicLedger } = require('./api/public-ledger');
+app.get('/api/public-ledger', getPublicLedger);
+
 // Public stats — anon-readable proxy over mv_model_accuracy so the Landing's
 // Track Record + hero hit-rate render for unauthenticated visitors without
 // loosening RLS on the underlying table.
@@ -488,6 +493,13 @@ app.post('/cron/fetch-espn-intelligence', fetchEspnIntelligence);
 
 const factCheckPicks = require('./api/cron/fact-check-picks');
 app.post('/cron/fact-check-picks', factCheckPicks);
+
+// Machine-built house parlays: build daily from the highest-edge published
+// legs, settle from the legs' outcomes. Both idempotent.
+const buildHouseParlays = require('./api/cron/build-house-parlays');
+app.post('/cron/build-house-parlays', buildHouseParlays);
+const settleHouseParlays = require('./api/cron/settle-house-parlays');
+app.post('/cron/settle-house-parlays', settleHouseParlays);
 
 // Admin dashboard - protected by secret query param
 const { getAdminDashboard } = require('./api/admin-dashboard');

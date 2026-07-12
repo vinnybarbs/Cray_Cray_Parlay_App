@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, pickIdFor, buildLockedPayload } from '../lib/tiers'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
 
@@ -68,37 +69,6 @@ function formatFullDate(isoString) {
 
 const LockedPicksContext = createContext(null)
 
-function pickIdFor(game) {
-  return `${game.home_team}-${game.away_team}-${game.recommended_side || 'pick'}`
-}
-
-// Real odds for the recommended side. recommended_odds is captured at
-// analysis time server-side; rows analyzed before that column existed still
-// carry ML prices on the row. When no real price is known we send null —
-// never a made-up -110, downstream lock records feed the settlement ledger.
-function lockOddsFor(game) {
-  if (game.recommended_odds != null) return game.recommended_odds
-  if (game.recommended_side === 'home_ml') return game.moneyline_home ?? null
-  if (game.recommended_side === 'away_ml') return game.moneyline_away ?? null
-  return null
-}
-
-function buildLockedPayload(game, sport) {
-  return {
-    id: pickIdFor(game),
-    sport,
-    homeTeam: game.home_team,
-    awayTeam: game.away_team,
-    pick: game.recommended_pick,
-    betType: game.recommended_side || 'Moneyline/Spread',
-    odds: lockOddsFor(game),
-    model: game.model_used || null,
-    confidence: game.edge_score || 7,
-    reasoning: game.analysis_snippet || '',
-    gameDate: game.game_date,
-  }
-}
-
 function edgeBadgeClass(score) {
   if (score == null) return 'bg-ink-800 text-ink-300'
   if (score >= 8) return 'bg-emerald-900 text-emerald-300 border border-emerald-700'
@@ -106,49 +76,8 @@ function edgeBadgeClass(score) {
   return 'bg-ink-800 text-ink-300 border border-ink-600'
 }
 
-// 6-tier label scheme from signed edge in percentage points.
-// Sharp-Quant aesthetic: graphite frame + amber/crimson signal accent.
-// Hybrid labels: analytical primary (Trap/Skip/Lean/Play/Strong Play/Sharp Take)
-// + brand subtitle (fade it / pass on it / lean it / play it / hammer it / sharp take).
-// We deliberately avoid "Lock" — it recreates the "guaranteed-win" mental model
-// the old 10/10 edge_score caused. Negative edges get their own tier so we never
-// silently dress them up.
-function edgeTier(signedPp) {
-  if (signedPp == null || Number.isNaN(signedPp)) {
-    return { label: '—', subtitle: '', color: 'text-ink-400', bg: 'bg-ink-850 shadow-hairline' }
-  }
-  if (signedPp < 0) {
-    return { label: 'Trap', subtitle: 'fade it', color: 'text-signal-neg', bg: 'bg-signal-neg-dim/30 shadow-hairline-neg' }
-  }
-  if (signedPp < 2) {
-    return { label: 'Skip', subtitle: 'pass on it', color: 'text-ink-300', bg: 'bg-ink-850 shadow-hairline' }
-  }
-  if (signedPp < 4) {
-    return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
-  }
-  if (signedPp < 7) {
-    return { label: 'Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
-  }
-  if (signedPp < 10) {
-    return { label: 'Strong Play', subtitle: 'hammer it', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/25 shadow-hairline-pos' }
-  }
-  return { label: 'Sharp Take', subtitle: 'sharp take', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/40 shadow-hairline-pos-bright' }
-}
-
-function formatPp(signedPp) {
-  if (signedPp == null) return null
-  const v = Number(signedPp)
-  if (Number.isNaN(v)) return null
-  return `${v >= 0 ? '+' : ''}${v.toFixed(1)}pp`
-}
-
-// Convert the game.edges dict (signed fractions) into pp for a given side key.
-function edgePpForSide(edges, side) {
-  if (!edges || side == null) return null
-  const v = edges[side]
-  if (v == null) return null
-  return Number((v * 100).toFixed(1))
-}
+// edgeTier / formatPp / edgePpForSide now live in src/lib/tiers.js — one
+// grading language shared by digest, generator, landing, and ledger.
 
 // Build a readable pick label for one side using market context already on the game row.
 function sidePickText(game, side) {
@@ -1733,10 +1662,16 @@ export default function DailyDigest({ onBack }) {
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
         <span className="text-sm font-semibold text-ink-200">Daily Digest</span>
         <button
-          onClick={onBack}
+          onClick={() => { window.location.hash = '#/ledger' }}
           className="ml-auto px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
-          Generator
+          Ledger
+        </button>
+        <button
+          onClick={onBack}
+          className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+        >
+          The Board
         </button>
         <button
           onClick={fetchDigest}
@@ -1887,7 +1822,7 @@ export default function DailyDigest({ onBack }) {
                 onClick={onBack}
                 className="w-full sm:w-auto px-6 py-3 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-mono font-medium uppercase tracking-[0.12em] text-sm text-ink-200 transition-all active:scale-[0.98]"
               >
-                Full Pick Generator
+                The Board — filter every pick
               </button>
             </div>
           </>

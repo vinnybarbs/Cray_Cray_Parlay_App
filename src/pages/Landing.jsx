@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { tierRange } from '../lib/tiers'
 
 // API_BASE matches the rest of the app — Railway in prod, env override locally.
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://craycrayparlayapp-production.up.railway.app'
@@ -212,6 +213,9 @@ function Nav({ onStartTrial, onSignIn, scrollTo }) {
           </button>
           <button onClick={scrollTo('track')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
             Track record
+          </button>
+          <button onClick={() => { window.location.hash = '#/ledger' }} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
+            The Ledger
           </button>
           <button onClick={scrollTo('terms')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
             Pricing
@@ -811,6 +815,11 @@ function TrackRecord({ sportStats, tierStats }) {
                 <div key={label} className={`grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
                   <span className="text-ink-100 font-medium">
                     {label}
+                    {useTiers && tierRange(label) && (
+                      <span className="ml-2 font-mono text-[10px] text-ink-500 tabular-nums">
+                        {tierRange(label) === 'below 0' ? 'edge below 0pp' : `edge ${tierRange(label)}`}
+                      </span>
+                    )}
                     {isTrap && (
                       <span className="block text-[10px] font-normal text-ink-400 mt-0.5">
                         picks we said to fade — low is the model working
@@ -861,6 +870,15 @@ function TrackRecord({ sportStats, tierStats }) {
             means the warning was right.
           </p>
         )}
+
+        <div className="mt-8">
+          <button
+            onClick={() => { window.location.hash = '#/ledger' }}
+            className="inline-flex items-center gap-2 text-signal-pos text-xs font-bold uppercase tracking-[0.18em] hover:underline"
+          >
+            Open The House Ledger — every pick, timestamped →
+          </button>
+        </div>
       </div>
     </section>
   )

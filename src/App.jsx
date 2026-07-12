@@ -9,6 +9,7 @@ import ChatPicks from './pages/ChatPicks'
 import BetslipBuilder from './pages/BetslipBuilder'
 import ResultsPage from './pages/ResultsPage'
 import AdminDashboard from './pages/AdminDashboard'
+import HouseLedger from './pages/HouseLedger'
 
 // App-level router. HashRouter (mounted in main.jsx) keeps every pre-existing
 // #/digest-style URL and localStorage hand-off working unchanged: setting
@@ -105,6 +106,8 @@ export default function App() {
       <Route path="/chat" element={<ChatRoute />} />
       <Route path="/betslip" element={<BetslipRoute />} />
       <Route path="/results" element={<ResultsRoute />} />
+      {/* The House Ledger is deliberately public — it IS the marketing. */}
+      <Route path="/ledger" element={<HouseLedger />} />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
