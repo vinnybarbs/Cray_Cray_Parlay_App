@@ -1,13 +1,9 @@
 // Parse natural language betslip requests and generate deep links
 const { createClient } = require('@supabase/supabase-js');
-const OpenAI = require('openai');
+const { complete, MODELS } = require('../lib/services/claude');
 
 const AFFILIATE_ID = 'vinnybarbs';
 const STATE = 'US-CO'; // Colorado
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -126,18 +122,21 @@ Response format:
   "message": "Friendly confirmation message"
 }`;
 
-    const aiResponse = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a helpful sports betting assistant. Always return valid JSON.' },
-        { role: 'user', content: aiPrompt }
-      ],
-      temperature: 0.3,
-      response_format: { type: 'json_object' }
+    const parsed = await complete({
+      model: MODELS.UTILITY,
+      system: 'You are a helpful sports betting assistant. Always return valid JSON.',
+      messages: [{ role: 'user', content: aiPrompt }],
+      maxTokens: 1000,
+      json: true,
     });
-
-    const parsed = JSON.parse(aiResponse.choices[0].message.content);
     console.log('  🤖 AI parsed:', parsed);
+
+    if (!parsed) {
+      return res.json({
+        success: false,
+        error: "I couldn't parse those picks. Try being more specific — team name + bet type works best."
+      });
+    }
 
     if (!parsed.picks || parsed.picks.length === 0) {
       return res.json({

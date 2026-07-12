@@ -8,8 +8,10 @@ const { logger } = require('../shared/logger');
 const { supabase } = require('../lib/middleware/supabaseAuth');
 const aiInstructions = require('../lib/services/ai-instructions');
 const pickGrader = require('../lib/services/pick-grader');
+const { getClient: getClaude, complete, MODELS } = require('../lib/services/claude');
 
-// OpenAI function tools that the AI can call to query our database
+// Tool definitions the model can call to query our database (legacy
+// chat-completions shape; converted to Anthropic tool shape below).
 const TOOLS = [
   {
     type: 'function',
@@ -709,9 +711,8 @@ async function chatPicksHandler(req, res) {
       logger.warn('Failed to load AI playbook:', e.message);
     }
 
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      return res.status(500).json({ error: 'OpenAI API key not configured' });
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return res.status(500).json({ error: 'Anthropic API key not configured' });
     }
 
     // Build conversation with system prompt + DB playbook + live time context
@@ -719,43 +720,46 @@ async function chatPicksHandler(req, res) {
     const timeContext = `\nCURRENT TIME: ${mt}\nTODAY (Mountain Time): ${todayMT}\nTOMORROW (Mountain Time): ${tomorrowDate}\n`;
     const systemContent = (playbook ? `${playbook}\n\n---\n\n` : '') + SYSTEM_PROMPT + timeContext;
     const fullMessages = [
-      { role: 'system', content: systemContent },
       ...conversationHistory,
       ...messages
     ];
 
     // First call REQUIRES tool use — forces the model to gather data before answering
-    let response = await callOpenAI(apiKey, fullMessages, TOOLS, 'required');
-    let assistantMessage = response.choices[0].message;
+    let response = await callClaude(systemContent, fullMessages, 'required');
 
     // Handle tool calls (may need multiple rounds)
     let iterations = 0;
     const maxIterations = 8;
 
-    while (assistantMessage.tool_calls && iterations < maxIterations) {
+    let toolUses = response.content.filter(b => b.type === 'tool_use');
+    while (toolUses.length > 0 && iterations < maxIterations) {
       iterations++;
       const toolResults = [];
 
-      for (const toolCall of assistantMessage.tool_calls) {
-        const args = JSON.parse(toolCall.function.arguments);
-        logger.info(`Tool call: ${toolCall.function.name}`, args);
+      for (const toolUse of toolUses) {
+        const args = toolUse.input || {};
+        logger.info(`Tool call: ${toolUse.name}`, args);
 
-        const result = await executeTool(toolCall.function.name, args);
+        const result = await executeTool(toolUse.name, args);
 
         toolResults.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
+          type: 'tool_result',
+          tool_use_id: toolUse.id,
           content: JSON.stringify(result)
         });
       }
 
       // Continue conversation with tool results
-      fullMessages.push(assistantMessage);
-      fullMessages.push(...toolResults);
+      fullMessages.push({ role: 'assistant', content: response.content });
+      fullMessages.push({ role: 'user', content: toolResults });
 
-      response = await callOpenAI(apiKey, fullMessages, TOOLS, 'auto');
-      assistantMessage = response.choices[0].message;
+      response = await callClaude(systemContent, fullMessages, 'auto');
+      toolUses = response.content.filter(b => b.type === 'tool_use');
     }
+
+    const assistantMessage = {
+      content: response.content.filter(b => b.type === 'text').map(b => b.text).join('\n')
+    };
 
     const duration = Date.now() - startTime;
 
@@ -782,34 +786,32 @@ async function chatPicksHandler(req, res) {
   }
 }
 
-async function callOpenAI(apiKey, messages, tools, toolChoice = 'auto') {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      messages,
-      tools,
-      tool_choice: toolChoice || 'auto',
-      max_tokens: 2000,
-      temperature: 0.4
-    })
+// Anthropic tool shape, derived once from the legacy definitions above.
+const CLAUDE_TOOLS = TOOLS.map(t => ({
+  name: t.function.name,
+  description: t.function.description,
+  input_schema: t.function.parameters,
+}));
+
+async function callClaude(system, messages, toolChoice = 'auto') {
+  const claude = getClaude();
+  if (!claude) throw new Error('Server missing ANTHROPIC_API_KEY');
+  return claude.messages.create({
+    model: MODELS.CHAT,
+    max_tokens: 2000,
+    thinking: { type: 'disabled' },
+    system,
+    tools: CLAUDE_TOOLS,
+    // 'required' forces at least one tool call (data before takes);
+    // Anthropic's equivalent is {type: 'any'}.
+    tool_choice: toolChoice === 'required' ? { type: 'any' } : { type: 'auto' },
+    messages,
   });
-
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`OpenAI API error: ${response.status} ${errBody}`);
-  }
-
-  return response.json();
 }
 
 /**
  * Extract picks from De-Genny's response and store in ai_suggestions
- * for model performance tracking. Uses gpt-4o-mini to parse the
+ * for model performance tracking. Uses the utility model to parse the
  * unstructured chat response into structured pick data.
  */
 async function extractAndStorePicks(responseText) {
@@ -820,17 +822,13 @@ async function extractAndStorePicks(responseText) {
   if (!hasPickSignals) return 0;
 
   try {
-    const extractResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{
-          role: 'user',
-          content: `Extract structured betting picks from this text. Return a JSON array of picks found. If no clear picks, return [].
+    const parsed = await complete({
+      model: MODELS.UTILITY,
+      maxTokens: 1500,
+      json: true,
+      messages: [{
+        role: 'user',
+        content: `Extract structured betting picks from this text. Return a JSON array of picks found. If no clear picks, return [].
 
 TEXT:
 ${responseText}
@@ -847,20 +845,10 @@ Return ONLY valid JSON array with this format:
   "confidence": 1-10,
   "reasoning": "brief summary of why (1-2 sentences)"
 }]`
-        }],
-        temperature: 0.1,
-        max_tokens: 1500,
-        response_format: { type: 'json_object' }
-      })
+      }],
     });
 
-    if (!extractResponse.ok) return 0;
-
-    const extractData = await extractResponse.json();
-    let parsed;
-    try {
-      parsed = JSON.parse(extractData.choices[0].message.content);
-    } catch { return 0; }
+    if (!parsed) return 0;
 
     // Handle both { picks: [...] } and direct array
     const picks = Array.isArray(parsed) ? parsed : (parsed.picks || []);

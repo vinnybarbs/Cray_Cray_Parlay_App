@@ -1,6 +1,7 @@
 // CRON JOB: Pre-Analyze Upcoming Games
-// Runs 2-3x daily to generate AI analysis snippets per game using GPT-4o-mini
-// Stores results in game_analysis table for cheap/fast pick generation
+// Runs 2-3x daily to generate AI analysis snippets per game (Claude narrates;
+// the math picks the side). Stores results in game_analysis for cheap/fast
+// pick generation.
 // Schedule: Every 4 hours
 // Endpoint: POST /cron/pre-analyze-games
 
@@ -10,8 +11,7 @@ const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
-
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const { getClient: getClaude, MODELS } = require('../../lib/services/claude.js');
 
 // Map odds_cache sport slugs to display sport names
 const SLUG_TO_SPORT = {
@@ -656,30 +656,22 @@ Respond in EXACTLY this JSON format (no markdown):
 Key factors MUST include specific numbers/records. Do NOT include recommended_pick, recommended_side, or edge_score — those are determined by the math, not by you.`;
 
   try {
-    const response = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-        max_tokens: 600
-      })
+    const claude = getClaude();
+    if (!claude) throw new Error('Server missing ANTHROPIC_API_KEY');
+
+    const data = await claude.messages.create({
+      model: MODELS.NARRATION,
+      max_tokens: 600,
+      // Narration only — the math already picked the side. Thinking stays
+      // off to keep the per-game cost/latency profile of the old setup.
+      thinking: { type: 'disabled' },
+      messages: [{ role: 'user', content: prompt }],
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`OpenAI ${response.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content?.trim();
+    const content = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
     const usage = data.usage;
 
-    if (!content) throw new Error('Empty response from OpenAI');
+    if (!content) throw new Error('Empty response from Claude');
 
     // Parse JSON (strip markdown fences if present)
     const jsonStr = content.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
@@ -694,8 +686,8 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
       recommended_side: mathPick ? mathPick.recommended_side : null,
       key_factors: parsed.key_factors,
       what_changed: parsed.what_changed || null,
-      prompt_tokens: usage?.prompt_tokens,
-      completion_tokens: usage?.completion_tokens
+      prompt_tokens: usage?.input_tokens,
+      completion_tokens: usage?.output_tokens
     };
   } catch (err) {
     console.error(`AI analysis failed for ${game.game_key}:`, err.message);
@@ -969,7 +961,7 @@ async function runPreAnalysis(sportSlugs) {
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
-            model_used: 'gpt-4o-mini',
+            model_used: MODELS.NARRATION,
             prompt_tokens: result.prompt_tokens,
             completion_tokens: result.completion_tokens,
             generated_at: new Date().toISOString(),

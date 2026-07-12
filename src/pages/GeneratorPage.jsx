@@ -188,7 +188,7 @@ const AIAgentsWorkflow = () => {
                 <h4 className="font-bold text-blue-400">Real-Time News</h4>
               </div>
               <p className="text-sm text-ink-200">
-                Randy monitors 17 sports news sources (ESPN, CBS, Yahoo, Bleacher Report) every 3 hours. Fresh injury reports, player news, and trends.
+                Randy monitors the leading sports news outlets every 3 hours. Fresh injury reports, player news, and trends.
               </p>
             </div>
 
@@ -278,7 +278,7 @@ const AnalysisLoadingScreen = ({ sports, betTypes, elapsed }) => {
     5: [`Found games with ${betTypes.join(', ')} markets`, 'Comparing lines across books...'],
     8: ['Scanning 5,000+ articles for relevant news...', 'Checking injury reports & lineup changes...'],
     11: ['Loading pre-analyzed matchup intelligence...', 'Edge scores computed for upcoming games'],
-    15: ['Pulling ESPN box scores for player averages...', 'Cross-referencing props vs recent stats...'],
+    15: ['Pulling box scores for player averages...', 'Cross-referencing props vs recent stats...'],
     20: ['Identifying value discrepancies in lines...', 'Checking key factors: pace, rest, travel...'],
     28: ['Ranking picks by expected value...', 'Filtering for highest-conviction plays...'],
     35: ['Deduplicating conflicting picks...', 'Final validation complete!'],

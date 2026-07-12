@@ -32,7 +32,7 @@ app.use(express.json());
 app.use(generalRateLimiter.middleware());
 
 // Validate API keys on startup
-const requiredKeys = ['ODDS_API_KEY', 'OPENAI_API_KEY'];
+const requiredKeys = ['ODDS_API_KEY', 'ANTHROPIC_API_KEY'];
 const missingKeys = requiredKeys.filter(key => !process.env[key]);
 if (missingKeys.length > 0) {
   logger.warn('Missing required API keys', { missingKeys });
@@ -55,7 +55,7 @@ if (process.env.NODE_ENV === 'production') {
 // Enhanced health check with environment info
 app.get('/health', (req, res) => {
   const hasOddsKey = !!process.env.ODDS_API_KEY;
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
   const hasSerperKey = !!process.env.SERPER_API_KEY;
   
   res.json({ 
@@ -64,7 +64,7 @@ app.get('/health', (req, res) => {
     port: PORT,
     apis: {
       odds: hasOddsKey,
-      openai: hasOpenAIKey,
+      anthropic: hasAnthropicKey,
       serper: hasSerperKey
     },
     timestamp: new Date().toISOString()
@@ -74,7 +74,7 @@ app.get('/health', (req, res) => {
 // Mirror health under /api for vite proxy convenience
 app.get('/api/health', (req, res) => {
   const hasOddsKey = !!process.env.ODDS_API_KEY;
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const hasAnthropicKey = !!process.env.ANTHROPIC_API_KEY;
   const hasSerperKey = !!process.env.SERPER_API_KEY;
   res.json({
     status: 'ok',
@@ -82,7 +82,7 @@ app.get('/api/health', (req, res) => {
     port: PORT,
     apis: {
       odds: hasOddsKey,
-      openai: hasOpenAIKey,
+      anthropic: hasAnthropicKey,
       serper: hasSerperKey
     },
     timestamp: new Date().toISOString()
@@ -226,7 +226,6 @@ app.get('/debug/supabase', (req, res) => {
 
     const apiKeys = {
       'ODDS_API_KEY': process.env.ODDS_API_KEY,
-      'OPENAI_API_KEY': process.env.OPENAI_API_KEY,
       'SERPER_API_KEY': process.env.SERPER_API_KEY,
       'ANTHROPIC_API_KEY': process.env.ANTHROPIC_API_KEY
     };

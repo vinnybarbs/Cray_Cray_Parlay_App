@@ -2,14 +2,15 @@
  * Cron: Enrich news articles with full content + AI analysis
  *
  * 1. Fetches articles that have a link but no full content
- * 2. Scrapes the article text from ESPN/CBS/Yahoo
- * 3. Uses GPT-4o-mini to extract betting-relevant intelligence
+ * 2. Scrapes the article text from the source outlets
+ * 3. Uses Claude to extract betting-relevant intelligence
  *
  * POST /cron/enrich-articles
  */
 
 const { supabase } = require('../../lib/middleware/supabaseAuth');
 const { logger } = require('../../shared/logger');
+const { complete, MODELS } = require('../../lib/services/claude');
 
 const MAX_ARTICLES_PER_RUN = 10;
 const FETCH_TIMEOUT = 8000;
@@ -115,27 +116,20 @@ async function fetchArticleContent(url) {
 }
 
 async function extractBettingIntel(title, content, articleLink) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey || !content || content.length < 100) return null;
+  if (!process.env.ANTHROPIC_API_KEY || !content || content.length < 100) return null;
 
   try {
     // Truncate content to save tokens
     const truncated = content.substring(0, 3000);
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [{
-          role: 'system',
-          content: `You extract betting-relevant intelligence from sports articles. Return JSON only, no markdown.`
-        }, {
-          role: 'user',
-          content: `Extract betting-relevant info from this article.
+    const intel = await complete({
+      model: MODELS.UTILITY,
+      system: 'You extract betting-relevant intelligence from sports articles. Return JSON only, no markdown.',
+      maxTokens: 500,
+      json: true,
+      messages: [{
+        role: 'user',
+        content: `Extract betting-relevant info from this article.
 
 Title: ${title}
 Content: ${truncated}
@@ -148,21 +142,10 @@ Return this exact JSON structure:
   "teams_mentioned": ["Team Name"],
   "key_stats": ["any specific stats mentioned like '5-game win streak' or 'averaging 28 PPG'"]
 }`
-        }],
-        max_tokens: 500,
-        temperature: 0.3
-      })
+      }],
     });
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const text = data.choices?.[0]?.message?.content;
-    if (!text) return null;
-
-    // Parse JSON from response (handle potential markdown wrapping)
-    const jsonStr = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    return JSON.parse(jsonStr);
+    return intel || null;
   } catch (err) {
     logger.warn(`AI enrichment failed: ${err.message}`);
     return null;

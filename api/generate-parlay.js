@@ -455,12 +455,12 @@ async function handler(req, res) {
   const apiKeys = {
     odds: process.env.ODDS_API_KEY,
     serper: process.env.SERPER_API_KEY,
-    openai: process.env.OPENAI_API_KEY
+    anthropic: process.env.ANTHROPIC_API_KEY
   };
 
   logger.debug('Environment check', {
     hasOddsKey: !!apiKeys.odds,
-    hasOpenAIKey: !!apiKeys.openai,
+    hasAnthropicKey: !!apiKeys.anthropic,
     hasSerperKey: !!apiKeys.serper,
     nodeEnv: process.env.NODE_ENV || 'undefined'
   });
@@ -497,19 +497,19 @@ async function handler(req, res) {
     
     numLegs = parseInt(numLegs) || 3;
     oddsPlatform = oddsPlatform || 'DraftKings';
-    aiModel = 'openai'; // force OpenAI-only
+    aiModel = 'anthropic'; // all generation runs on Anthropic models
     riskLevel = riskLevel || 'Medium';
   dateRange = parseInt(dateRange) || 1;
   fastMode = !!fastMode; // optional latency-optimized mode
 
-    // Preflight: ensure OpenAI key is present or serve mock
-    if (!apiKeys.openai) {
+    // Preflight: ensure Anthropic key is present or serve mock
+    if (!apiKeys.anthropic) {
       if (mockMode || req.body?.mock) {
         logger.info('Returning mock parlay (no AI keys)');
         return res.status(200).json(buildMockParlayResponse({ aiModel: 'mock', selectedSports, selectedBetTypes, numLegs }));
       }
-      logger.error('Missing OPENAI_API_KEY');
-      return res.status(500).json({ error: 'Server missing OPENAI_API_KEY' });
+      logger.error('Missing ANTHROPIC_API_KEY');
+      return res.status(500).json({ error: 'Server missing ANTHROPIC_API_KEY' });
     }
 
     console.log('\n' + '='.repeat(60));
@@ -518,7 +518,7 @@ async function handler(req, res) {
     console.log(`Sports: ${selectedSports.join(', ')}`);
     console.log(`Bet Types: ${selectedBetTypes.join(', ')}`);
     console.log(`Legs: ${numLegs} | Risk: ${riskLevel} | Platform: ${oddsPlatform}`);
-    console.log(`AI Model: openai | Date Range: ${dateRange} days`);
+    console.log(`AI Model: anthropic | Date Range: ${dateRange} days`);
     console.log('='.repeat(60) + '\n');
 
     // Generate unique request ID for progress tracking

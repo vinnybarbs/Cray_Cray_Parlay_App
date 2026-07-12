@@ -75,7 +75,7 @@ require('dotenv').config({ path: '../.env.local' });
 require('dotenv').config({ path: '../.env' });
 ```
 
-So the local backend uses `.env.local` and `.env` for secrets like `ODDS_API_KEY`, `OPENAI_API_KEY`, etc.
+So the local backend uses `.env.local` and `.env` for secrets like `ODDS_API_KEY`, `ANTHROPIC_API_KEY`, etc.
 
 > **Important:** `npm run server:dev` only affects your local machine. It does **not** redeploy or restart Railway.
 

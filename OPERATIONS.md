@@ -18,7 +18,7 @@ supabase/migrations/.
 | Secret | Lives in | Used for |
 |---|---|---|
 | CRON_SECRET | Railway env (also embedded in pg_cron job commands) | authenticates /cron/* endpoints |
-| ANTHROPIC_API_KEY | Railway env | data-integrity agent sub-agents |
+| ANTHROPIC_API_KEY | Railway env | ALL LLM calls: pick narration, De-Genny chat, parsing/extraction, learning analysis, data-integrity agent (migrated off OpenAI 2026-07-11) |
 | report_secret | app_config table | read-only auth for /api/review-bundle |
 | Supabase service role | Railway env | backend DB access (bypasses RLS) |
 

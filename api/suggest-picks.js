@@ -1359,10 +1359,10 @@ async function suggestPicksHandler(req, res) {
     const apiKeys = {
       odds: process.env.ODDS_API_KEY,
       serper: process.env.SERPER_API_KEY,
-      openai: process.env.OPENAI_API_KEY
+      anthropic: process.env.ANTHROPIC_API_KEY
     };
 
-    if (!apiKeys.odds || !apiKeys.openai) {
+    if (!apiKeys.odds || !apiKeys.anthropic) {
       logger.error('Missing required API keys');
       return res.status(500).json({ 
         error: 'Server configuration error',
@@ -1640,7 +1640,7 @@ async function suggestPicksHandler(req, res) {
             acc[p.sport] = (acc[p.sport] || 0) + 1;
             return acc;
           }, {}),
-          dataSource: 'ESPN API'
+          dataSource: 'league data feed'
         }
       }
     });

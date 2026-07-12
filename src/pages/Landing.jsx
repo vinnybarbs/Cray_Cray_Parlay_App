@@ -459,7 +459,7 @@ function ExecutionFlow() {
       title: 'Math grades every game',
       body: 'Per-side edge calculator runs against ML, spread, and total. Computes model probability, compares to the book\'s implied. Gap = signed pp.',
       meta: [
-        ['// source', 'The Odds API · ESPN'],
+        ['// source', 'live market + league data from industry leaders'],
         ['// math',   'deterministic · same formula every game'],
         ['// output', 'signed_pp · tier'],
       ],
@@ -469,7 +469,7 @@ function ExecutionFlow() {
       title: 'De-Genny narrates',
       body: 'Once math has picked the side, the LLM writes the rationale in plain English. The AI explains. It does not pick.',
       meta: [
-        ['// engine',  'fine-tuned on our own graded picks'],
+        ['// engine',  'top-tier frontier models'],
         ['// role',    'narration only'],
         ['// guard',   'no hallucinated stats'],
       ],

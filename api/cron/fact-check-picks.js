@@ -3,13 +3,14 @@
  *
  * Runs after picks are generated. For each un-checked suggestion:
  * 1. Gathers real data: odds, scores, standings, injuries, articles
- * 2. Asks gpt-4o-mini to compare the reasoning against the data
+ * 2. Asks Claude to compare the reasoning against the data
  * 3. Stores verified claims, unverifiable claims, and flagged issues
  */
 
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../../shared/logger');
 const aiInstructions = require('../../lib/services/ai-instructions');
+const { complete, MODELS } = require('../../lib/services/claude');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -175,25 +176,15 @@ Respond in this exact JSON format:
   "summary": "One-line verdict on this analysis quality"
 }`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.1,
-      max_tokens: 1000,
-      response_format: { type: 'json_object' }
-    })
+  // Verification is a judgment call — Sonnet over the utility tier.
+  const parsed = await complete({
+    model: MODELS.NARRATION,
+    messages: [{ role: 'user', content: prompt }],
+    maxTokens: 1000,
+    json: true,
   });
-
-  if (!response.ok) throw new Error(`OpenAI error: ${response.statusText}`);
-
-  const data = await response.json();
-  return JSON.parse(data.choices[0].message.content);
+  if (!parsed) throw new Error('Fact-check model returned no parseable JSON');
+  return parsed;
 }
 
 function mapSportToOddsKey(sport) {
