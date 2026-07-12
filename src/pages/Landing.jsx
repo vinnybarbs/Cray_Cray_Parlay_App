@@ -199,12 +199,13 @@ function Nav({ onStartTrial, onSignIn, scrollTo }) {
   return (
     <header className="sticky top-0 z-30 bg-ink-950/90 backdrop-blur-md border-b border-ink-800">
       <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
-        <button onClick={scrollTo('top')} className="flex items-baseline gap-2 group">
-          <span className="text-sm font-bold uppercase tracking-[0.18em] text-ink-100 group-hover:text-signal-pos transition-colors">
-            Cray Cray
+        <button onClick={scrollTo('top')} className="flex items-center gap-2.5 group">
+          <img src="/traphawk-mark.png" alt="" className="h-7 w-7 object-contain" />
+          <span className="text-sm font-bold uppercase tracking-[0.18em] transition-colors">
+            <span className="text-signal-pos">Trap</span><span className="text-ink-100 group-hover:text-signal-pos">Hawk</span>
           </span>
-          <span className="text-[9px] uppercase tracking-[0.24em] text-signal-pos">
-            ▌ for parlays
+          <span className="hidden sm:inline text-[9px] uppercase tracking-[0.24em] text-ink-500">
+            ▌ every pick on the house ledger
           </span>
         </button>
         <nav className="flex items-center gap-1 md:gap-5">
