@@ -32,8 +32,8 @@ function fmtUnits(u) {
 }
 
 function OutcomeChip({ outcome, tier }) {
-  // A correct Trap fade would read as a win, but the published ledger picks
-  // are all positive-edge sides, so outcomes read straight.
+  // The feed and records only contain actionable picks (Lean and up) — traps
+  // are split into their own fade report — so outcomes read straight here.
   const map = {
     won:  { label: 'WON',  cls: 'bg-signal-pos-dim/40 text-signal-pos shadow-hairline-pos' },
     lost: { label: 'LOST', cls: 'bg-signal-neg-dim/40 text-signal-neg shadow-hairline-neg' },
@@ -106,6 +106,7 @@ export default function HouseLedger() {
 
   const overall = data?.summary?.overall
   const byTier = data?.summary?.byTier || {}
+  const trapReport = data?.summary?.trapReport
   const tierOrder = TIERS.map(t => t.label).filter(l => byTier[l])
 
   return (
@@ -131,7 +132,7 @@ export default function HouseLedger() {
             Every pick. Published before. Settled after.
           </h1>
           <p className="mt-3 text-ink-300 max-w-2xl leading-relaxed text-sm">
-            This is the house record, written by the settlement pipeline and never edited. The headline number below covers every published pick across all tiers and sports. The tier table shows where the edges actually live.
+            This is the house record, written by the settlement pipeline and never edited. The headline number covers every actionable pick we published, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The tier table shows where the edges actually live.
           </p>
         </div>
 
@@ -195,6 +196,20 @@ export default function HouseLedger() {
                     </div>
                   )
                 })}
+              </div>
+            )}
+
+            {/* Traps are fade advice, not bets — the record above only counts
+                actionable picks. A trap side losing means the call was right. */}
+            {trapReport && trapReport.called > 0 && (
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-signal-neg">Traps called</span>
+                <span className="font-mono text-sm tabular-nums text-ink-100">{trapReport.called}</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">fading them went</span>
+                <span className={`font-mono text-sm font-bold tabular-nums ${trapReport.fadeRate >= 55 ? 'text-signal-pos' : 'text-ink-100'}`}>
+                  {trapReport.fadeWins}–{trapReport.fadeLosses}{trapReport.fadeRate != null ? ` (${trapReport.fadeRate}%)` : ''}
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full sm:basis-auto sm:ml-auto">a trap is advice to bet against a side — its loss is our win</span>
               </div>
             )}
 

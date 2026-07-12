@@ -104,16 +104,38 @@ async function getPublicLedger(req, res) {
       return data || [];
     }) || [];
 
-    // Per-tier and overall record over the full settled history.
+    // Traps and Skips are NOT bets — a Trap is fade advice (the model says
+    // the side is overpriced) and a Skip is below the actionable floor. They
+    // stay in the database for calibration, but they don't belong in the
+    // win/loss record. A trap whose side LOST is a CORRECT call.
+    const isActionable = (row) =>
+      row.tier ? !['Trap', 'Skip'].includes(row.tier) : true;
+    const actionablePicks = settledPicks.filter(isActionable);
+    const trapPicks = settledPicks.filter(r => r.tier === 'Trap');
+
+    // Per-tier and overall record over the actionable settled history.
     const byTier = {};
-    for (const row of settledPicks) {
+    for (const row of actionablePicks) {
       const tier = row.tier || 'Ungraded';
       if (!byTier[tier]) byTier[tier] = [];
       byTier[tier].push(row);
     }
+
+    // Fade record: the trap side losing means the fade won.
+    const trapReport = { called: trapPicks.length, fadeWins: 0, fadeLosses: 0, pushes: 0 };
+    for (const t of trapPicks) {
+      if (t.actual_outcome === 'lost') trapReport.fadeWins++;
+      else if (t.actual_outcome === 'won') trapReport.fadeLosses++;
+      else trapReport.pushes++;
+    }
+    const fadeDecided = trapReport.fadeWins + trapReport.fadeLosses;
+    trapReport.fadeRate = fadeDecided > 0
+      ? Math.round((trapReport.fadeWins / fadeDecided) * 1000) / 10 : null;
+
     const summary = {
-      overall: summarize(settledPicks),
+      overall: summarize(actionablePicks),
       byTier: Object.fromEntries(Object.entries(byTier).map(([t, rows]) => [t, summarize(rows)])),
+      trapReport,
     };
 
     // Machine-built house parlays (pending + settled). Missing table (before
@@ -133,13 +155,13 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every pick published by the daily analysis pipeline, all tiers, all sports. Nothing removed, nothing edited after publication.',
+        population: 'Every actionable pick published by the daily analysis pipeline, all sports. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
         grading: 'Signed model edge in percentage points at publish time sets the tier. Outcomes graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
       },
       summary,
-      picks: settledPicks.slice(0, 250),
+      picks: actionablePicks.slice(0, 250),
       openPicks,
       parlays,
     });

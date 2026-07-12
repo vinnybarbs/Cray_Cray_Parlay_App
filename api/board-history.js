@@ -47,7 +47,13 @@ module.exports = async function boardHistory(req, res) {
 
     if (error) throw error;
 
-    const picks = data || [];
+    const all = data || [];
+    // Traps are fade advice, not bets — split them out so the day's record
+    // only counts picks, and the fade calls get their own honest framing
+    // (the trap side losing = the call was right).
+    const picks = all.filter(p => p.tier !== 'Trap' && p.tier !== 'Skip');
+    const traps = all.filter(p => p.tier === 'Trap');
+
     const summary = { total: picks.length, won: 0, lost: 0, push: 0, pending: 0, units: 0 };
     for (const p of picks) {
       if (p.actual_outcome === 'won') summary.won++;
@@ -61,7 +67,7 @@ module.exports = async function boardHistory(req, res) {
     summary.winRate = settled > 0 ? Math.round((summary.won / settled) * 1000) / 10 : null;
 
     res.setHeader('Cache-Control', 'no-store');
-    res.status(200).json({ date, summary, picks });
+    res.status(200).json({ date, summary, picks, traps });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

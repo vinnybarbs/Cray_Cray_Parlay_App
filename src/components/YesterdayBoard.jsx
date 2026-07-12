@@ -79,6 +79,33 @@ export default function YesterdayBoard() {
             )}
             <span className="ml-auto text-ink-600">losers included</span>
           </div>
+          {data.traps?.length > 0 && (
+            <>
+              <div className="px-4 py-2 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500 border-t border-ink-800">
+                Traps called · the advice was to fade these sides
+              </div>
+              {data.traps.map((p, i) => {
+                const fade = p.actual_outcome === 'lost' ? { label: 'FADE WON', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
+                  : p.actual_outcome === 'won' ? { label: 'FADE LOST', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
+                  : { label: p.actual_outcome === 'push' || p.actual_outcome === 'void' ? 'PUSH' : 'OPEN', cls: 'bg-ink-850 text-ink-300' }
+                return (
+                  <div key={`trap-${i}`} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800">
+                    <span className="flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider text-signal-neg bg-signal-neg-dim/30">
+                      TRAP
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-ink-100 truncate">
+                        {p.pick}
+                        {p.odds && <span className="ml-2 font-mono text-xs text-ink-400">{p.odds}</span>}
+                      </div>
+                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider flex-shrink-0 ${fade.cls}`}>{fade.label}</span>
+                  </div>
+                )
+              })}
+            </>
+          )}
           {(!s || s.total === 0) ? (
             <p className="px-4 py-6 text-sm text-ink-400 text-center">Nothing was published yesterday either — the slate was dark.</p>
           ) : (
