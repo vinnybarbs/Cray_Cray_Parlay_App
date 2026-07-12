@@ -752,10 +752,21 @@ async function preAnalyzeGames(req, res) {
 
 async function runPreAnalysis(sportSlugs) {
   const startTime = Date.now();
+  const jobName = `pre-analyze-${[...new Set(sportSlugs.map(s => SLUG_TO_SPORT[s] || s))].join('-')}`;
 
   try {
     const sportNames = sportSlugs.map(s => SLUG_TO_SPORT[s] || s).join(', ');
     console.log(`\n🧠 CRON: Pre-analyzing ${sportNames}...`);
+
+    // Started marker — a run that dies mid-flight (deploy restart, crash)
+    // leaves this row with no completion row after it, instead of vanishing
+    // without a trace (which hid failures on 7/12).
+    try {
+      await supabase.from('cron_job_logs').insert({
+        job_name: jobName, status: 'started',
+        details: JSON.stringify({ sports: sportSlugs }),
+      });
+    } catch (e) { /* don't block on logging */ }
 
     let games = await getUpcomingGames(sportSlugs);
 
@@ -1135,6 +1146,16 @@ async function runPreAnalysis(sportSlugs) {
 
   } catch (error) {
     console.error('❌ Pre-analysis failed:', error.message);
+    // Total failures used to log only to the (unreadable) container console.
+    try {
+      await supabase.from('cron_job_logs').insert({
+        job_name: jobName, status: 'failed',
+        details: JSON.stringify({
+          error: error.message,
+          stack: String(error.stack || '').split('\n').slice(0, 4).join(' | '),
+        }),
+      });
+    } catch (e) { /* don't block on logging */ }
   }
 }
 
