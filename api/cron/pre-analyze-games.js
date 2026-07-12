@@ -1051,9 +1051,13 @@ async function runPreAnalysis(sportSlugs) {
                 const isHomeMl = side === 'home_ml';
                 const isAwayMl = side === 'away_ml';
 
+                // Refinement passes re-run games that already saved their
+                // pick — ignoreDuplicates keeps the original row (with its
+                // odds/edge snapshot) instead of erroring on the unique key
+                // every 3 hours.
                 const { error: sugErr } = await supabase
                   .from('ai_suggestions')
-                  .insert({
+                  .upsert({
                     session_id: `auto_digest_${new Date().toISOString().split('T')[0]}`,
                     sport: sportDisplay,
                     home_team: game.home_team,
@@ -1079,7 +1083,7 @@ async function runPreAnalysis(sportSlugs) {
                               : isAwayMl ? edgeData?.awayWinProb ?? null : null,
                     implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null
                                 : isAwayMl ? edgeData?.impliedAwayProb ?? null : null
-                  });
+                  }, { onConflict: 'session_id,home_team,away_team,bet_type,pick', ignoreDuplicates: true });
                 if (sugErr) {
                   console.warn(`  Auto-save pick result: ${sugErr.message}`);
                 } else {

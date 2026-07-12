@@ -85,7 +85,7 @@ async function getDigest(req, res) {
       const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('news_cache')
-        .select('team_name, content, last_updated, sport')
+        .select('team_name, content:summary, last_updated, sport')
         .eq('search_type', 'injuries')
         .gt('last_updated', cutoff)
         .in('team_name', ['NBA', 'NHL', 'MLB', 'NFL', 'NCAAB', 'NCAAF', 'EPL', 'MLS', 'Soccer']);
@@ -348,7 +348,7 @@ async function deepResearch(req, res) {
       const teamsToSearch = [home_team, away_team, sportCode];
       const { data, error } = await supabase
         .from('news_cache')
-        .select('team_name, content, last_updated')
+        .select('team_name, content:summary, last_updated')
         .eq('search_type', 'injuries')
         .in('team_name', teamsToSearch);
       if (error) throw error;
