@@ -1,10 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 180" width="640" height="180">
   <rect width="640" height="180" rx="12" fill="#0d0d0f"/>
-  <rect x="42" y="126" width="112" height="6" fill="#52525b"/>
-  <polygon points="52,123 75,123 80,95 57,95" fill="#f5a524" opacity="0.4"/>
-  <polygon points="83,123 106,123 111,72 88,72" fill="#f5a524" opacity="0.65"/>
-  <polygon points="114,123 137,123 142,33 119,33" fill="#f5a524"/>
-  <polygon points="137,131 138,110 152,105 165,115 158,119 154,123 155,131" fill="#f5a524"/>
+  <g transform="translate(14,14) scale(0.62)">
+    <rect x="38" y="192" width="170" height="9" fill="#52525b"/>
+    <polygon points="54,188 88,188 96,146 62,146" fill="#f5a524" opacity="0.4"/>
+    <polygon points="100,188 134,188 142,112 108,112" fill="#f5a524" opacity="0.65"/>
+    <polygon points="146,188 180,188 188,54 154,54" fill="#f5a524"/>
+    <path d="M184,196 L184,160 C184,146 194,138 206,138 C218,138 226,144 229,152 C234,153 238,157 238,162 C238,168 237,172 232,176 L226,166 C220,166 214,168 210,172 C206,180 204,188 204,196 Z" fill="#f5a524"/>
+  </g>
   <text x="196" y="98" font-family="'JetBrains Mono','Menlo','Consolas',monospace" font-size="54" font-weight="700" letter-spacing="2"><tspan fill="#f5a524">TRAP</tspan><tspan fill="#e7e5e4">HAWK</tspan></text>
   <text x="198" y="134" font-family="'JetBrains Mono','Menlo','Consolas',monospace" font-size="13" letter-spacing="5.5" fill="#71717a">EVERY PICK ON THE HOUSE LEDGER</text>
 </svg>
