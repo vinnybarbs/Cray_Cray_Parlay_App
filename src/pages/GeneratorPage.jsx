@@ -195,8 +195,41 @@ export default function GeneratorPage() {
           </div>
         )}
 
+        {/* Dark slate — no games on the board at all. Distinct from "your
+            filter cleared everything" below: this is the calendar, not the
+            filters, and it should never read as an outage. */}
+        {!loading && !error && allRows.length === 0 && (
+          <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
+            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
+              $ slate_status --next
+            </div>
+            <h2 className="text-xl font-bold text-ink-100 leading-tight">The slate is dark.</h2>
+            <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
+              Every game on the board has started or settled, and the books haven't
+              posted the next slate yet. Nothing is broken — there's just nothing
+              to grade until new games go up.
+            </p>
+            {data?.firstGameTime && (
+              <p className="mt-4 font-mono text-sm text-signal-pos">
+                Next slate: {new Date(data.firstGameTime).toLocaleString('en-US', { timeZone: 'America/Denver', weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} MT
+              </p>
+            )}
+            {Object.entries(data?.upcomingCounts || {}).filter(([, n]) => n > 0).length > 0 && (
+              <p className="mt-1 font-mono text-xs text-ink-400">
+                On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
+              </p>
+            )}
+            <button
+              onClick={() => navigate('/ledger')}
+              className="mt-5 px-4 py-2 text-xs font-semibold bg-ink-850 hover:bg-ink-800 text-ink-200 rounded-sharp shadow-hairline transition-colors active:scale-95"
+            >
+              Browse The House Ledger
+            </button>
+          </div>
+        )}
+
         {/* Rows */}
-        {!loading && !error && (
+        {!loading && !error && allRows.length > 0 && (
           <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
             <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500">
               <span className="w-24 text-center flex-shrink-0">Tier</span>
@@ -217,7 +250,7 @@ export default function GeneratorPage() {
           </div>
         )}
 
-        {!loading && !error && (
+        {!loading && !error && allRows.length > 0 && (
           <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500 text-center">
             // same math as the digest · picks below 2pp are shown so you know what to skip, not to bet
           </p>

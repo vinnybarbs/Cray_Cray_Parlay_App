@@ -1658,16 +1658,38 @@ export default function DailyDigest({ onBack }) {
             {/* Pick of the Day — the single best edge across all sports, featured
                 above the accordions so new users see the aha moment on first scroll. */}
             {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} tierCounts={tierCounts} totalGames={totalGames} tierStats={tierStats} />}
-            {!pickOfTheDay && <QuietDayCard best={quietBest} trapCount={tierCounts.traps} />}
+            {/* Dark slate (no games at all) gets the calendar card below instead —
+                the 7pp-bar copy makes no sense when there is nothing to grade. */}
+            {!pickOfTheDay && totalGames > 0 && <QuietDayCard best={quietBest} trapCount={tierCounts.traps} />}
 
             {/* Golf tournament leaderboard */}
             {data.golf && <GolfLeaderboard golf={data.golf} />}
 
             {/* Sport sections — all start collapsed, show 3 game preview */}
             {sportSections.length === 0 ? (
-              <div className="bg-ink-900 rounded-sharp border border-ink-700 p-8 text-center">
-                <p className="text-ink-300 text-lg font-medium">No fresh game analysis available today.</p>
-                <p className="text-ink-500 text-sm mt-2">Check back later or run the Pick Generator to generate analysis.</p>
+              <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
+                <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
+                  $ slate_status --next
+                </div>
+                <h2 className="text-xl md:text-2xl font-bold text-ink-100 leading-tight">The slate is dark.</h2>
+                <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
+                  Every game on the board has started or settled, and the books haven't
+                  posted the next slate yet. Nothing is broken — there's just nothing
+                  to grade until new games go up.
+                </p>
+                {data.firstGameTime && (
+                  <p className="mt-4 font-mono text-sm text-signal-pos">
+                    Next slate: {new Date(data.firstGameTime).toLocaleString('en-US', { timeZone: 'America/Denver', weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} MT
+                  </p>
+                )}
+                {Object.entries(data.upcomingCounts || {}).filter(([, n]) => n > 0).length > 0 && (
+                  <p className="mt-1 font-mono text-xs text-ink-400">
+                    On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
+                  </p>
+                )}
+                <p className="text-xs text-ink-500 mt-4">
+                  Meanwhile, every settled pick is on <button onClick={() => { window.location.hash = '#/ledger' }} className="text-signal-pos hover:underline">The House Ledger</button>.
+                </p>
               </div>
             ) : (
               sportSections.map(([sport, games], i) => (

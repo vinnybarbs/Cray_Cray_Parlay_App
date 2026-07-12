@@ -818,6 +818,15 @@ async function runPreAnalysis(sportSlugs) {
 
     if (games.length === 0) {
       console.log('No upcoming games found');
+      // Log the empty run — bare returns left "started" rows with no
+      // completion, which read as mid-flight deaths and burned a morning
+      // of debugging a phantom hang (7/12).
+      try {
+        await supabase.from('cron_job_logs').insert({
+          job_name: jobName, status: 'completed',
+          details: JSON.stringify({ games_found: 0, analyzed: 0 }),
+        });
+      } catch (e) { /* don't block on logging */ }
       return;
     }
 
