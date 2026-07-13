@@ -107,6 +107,8 @@ export default function HouseLedger() {
   const overall = data?.summary?.overall
   const byTier = data?.summary?.byTier || {}
   const trapReport = data?.summary?.trapReport
+  const bySport = data?.summary?.bySport || {}
+  const byBetType = data?.summary?.byBetType || {}
   const tierOrder = TIERS.map(t => t.label).filter(l => byTier[l])
 
   return (
@@ -132,7 +134,7 @@ export default function HouseLedger() {
             Every pick. Published before. Settled after.
           </h1>
           <p className="mt-3 text-ink-300 max-w-2xl leading-relaxed text-sm">
-            This is the house record, written by the settlement pipeline and never edited. The headline number covers every actionable pick we published, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The tier table shows where the edges actually live.
+            This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The tier table shows where the edges actually live.
           </p>
         </div>
 
@@ -213,6 +215,31 @@ export default function HouseLedger() {
               </div>
             )}
 
+
+            {/* Hit rates by sport and by bet type — same population as the
+                headline record above. */}
+            {(Object.keys(bySport).length > 0 || Object.keys(byBetType).length > 0) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[['By sport', bySport], ['By bet type', byBetType]].map(([title, groups]) => (
+                  <div key={title} className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden self-start">
+                    <div className="grid grid-cols-[1fr_64px_64px_72px] gap-2 px-4 py-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500">
+                      <span>{title}</span>
+                      <span className="text-right">Settled</span>
+                      <span className="text-right">Hit rate</span>
+                      <span className="text-right">Units</span>
+                    </div>
+                    {Object.entries(groups).map(([label, s]) => (
+                      <div key={label} className="grid grid-cols-[1fr_64px_64px_72px] gap-2 px-4 py-2.5 border-t border-ink-800 items-center">
+                        <span className="text-sm text-ink-100 font-medium truncate">{label}</span>
+                        <span className="text-right font-mono text-sm tabular-nums text-ink-300">{s.settled}</span>
+                        <span className={`text-right font-mono text-sm font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '—'}</span>
+                        <span className={`text-right font-mono text-sm tabular-nums ${s.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(s.units)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Machine-built parlays */}
             {data.parlays?.length > 0 && (
