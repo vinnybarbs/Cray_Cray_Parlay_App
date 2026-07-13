@@ -116,10 +116,14 @@ async function getPublicLedger(req, res) {
     const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
     const nonSoccer = settledPicks.filter(r => !SOCCER_SPORTS.has(r.sport));
 
-    const isActionable = (row) =>
-      row.tier ? !['Trap', 'Skip'].includes(row.tier) : true;
-    const actionablePicks = nonSoccer.filter(isActionable);
-    const trapPicks = nonSoccer.filter(r => r.tier === 'Trap');
+    // The public record begins at the graded era (2026-05-10, when edge
+    // grading went live). Ungraded picks before that were development
+    // output — pre-launch R&D, not shown (decision 2026-07-12).
+    const graded = nonSoccer.filter(r => r.tier != null);
+
+    const isActionable = (row) => !['Trap', 'Skip'].includes(row.tier);
+    const actionablePicks = graded.filter(isActionable);
+    const trapPicks = graded.filter(r => r.tier === 'Trap');
 
     // Per-tier and overall record over the actionable settled history.
     const byTier = {};
@@ -140,9 +144,25 @@ async function getPublicLedger(req, res) {
     trapReport.fadeRate = fadeDecided > 0
       ? Math.round((trapReport.fadeWins / fadeDecided) * 1000) / 10 : null;
 
+    // Hit rates by sport and by bet type, same population as the headline.
+    const groupSummaries = (keyFn) => {
+      const groups = {};
+      for (const row of actionablePicks) {
+        const key = keyFn(row) || 'Other';
+        (groups[key] ??= []).push(row);
+      }
+      return Object.fromEntries(
+        Object.entries(groups)
+          .map(([k, rows]) => [k, summarize(rows)])
+          .sort((a, b) => b[1].settled - a[1].settled)
+      );
+    };
+
     const summary = {
       overall: summarize(actionablePicks),
       byTier: Object.fromEntries(Object.entries(byTier).map(([t, rows]) => [t, summarize(rows)])),
+      bySport: groupSummaries(r => r.sport),
+      byBetType: groupSummaries(r => r.bet_type),
       trapReport,
     };
 
@@ -163,7 +183,7 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every actionable pick published by the daily analysis pipeline. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
+        population: 'Every actionable pick published since May 10, 2026, when edge grading went live — the start of the graded record. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
         grading: 'Signed model edge in percentage points at publish time sets the tier. Outcomes graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
