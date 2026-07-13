@@ -51,8 +51,10 @@ module.exports = async function boardHistory(req, res) {
     // Traps are fade advice, not bets — split them out so the day's record
     // only counts picks, and the fade calls get their own honest framing
     // (the trap side losing = the call was right).
-    const picks = all.filter(p => p.tier !== 'Trap' && p.tier !== 'Skip');
-    const traps = all.filter(p => p.tier === 'Trap');
+    const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+    const nonSoccer = all.filter(p => !SOCCER_SPORTS.has(p.sport));
+    const picks = nonSoccer.filter(p => p.tier !== 'Trap' && p.tier !== 'Skip');
+    const traps = nonSoccer.filter(p => p.tier === 'Trap');
 
     const summary = { total: picks.length, won: 0, lost: 0, push: 0, pending: 0, units: 0 };
     for (const p of picks) {

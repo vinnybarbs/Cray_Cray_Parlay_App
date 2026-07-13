@@ -107,6 +107,7 @@ export default function HouseLedger() {
   const overall = data?.summary?.overall
   const byTier = data?.summary?.byTier || {}
   const trapReport = data?.summary?.trapReport
+  const retiredSoccer = data?.summary?.retiredSoccer
   const tierOrder = TIERS.map(t => t.label).filter(l => byTier[l])
 
   return (
@@ -210,6 +211,20 @@ export default function HouseLedger() {
                   {trapReport.fadeWins}–{trapReport.fadeLosses}{trapReport.fadeRate != null ? ` (${trapReport.fadeRate}%)` : ''}
                 </span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full sm:basis-auto sm:ml-auto">a trap is advice to bet against a side — its loss is our win</span>
+              </div>
+            )}
+
+            {/* Retired experiments stay visible under their own label — the
+                append-only claim survives because nothing is deleted. */}
+            {retiredSoccer && retiredSoccer.settled > 0 && (
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                  <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-400">Soccer v1 · retired</span>
+                  <span className="font-mono text-sm tabular-nums text-ink-300">{retiredSoccer.won}–{retiredSoccer.lost}{retiredSoccer.push > 0 ? `–${retiredSoccer.push}` : ''}</span>
+                  <span className={`font-mono text-sm tabular-nums ${retiredSoccer.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(retiredSoccer.units)}</span>
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600">not counted in the record above</span>
+                </div>
+                <p className="mt-1.5 text-xs text-ink-500 max-w-2xl">{retiredSoccer.note}</p>
               </div>
             )}
 

@@ -33,6 +33,12 @@ const SLUG_TO_SPORT = {
   mma_mixed_martial_arts: 'UFC'
 };
 
+// Soccer v1 is RETIRED (2026-07-12). The edge calculator prices two-way
+// markets and never modeled the draw, so its soccer edges were structurally
+// inflated (EPL ML settled 17-54). Soccer games still get preview analyses
+// for the digest, but no picks publish until a real three-way model exists.
+const PREVIEW_ONLY_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+
 function slugToSport(slug) {
   if (!slug) return slug;
   if (slug.startsWith('tennis_')) return 'Tennis';
@@ -875,7 +881,9 @@ async function runPreAnalysis(sportSlugs) {
         // overruled the per-side edge data (e.g., OKC -10.5 chosen over the
         // +18pp Lakers +10.5 cover edge).
         let mathPick = null;
-        const bestSide = edgeData ? edgeCalc.pickBestSide(edgeData) : null;
+        const previewOnly = PREVIEW_ONLY_SPORTS.has(sportDisplay);
+        const bestSide = (edgeData && !previewOnly) ? edgeCalc.pickBestSide(edgeData) : null;
+        if (previewOnly) console.log(`  Soccer preview-only — no pick published (${game.game_key})`);
         if (bestSide) {
           const pickText = buildPickText(bestSide.side, oddsCtx, game);
           if (pickText) {

@@ -97,6 +97,7 @@ async function getPublicLedger(req, res) {
         .select('id, sport, bet_type, pick, odds, edge_pp, tier, game_date, created_at, actual_outcome')
         .like('session_id', 'auto_digest%')
         .eq('actual_outcome', 'pending')
+        .not('sport', 'in', '("EPL","MLS","Soccer","World Cup","Champions League","Copa America","Euros")')
         .gt('game_date', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())
         .order('game_date', { ascending: true })
         .limit(100);
@@ -108,10 +109,23 @@ async function getPublicLedger(req, res) {
     // the side is overpriced) and a Skip is below the actionable floor. They
     // stay in the database for calibration, but they don't belong in the
     // win/loss record. A trap whose side LOST is a CORRECT call.
+    // Soccer v1 is a RETIRED experiment: the pick engine priced two-way
+    // markets and never modeled the draw, so its soccer edges were
+    // structurally invalid. Retired, not deleted — the record stays visible
+    // under its own label so the append-only claim survives an audit.
+    const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+    const soccerPicks = settledPicks.filter(r => SOCCER_SPORTS.has(r.sport));
+    const nonSoccer = settledPicks.filter(r => !SOCCER_SPORTS.has(r.sport));
+
     const isActionable = (row) =>
       row.tier ? !['Trap', 'Skip'].includes(row.tier) : true;
-    const actionablePicks = settledPicks.filter(isActionable);
-    const trapPicks = settledPicks.filter(r => r.tier === 'Trap');
+    const actionablePicks = nonSoccer.filter(isActionable);
+    const trapPicks = nonSoccer.filter(r => r.tier === 'Trap');
+
+    const retiredSoccer = soccerPicks.length > 0 ? {
+      ...summarize(soccerPicks.filter(isActionable)),
+      note: 'Piloted on a two-way model that never priced the draw. Retired July 2026 rather than deleted. Soccer returns when it has a real three-way model.',
+    } : null;
 
     // Per-tier and overall record over the actionable settled history.
     const byTier = {};
@@ -136,6 +150,7 @@ async function getPublicLedger(req, res) {
       overall: summarize(actionablePicks),
       byTier: Object.fromEntries(Object.entries(byTier).map(([t, rows]) => [t, summarize(rows)])),
       trapReport,
+      retiredSoccer,
     };
 
     // Machine-built house parlays (pending + settled). Missing table (before
@@ -155,7 +170,7 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every actionable pick published by the daily analysis pipeline, all sports. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
+        population: 'Every actionable pick published by the daily analysis pipeline. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. The first-generation soccer record is shown separately as a retired experiment — its model never priced the draw. Nothing deleted, nothing edited after publication.',
         grading: 'Signed model edge in percentage points at publish time sets the tier. Outcomes graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
