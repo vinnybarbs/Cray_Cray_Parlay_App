@@ -97,6 +97,7 @@ async function fetchScoreboard(sport, sportPath, dateStr) {
         away_score: awayScore,
         status: 'final',
         metadata: {
+          espn_status: status,
           event_name: event.name,
           venue: comp.venue?.fullName,
           home_record: home.records?.[0]?.summary,
