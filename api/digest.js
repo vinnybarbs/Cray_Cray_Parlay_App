@@ -139,11 +139,14 @@ async function getDigest(req, res) {
       return bySport;
     });
 
-    // 4. Model accuracy — 3 periods (7d / 30d / all) x (overall + bySport + byBetType) from MV.
-    // ROI dropped: per-leg hit rate is the signal a parlay-focused product cares about.
+    // 4. Model accuracy — 3 periods (7d / 30d / all) x (overall + bySport + byBetType).
+    // Reads mv_public_record: the SAME population as the House Ledger (graded
+    // era, actionable tiers, no soccer v1) so the digest and the ledger can
+    // never tell different stories. mv_model_accuracy keeps the full history
+    // for calibration and stays off public surfaces.
     const modelAccuracyResult = await safeQuery(async () => {
       const { data, error } = await supabase
-        .from('mv_model_accuracy')
+        .from('mv_public_record')
         .select('period_bucket, dimension_type, dimension_value, won, lost, push, total')
         .in('period_bucket', ['last_7d', 'last_30d', 'all']);
       if (error) throw error;

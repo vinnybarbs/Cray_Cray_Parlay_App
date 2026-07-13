@@ -1,4 +1,5 @@
-// Public-stats endpoint — proxies mv_model_accuracy to the Landing without
+// Public-stats endpoint — proxies mv_public_record (the ledger-population
+// rollup: graded era, actionable tiers, no soccer v1) to the Landing without
 // requiring auth, so the Track Record section + hero hit-rate render for
 // unauthenticated visitors. Uses the service role key server-side so RLS
 // can stay strict on the underlying table (anon SELECT remains blocked).

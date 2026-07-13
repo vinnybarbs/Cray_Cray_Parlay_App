@@ -1,0 +1,9 @@
+-- The public record view: same shape as mv_model_accuracy, restricted to the
+-- population the public ledger stands on (graded era, actionable tiers, no
+-- soccer v1). Digest Model Performance + Landing public-stats read THIS;
+-- mv_model_accuracy keeps full history for calibration and the weekly review.
+-- Applied to prod 2026-07-12 late night via MCP (full definition mirrors
+-- mv_model_accuracy blocks: overall / sport / bet_type / tier, filtered by
+-- session_id like 'auto_digest%', tier not null, tier not in (Trap, Skip),
+-- sport not in soccer list). Also: refresh_mv_model_accuracy() now refreshes
+-- BOTH views, and the two nightly refresh crons call the function.
