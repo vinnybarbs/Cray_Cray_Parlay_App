@@ -94,7 +94,10 @@ module.exports = async (req, res) => {
         wins: stRow.won,
         losses: stRow.lost,
         hitRate: Math.round((stRow.won / decided) * 1000) / 10,
-        roiPct: stRow.roi_pct != null ? Math.round(Number(stRow.roi_pct) * 10) / 10 : null,
+        // Same math as the House Ledger: units profit over decided 1u stakes.
+        roiPct: stRow.roi_units != null && decided > 0
+          ? Math.round((Number(stRow.roi_units) / decided) * 1000) / 10
+          : null,
       };
     }
 
