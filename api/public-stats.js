@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
 
   try {
     const { data: rows, error } = await supabase
-      .from('mv_model_accuracy')
+      .from('mv_public_record')
       .select('*')
       .in('period_bucket', ['last_30d', 'all']);
 
