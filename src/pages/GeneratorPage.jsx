@@ -40,28 +40,31 @@ function formatOdds(odds) {
 }
 
 function PickRow({ row }) {
+  // pp null = a preview (soccer, or a game the model has no data for):
+  // analysis exists, no graded side. Still content — show it honestly.
+  const isPreview = row.pp == null
   const tier = edgeTier(row.pp)
   const odds = formatOdds(row.odds)
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-t border-ink-800">
-      <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${tier.color} ${tier.bg}`}>
-        {tier.label}
+      <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${isPreview ? 'text-ink-300 bg-ink-850 shadow-hairline' : `${tier.color} ${tier.bg}`}`}>
+        {isPreview ? 'Preview' : tier.label}
       </span>
-      <span className={`flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums ${row.pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-        {formatPp(row.pp)}
+      <span className={`flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : row.pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
+        {isPreview ? '—' : formatPp(row.pp)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
-          {row.game.recommended_pick || '—'}
+          {row.game.recommended_pick || `${row.game.away_team} @ ${row.game.home_team}`}
           {odds && <span className="ml-2 font-mono text-xs text-ink-300">{odds}</span>}
         </div>
         <div className="text-xs text-ink-400 truncate">
-          {row.sport} · {row.game.away_team} @ {row.game.home_team}
+          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : <> · analysis, no graded side</>}
           {row.game.game_date && <> · {toMountainTime(row.game.game_date)} MT</>}
         </div>
       </div>
-      <span className={`flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider ${tier.color}`}>
-        {tier.subtitle}
+      <span className={`flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider ${isPreview ? 'text-ink-500' : tier.color}`}>
+        {isPreview ? 'no bet graded' : tier.subtitle}
       </span>
     </div>
   )
@@ -76,7 +79,8 @@ export default function GeneratorPage() {
 
   // Filters
   const [selectedSports, setSelectedSports] = useState([]) // empty = all
-  const [minTier, setMinTier] = useState('lean')
+  // Default to everything — traps, skips, and previews are content too.
+  const [minTier, setMinTier] = useState('all')
 
   useEffect(() => {
     let cancelled = false

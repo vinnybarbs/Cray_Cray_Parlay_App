@@ -568,18 +568,29 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
   // is the structural fix for the "LLM picks the wrong side because of
   // narrative" problem (e.g., OKC -10.5 picked over Lakers +10.5 despite a
   // +18pp model edge on the Lakers side).
-  const pickBlock = mathPick
+  const edgePpForPrompt = mathPick ? mathPick.signedEdge * 100 : null;
+  const pickBlock = mathPick && edgePpForPrompt >= 2
     ? `\nOUR MODEL'S PICK (fixed — do not change):
   Side: ${mathPick.recommended_side}
   Pick text: ${mathPick.recommended_pick}
-  Model edge: ${(mathPick.signedEdge * 100).toFixed(1)}pp vs market
+  Model edge: ${edgePpForPrompt.toFixed(1)}pp vs market
   Your job is to JUSTIFY this pick using the matchup data above. If the data
   contradicts the model's pick, say so honestly in the analysis (we'd rather
   catch a model mistake than confidently bullshit). Do NOT write a different
   pick — that's chosen by our math.\n`
-    : `\nOUR MODEL HAS NO EDGE on this game (every market < +2pp). Your job is to
-  write a 2-3 sentence preview that explains why this game lacks a clear edge.
-  Do not recommend a pick.\n`;
+    : mathPick && edgePpForPrompt < 0
+    ? `\nOUR MODEL'S READ (display only — this is NOT a bet):
+  Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp — NEGATIVE.
+  Every side of this game is priced worse than fair. This is a TRAP: explain
+  in 2-3 sentences why the market has this game priced tight or why the
+  popular side is overvalued. Advise staying away. Never call it a pick.\n`
+    : mathPick
+    ? `\nOUR MODEL'S READ (display only — this is NOT a bet):
+  Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp — below our 2pp betting floor.
+  Write a 2-3 sentence read on the matchup and say plainly that the value
+  isn't there. This is a SKIP. Never call it a pick.\n`
+    : `\nOUR MODEL HAS NO EDGE DATA on this game. Your job is to write a 2-3
+  sentence preview from the matchup data above. Do not recommend a pick.\n`;
 
   const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Justify our model's pick using the data below.
 ${refinementBlock}
@@ -882,7 +893,12 @@ async function runPreAnalysis(sportSlugs) {
         // +18pp Lakers +10.5 cover edge).
         let mathPick = null;
         const previewOnly = PREVIEW_ONLY_SPORTS.has(sportDisplay);
-        const bestSide = (edgeData && !previewOnly) ? edgeCalc.pickBestSide(edgeData) : null;
+        // No minimum edge for DISPLAY: a negative best side is a Trap read,
+        // 0-2pp is a Skip — the board shows what the math sees either way
+        // (Vince: "just because there might not be sharp takes doesn't mean
+        // we shouldn't show what we have"). The RECORD gate stays at 2pp in
+        // the auto-save below.
+        const bestSide = (edgeData && !previewOnly) ? edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }) : null;
         if (previewOnly) console.log(`  Soccer preview-only — no pick published (${game.game_key})`);
         if (bestSide) {
           const pickText = buildPickText(bestSide.side, oddsCtx, game);
@@ -990,8 +1006,11 @@ async function runPreAnalysis(sportSlugs) {
             totalPromptTokens += result.prompt_tokens || 0;
             totalCompletionTokens += result.completion_tokens || 0;
 
-            // Auto-save ALL predictions to ai_suggestions for honest performance tracking
-            if (result.recommended_pick) {
+            // Publish to the RECORD only at Lean or better (>= 2pp). Trap
+            // and Skip reads live on the board as information, not as bets.
+            const displayEdgePp = edgeData?.edges?.[result.recommended_side] != null
+              ? edgeData.edges[result.recommended_side] * 100 : null;
+            if (result.recommended_pick && displayEdgePp != null && displayEdgePp >= 2) {
               try {
                 // Derive bet type from the math-chosen side, NOT regex on the
                 // pick text. ML picks include the price ("+310"), which the
