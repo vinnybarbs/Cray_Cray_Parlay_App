@@ -590,7 +590,9 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
   Write a 2-3 sentence read on the matchup and say plainly that the value
   isn't there. This is a SKIP. Never call it a pick.\n`
     : `\nOUR MODEL HAS NO EDGE DATA on this game. Your job is to write a 2-3
-  sentence preview from the matchup data above. Do not recommend a pick.\n`;
+  sentence preview from the matchup data above. Do not recommend a pick, do
+  not mention edges, thresholds, or implied probabilities — just preview the
+  matchup like a knowledgeable fan would.\n`;
 
   const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Justify our model's pick using the data below.
 ${refinementBlock}
@@ -853,15 +855,23 @@ async function runPreAnalysis(sportSlugs) {
         const oddsCtx = extractOddsContext(game);
         const sportDisplay = slugToSport(game.sport) || game.sport.toUpperCase();
 
-        // Fetch context in parallel — DB queries + API-Sports + news
+        // National-team tournaments must NEVER read club tables — "England"
+        // is contained in "New England Revolution", and the bidirectional
+        // name match fed the Revolution's MLS record into a World Cup
+        // semifinal preview. News + web-verified intel only.
+        const NATIONAL_TEAM_SPORTS = new Set(['World Cup', 'Euros', 'Copa America']);
+        const nationalTeams = NATIONAL_TEAM_SPORTS.has(sportDisplay);
+        const emptyRankCtx = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
+
+        // Fetch context in parallel — DB queries + news
         const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
-          getInjuryContext(game.home_team, game.away_team),
-          getRankingsContext(game.home_team, game.away_team),
-          getRecentResults(game.home_team, game.sport),
-          getRecentResults(game.away_team, game.sport),
+          nationalTeams ? null : getInjuryContext(game.home_team, game.away_team),
+          nationalTeams ? Promise.resolve(emptyRankCtx) : getRankingsContext(game.home_team, game.away_team),
+          nationalTeams ? null : getRecentResults(game.home_team, game.sport),
+          nationalTeams ? null : getRecentResults(game.away_team, game.sport),
           getPastAccuracy(game.sport),
-          getPlayerStatsContext(game.home_team, game.away_team, game.sport),
+          nationalTeams ? null : getPlayerStatsContext(game.home_team, game.away_team, game.sport),
           // Web-verified injuries/weather/record warnings from the data
           // integrity agent (empty string when no fresh intel exists).
           getIntelContext(supabase, game.home_team, game.away_team)
