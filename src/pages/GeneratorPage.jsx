@@ -39,14 +39,15 @@ function formatOdds(odds) {
   return n > 0 ? `+${n}` : String(n)
 }
 
-function PickRow({ row }) {
+function PickRow({ row, isOpen, onToggle }) {
   // pp null = a preview (soccer, or a game the model has no data for):
   // analysis exists, no graded side. Still content — show it honestly.
   const isPreview = row.pp == null
   const tier = edgeTier(row.pp)
   const odds = formatOdds(row.odds)
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-t border-ink-800">
+    <div>
+    <button onClick={onToggle} className={`w-full text-left flex items-center gap-3 px-4 py-3 border-t border-ink-800 transition-colors ${isOpen ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}>
       <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${isPreview ? 'text-ink-300 bg-ink-850 shadow-hairline' : `${tier.color} ${tier.bg}`}`}>
         {isPreview ? 'Preview' : tier.label}
       </span>
@@ -66,6 +67,21 @@ function PickRow({ row }) {
       <span className={`flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider ${isPreview ? 'text-ink-500' : tier.color}`}>
         {isPreview ? 'no bet graded' : tier.subtitle}
       </span>
+    </button>
+    {isOpen && (
+      <div className="px-4 pb-3 pt-1 bg-ink-850/40 border-t border-ink-800/50">
+        {row.game.analysis_snippet
+          ? <p className="text-xs text-ink-200 leading-relaxed max-w-2xl">{row.game.analysis_snippet}</p>
+          : <p className="text-xs text-ink-500">No written analysis yet — the next analysis pass will fill this in.</p>}
+        {Array.isArray(row.game.key_factors) && row.game.key_factors.length > 0 && (
+          <ul className="mt-2 space-y-0.5">
+            {row.game.key_factors.slice(0, 4).map((f, i) => (
+              <li key={i} className="text-[11px] text-ink-400 leading-relaxed">· {f}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )}
     </div>
   )
 }
@@ -76,6 +92,8 @@ export default function GeneratorPage() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  const [openRow, setOpenRow] = useState(null)
 
   // Filters
   const [selectedSports, setSelectedSports] = useState([]) // empty = all
@@ -246,9 +264,17 @@ export default function GeneratorPage() {
                 <p className="text-xs text-ink-500 mt-1 font-mono">Loosen the edge floor or check back after the next analysis run.</p>
               </div>
             ) : (
-              rows.map(row => (
-                <PickRow key={pickIdFor(row.game)} row={row} />
-              ))
+              rows.map(row => {
+                const id = pickIdFor(row.game)
+                return (
+                  <PickRow
+                    key={id}
+                    row={row}
+                    isOpen={openRow === id}
+                    onToggle={() => setOpenRow(openRow === id ? null : id)}
+                  />
+                )
+              })
             )}
           </div>
         )}
