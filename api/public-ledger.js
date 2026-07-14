@@ -184,7 +184,7 @@ async function getPublicLedger(req, res) {
       generated_at: new Date().toISOString(),
       methodology: {
         population: 'Every actionable pick published since May 10, 2026, when edge grading went live — the start of the graded record. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
-        grading: 'Signed model edge in percentage points at publish time sets the tier. Outcomes graded from final scores by the settlement pipeline.',
+        grading: 'One pick per game per day — the final version published before start, at its price. Pre-start revisions replace, never add. Signed model edge in percentage points sets the tier; outcomes graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
       },

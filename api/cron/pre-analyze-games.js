@@ -1020,43 +1020,72 @@ async function runPreAnalysis(sportSlugs) {
                 const isHomeMl = side === 'home_ml';
                 const isAwayMl = side === 'away_ml';
 
-                // Refinement passes re-run games that already saved their
-                // pick — ignoreDuplicates keeps the original row (with its
-                // odds/edge snapshot) instead of erroring on the unique key
-                // every 3 hours.
-                const { error: sugErr } = await supabase
+                // ONE settled bet per game per day. A refinement pass REVISES
+                // the day's row (pick, odds, even the market can change while
+                // the line moves) instead of inserting a sibling — 4 re-picks
+                // of the same loser used to count as 4 losses. created_at
+                // stays the FIRST publish time (the receipts stamp);
+                // last_revised_at tracks the final pre-game version. Settled
+                // rows are never touched, and only unstarted games get
+                // analyzed, so the settled bet is always the last version
+                // published before start.
+                const sessionId = `auto_digest_${new Date().toISOString().split('T')[0]}`;
+                const pickPayload = {
+                  sport: sportDisplay,
+                  bet_type: betType,
+                  pick: result.recommended_pick,
+                  point: point,
+                  odds: pickOdds,
+                  confidence: Math.round(result.edge_score),
+                  reasoning: result.analysis_snippet,
+                  risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
+                  generate_mode: 'auto_digest',
+                  // 6 = calibrated devig regime (edge_calibration multipliers
+                  // + real spread/total baselines). Calibration refresh only
+                  // trusts picks from this regime forward.
+                  pipeline_version: 6,
+                  edge_pp: edgePp,
+                  edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
+                  tier: pickGrader.edgeTier(edgePp),
+                  model_prob: isHomeMl ? edgeData?.homeWinProb ?? null
+                            : isAwayMl ? edgeData?.awayWinProb ?? null : null,
+                  implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null
+                              : isAwayMl ? edgeData?.impliedAwayProb ?? null : null,
+                };
+
+                const { data: existingPick } = await supabase
                   .from('ai_suggestions')
-                  .upsert({
-                    session_id: `auto_digest_${new Date().toISOString().split('T')[0]}`,
-                    sport: sportDisplay,
-                    home_team: game.home_team,
-                    away_team: game.away_team,
-                    game_date: game.game_date,
-                    bet_type: betType,
-                    pick: result.recommended_pick,
-                    point: point,
-                    odds: pickOdds,
-                    confidence: Math.round(result.edge_score),
-                    reasoning: result.analysis_snippet,
-                    risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
-                    generate_mode: 'auto_digest',
-                    actual_outcome: 'pending',
-                    // 6 = calibrated devig regime (edge_calibration multipliers
-                    // + real spread/total baselines). Calibration refresh only
-                    // trusts picks from this regime forward.
-                    pipeline_version: 6,
-                    edge_pp: edgePp,
-                    edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
-                    tier: pickGrader.edgeTier(edgePp),
-                    model_prob: isHomeMl ? edgeData?.homeWinProb ?? null
-                              : isAwayMl ? edgeData?.awayWinProb ?? null : null,
-                    implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null
-                                : isAwayMl ? edgeData?.impliedAwayProb ?? null : null
-                  }, { onConflict: 'session_id,home_team,away_team,bet_type,pick', ignoreDuplicates: true });
+                  .select('id, actual_outcome')
+                  .eq('session_id', sessionId)
+                  .eq('home_team', game.home_team)
+                  .eq('away_team', game.away_team)
+                  .eq('game_date', game.game_date)
+                  .maybeSingle();
+
+                let sugErr = null;
+                if (existingPick && existingPick.actual_outcome !== 'pending') {
+                  console.log(`  Pick already settled for ${game.game_key} — not revising`);
+                } else if (existingPick) {
+                  ({ error: sugErr } = await supabase
+                    .from('ai_suggestions')
+                    .update({ ...pickPayload, last_revised_at: new Date().toISOString() })
+                    .eq('id', existingPick.id));
+                  if (!sugErr) console.log(`  ✏️ Revised day's pick: ${result.recommended_pick} (${sportDisplay})`);
+                } else {
+                  ({ error: sugErr } = await supabase
+                    .from('ai_suggestions')
+                    .insert({
+                      session_id: sessionId,
+                      home_team: game.home_team,
+                      away_team: game.away_team,
+                      game_date: game.game_date,
+                      actual_outcome: 'pending',
+                      ...pickPayload,
+                    }));
+                  if (!sugErr) console.log(`  ✅ Published pick: ${result.recommended_pick} (${sportDisplay})`);
+                }
                 if (sugErr) {
                   console.warn(`  Auto-save pick result: ${sugErr.message}`);
-                } else {
-                  console.log(`  ✅ Auto-saved pick: ${result.recommended_pick} (${sportDisplay})`);
                 }
               } catch (e) {
                 console.error(`  ❌ Auto-save exception: ${e.message}`);

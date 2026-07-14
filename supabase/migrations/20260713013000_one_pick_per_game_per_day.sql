@@ -1,0 +1,9 @@
+-- One settled bet per game per day (applied to prod 2026-07-12 late night).
+-- Backfilled: kept the final pre-game row per (session_id, home_team,
+-- away_team, game_date) for auto_digest sessions, preserved the group's
+-- earliest created_at as the publish stamp, recorded last_revised_at,
+-- deleted superseded siblings (~400 rows). Dropped the pick-text unique
+-- (ai_suggestions_session_id_home_team_away_team_bet_type_pick_key); added
+-- partial unique uq_ai_suggestions_auto_digest_game on
+-- (session_id, home_team, away_team, game_date) where session_id like
+-- 'auto_digest%'. Added column last_revised_at timestamptz. Refreshed MVs.
