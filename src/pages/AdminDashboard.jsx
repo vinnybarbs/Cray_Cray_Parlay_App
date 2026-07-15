@@ -145,6 +145,114 @@ function FeedPanel({ title, sub, children, maxH = 'max-h-[420px]' }) {
   )
 }
 
+function Cell({ label, value, mono = true }) {
+  const display = value == null || value === '' ? '—'
+    : typeof value === 'number' ? (Number.isInteger(value) ? String(value) : value.toFixed(3))
+    : String(value)
+  return (
+    <div className="bg-ink-950/60 rounded-sharp px-2.5 py-1.5 min-w-0">
+      <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-500 truncate">{label}</p>
+      <p className={`text-xs ${mono ? 'font-mono tabular-nums' : ''} ${value == null || value === '' ? 'text-ink-600' : 'text-ink-100'} break-words`}>{display}</p>
+    </div>
+  )
+}
+
+function JsonCell({ label, value }) {
+  if (value == null) return <Cell label={label} value={null} />
+  return (
+    <div className="bg-ink-950/60 rounded-sharp px-2.5 py-1.5 col-span-2 sm:col-span-3 min-w-0">
+      <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-500">{label}</p>
+      <pre className="text-[10px] text-ink-300 whitespace-pre-wrap break-all max-h-32 overflow-y-auto">{JSON.stringify(value, null, 1)}</pre>
+    </div>
+  )
+}
+
+function UpcomingInspectorSection({ analyses }) {
+  const [openKey, setOpenKey] = useState(null)
+  const upcoming = analyses || []
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+      <div className="px-4 py-3 bg-ink-950 border-b border-ink-800">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal-pos">Upcoming game inspector</p>
+        <p className="text-ink-500 text-[11px] mt-0.5">{upcoming.length} analyzed games not yet started — tap one to see every cell the tile is built from</p>
+      </div>
+      <div className="max-h-[560px] overflow-y-auto">
+        {upcoming.length === 0 ? (
+          <p className="px-4 py-8 text-center text-ink-500 text-sm">Nothing analyzed and upcoming right now.</p>
+        ) : upcoming.map((g) => {
+          const isOpen = openKey === g.game_key
+          return (
+            <div key={g.game_key}>
+              <button
+                onClick={() => setOpenKey(isOpen ? null : g.game_key)}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-left border-t border-ink-800/60 transition-colors ${isOpen ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}
+              >
+                <span className="font-mono text-[10px] text-ink-500 w-20 flex-shrink-0 truncate">{g.sport}</span>
+                <span className="text-sm text-ink-100 truncate flex-1">{g.away_team} @ {g.home_team}</span>
+                <span className={`font-mono text-[10px] flex-shrink-0 ${g.recommended_pick ? 'text-signal-pos' : 'text-ink-500'}`}>{g.recommended_pick || 'preview'}</span>
+                <span className="font-mono text-[10px] text-ink-500 flex-shrink-0">{fmtDate(g.game_date)}</span>
+              </button>
+              {isOpen && (
+                <div className="px-4 py-3 bg-ink-950/40 border-t border-ink-800/40">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1.5">
+                    <Cell label="game_key" value={g.game_key} />
+                    <Cell label="version" value={g.analysis_version} />
+                    <Cell label="stale" value={String(g.stale)} />
+                    <Cell label="generated" value={timeAgo(g.generated_at)} />
+                    <Cell label="expires" value={timeAgo(g.expires_at)} />
+                    <Cell label="tokens in/out" value={`${g.prompt_tokens ?? '—'} / ${g.completion_tokens ?? '—'}`} />
+                    <Cell label="pick" value={g.recommended_pick} />
+                    <Cell label="side" value={g.recommended_side} />
+                    <Cell label="pick odds" value={g.recommended_odds} />
+                    <Cell label="edge score" value={g.edge_score} />
+                    <Cell label="calc edge" value={g.calc_edge} />
+                    <Cell label="edge side" value={g.calc_edge_side} />
+                    <Cell label="spread" value={g.spread} />
+                    <Cell label="total" value={g.total} />
+                    <Cell label="ml home" value={g.moneyline_home} />
+                    <Cell label="ml away" value={g.moneyline_away} />
+                    <Cell label="home rec" value={g.home_record} />
+                    <Cell label="away rec" value={g.away_record} />
+                    <Cell label="calc P(home)" value={g.calc_home_prob} />
+                    <Cell label="calc P(away)" value={g.calc_away_prob} />
+                    <Cell label="implied P(home)" value={g.implied_home_prob} />
+                    <Cell label="implied P(away)" value={g.implied_away_prob} />
+                    <Cell label="home rank" value={g.home_ranking} />
+                    <Cell label="away rank" value={g.away_ranking} />
+                    <JsonCell label="edges (capped)" value={g.edges} />
+                    <JsonCell label="edges raw" value={g.edges_raw} />
+                    <JsonCell label="edge factors + adjustments" value={g.edge_factors} />
+                    <JsonCell label="key factors" value={g.key_factors} />
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    <div className="bg-ink-950/60 rounded-sharp px-2.5 py-1.5">
+                      <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-500">analysis snippet</p>
+                      <p className="text-xs text-ink-200 leading-relaxed">{g.analysis_snippet || '—'}</p>
+                      {g.what_changed && <p className="mt-1 text-[11px] text-signal-pos/80">Changed: {g.what_changed}</p>}
+                    </div>
+                    {g.news_context && (
+                      <div className="bg-ink-950/60 rounded-sharp px-2.5 py-1.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-500">news context (as fed to the model)</p>
+                        <pre className="text-[10px] text-ink-300 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{g.news_context}</pre>
+                      </div>
+                    )}
+                    {g.injury_context && (
+                      <div className="bg-ink-950/60 rounded-sharp px-2.5 py-1.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-500">injury context</p>
+                        <pre className="text-[10px] text-ink-300 whitespace-pre-wrap break-words max-h-40 overflow-y-auto">{g.injury_context}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function IntelFeedSection({ intel }) {
   const kindCls = {
     injury: 'text-signal-neg bg-signal-neg-dim/30',
@@ -412,30 +520,6 @@ function ModelPerformanceSection({ modelAccuracy }) {
   )
 }
 
-function ByModeSection({ byMode }) {
-  if (!byMode || Object.keys(byMode).length === 0) return null
-  return (
-    <div className="bg-ink-950 rounded-sharp border border-ink-700 p-5">
-      <SectionHeader title="By Generate Mode" sub="Performance by pick-generation pipeline" />
-      <div className="space-y-2">
-        {Object.entries(byMode)
-          .sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost))
-          .map(([mode, counts]) => (
-            <div key={mode} className="flex items-center gap-3">
-              <span className="text-ink-200 text-xs w-40 flex-shrink-0">{mode}</span>
-              <div className="flex-1">
-                <WinRateBar won={counts.won} lost={counts.lost} />
-              </div>
-              <span className="text-ink-400 text-xs w-20 text-right flex-shrink-0">
-                {counts.won}W / {counts.lost}L
-              </span>
-            </div>
-          ))}
-      </div>
-    </div>
-  )
-}
-
 function RecentPicksSection({ recentPicks }) {
   const [expanded, setExpanded] = useState(null)
 
@@ -509,118 +593,6 @@ function RecentPicksSection({ recentPicks }) {
             })}
           </tbody>
         </table>
-      </div>
-    </div>
-  )
-}
-
-function CalibrationSection({ title, subtitle, calibration }) {
-  if (!calibration || calibration.length === 0) return null
-  return (
-    <div className="bg-ink-900 rounded-sharp p-5 border border-ink-700">
-      <SectionHeader title={title} sub={subtitle} />
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-4">
-        {calibration.map(b => {
-          const won = b.won || 0
-          const lost = b.lost || 0
-          const total = won + lost
-          const winPct = total > 0 ? Math.round((won / total) * 100) : 0
-          const expected = Number(b.dimension_value) * 10
-          const isCalibrated = Math.abs(winPct - expected) < 15
-          return (
-            <div key={b.dimension_value} className="bg-ink-950 rounded-sharp p-3 text-center border border-ink-700">
-              <div className="text-2xl font-bold text-signal-pos">{b.dimension_value}/10</div>
-              <div className={`text-lg font-bold mt-1 ${winPct >= 65 ? 'text-green-400' : winPct >= 50 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-                {winPct}%
-              </div>
-              <div className="text-xs text-ink-400 mt-1">{won}W-{lost}L ({total})</div>
-              <div className="mt-2 w-full bg-ink-800 rounded-full h-2">
-                <div className={`h-2 rounded-full ${winPct >= 65 ? 'bg-green-500' : winPct >= 50 ? 'bg-signal-pos' : 'bg-red-500'}`}
-                  style={{ width: `${winPct}%` }} />
-              </div>
-              <div className="text-[10px] mt-1 text-ink-500">
-                {total === 0 ? '—' : isCalibrated ? '✓ calibrated' : winPct > expected ? '↑ underconfident' : '↓ overconfident'}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function SettlementSection({ settlementStatus }) {
-  const { parlaysByStatus = {}, legsByOutcome = {} } = settlementStatus || {}
-
-  const parlayEntries = Object.entries(parlaysByStatus).sort((a, b) => b[1] - a[1])
-  const legEntries = Object.entries(legsByOutcome).sort((a, b) => b[1] - a[1])
-  const totalParlays = parlayEntries.reduce((s, [, v]) => s + v, 0)
-  const totalLegs = legEntries.reduce((s, [, v]) => s + v, 0)
-
-  const statusColors = {
-    won: 'bg-green-500',
-    lost: 'bg-red-500',
-    push: 'bg-signal-pos',
-    pending: 'bg-ink-600',
-    settled: 'bg-blue-500',
-    active: 'bg-cyan-500',
-  }
-
-  return (
-    <div className="bg-ink-950 rounded-sharp border border-ink-700 p-5">
-      <SectionHeader title="Settlement Monitor" sub="Parlay and leg status breakdown" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-        {/* Parlays */}
-        <div>
-          <p className="text-ink-300 text-xs uppercase tracking-wide mb-3">Parlays by Status ({totalParlays.toLocaleString()} total)</p>
-          {parlayEntries.length === 0 ? (
-            <p className="text-ink-400 text-sm">No parlays found.</p>
-          ) : (
-            <div className="space-y-2">
-              {parlayEntries.map(([status, count]) => {
-                const pct = totalParlays > 0 ? Math.round((count / totalParlays) * 100) : 0
-                const barCls = statusColors[status] || 'bg-ink-600'
-                return (
-                  <div key={status}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-ink-200 capitalize">{status}</span>
-                      <span className="text-ink-300">{count} ({pct}%)</span>
-                    </div>
-                    <div className="bg-ink-800 rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full ${barCls}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Legs */}
-        <div>
-          <p className="text-ink-300 text-xs uppercase tracking-wide mb-3">Parlay Legs by Outcome ({totalLegs.toLocaleString()} total)</p>
-          {legEntries.length === 0 ? (
-            <p className="text-ink-400 text-sm">No leg data found.</p>
-          ) : (
-            <div className="space-y-2">
-              {legEntries.map(([outcome, count]) => {
-                const pct = totalLegs > 0 ? Math.round((count / totalLegs) * 100) : 0
-                const barCls = statusColors[outcome] || 'bg-ink-600'
-                return (
-                  <div key={outcome}>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-ink-200 capitalize">{outcome}</span>
-                      <span className="text-ink-300">{count} ({pct}%)</span>
-                    </div>
-                    <div className="bg-ink-800 rounded-full h-1.5">
-                      <div className={`h-1.5 rounded-full ${barCls}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
       </div>
     </div>
   )
@@ -753,8 +725,9 @@ export default function AdminDashboard({ onBack }) {
                 color="yellow"
               />
               <StatCard
-                label="Total Parlays"
-                value={Object.values(data.settlementStatus?.parlaysByStatus || {}).reduce((s, v) => s + v, 0).toLocaleString()}
+                label="Machine Parlays"
+                value={(data.houseParlays || []).length.toLocaleString()}
+                sub="last 20 builds"
                 color="purple"
               />
             </div>
@@ -775,28 +748,14 @@ export default function AdminDashboard({ onBack }) {
               <DataFreshnessSection dataFreshness={data.dataFreshness} />
             </div>
 
-            {/* Model Performance */}
+            {/* Upcoming games — every cell the tile is built from */}
+            <UpcomingInspectorSection analyses={data.upcomingAnalyses} />
+
+            {/* Model Performance — graded era only, same population as the ledger */}
             <ModelPerformanceSection modelAccuracy={data.modelAccuracy} />
 
-            <ByModeSection byMode={data.modelAccuracy?.byMode} />
-
-            {/* Recent Picks */}
+            {/* Recent Picks — the graded digest stream */}
             <RecentPicksSection recentPicks={data.recentPicks} />
-
-            {/* Calibration */}
-            <CalibrationSection
-              title="Edge Score Performance"
-              subtitle="Win rate by calculated edge score (auto-generated picks only)"
-              calibration={data.modelAccuracy?.edgeCalibration}
-            />
-            <CalibrationSection
-              title="De-Genny Confidence Calibration"
-              subtitle="Win rate by De-Genny's self-stated confidence (chat picks only)"
-              calibration={data.modelAccuracy?.chatConfidenceCalibration}
-            />
-
-            {/* Settlement Monitor */}
-            <SettlementSection settlementStatus={data.settlementStatus} />
 
             {/* Raw timestamp */}
             <p className="text-ink-700 text-xs text-center pb-4">

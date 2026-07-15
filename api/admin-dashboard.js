@@ -95,8 +95,12 @@ async function getAdminDashboard(req, res) {
       : 'all';
 
     const modelAccuracyResult = await safeQuery(async () => {
+      // Graded-era public record only (May 10 2026 onward, actionable tiers,
+      // no soccer v1). The full-history mv_model_accuracy stays reserved for
+      // calibration and the weekly review — it no longer appears on any
+      // dashboard, admin included.
       const { data, error } = await supabase
-        .from('mv_model_accuracy')
+        .from('mv_public_record')
         .select('*')
         .eq('period_bucket', period);
       if (error) throw error;
@@ -132,10 +136,7 @@ async function getAdminDashboard(req, res) {
         overall,
         bySport:   keyByValue(data.filter(r => r.dimension_type === 'sport')),
         byBetType: keyByValue(data.filter(r => r.dimension_type === 'bet_type')),
-        byMode:    keyByValue(data.filter(r => r.dimension_type === 'generate_mode')),
-        edgeCalibration:           data.filter(r => r.dimension_type === 'edge_integer').sort((a, b) => Number(a.dimension_value) - Number(b.dimension_value)),
-        edgeBuckets:               data.filter(r => r.dimension_type === 'edge_bucket'),
-        chatConfidenceCalibration: data.filter(r => r.dimension_type === 'chat_confidence').sort((a, b) => Number(a.dimension_value) - Number(b.dimension_value)),
+        byTier:    keyByValue(data.filter(r => r.dimension_type === 'tier')),
         period,
       };
     });
@@ -145,6 +146,8 @@ async function getAdminDashboard(req, res) {
       const { data, error } = await supabase
         .from('ai_suggestions')
         .select('id, session_id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, actual_outcome, created_at, last_revised_at, generate_mode')
+        .like('session_id', 'auto_digest%')
+        .not('tier', 'is', null)
         .order('created_at', { ascending: false })
         .limit(40);
       if (error) throw error;
@@ -195,31 +198,16 @@ async function getAdminDashboard(req, res) {
       return data || [];
     });
 
-    // --- 5. Settlement Status: parlays count by status ---
-    const parlayStatusResult = await safeQuery(async () => {
+    // --- 5. Upcoming game inspector: every cell the tile is built from ---
+    const upcomingAnalysesResult = await safeQuery(async () => {
       const { data, error } = await supabase
-        .from('parlays')
-        .select('status');
+        .from('game_analysis')
+        .select('game_key, sport, home_team, away_team, game_date, analysis_version, stale, expires_at, generated_at, model_used, prompt_tokens, completion_tokens, recommended_pick, recommended_side, recommended_odds, edge_score, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, calc_home_prob, calc_away_prob, implied_home_prob, implied_away_prob, calc_edge, calc_edge_side, edges, edges_raw, edge_factors, key_factors, analysis_snippet, what_changed, news_context, injury_context')
+        .gt('game_date', new Date().toISOString())
+        .order('game_date', { ascending: true })
+        .limit(30);
       if (error) throw error;
-      const counts = {};
-      for (const row of data || []) {
-        const status = row.status || 'unknown';
-        counts[status] = (counts[status] || 0) + 1;
-      }
-      return counts;
-    });
-
-    const parlayLegsResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('parlay_legs')
-        .select('outcome');
-      if (error) throw error;
-      const counts = {};
-      for (const row of data || []) {
-        const outcome = row.outcome || 'pending';
-        counts[outcome] = (counts[outcome] || 0) + 1;
-      }
-      return counts;
+      return data || [];
     });
 
     // --- 6. Data Freshness: count + max timestamp for key tables ---
@@ -279,10 +267,7 @@ async function getAdminDashboard(req, res) {
       recentRuns: recentRunsResult || [],
       recentAnalyses: recentAnalysesResult || [],
       houseParlays: houseParlaysResult || [],
-      settlementStatus: {
-        parlaysByStatus: parlayStatusResult || {},
-        legsByOutcome: parlayLegsResult || {}
-      },
+      upcomingAnalyses: upcomingAnalysesResult || [],
       dataFreshness: freshnessResults,
     });
 
