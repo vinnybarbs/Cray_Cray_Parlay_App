@@ -130,6 +130,116 @@ function WinRateBar({ won, lost }) {
 
 // ─── Sections ─────────────────────────────────────────────────────────────────
 
+// ─── Scrollable feed panel: shared shell for intel / runs / analyses ────────
+function FeedPanel({ title, sub, children, maxH = 'max-h-[420px]' }) {
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+      <div className="px-4 py-3 bg-ink-950 border-b border-ink-800">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal-pos">{title}</p>
+        {sub && <p className="text-ink-500 text-[11px] mt-0.5">{sub}</p>}
+      </div>
+      <div className={`${maxH} overflow-y-auto`}>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function IntelFeedSection({ intel }) {
+  const kindCls = {
+    injury: 'text-signal-neg bg-signal-neg-dim/30',
+    weather: 'text-sky-400 bg-sky-950/50',
+    record_mismatch: 'text-signal-pos bg-signal-pos-dim/30',
+    agent_error: 'text-ink-400 bg-ink-850',
+  }
+  const summarize = (kind, p) => {
+    if (!p) return ''
+    if (kind === 'injury') return `${p.player || '?'} (${p.status || '?'}) ${p.note || ''}`
+    if (kind === 'weather') return `${p.stadium || ''} ${p.temp_f ?? '?'}F wind ${p.wind_mph ?? '?'}mph precip ${p.precip_chance_pct ?? '?'}%`
+    if (kind === 'record_mismatch') return `ours ${p.ours || '?'} vs ${p.source || 'web'} ${p.actual || '?'}`
+    return JSON.stringify(p).slice(0, 120)
+  }
+  return (
+    <FeedPanel title="Intel feed" sub={`${intel?.length || 0} findings from the research agent, newest first`}>
+      {(!intel || intel.length === 0) ? (
+        <p className="px-4 py-8 text-center text-ink-500 text-sm">No intel filed in the current window.</p>
+      ) : intel.map((r, i) => (
+        <div key={i} className="flex items-start gap-3 px-4 py-2.5 border-t border-ink-800/60">
+          <span className={`flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold uppercase tracking-wider ${kindCls[r.kind] || 'text-ink-300 bg-ink-850'}`}>
+            {(r.kind || '?').replace('_', ' ')}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-ink-100 truncate">{r.team || (r.payload?.game || '—')}</p>
+            <p className="text-xs text-ink-400 leading-relaxed">{summarize(r.kind, r.payload)}</p>
+          </div>
+          <span className="flex-shrink-0 font-mono text-[10px] text-ink-500">{timeAgo(r.created_at)}</span>
+        </div>
+      ))}
+    </FeedPanel>
+  )
+}
+
+function PipelineRunsSection({ runs }) {
+  const [openIdx, setOpenIdx] = React.useState(null)
+  return (
+    <FeedPanel title="Pipeline runs" sub={`Last ${runs?.length || 0} cron log rows — tap a row for the raw details`}>
+      {(!runs || runs.length === 0) ? (
+        <p className="px-4 py-8 text-center text-ink-500 text-sm">No runs logged.</p>
+      ) : runs.map((r, i) => (
+        <div key={i}>
+          <button
+            onClick={() => setOpenIdx(openIdx === i ? null : i)}
+            className={`w-full flex items-center gap-3 px-4 py-2 text-left border-t border-ink-800/60 transition-colors ${openIdx === i ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}
+          >
+            <StatusDot status={r.status} />
+            <span className="font-mono text-xs text-ink-100 truncate flex-1">{r.job_name}</span>
+            <span className={`font-mono text-[10px] uppercase ${r.status === 'failed' ? 'text-signal-neg' : 'text-ink-500'}`}>{r.status}</span>
+            <span className="font-mono text-[10px] text-ink-500 flex-shrink-0 w-16 text-right">{timeAgo(r.created_at)}</span>
+          </button>
+          {openIdx === i && (
+            <pre className="px-4 py-2 bg-ink-950/60 text-[11px] text-ink-300 whitespace-pre-wrap break-all border-t border-ink-800/40">{typeof r.details === 'string' ? r.details : JSON.stringify(r.details, null, 1)}</pre>
+          )}
+        </div>
+      ))}
+    </FeedPanel>
+  )
+}
+
+function RecentAnalysesSection({ analyses }) {
+  const [openIdx, setOpenIdx] = React.useState(null)
+  return (
+    <FeedPanel title="Analysis engine output" sub={`Last ${analyses?.length || 0} game analyses — version, pick, tokens; tap for the written text`}>
+      {(!analyses || analyses.length === 0) ? (
+        <p className="px-4 py-8 text-center text-ink-500 text-sm">No analyses in the window.</p>
+      ) : analyses.map((a, i) => (
+        <div key={i}>
+          <button
+            onClick={() => setOpenIdx(openIdx === i ? null : i)}
+            className={`w-full flex items-center gap-3 px-4 py-2 text-left border-t border-ink-800/60 transition-colors ${openIdx === i ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}
+          >
+            <span className="font-mono text-[10px] text-ink-500 w-14 flex-shrink-0">{a.sport}</span>
+            <span className="text-xs text-ink-100 truncate flex-1">{a.away_team} @ {a.home_team}</span>
+            <span className="font-mono text-[10px] text-ink-400 flex-shrink-0">v{a.analysis_version}</span>
+            <span className={`font-mono text-[10px] flex-shrink-0 w-28 truncate text-right ${a.recommended_pick ? 'text-signal-pos' : 'text-ink-500'}`}>
+              {a.recommended_pick || 'preview'}
+            </span>
+            <span className="font-mono text-[10px] text-ink-500 flex-shrink-0 w-14 text-right">{timeAgo(a.generated_at)}</span>
+          </button>
+          {openIdx === i && (
+            <div className="px-4 py-2.5 bg-ink-950/60 border-t border-ink-800/40">
+              <p className="text-xs text-ink-200 leading-relaxed">{a.analysis_snippet || 'No text stored.'}</p>
+              {a.what_changed && <p className="mt-1.5 text-[11px] text-signal-pos/80">Changed: {a.what_changed}</p>}
+              <p className="mt-1.5 font-mono text-[10px] text-ink-500">
+                {a.prompt_tokens || 0} in / {a.completion_tokens || 0} out{a.stale ? ' · stale' : ''} · {a.game_key}
+              </p>
+            </div>
+          )}
+        </div>
+      ))}
+    </FeedPanel>
+  )
+}
+
 function CronHealthSection({ cronHealth, recentErrors }) {
   // Deduplicate: for each job_name keep latest entry only
   const latestByJob = {}
@@ -651,6 +761,13 @@ export default function AdminDashboard({ onBack }) {
 
             {/* System Health row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <IntelFeedSection intel={data.intel} />
+                <PipelineRunsSection runs={data.recentRuns} />
+              </div>
+              <div className="lg:col-span-2">
+                <RecentAnalysesSection analyses={data.recentAnalyses} />
+              </div>
               <CronHealthSection
                 cronHealth={data.cronHealth}
                 recentErrors={data.recentErrors}

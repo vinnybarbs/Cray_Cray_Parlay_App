@@ -140,13 +140,57 @@ async function getAdminDashboard(req, res) {
       };
     });
 
-    // --- 4. Recent Picks: last 15 from ai_suggestions ---
+    // --- 4. Recent Picks: last 40 from ai_suggestions ---
     const recentPicksResult = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('ai_suggestions')
-        .select('*')
+        .select('id, session_id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, actual_outcome, created_at, last_revised_at, generate_mode')
         .order('created_at', { ascending: false })
-        .limit(15);
+        .limit(40);
+      if (error) throw error;
+      return data || [];
+    });
+
+    // --- 4b. Intel feed: everything the research agent has filed ---
+    const intelResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('agent_intel')
+        .select('kind, team, payload, run_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    });
+
+    // --- 4c. Pipeline runs: raw scrollable cron log ---
+    const recentRunsResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('cron_job_logs')
+        .select('job_name, status, details, created_at')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    });
+
+    // --- 4d. Recent analyses: what the pick engine wrote, version by version ---
+    const recentAnalysesResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('game_analysis')
+        .select('game_key, sport, home_team, away_team, game_date, analysis_version, recommended_pick, edge_score, what_changed, analysis_snippet, model_used, prompt_tokens, completion_tokens, generated_at, stale')
+        .order('generated_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data || [];
+    });
+
+    // --- 4e. Machine parlays with the honest math ---
+    const houseParlaysResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('house_parlays')
+        .select('parlay_date, legs_count, legs, combined_odds, combined_edge_pp, model_win_prob, fair_win_prob, ev_pct, status, created_at, settled_at')
+        .order('parlay_date', { ascending: false })
+        .limit(20);
       if (error) throw error;
       return data || [];
     });
@@ -231,6 +275,10 @@ async function getAdminDashboard(req, res) {
         period: 'all',
       },
       recentPicks: recentPicksResult || [],
+      intel: intelResult || [],
+      recentRuns: recentRunsResult || [],
+      recentAnalyses: recentAnalysesResult || [],
+      houseParlays: houseParlaysResult || [],
       settlementStatus: {
         parlaysByStatus: parlayStatusResult || {},
         legsByOutcome: parlayLegsResult || {}
