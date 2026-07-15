@@ -21,7 +21,7 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          sport: { type: 'string', description: 'Sport slug: basketball_nba, basketball_ncaab, americanfootball_nfl, icehockey_nhl, baseball_mlb, soccer_epl' },
+          sport: { type: 'string', description: 'Sport name or slug — accepts nba, mlb, nfl, nhl, ncaab, epl, mls, ufc, tennis, golf, world cup, champions league, etc. Rotating tournaments (World Cup, tennis events, golf majors) resolve automatically to whatever is live.' },
           team: { type: 'string', description: 'Optional team name to filter by (e.g. "Lakers", "Duke")' },
           market_type: { type: 'string', description: 'Market type: h2h (moneyline), spreads, totals, player_points, player_rebounds, player_assists, player_pass_yds, player_rush_yds, player_receptions' },
           bookmaker: { type: 'string', description: 'Bookmaker: draftkings or fanduel. Default draftkings.' }
@@ -67,7 +67,7 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          sport: { type: 'string', description: 'Sport slug: basketball_nba, basketball_ncaab, americanfootball_nfl, etc.' },
+          sport: { type: 'string', description: 'Sport name or slug — accepts nba, mlb, world cup, tennis, etc. Rotating tournaments resolve automatically.' },
           days: { type: 'number', description: 'How many days ahead to look (1-7). Default 2.' }
         },
         required: ['sport']
@@ -162,16 +162,57 @@ const TOOLS = [
 ];
 
 // Execute tool calls against Supabase
+
+// Resolve whatever the model calls a sport ("world cup", "World Cup",
+// "soccer_fifa_world_cup", "tennis") to the slug(s) actually present in
+// odds_cache right now. Tournament keys rotate weekly, so this must NEVER
+// be a hardcoded list — that exact disease blinded this chat to the 2026
+// World Cup while the rest of the site covered it. 5-minute cache.
+let _sportSlugCache = { at: 0, slugs: [] };
+async function resolveSportSlugs(input) {
+  if (!input) return [];
+  if (Date.now() - _sportSlugCache.at > 5 * 60 * 1000) {
+    const { data } = await supabase
+      .from('odds_cache')
+      .select('sport')
+      .gt('commence_time', new Date(Date.now() - 6 * 3600e3).toISOString());
+    _sportSlugCache = { at: Date.now(), slugs: [...new Set((data || []).map(r => r.sport))] };
+  }
+  const slugs = _sportSlugCache.slugs;
+  const raw = String(input).trim().toLowerCase();
+  if (slugs.includes(raw)) return [raw];
+
+  const norm = raw.replace(/[^a-z0-9]+/g, '_');
+  const ALIASES = {
+    nba: 'basketball_nba', ncaab: 'basketball_ncaab', nfl: 'americanfootball_nfl',
+    ncaaf: 'americanfootball_ncaaf', nhl: 'icehockey_nhl', mlb: 'baseball_mlb',
+    baseball: 'baseball_mlb', epl: 'soccer_epl', premier_league: 'soccer_epl',
+    mls: 'soccer_usa_mls', ufc: 'mma_mixed_martial_arts', mma: 'mma_mixed_martial_arts',
+    world_cup: 'soccer_fifa_world_cup', fifa_world_cup: 'soccer_fifa_world_cup',
+    champions_league: 'soccer_uefa_champs_league', copa_america: 'soccer_conmebol_copa_america',
+    euros: 'soccer_uefa_european_championship',
+  };
+  if (ALIASES[norm] && slugs.includes(ALIASES[norm])) return [ALIASES[norm]];
+  if (norm === 'tennis') return slugs.filter(s => s.startsWith('tennis_'));
+  if (norm === 'golf') return slugs.filter(s => s.startsWith('golf_'));
+  if (norm === 'soccer' || norm === 'football_soccer') return slugs.filter(s => s.startsWith('soccer_'));
+  // Substring match against live slugs ("world_cup" matches soccer_fifa_world_cup)
+  const partial = slugs.filter(s => s.includes(norm) || norm.includes(s));
+  if (partial.length > 0) return partial;
+  return ALIASES[norm] ? [ALIASES[norm]] : [String(input)];
+}
+
 async function executeTool(name, args) {
   try {
     switch (name) {
       case 'search_odds': {
         const now = new Date().toISOString();
         const bookmaker = args.bookmaker || 'draftkings';
+        const sportSlugs = await resolveSportSlugs(args.sport);
         let query = supabase
           .from('odds_cache')
           .select('sport, home_team, away_team, market_type, bookmaker, outcomes, commence_time, external_game_id')
-          .eq('sport', args.sport)
+          .in('sport', sportSlugs)
           .eq('bookmaker', bookmaker)
           .gt('commence_time', now)
           .order('commence_time', { ascending: true })
@@ -407,10 +448,11 @@ async function executeTool(name, args) {
         const now = new Date().toISOString();
         const end = new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
 
+        const upcomingSlugs = await resolveSportSlugs(args.sport);
         const { data } = await supabase
           .from('odds_cache')
           .select('home_team, away_team, commence_time, market_type, outcomes')
-          .eq('sport', args.sport)
+          .in('sport', upcomingSlugs)
           .eq('market_type', 'h2h')
           .eq('bookmaker', 'draftkings')
           .gt('commence_time', now)
