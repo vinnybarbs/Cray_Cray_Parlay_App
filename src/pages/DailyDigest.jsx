@@ -337,18 +337,24 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                 <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-3">Current Lines</div>
                 {hasOdds ? (
                   <div className="space-y-2">
-                    {odds.map((line, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs">
-                        <span className="text-ink-400 capitalize">{line.market_type || 'Line'}</span>
-                        <div className="flex gap-3 text-ink-200">
-                          {line.spread != null && <span>Spread: {line.spread > 0 ? '+' : ''}{line.spread}</span>}
-                          {line.total != null && <span>O/U: {line.total}</span>}
-                          {line.moneyline_home != null && (
-                            <span>ML: {line.moneyline_home > 0 ? '+' : ''}{line.moneyline_home} / {line.moneyline_away > 0 ? '+' : ''}{line.moneyline_away}</span>
-                          )}
+                    {/* Rows are {market, bookmaker, outcomes:[{name, price, point?}]} —
+                        prices live inside outcomes, not flat columns. */}
+                    {odds.map((line, i) => {
+                      const marketLabel = { h2h: 'Moneyline', spreads: 'Spread', totals: 'Total' }[line.market] || line.market || 'Line'
+                      const fmtP = (p) => (p > 0 ? `+${p}` : `${p}`)
+                      return (
+                        <div key={i} className="flex items-start justify-between gap-3 text-xs">
+                          <span className="text-ink-400 flex-shrink-0">{marketLabel} <span className="text-ink-600">· {line.bookmaker}</span></span>
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-ink-200 justify-end">
+                            {(line.outcomes || []).map((o, j) => (
+                              <span key={j} className="whitespace-nowrap">
+                                {o.name}{o.point != null ? ` ${o.point > 0 ? '+' : ''}${o.point}` : ''} <span className="font-mono">{fmtP(o.price)}</span>
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
                   <div className="flex flex-wrap gap-2">
