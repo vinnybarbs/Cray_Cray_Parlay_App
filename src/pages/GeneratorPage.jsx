@@ -39,11 +39,46 @@ function formatOdds(odds) {
   return n > 0 ? `+${n}` : String(n)
 }
 
+// When no side cleared the 2pp pick bar, the edges dict still tells a
+// story: the best available side (usually a Skip) and any genuinely
+// negative side (a Trap to fade). Spotting and explaining traps is the
+// product — a blank "Preview" row throws that away.
+function sideLabel(side, game) {
+  const map = {
+    home_ml: `${game.home_team} ML`,
+    away_ml: `${game.away_team} ML`,
+    home_spread: `${game.home_team} spread`,
+    away_spread: `${game.away_team} spread`,
+    over: 'Over', under: 'Under',
+  }
+  return map[side] || side
+}
+
+function edgeStory(game) {
+  const edges = game.edges
+  if (!edges) return null
+  const entries = Object.entries(edges).filter(([, v]) => v != null)
+  if (entries.length === 0) return null
+  const toPp = (v) => Math.round(v * 1000) / 10
+  const sorted = [...entries].sort((a, b) => b[1] - a[1])
+  const story = { bestSide: sorted[0][0], bestPp: toPp(sorted[0][1]) }
+  const [worstSide, worstVal] = sorted[sorted.length - 1]
+  if (toPp(worstVal) <= -2) {
+    story.trapSide = worstSide
+    story.trapPp = toPp(worstVal)
+  }
+  if (story.bestPp === 0 && !story.trapSide) return null
+  return story
+}
+
 function PickRow({ row, isOpen, onToggle }) {
-  // pp null = a preview (soccer, or a game the model has no data for):
-  // analysis exists, no graded side. Still content — show it honestly.
-  const isPreview = row.pp == null
-  const tier = edgeTier(row.pp)
+  // pp null = no published pick. If the game still has edge data, surface
+  // the story (best side's tier, trap callouts) instead of a blank preview.
+  // Truly no-data games (soccer, UFC) stay honest previews.
+  const story = row.pp == null ? edgeStory(row.game) : null
+  const effPp = row.pp != null ? row.pp : story ? story.bestPp : null
+  const isPreview = effPp == null
+  const tier = edgeTier(effPp)
   const odds = formatOdds(row.odds)
   return (
     <div>
@@ -51,16 +86,22 @@ function PickRow({ row, isOpen, onToggle }) {
       <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${isPreview ? 'text-ink-300 bg-ink-850 shadow-hairline' : `${tier.color} ${tier.bg}`}`}>
         {isPreview ? 'Preview' : tier.label}
       </span>
-      <span className={`flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : row.pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-        {isPreview ? '—' : formatPp(row.pp)}
+      <span className={`flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
+        {isPreview ? '—' : formatPp(effPp)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
-          {row.game.recommended_pick || `${row.game.away_team} @ ${row.game.home_team}`}
+          {row.game.recommended_pick
+            || (story ? `best side: ${sideLabel(story.bestSide, row.game)}` : `${row.game.away_team} @ ${row.game.home_team}`)}
           {odds && <span className="ml-2 font-mono text-xs text-ink-300">{odds}</span>}
         </div>
+        {story?.trapSide && (
+          <div className="text-xs text-signal-neg truncate font-mono">
+            trap · fade {sideLabel(story.trapSide, row.game)} ({formatPp(story.trapPp)})
+          </div>
+        )}
         <div className="text-xs text-ink-400 truncate">
-          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : <> · analysis, no graded side</>}
+          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : story ? <> · {row.game.away_team} @ {row.game.home_team} · below the 2pp pick bar</> : <> · analysis, no graded side</>}
           {row.game.game_date && <> · {toMountainTime(row.game.game_date)} MT</>}
         </div>
       </div>
