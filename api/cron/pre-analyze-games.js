@@ -610,6 +610,9 @@ CRITICAL RULES:
   is NOT provided in the matchup data above, DO NOT write a specific value for it.
   If the data isn't there, either omit that dimension or say "not available" explicitly.
   It is better to have shorter analysis than confident-sounding invented numbers.
+- NEVER name a tournament round or stage (final, semifinal, third-place match,
+  quarterfinal) unless the matchup data or news above EXPLICITLY states it for
+  THIS game. Calling a third-place playoff "the final" destroys credibility.
 
 Respond in EXACTLY this JSON format (no markdown):
 {
