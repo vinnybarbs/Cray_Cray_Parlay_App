@@ -1244,94 +1244,6 @@ function GolfLeaderboard({ golf }) {
   )
 }
 
-// ─── ModelPerformance ────────────────────────────────────────────────────────
-
-function ModelPerformance({ accuracy }) {
-  const [period, setPeriod] = React.useState('last_7d')
-  const data = accuracy?.[period]
-  if (!data || !data.overall) return null
-
-  const { overall, bySport, byBetType } = data
-  const sports = Object.entries(bySport || {}).sort((a, b) => (b[1].winRate || 0) - (a[1].winRate || 0))
-  const betTypes = Object.entries(byBetType || {}).sort((a, b) => (b[1].winRate || 0) - (a[1].winRate || 0))
-
-  const periodLabel = period === 'last_7d' ? 'last 7 days'
-    : period === 'last_30d' ? 'last 30 days'
-    : 'all time'
-
-  const pills = [
-    { key: 'last_7d',  label: '7d' },
-    { key: 'last_30d', label: '30d' },
-    { key: 'all',      label: 'All' },
-  ]
-
-  const rateColor = (r) => r >= 55 ? 'text-signal-pos' : r >= 50 ? 'text-ink-100' : 'text-signal-neg'
-  const barColor = (r) => r >= 55 ? 'bg-signal-pos/70' : r >= 50 ? 'bg-ink-400' : 'bg-signal-neg/70'
-
-  const StatRows = ({ title, entries, labelFor }) => (
-    <div>
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-2">{title}</p>
-      <div className="space-y-2.5">
-        {entries.map(([key, stats]) => (
-          <div key={key}>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-sm text-ink-200 font-medium truncate">{labelFor(key)}</span>
-              <span className="font-mono text-xs text-ink-500 tabular-nums ml-auto">{stats.won}–{stats.lost}</span>
-              <span className={`font-mono text-sm font-bold tabular-nums w-12 text-right ${rateColor(stats.winRate)}`}>
-                {stats.winRate != null ? `${stats.winRate}%` : '—'}
-              </span>
-            </div>
-            <div className="h-1 mt-1 bg-ink-850 rounded-full overflow-hidden">
-              {stats.winRate != null && (
-                <div className={`h-full rounded-full ${barColor(stats.winRate)}`} style={{ width: `${Math.min(stats.winRate, 100)}%` }} />
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-
-  return (
-    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
-      <div className="px-4 py-3 bg-ink-950 flex items-center gap-3">
-        <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos">Model performance · settled picks only</span>
-        <div className="ml-auto flex bg-ink-900 rounded-sharp p-0.5 shadow-hairline">
-          {pills.map(p => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1 font-mono text-xs rounded-sharp transition-colors ${period === p.key ? 'bg-signal-pos text-ink-950 font-bold' : 'text-ink-400 hover:text-ink-100'}`}
-            >{p.label}</button>
-          ))}
-        </div>
-      </div>
-
-      <div className="p-4 md:p-6">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-5">
-          <span className={`text-4xl font-bold font-mono tabular-nums ${rateColor(overall.winRate)}`}>
-            {overall.winRate != null ? `${overall.winRate}%` : '—'}
-          </span>
-          <span className="font-mono text-sm text-ink-300 tabular-nums">{overall.won}–{overall.lost}</span>
-          <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">{overall.total} picks settled · {periodLabel}</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          {sports.length > 0 && <StatRows title="By sport" entries={sports} labelFor={(s) => getSportMeta(s).label} />}
-          {betTypes.length > 0 && <StatRows title="By bet type" entries={betTypes} labelFor={(b) => b} />}
-        </div>
-      </div>
-
-      <button
-        onClick={() => { window.location.hash = '#/ledger' }}
-        className="w-full px-4 py-2.5 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 hover:text-signal-pos transition-colors text-left"
-      >
-        Units, ROI, and the tier table live on The House Ledger — every pick, losers included
-      </button>
-    </div>
-  )
-}
-
 // ─── QuietDayCard — fallback hero when nothing clears the feature bar ────────
 // The bar stays at 7pp; on a quiet slate the honest move is to say so and
 // hand the user a next step, not to leave a hole where the hero was.
@@ -1503,14 +1415,21 @@ export default function DailyDigest({ onBack }) {
     return best
   }, [data, pickOfTheDay])
 
-  // 30d hit-rate for the hero trust anchor — prefer 30d, fall back to 7d, then all-time.
-  const heroHitRate = data?.modelAccuracy?.last_30d?.overall?.winRate != null
-    ? { rate: data.modelAccuracy.last_30d.overall.winRate, label: '30d' }
-    : data?.modelAccuracy?.last_7d?.overall?.winRate != null
-      ? { rate: data.modelAccuracy.last_7d.overall.winRate, label: '7d' }
-      : data?.modelAccuracy?.all?.overall?.winRate != null
-        ? { rate: data.modelAccuracy.all.overall.winRate, label: 'all-time' }
-        : null
+  // Hero trust anchor reads Sharp Take — the ticket. Prefer 30d, fall back
+  // to 7d then all-time; fall back to the overall record only if tier data
+  // is absent. The full table lives on the ledger, not here.
+  const heroHitRate = (() => {
+    const periods = [['last_30d', '30d'], ['last_7d', '7d'], ['all', 'all-time']]
+    for (const [period, label] of periods) {
+      const st = data?.modelAccuracy?.[period]?.byTier?.['Sharp Take']
+      if (st?.winRate != null) return { name: 'Sharp Take', rate: st.winRate, label }
+    }
+    for (const [period, label] of periods) {
+      const o = data?.modelAccuracy?.[period]?.overall
+      if (o?.winRate != null) return { name: 'Model', rate: o.winRate, label }
+    }
+    return null
+  })()
 
   const handleOpenDeepResearch = useCallback((game, gameKey) => {
     setDeepResearchTarget({ game, gameKey })
@@ -1556,7 +1475,7 @@ export default function DailyDigest({ onBack }) {
             <div className="flex items-center gap-4 flex-shrink-0">
               {heroHitRate && (
                 <span>
-                  Model · <span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span> · {heroHitRate.label}
+                  {heroHitRate.name} · <span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span> · {heroHitRate.label}
                 </span>
               )}
               <button
@@ -1637,11 +1556,6 @@ export default function DailyDigest({ onBack }) {
         {/* Sport sections */}
         {!loading && !error && data && (
           <>
-            {/* Model Performance — right after hero */}
-            {(data.modelAccuracy?.last_7d?.overall || data.modelAccuracy?.last_30d?.overall || data.modelAccuracy?.all?.overall) && (
-              <ModelPerformance accuracy={data.modelAccuracy} />
-            )}
-
             {/* Yesterday's board — the same settled receipts the dark-slate
                 card offers, one button away on normal days too. */}
             {sportSections.length > 0 && (

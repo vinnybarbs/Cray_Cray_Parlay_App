@@ -184,6 +184,7 @@ async function getDigest(req, res) {
           },
           bySport:   buildBreakdown(rows.filter(r => r.dimension_type === 'sport')),
           byBetType: buildBreakdown(rows.filter(r => r.dimension_type === 'bet_type')),
+          byTier:    buildBreakdown(rows.filter(r => r.dimension_type === 'tier')),
         };
       }
       return byPeriod;

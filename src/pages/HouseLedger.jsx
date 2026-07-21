@@ -135,7 +135,7 @@ export default function HouseLedger() {
             Every pick. Published before. Settled after.
           </h1>
           <p className="mt-3 text-ink-300 max-w-2xl leading-relaxed text-sm">
-            This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The tier table shows where the edges actually live.
+            This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The headline is the Sharp Take record — the tier this product exists to find. The full tier table shows where the rest of the edges live.
           </p>
         </div>
 
@@ -151,27 +151,39 @@ export default function HouseLedger() {
 
         {!loading && !error && data && (
           <>
-            {/* Overall record */}
-            {overall && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Record (all tiers)</p>
-                  <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-ink-100">{overall.won}–{overall.lost}{overall.push > 0 && <span className="text-ink-400 text-base">–{overall.push}</span>}</p>
+            {/* Sharp Take is the headline number — it is the product. The
+                all-tier record drops to one line; the full table follows. */}
+            {(byTier['Sharp Take'] || overall) && (() => {
+              const sharp = byTier['Sharp Take']
+              const h = sharp || overall
+              return (
+                <div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-signal-pos">{sharp ? 'Sharp Take record' : 'Record (all tiers)'}</p>
+                      <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-ink-100">{h.won}–{h.lost}{h.push > 0 && <span className="text-ink-400 text-base">–{h.push}</span>}</p>
+                    </div>
+                    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Hit rate</p>
+                      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${h.winRate >= 55 ? 'text-signal-pos' : h.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{h.winRate != null ? `${h.winRate}%` : '—'}</p>
+                    </div>
+                    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">ROI at 1u stakes</p>
+                      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${h.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{h.roi != null ? `${h.roi >= 0 ? '+' : ''}${h.roi}%` : '—'}</p>
+                    </div>
+                    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Units</p>
+                      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${h.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(h.units)}</p>
+                    </div>
+                  </div>
+                  {sharp && overall && (
+                    <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+                      All graded tiers: {overall.won}–{overall.lost}{overall.winRate != null ? ` (${overall.winRate}%)` : ''} · {fmtUnits(overall.units)} · full table below
+                    </p>
+                  )}
                 </div>
-                <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Hit rate</p>
-                  <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${overall.winRate >= 55 ? 'text-signal-pos' : overall.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{overall.winRate != null ? `${overall.winRate}%` : '—'}</p>
-                </div>
-                <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">ROI at 1u stakes</p>
-                  <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${overall.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{overall.roi != null ? `${overall.roi >= 0 ? '+' : ''}${overall.roi}%` : '—'}</p>
-                </div>
-                <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Units</p>
-                  <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${overall.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(overall.units)}</p>
-                </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Per-tier record */}
             {tierOrder.length > 0 && (
@@ -246,8 +258,18 @@ export default function HouseLedger() {
             {data.parlays?.length > 0 && (
               <div>
                 <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Machine-built parlays</h2>
+                {(() => {
+                  const settled = data.parlays.filter(p => p.status === 'won' || p.status === 'lost')
+                  const won = settled.filter(p => p.status === 'won').length
+                  if (settled.length === 0) return null
+                  return (
+                    <p className="font-mono text-xs text-ink-300 mb-1 tabular-nums">
+                      Parlay record: <span className="font-bold text-ink-100">{won}–{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own — never mixed into the pick record
+                    </p>
+                  )
+                })()}
                 <p className="text-sm text-ink-300 mb-4 max-w-2xl">
-                  Parlays the machine assembles from its own highest-edge legs, cross-game only, published before the first pitch and settled here win or lose.
+                  Parlays the machine assembles from its own highest-edge legs, cross-game only, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
                 </p>
                 <div className="grid md:grid-cols-2 gap-3">
                   {data.parlays.map(p => <ParlayCard key={p.id} parlay={p} />)}
