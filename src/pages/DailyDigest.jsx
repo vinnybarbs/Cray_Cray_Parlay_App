@@ -1099,6 +1099,48 @@ function fmtGolfPrice(price) {
   return n > 0 ? `+${n}` : String(n)
 }
 
+function OnDeckRail({ onDeck }) {
+  const [open, setOpen] = useState(false)
+  const sports = Object.entries(onDeck || {}).filter(([, games]) => games.length > 0)
+  if (sports.length === 0) return null
+  const total = sports.reduce((s, [, g]) => s + g.length, 0)
+  const fmtMl = (v) => v == null ? '—' : v > 0 ? `+${v}` : String(v)
+  const fmtDay = (iso) => new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/Denver', weekday: 'short', month: 'short', day: 'numeric' })
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-ink-850 transition-colors text-left"
+      >
+        <span className="text-sm font-semibold text-ink-100">On deck</span>
+        <span className="text-xs text-ink-400 truncate">
+          {total} games with live lines · {sports.map(([s, g]) => `${s} ${g.length}`).join(' · ')}
+        </span>
+        <span className="ml-auto text-ink-500 text-xs flex-shrink-0">{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div className="border-t border-ink-800 max-h-[420px] overflow-y-auto">
+          {sports.map(([sport, games]) => (
+            <div key={sport}>
+              <div className="px-4 py-1.5 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.18em] text-ink-500">{sport}</div>
+              {games.map((g, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-2 border-t border-ink-800/50">
+                  <span className="text-sm text-ink-100 truncate flex-1">{g.away_team} @ {g.home_team}</span>
+                  <span className="font-mono text-xs text-ink-400 tabular-nums flex-shrink-0">{fmtMl(g.ml_away)} / {fmtMl(g.ml_home)}</span>
+                  <span className="font-mono text-[10px] text-ink-500 flex-shrink-0 w-24 text-right">{fmtDay(g.commence_time)}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+          <p className="px-4 py-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 border-t border-ink-800/50">
+            lines live now · full analysis begins 3 days before each game
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GolfFieldBoard({ field }) {
   const [expanded, setExpanded] = useState(false)
   const [openNote, setOpenNote] = useState(null)
@@ -1677,6 +1719,10 @@ export default function DailyDigest({ onBack }) {
             {/* Golf — a side dish, not the main course. One collapsed line at
                 the bottom of the sports list; the field boards live inside. */}
             {data.golf && <GolfLeaderboard golf={data.golf} />}
+
+            {/* On deck — the wall of future games the books already price.
+                The board is never "thin", the window is just honest. */}
+            <OnDeckRail onDeck={data.onDeck} />
 
             {/* Bottom CTA — primary action (Chat) gets the amber fill; secondary (Generator) stays ghost so the eye lands on the primary */}
             <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 flex flex-col sm:flex-row items-center justify-center gap-3">

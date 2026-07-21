@@ -279,6 +279,59 @@ async function getDigest(req, res) {
       }
     });
 
+    // On Deck — games with odds beyond the 3-day analysis window. The books
+    // post weeks ahead; the board looked "thin" because this wall of real
+    // data was invisible until games entered the window.
+    const onDeckResult = await safeQuery(async () => {
+      const windowEnd = new Date(Date.now() + 3 * 24 * 3600e3).toISOString();
+      const horizon = new Date(Date.now() + 14 * 24 * 3600e3).toISOString();
+      const { data, error } = await supabase
+        .from('odds_cache')
+        .select('sport, home_team, away_team, commence_time, outcomes, bookmaker')
+        .eq('market_type', 'h2h')
+        .gt('commence_time', windowEnd)
+        .lt('commence_time', horizon)
+        .order('commence_time', { ascending: true })
+        .limit(400);
+      if (error) throw error;
+
+      const seen = new Map();
+      for (const row of data || []) {
+        const key = `${row.sport}|${row.away_team}|${row.home_team}|${String(row.commence_time).slice(0, 10)}`;
+        if (seen.has(key) && row.bookmaker !== 'draftkings') continue;
+        const outcomes = typeof row.outcomes === 'string' ? JSON.parse(row.outcomes) : (row.outcomes || []);
+        const home = outcomes.find(o => o.name === row.home_team);
+        const away = outcomes.find(o => o.name === row.away_team);
+        seen.set(key, {
+          sport: row.sport,
+          home_team: row.home_team,
+          away_team: row.away_team,
+          commence_time: row.commence_time,
+          ml_home: home?.price ?? null,
+          ml_away: away?.price ?? null,
+        });
+      }
+      const bySport = {};
+      for (const g of seen.values()) {
+        const label = g.sport.startsWith('tennis_') ? 'Tennis'
+          : g.sport === 'soccer_fifa_world_cup' ? 'World Cup'
+          : g.sport === 'soccer_epl' ? 'EPL'
+          : g.sport === 'soccer_usa_mls' ? 'MLS'
+          : g.sport === 'baseball_mlb' ? 'MLB'
+          : g.sport === 'basketball_nba' ? 'NBA'
+          : g.sport === 'basketball_ncaab' ? 'NCAAB'
+          : g.sport === 'americanfootball_nfl' ? 'NFL'
+          : g.sport === 'americanfootball_ncaaf' ? 'NCAAF'
+          : g.sport === 'icehockey_nhl' ? 'NHL'
+          : g.sport === 'mma_mixed_martial_arts' ? 'UFC'
+          : g.sport.startsWith('soccer_') ? 'Soccer' : g.sport;
+        (bySport[label] ??= []).push({ ...g, sport: label });
+      }
+      // Cap per sport so NFL's 75 openers don't swamp the rail.
+      for (const k of Object.keys(bySport)) bySport[k] = bySport[k].slice(0, 16);
+      return bySport;
+    });
+
     // First game time for countdown
     const firstGameResult = await safeQuery(async () => {
       const now = new Date().toISOString();
@@ -301,6 +354,7 @@ async function getDigest(req, res) {
       modelAccuracy: modelAccuracyResult || { last_7d: null, last_30d: null, all: null },
       upcomingCounts: upcomingCountResult || {},
       firstGameTime: firstGameResult || null,
+      onDeck: onDeckResult || {},
       golf: golfResult || null,
     });
   } catch (err) {

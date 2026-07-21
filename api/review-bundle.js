@@ -7,10 +7,14 @@ const { supabase } = require('../lib/middleware/supabaseAuth.js');
 
 module.exports = async function reviewBundle(req, res) {
   try {
-    const { data: cfg } = await supabase
-      .from('app_config').select('value').eq('key', 'report_secret').single();
+    // Two accepted read-only secrets: the original report_secret (weekly
+    // review) and report_secret_2 (daily routine — embedded in its task
+    // prompt so scheduled runs need no database connector).
+    const { data: cfgRows } = await supabase
+      .from('app_config').select('key, value').in('key', ['report_secret', 'report_secret_2']);
+    const accepted = new Set((cfgRows || []).map(r => r.value).filter(Boolean));
     const provided = req.headers['x-report-secret'] || req.query.secret;
-    if (!cfg?.value || provided !== cfg.value) {
+    if (accepted.size === 0 || !provided || !accepted.has(provided)) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 

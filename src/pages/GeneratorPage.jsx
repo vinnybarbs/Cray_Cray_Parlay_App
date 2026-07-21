@@ -75,8 +75,9 @@ function PickRow({ row, isOpen, onToggle }) {
   // pp null = no published pick. If the game still has edge data, surface
   // the story (best side's tier, trap callouts) instead of a blank preview.
   // Truly no-data games (soccer, UFC) stay honest previews.
-  const story = row.pp == null ? edgeStory(row.game) : null
+  const story = edgeStory(row.game)
   const effPp = row.pp != null ? row.pp : story ? story.bestPp : null
+  const showBestSide = row.pp == null && story
   const isPreview = effPp == null
   const tier = edgeTier(effPp)
   const odds = formatOdds(row.odds)
@@ -92,7 +93,7 @@ function PickRow({ row, isOpen, onToggle }) {
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
           {row.game.recommended_pick
-            || (story ? `best side: ${sideLabel(story.bestSide, row.game)}` : `${row.game.away_team} @ ${row.game.home_team}`)}
+            || (showBestSide ? `best side: ${sideLabel(story.bestSide, row.game)}` : `${row.game.away_team} @ ${row.game.home_team}`)}
           {odds && <span className="ml-2 font-mono text-xs text-ink-300">{odds}</span>}
         </div>
         {story?.trapSide && (
@@ -101,7 +102,7 @@ function PickRow({ row, isOpen, onToggle }) {
           </div>
         )}
         <div className="text-xs text-ink-400 truncate">
-          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : story ? <> · {row.game.away_team} @ {row.game.home_team} · below the 2pp pick bar</> : <> · analysis, no graded side</>}
+          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} @ {row.game.home_team} · below the 2pp pick bar</> : <> · analysis, no graded side</>}
           {row.game.game_date && <> · {toMountainTime(row.game.game_date)} MT</>}
         </div>
       </div>
