@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { edgeTier, formatPp } from '../lib/tiers'
 import { API_BASE_URL as API_BASE } from '../config'
+import { fmtGameDateTime } from '../lib/gameTime'
 
 // Yesterday's board — rendered inside the dark-slate empty states on the
 // Digest and The Board. When today has nothing to grade, show what the
@@ -64,7 +65,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
     : null
 
   const fmtPublished = (iso) => iso
-    ? new Date(iso).toLocaleString('en-US', { timeZone: 'America/Denver', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' MT'
+    ? fmtGameDateTime(iso)
     : null
 
   return (

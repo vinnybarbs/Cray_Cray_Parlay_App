@@ -40,26 +40,7 @@ const ANALYSIS_SPORT_TO_CODE = {
   soccer_usa_mls: 'MLS',
 }
 
-function toMountainTime(isoString) {
-  if (!isoString) return null
-  return new Date(isoString).toLocaleString('en-US', {
-    timeZone: 'America/Denver',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-}
-
-function formatFullDate(isoString) {
-  const d = isoString ? new Date(isoString) : new Date()
-  return d.toLocaleDateString('en-US', {
-    timeZone: 'America/Denver',
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
+import { fmtGameDateTime, fmtGameDay, fmtFullDate as formatFullDate } from '../lib/gameTime'
 
 function edgeBadgeClass(score) {
   if (score == null) return 'bg-ink-800 text-ink-300'
@@ -241,7 +222,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
               {game.away_team} <span className="text-ink-400">@</span> {game.home_team}
             </h2>
             {game.game_date && (
-              <div className="text-xs text-ink-400 mt-0.5">{toMountainTime(game.game_date)} MT</div>
+              <div className="text-xs text-ink-400 mt-0.5">{fmtGameDateTime(game.game_date)}</div>
             )}
           </div>
           <button
@@ -663,7 +644,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               </div>
             )}
             {game.game_date && (
-              <div className="font-mono text-[11px] text-ink-500 mt-0.5 tabular-nums">{toMountainTime(game.game_date)} MT</div>
+              <div className="font-mono text-[11px] text-ink-500 mt-0.5 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
             )}
           </div>
           <EdgeChip signedPp={signedPp} />
@@ -994,7 +975,7 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
           <div className="min-w-0">
             <div className="font-mono text-sm text-ink-300 tracking-tight tabular-nums">
               {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
-              {game.game_date && <span className="text-ink-500"> · {toMountainTime(game.game_date)} MT</span>}
+              {game.game_date && <span className="text-ink-500"> · {fmtGameDateTime(game.game_date)}</span>}
             </div>
             <div className="mt-2 font-mono text-2xl md:text-3xl font-bold text-signal-pos tabular-nums tracking-tight leading-tight">
               {game.recommended_pick}
@@ -1105,7 +1086,6 @@ function OnDeckRail({ onDeck }) {
   if (sports.length === 0) return null
   const total = sports.reduce((s, [, g]) => s + g.length, 0)
   const fmtMl = (v) => v == null ? '—' : v > 0 ? `+${v}` : String(v)
-  const fmtDay = (iso) => new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/Denver', weekday: 'short', month: 'short', day: 'numeric' })
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
       <button
@@ -1127,7 +1107,7 @@ function OnDeckRail({ onDeck }) {
                 <div key={i} className="flex items-center gap-3 px-4 py-2 border-t border-ink-800/50">
                   <span className="text-sm text-ink-100 truncate flex-1">{g.away_team} @ {g.home_team}</span>
                   <span className="font-mono text-xs text-ink-400 tabular-nums flex-shrink-0">{fmtMl(g.ml_away)} / {fmtMl(g.ml_home)}</span>
-                  <span className="font-mono text-[10px] text-ink-500 flex-shrink-0 w-24 text-right">{fmtDay(g.commence_time)}</span>
+                  <span className="font-mono text-[10px] text-ink-500 flex-shrink-0 w-24 text-right">{fmtGameDay(g.commence_time)}</span>
                 </div>
               ))}
             </div>
@@ -1689,7 +1669,7 @@ export default function DailyDigest({ onBack }) {
                 </p>
                 {data.firstGameTime && (
                   <p className="mt-4 font-mono text-sm text-signal-pos">
-                    Next slate: {new Date(data.firstGameTime).toLocaleString('en-US', { timeZone: 'America/Denver', weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} MT
+                    Next slate: {fmtGameDateTime(data.firstGameTime)}
                   </p>
                 )}
                 {Object.entries(data.upcomingCounts || {}).filter(([, n]) => n > 0).length > 0 && (

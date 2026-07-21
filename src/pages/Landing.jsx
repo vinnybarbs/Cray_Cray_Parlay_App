@@ -3,6 +3,7 @@ import { tierRange } from '../lib/tiers'
 
 // API_BASE matches the rest of the app — Railway in prod, env override locally.
 import { API_BASE_URL as API_BASE } from '../config'
+import { fmtGameDateTime } from '../lib/gameTime'
 
 // ─── Landing — public marketing surface ────────────────────────────────────
 // Concept: "Trading terminal as marketing page." Bloomberg-severity layout
@@ -587,10 +588,7 @@ function SnapshotTerminal({ tierStats }) {
   const decided = sharpTake ? sharpTake.wins + sharpTake.losses : 0
   const tr = decided >= 10 ? sharpTake : null
 
-  const gameTime = pick?.gameDate ? new Date(pick.gameDate).toLocaleString('en-US', {
-    weekday: 'short', hour: 'numeric', minute: '2-digit',
-    timeZone: 'America/New_York',
-  }) + ' ET' : null
+  const gameTime = pick?.gameDate ? fmtGameDateTime(pick.gameDate) : null
   const pp = pick?.edgePp != null ? Number(pick.edgePp) : null
   const ppText = pp != null ? `${pp >= 0 ? '+' : '−'}${Math.abs(pp).toFixed(1)}` : null
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { fmtGameDateTime } from '../lib/gameTime'
 
 // Helper function to get short tagline (edge-focused)
 const getShortTagline = (pick) => {
@@ -79,10 +80,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
   const propMeta = parsePlayerPropPick(pick)
   const formatDate = (dateString) => {
     if (!dateString) return 'TBD'
-    const date = new Date(dateString)
-    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Denver' })
-    const timePart = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Denver' })
-    return `${datePart} • ${timePart}`
+    return fmtGameDateTime(dateString)
   }
 
   const getConfidenceColor = (confidence) => {

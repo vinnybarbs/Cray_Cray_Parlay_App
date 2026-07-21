@@ -21,16 +21,7 @@ const MIN_TIER_OPTIONS = [
   { key: 'sharp',  label: 'Sharp Take', min: 10 },
 ]
 
-function toMountainTime(isoString) {
-  if (!isoString) return null
-  return new Date(isoString).toLocaleString('en-US', {
-    timeZone: 'America/Denver',
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  })
-}
+import { fmtGameDateTime } from '../lib/gameTime'
 
 function formatOdds(odds) {
   if (odds == null) return null
@@ -103,7 +94,7 @@ function PickRow({ row, isOpen, onToggle }) {
         )}
         <div className="text-xs text-ink-400 truncate">
           {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} @ {row.game.home_team} · below the 2pp pick bar</> : <> · analysis, no graded side</>}
-          {row.game.game_date && <> · {toMountainTime(row.game.game_date)} MT</>}
+          {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
         </div>
       </div>
       <span className={`flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider ${isPreview ? 'text-ink-500' : tier.color}`}>
@@ -276,7 +267,7 @@ export default function GeneratorPage() {
             </p>
             {data?.firstGameTime && (
               <p className="mt-4 font-mono text-sm text-signal-pos">
-                Next slate: {new Date(data.firstGameTime).toLocaleString('en-US', { timeZone: 'America/Denver', weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} MT
+                Next slate: {fmtGameDateTime(data.firstGameTime)}
               </p>
             )}
             {Object.entries(data?.upcomingCounts || {}).filter(([, n]) => n > 0).length > 0 && (

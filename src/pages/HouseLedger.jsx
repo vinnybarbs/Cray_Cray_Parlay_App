@@ -9,14 +9,15 @@ import { API_BASE_URL as API_BASE } from '../config'
 // time: every pick published before the game, settled after, losers included,
 // ROI and units alongside win rate. Anyone can read it, signed in or not.
 
+import { fmtGameDateTime } from '../lib/gameTime'
+
 function fmtDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { timeZone: 'America/Denver', month: 'short', day: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function fmtDateTime(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-US', { timeZone: 'America/Denver', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
+  return fmtGameDateTime(iso) || '—'
 }
 
 function fmtOdds(odds) {
@@ -74,8 +75,8 @@ function ParlayCard({ parlay }) {
         ) : (
           <>combined edge +{Number(parlay.combined_edge_pp).toFixed(1)}pp</>
         )}
-        {' '}· published {fmtDateTime(parlay.created_at)} MT
-        {parlay.settled_at && <> · settled {fmtDateTime(parlay.settled_at)} MT</>}
+        {' '}· published {fmtDateTime(parlay.created_at)}
+        {parlay.settled_at && <> · settled {fmtDateTime(parlay.settled_at)}</>}
       </div>
     </div>
   )
@@ -266,7 +267,7 @@ export default function HouseLedger() {
                       <span className="text-ink-100 font-medium truncate">{p.pick}</span>
                       <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
                       {p.edge_pp != null && <span className="font-mono text-signal-pos/80 tabular-nums flex-shrink-0">+{Number(p.edge_pp).toFixed(1)}pp</span>}
-                      <span className="ml-auto font-mono text-[10px] text-ink-500 flex-shrink-0">published {fmtDateTime(p.created_at)} MT</span>
+                      <span className="ml-auto font-mono text-[10px] text-ink-500 flex-shrink-0">published {fmtDateTime(p.created_at)}</span>
                     </div>
                   ))}
                 </div>
