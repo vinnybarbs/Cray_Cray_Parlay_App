@@ -1,0 +1,5 @@
+-- The 10:00 UTC morning sweep verified records the 10:30 standings sync
+-- hadn't refreshed yet after overnight games (16 phantom mismatches Sun
+-- 7/19, 6 on Tue 7/21, all self-clearing by evening). Rescheduled
+-- data_integrity_morning to 10:45 UTC, after the sync. Applied to prod
+-- 2026-07-21 via MCP.
