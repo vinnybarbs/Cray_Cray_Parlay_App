@@ -1,6 +1,6 @@
 // Read-only pipeline vitals for the daily 6am sanity-check routine (a
 // scheduled Claude agent, same pattern as review-bundle). Auth: the shared
-// report_secret from app_config — reads aggregates only, can't trigger jobs.
+// report_secret from app_config. Reads aggregates only, can't trigger jobs.
 //
 // The checks exist because failures here have historically been SILENT:
 // the 7/11 Anthropic migration truncated every analysis response and the
@@ -26,7 +26,7 @@ function slugToSport(slug) {
 module.exports = async function pipelineHealth(req, res) {
   try {
     // Two accepted read-only secrets: the original report_secret (weekly
-    // review) and report_secret_2 (daily routine — embedded in its task
+    // review) and report_secret_2 (daily routine, embedded in its task
     // prompt so scheduled runs need no database connector).
     const { data: cfgRows } = await supabase
       .from('app_config').select('key, value').in('key', ['report_secret', 'report_secret_2']);

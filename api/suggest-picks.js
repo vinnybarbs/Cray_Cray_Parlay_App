@@ -27,7 +27,7 @@ async function storeAISuggestions(suggestions, options = {}) {
     const { edgeTier } = require('../lib/services/pick-grader.js');
     const suggestionRecords = suggestions.map(suggestion => {
       // annotatePicksWithEdges puts edgePp/signedEdge on picks that were
-      // graded against game_analysis.edges — snapshot it so the pick row
+      // graded against game_analysis.edges. Snapshot it so the pick row
       // carries its own edge even after the analysis cache regenerates.
       const edgePp = suggestion.edgePp
         ?? (suggestion.signedEdge != null ? Math.round(suggestion.signedEdge * 1000) / 10 : null);
@@ -60,7 +60,7 @@ async function storeAISuggestions(suggestions, options = {}) {
     for (const rec of suggestionRecords) {
       const { error: insertErr } = await supabase.from('ai_suggestions').insert(rec);
       if (insertErr && insertErr.code === '23505') {
-        // Duplicate — skip silently
+        // Duplicate, skip silently
         continue;
       }
       if (insertErr) {
@@ -897,7 +897,7 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
     } else if (marketType.includes('reception_tds') || marketType.includes('rec_td')) {
       statPattern = /([\d.]+)\s+rec TDs?\/game/i;
       statType = 'rec TDs';
-    // NBA stat types — ESPN format: "X pts, Y reb, Z ast/game"
+    // NBA stat types, ESPN format: "X pts, Y reb, Z ast/game"
     } else if (marketType === 'player_points') {
       statPattern = /([\d.]+)\s+(?:points?|pts)/i;
       statType = 'points';
@@ -942,7 +942,7 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
       parts.push(`${propType} is priced at ${priceText} for the ${matchupText} matchup${hasRecords ? ` (${awayRecord} @ ${homeRecord})` : ''}.`);
       break;
     case 1:
-      parts.push(`Looking at ${propType} at ${priceText} in the ${matchupText} game${hasRecords ? ` — ${odds.away_team} (${awayRecord}) visiting ${odds.home_team} (${homeRecord})` : ''}.`);
+      parts.push(`Looking at ${propType} at ${priceText} in the ${matchupText} game${hasRecords ? `, with ${odds.away_team} (${awayRecord}) visiting ${odds.home_team} (${homeRecord})` : ''}.`);
       break;
     case 2:
       parts.push(`This ${matchupText} matchup${hasRecords ? ` between ${awayRecord} and ${homeRecord} teams` : ''} features ${propType} sitting at ${priceText}.`);
@@ -1013,11 +1013,11 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
       parts.push(contrarianPhrases[verdictStyle]);
     }
   } else if (statSnippet) {
-    // Have stats text but couldn't extract a numeric average — still use the stats
+    // Have stats text but couldn't extract a numeric average. Still use the stats
     parts.push(`Based on recent performance data for ${playerName}: ${statSnippet.replace(playerName + ': ', '')}`);
     parts.push(`The ${direction} at ${line} presents a reasonable opportunity given the matchup dynamics.`);
   } else {
-    // No stats at all — generate reasoning from matchup context only
+    // No stats at all, so generate reasoning from matchup context only
     parts.push(`${playerName}'s ${direction} ${line} line at ${priceText} is worth considering given the ${matchupText} matchup dynamics.`);
   }
   
@@ -1497,7 +1497,7 @@ async function suggestPicksHandler(req, res) {
             fromCache: true,
             alert: {
               type: 'info',
-              message: `Showing ${cachedSuggestions.length} recent picks from cache — live generation had no results`
+              message: `Showing ${cachedSuggestions.length} recent picks from cache. Live generation had no results.`
             },
             metadata: { model: 'cached', fromCache: true, cachedCount: cachedSuggestions.length }
           });
@@ -1528,7 +1528,7 @@ async function suggestPicksHandler(req, res) {
     let workingSuggestions = dedupeConflictingGameSuggestions(enrichedSuggestions);
 
     // Apply generateMode-specific post-processing before final selection
-    // Easy Money: Moneyline favorites ONLY — high win-rate, lower payouts.
+    // Easy Money: Moneyline favorites ONLY. High win-rate, lower payouts.
     // Filter to moneyline bets with negative odds (favorites), sorted by
     // strongest favorite first. Falls back to all ML if strict filter is empty.
     if (generateMode === 'Easy Money' || generateMode === 'Heavy Favorites') {
@@ -1618,7 +1618,7 @@ async function suggestPicksHandler(req, res) {
       sessionId, // Include session ID for tracking
       metadata: {
         // What generated these picks. The client stamps this on lock records
-        // (parlays.ai_model) — never hardcode a model name client-side.
+        // (parlays.ai_model). Never hardcode a model name client-side.
         model: ANALYST_MODEL,
         requestedSuggestions: numSuggestions,
         returnedSuggestions: finalSuggestions.length,

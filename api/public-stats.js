@@ -1,11 +1,11 @@
-// Public-stats endpoint — proxies mv_public_record (the ledger-population
+// Public-stats endpoint. Proxies mv_public_record (the ledger-population
 // rollup: graded era, actionable tiers, no soccer v1) to the Landing without
 // requiring auth, so the Track Record section + hero hit-rate render for
 // unauthenticated visitors. Uses the service role key server-side so RLS
 // can stay strict on the underlying table (anon SELECT remains blocked).
 //
 // Response shape: { overall: {wins,losses,push,total,hitRate}, tiers: [...] }
-// All fields safe to expose publicly — just aggregate W/L/% per tier.
+// All fields safe to expose publicly, just aggregate W/L/% per tier.
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -17,7 +17,7 @@ function getSupabase() {
 }
 
 module.exports = async (req, res) => {
-  // CORS — Landing is served from the same origin in production but local
+  // CORS: Landing is served from the same origin in production but local
   // dev runs on a different port. Be permissive for GET reads.
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -84,7 +84,7 @@ module.exports = async (req, res) => {
     const tiers = shape(tierRows, 'tier');
 
     // The hero claim: Sharp Take all-time record with ROI. Only published
-    // when the sample is real (100+ decided picks) — the number itself is
+    // when the sample is real (100+ decided picks). The number itself is
     // whatever the ledger says, good or bad. That is the brand.
     const stRow = allRows.find(r => r.dimension_type === 'tier' && r.dimension_value === 'Sharp Take');
     let sharpTakeAllTime = null;

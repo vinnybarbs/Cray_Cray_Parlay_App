@@ -1,12 +1,12 @@
-// Public Pick-of-the-Day endpoint — the real free pick for the Landing.
+// Public Pick-of-the-Day endpoint. Serves the real free pick for the Landing.
 //
 // The Landing's "SEE TODAY'S FREE PICK" CTA used to scroll to a hardcoded
 // illustrative tile. The competitor research (competitor-profiles/_summary.md)
 // called a real free-value moment the conversion wedge, so serve the actual
-// highest-edge upcoming pick. One pick only — the full board stays paid.
+// highest-edge upcoming pick. One pick only, the full board stays paid.
 //
 // Selection mirrors DailyDigest.pickOfTheDay: highest signed pp that clears
-// the Play tier (>= 4pp). Below that we say so instead of forcing a pick —
+// the Play tier (>= 4pp). Below that we say so instead of forcing a pick.
 // "quiet day" is part of the brand (docs/marketing/landing-page-v1.md).
 
 const { createClient } = require('@supabase/supabase-js');
@@ -72,7 +72,7 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // "Show the work" payload — the INPUTS the model saw and WHICH signals
+    // "Show the work" payload: the INPUTS the model saw and WHICH signals
     // fired, sanitized. Adjustment magnitudes, weights, and the blend stay
     // server-side; publishing them would hand over the calculator.
     let work = null;
@@ -88,7 +88,7 @@ module.exports = async (req, res) => {
         .limit(1);
       const ef = ga?.[0]?.edge_factors;
       if (ef) {
-        // Season record comes from ESPN standings — the authoritative W-L.
+        // Season record comes from ESPN standings, the authoritative W-L.
         // The 20-game window from game_results is a recency stat and must
         // be labeled as such: publishing it as "Record" showed the White
         // Sox at 9-11 when they were 48-45 (July 2026 credibility bug).

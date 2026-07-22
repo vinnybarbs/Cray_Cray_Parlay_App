@@ -1,11 +1,11 @@
-// Yesterday's board — the full published pick list for a prior digest day,
+// Yesterday's board: the full published pick list for a prior digest day,
 // with settled outcomes. Public and read-only, same receipts philosophy as
 // the House Ledger: on dark-slate days the board shows what the machine
 // published yesterday and how it actually went, instead of a blank page.
 
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
 
-// Same 1u math as the House Ledger — the two surfaces must never disagree.
+// Same 1u math as the House Ledger. The two surfaces must never disagree.
 function unitProfit(oddsStr, outcome) {
   if (outcome === 'push' || outcome === 'void') return 0;
   if (outcome === 'lost') return -1;
@@ -25,7 +25,7 @@ module.exports = async function boardHistory(req, res) {
     let date = /^\d{4}-\d{2}-\d{2}$/.test(requested) ? requested : null;
     if (!date) {
       // Session ids sort lexically as dates, so one query finds the newest
-      // day with picks (was 8 serial count queries — slow enough that the
+      // day with picks (was 8 serial count queries, slow enough that the
       // button felt dead).
       const candidates = Array.from({ length: 8 }, (_, i) =>
         `auto_digest_${new Date(Date.now() - i * 24 * 3600e3).toISOString().split('T')[0]}`);
@@ -48,7 +48,7 @@ module.exports = async function boardHistory(req, res) {
     if (error) throw error;
 
     const all = data || [];
-    // Traps are fade advice, not bets — split them out so the day's record
+    // Traps are fade advice, not bets. Split them out so the day's record
     // only counts picks, and the fade calls get their own honest framing
     // (the trap side losing = the call was right).
     const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);

@@ -1,4 +1,4 @@
-// Public-ticker endpoint — real edges for the Landing ticker.
+// Public-ticker endpoint. Serves real edges for the Landing ticker.
 //
 // The ticker used to scroll a hardcoded demo array labeled LIVE, which showed
 // NBA/NFL edges in July. Bettors notice. This returns actual per-side edges
@@ -62,7 +62,7 @@ module.exports = async (req, res) => {
     const inSeason = [...new Set((games || []).map(g => g.sport).filter(Boolean))];
 
     // One item per game: the strongest-magnitude side, positive or negative.
-    // Negative edges are the product's differentiator — show them.
+    // Negative edges are the product's differentiator, so show them.
     const items = [];
     for (const g of games || []) {
       if (!g.edges) continue;

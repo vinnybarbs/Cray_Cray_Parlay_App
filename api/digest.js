@@ -55,7 +55,7 @@ async function getDigest(req, res) {
     // Non-breaking: every flat field on the game row (edge_score, home_record,
     // analysis_snippet, etc.) stays intact. The `fact_sheet` key is additive
     // so the tile component can migrate to the canonical shape incrementally.
-    // Parallel RPC calls — ~50 games × one function call each runs in ms.
+    // Parallel RPC calls. ~50 games at one function call each runs in ms.
     const games = todaysGamesResult || [];
     await Promise.all(games.map(async (game) => {
       try {
@@ -80,7 +80,7 @@ async function getDigest(req, res) {
       gamesBySport[sport].push(game);
     }
 
-    // 2. Key injuries from news_cache — sport-level summaries
+    // 2. Key injuries from news_cache, as sport-level summaries
     const injuriesResult = await safeQuery(async () => {
       const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
@@ -139,7 +139,7 @@ async function getDigest(req, res) {
       return bySport;
     });
 
-    // 4. Model accuracy — 3 periods (7d / 30d / all) x (overall + bySport + byBetType).
+    // 4. Model accuracy: 3 periods (7d / 30d / all) x (overall + bySport + byBetType).
     // Reads mv_public_record: the SAME population as the House Ledger (graded
     // era, actionable tiers, no soccer v1) so the digest and the ledger can
     // never tell different stories. mv_model_accuracy keeps the full history
@@ -280,7 +280,7 @@ async function getDigest(req, res) {
       }
     });
 
-    // On Deck — games with odds beyond the 3-day analysis window. The books
+    // On Deck: games with odds beyond the 3-day analysis window. The books
     // post weeks ahead; the board looked "thin" because this wall of real
     // data was invisible until games entered the window.
     const onDeckResult = await safeQuery(async () => {
@@ -393,7 +393,7 @@ async function deepResearch(req, res) {
       return res.status(404).json({ error: 'Game not found', game_key });
     }
 
-    // Canonical fact sheet (same as /digest list view) — structured matchup,
+    // Canonical fact sheet (same as /digest list view): structured matchup,
     // market, records, edge sections sourced from build_game_fact_sheet().
     const factSheetResult = await safeQuery(async () => {
       const { data, error } = await supabase.rpc('build_game_fact_sheet', { p_game_key: game_key });
@@ -431,7 +431,7 @@ async function deepResearch(req, res) {
     });
 
     // 4. Current odds lines for this matchup. odds_cache stores one row per
-    // (market, bookmaker) with prices inside the outcomes JSON — there are no
+    // (market, bookmaker) with prices inside the outcomes JSON. There are no
     // spread/total/moneyline columns (this query silently returned nothing
     // for months by selecting them).
     const oddsResult = await safeQuery(async () => {

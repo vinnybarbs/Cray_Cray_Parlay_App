@@ -28,7 +28,7 @@ const SPORT_CONFIGS = {
  * MLB/EPL: season = calendar year.
  */
 function currentSeason(sport) {
-  // Use current year for all sports — the current_standings view filters
+  // Use current year for all sports. The current_standings view filters
   // WHERE season = EXTRACT(YEAR FROM CURRENT_DATE), so we must match.
   return new Date().getFullYear();
 }
@@ -67,14 +67,14 @@ async function fetchESPNStandings(sport, config) {
       }
 
       // NHL's third column is overtime losses (key `otLosses`), NOT `ties`.
-      // Soccer (EPL/MLS) uses `ties` for draws — ESPN's stats match. Every
+      // Soccer (EPL/MLS) uses `ties` for draws, and ESPN's stats match. Every
       // other sport has no third column; `ties` is 0 or absent.
       const thirdCol = sport === 'NHL'
         ? (parseInt(stats.otLosses ?? stats.overtimeLosses) || 0)
         : (parseInt(stats.ties) || 0);
 
       // Strip ", N PTS" suffix that ESPN adds to some display strings (e.g.
-      // NHL "7-2-1, 0 PTS") — keep just the record portion.
+      // NHL "7-2-1, 0 PTS"). Keep just the record portion.
       const cleanDisplay = (v) => typeof v === 'string' ? v.split(',')[0].trim() : v;
 
       teams.push({

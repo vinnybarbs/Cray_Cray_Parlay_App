@@ -1,5 +1,5 @@
 /**
- * The House Ledger — public, append-only settlement record.
+ * The House Ledger: public, append-only settlement record.
  *
  * This endpoint is the substantiation surface the whole marketing pitch
  * stands on (audit ROADMAP NOW item 5): every house pick published before
@@ -67,9 +67,9 @@ async function getPublicLedger(req, res) {
   }
 
   try {
-    // Every settled house pick. auto_digest is the published-daily pipeline —
+    // Every settled house pick. auto_digest is the published-daily pipeline,
     // picks written by the analysis cron before games start. Supabase caps a
-    // select at 1,000 rows, so page until exhausted — the headline number
+    // select at 1,000 rows, so page until exhausted. The headline number
     // claims the full history and must actually cover it.
     const settledPicks = await safeQuery(async () => {
       const all = [];
@@ -105,11 +105,11 @@ async function getPublicLedger(req, res) {
       return data || [];
     }) || [];
 
-    // Traps and Skips are NOT bets — a Trap is fade advice (the model says
+    // Traps and Skips are NOT bets. A Trap is fade advice (the model says
     // the side is overpriced) and a Skip is below the actionable floor. They
     // stay in the database for calibration, but they don't belong in the
     // win/loss record. A trap whose side LOST is a CORRECT call.
-    // Soccer v1 was R&D on a two-way model that never priced the draw —
+    // Soccer v1 was R&D on a two-way model that never priced the draw,
     // scrapped pre-launch (2026-07-12). Its rows stay in the database but
     // appear nowhere on the site. Soccer returns as v2 with a real
     // three-way model.
@@ -118,7 +118,7 @@ async function getPublicLedger(req, res) {
 
     // The public record begins at the graded era (2026-05-10, when edge
     // grading went live). Ungraded picks before that were development
-    // output — pre-launch R&D, not shown (decision 2026-07-12).
+    // output, pre-launch R&D, and is not shown (decision 2026-07-12).
     const graded = nonSoccer.filter(r => r.tier != null);
 
     const isActionable = (row) => !['Trap', 'Skip'].includes(row.tier);
@@ -183,8 +183,8 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every actionable pick published since May 10, 2026, when edge grading went live — the start of the graded record. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
-        grading: 'One pick per game per day — the final version published before start, at its price. Pre-start revisions replace, never add. Signed model edge in percentage points sets the tier; outcomes graded from final scores by the settlement pipeline.',
+        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
+        grading: 'One pick per game per day, the final version published before start, at its price. Pre-start revisions replace, never add. Signed model edge in percentage points sets the tier; outcomes graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
       },
