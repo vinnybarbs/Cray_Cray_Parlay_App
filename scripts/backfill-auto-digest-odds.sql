@@ -52,7 +52,7 @@ SET odds = CASE
   -- (some lines are -105/-115), but conservative for ROI calculation.
   WHEN an.bet_type IN ('Spread', 'Total') THEN '-110'
   -- Moneyline fallback when recommended_side is missing or doesn't match a
-  -- home_ml/away_ml pattern (rare edge case — ~2 rows in production data).
+  -- home_ml/away_ml pattern (rare edge case, ~2 rows in production data).
   ELSE '-110'
 END
 FROM auto_null an

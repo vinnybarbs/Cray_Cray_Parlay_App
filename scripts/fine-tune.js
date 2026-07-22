@@ -3,11 +3,11 @@
  * Fine-Tune Pipeline for Cray Cray Parlay App
  *
  * Usage:
- *   node scripts/fine-tune.js export      — Export graded picks to JSONL training file
- *   node scripts/fine-tune.js train       — Start fine-tune job on OpenAI
- *   node scripts/fine-tune.js status      — Check fine-tune job status
- *   node scripts/fine-tune.js deploy      — Update ai_instructions with new model ID
- *   node scripts/fine-tune.js all         — Run export + train in sequence
+ *   node scripts/fine-tune.js export      Export graded picks to JSONL training file
+ *   node scripts/fine-tune.js train       Start fine-tune job on OpenAI
+ *   node scripts/fine-tune.js status      Check fine-tune job status
+ *   node scripts/fine-tune.js deploy      Update ai_instructions with new model ID
+ *   node scripts/fine-tune.js all         Run export + train in sequence
  */
 
 require('dotenv').config({ silent: true });
@@ -68,7 +68,7 @@ ${pick.odds ? `Odds: ${pick.odds}` : ''}
 
 What is your pick and why?`;
 
-    // The "ideal" response — what the model SHOULD have said
+    // The "ideal" response, meaning what the model SHOULD have said
     // For wins: reinforce the reasoning
     // For losses: show what went wrong so the model learns to avoid similar patterns
     let assistantResponse;
@@ -88,7 +88,7 @@ OUTCOME: LOST ❌
 
 REASONING: ${pick.reasoning}
 
-LESSON: This pick lost. The confidence of ${pick.confidence}/10 was ${pick.confidence >= 7 ? 'too high — should have been lower given the risk' : 'appropriately cautious'}. ${pick.bet_type === 'Spread' ? 'Spread picks require stronger data support than moneyline.' : ''} ${pick.confidence >= 8 ? 'Reserve 8+ confidence for picks with multiple confirming data points.' : ''}`;
+LESSON: This pick lost. The confidence of ${pick.confidence}/10 was ${pick.confidence >= 7 ? 'too high. It should have been lower given the risk' : 'appropriately cautious'}. ${pick.bet_type === 'Spread' ? 'Spread picks require stronger data support than moneyline.' : ''} ${pick.confidence >= 8 ? 'Reserve 8+ confidence for picks with multiple confirming data points.' : ''}`;
     }
 
     lines.push(JSON.stringify({

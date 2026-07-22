@@ -30,7 +30,7 @@ async function addCronJobPg() {
     const command = 'SELECT public.refresh_player_recent_form_concurrent();';
     const jobname = 'refresh_player_recent_form';
 
-    // Use cron.schedule(jobname, schedule, command) – this matches the pg_cron
+    // Use cron.schedule(jobname, schedule, command). This matches the pg_cron
     // usage in your existing SQL migration files.
     const sql = 'SELECT cron.schedule($1, $2, $3);';
     const res = await client.query(sql, [jobname, schedule, command]);

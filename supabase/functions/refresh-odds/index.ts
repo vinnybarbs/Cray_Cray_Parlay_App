@@ -14,7 +14,7 @@ const SPORTS = [
   "soccer_epl",
   "soccer_usa_mls",
   "mma_mixed_martial_arts",
-  // Tennis — only returns data when tournament is in season
+  // Tennis only returns data when tournament is in season
   "tennis_atp_monte_carlo_masters",
   "tennis_atp_madrid_open",
   "tennis_atp_italian_open",
@@ -61,7 +61,7 @@ const PROP_MARKETS = {
 };
 
 // Expanded to 6 US-regulated books for cross-book line comparison (market_edge
-// in the fact sheet). The-odds-api bills per request, not per bookmaker —
+// in the fact sheet). The-odds-api bills per request, not per bookmaker, so
 // adding books does not increase API credit cost; it just returns richer payloads.
 // If a book key is invalid, the API silently omits it (no error).
 const BOOKMAKERS = "draftkings,fanduel,betmgm,caesars,betrivers,fanatics";
