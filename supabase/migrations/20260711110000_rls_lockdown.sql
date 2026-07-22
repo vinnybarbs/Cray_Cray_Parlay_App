@@ -5,7 +5,7 @@
 -- is the combined record.
 --
 -- Why: the anon key ships in the frontend bundle, and 32 public tables had
--- RLS disabled — readable and writable by anyone who opened dev tools.
+-- RLS disabled, readable and writable by anyone who opened dev tools.
 -- Worst cases: ai_instructions (the playbook that steers the AI) and
 -- game_analysis (published edges) were both writable by strangers.
 --

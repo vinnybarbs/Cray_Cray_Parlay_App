@@ -13,7 +13,7 @@ DECLARE
 BEGIN
   -- 1) If table already in public, nothing to do
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'odds_cache') THEN
-    RAISE NOTICE 'odds_cache already exists in public — nothing to do.';
+    RAISE NOTICE 'odds_cache already exists in public. Nothing to do.';
     RETURN;
   END IF;
 
@@ -25,11 +25,11 @@ BEGIN
   LIMIT 1;
 
   IF v_schema IS NOT NULL THEN
-    RAISE NOTICE 'Found archived odds_cache in schema % — moving back to public', v_schema;
+    RAISE NOTICE 'Found archived odds_cache in schema %, moving back to public', v_schema;
     EXECUTE format('ALTER TABLE %I.%I SET SCHEMA public', v_schema, 'odds_cache');
     RAISE NOTICE 'Moved odds_cache back to public.';
   ELSE
-    -- 3) No archived copy found — create a safe, minimal table so the app and cron can run.
+    -- 3) No archived copy found. Create a safe, minimal table so the app and cron can run.
     RAISE NOTICE 'No archived odds_cache found. Creating a minimal empty public.odds_cache table as a fallback.';
     IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'odds_cache') THEN
       EXECUTE $$

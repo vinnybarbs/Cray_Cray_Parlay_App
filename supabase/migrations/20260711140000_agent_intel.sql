@@ -2,7 +2,7 @@
 --
 -- Storage + schedule for the data-integrity agent (Claude coordinator with
 -- web-search sub-agents: records verifier, injury scout, weather scout).
--- Motivated by the July 2026 records incident — nothing cross-checked the
+-- Motivated by the July 2026 records incident. Nothing cross-checked the
 -- data the site displayed, and injuries/weather coverage was thin.
 
 CREATE TABLE IF NOT EXISTS public.agent_intel (

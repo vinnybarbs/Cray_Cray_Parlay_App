@@ -1,15 +1,15 @@
--- FACT-SHEET SKELETON — the first concrete step of the "LLM as stylist, DB does
+-- FACT-SHEET SKELETON: the first concrete step of the "LLM as stylist, DB does
 -- the analysis" architecture. See memory/project_llm_in_digest_tile.md.
 --
 -- What lands here:
 --   1) ai_suggestions.pipeline_version column (4 = pre-fact-sheet, 5 = current)
---   2) build_game_fact_sheet(game_key) — returns canonical JSONB per matchup
+--   2) build_game_fact_sheet(game_key), returns canonical JSONB per matchup
 --
 -- What's intentionally STUB in this migration:
 --   - key_players   (waits on player_recent_form integration)
 --   - injuries      (waits on structured-injury design)
 --   - market_edge   (waits on multi-book odds_cache coverage from PR #5)
---   - narrative_hooks (waits on rules design — streaks, H2H, line movement)
+--   - narrative_hooks (waits on rules design: streaks, H2H, line movement)
 --
 -- Those sections ship in follow-up migrations as we design each. The
 -- consuming code (digest tile, chat, pre-analyze prompt) can already wire to
@@ -33,7 +33,7 @@ COMMENT ON COLUMN public.ai_suggestions.pipeline_version IS
   'MV aggregations filter by version to avoid mixing regimes.';
 
 -- ============================================================================
--- 2. build_game_fact_sheet(p_game_key) — canonical per-matchup JSONB
+-- 2. build_game_fact_sheet(p_game_key), canonical per-matchup JSONB
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.build_game_fact_sheet(p_game_key TEXT)
@@ -65,7 +65,7 @@ BEGIN
     'built_at', NOW(),
     'game_key', ga.game_key,
 
-    -- Matchup — who's playing, when.
+    -- Matchup: who's playing, when.
     'matchup', jsonb_build_object(
       'sport', ga.sport,
       'home', ga.home_team,
@@ -73,7 +73,7 @@ BEGIN
       'game_date', ga.game_date
     ),
 
-    -- Market — the lines and prices as of last pre-analysis run.
+    -- Market: the lines and prices as of last pre-analysis run.
     -- Note: today this reflects one book (DraftKings preferred, FanDuel fallback).
     -- Multi-book comparison lands when market_edge section is designed (PR #5 groundwork).
     'market', jsonb_build_object(
@@ -83,7 +83,7 @@ BEGIN
       'moneyline_away', ga.moneyline_away
     ),
 
-    -- Records — real season W-L from current_standings, per PR #3.
+    -- Records: real season W-L from current_standings, per PR #3.
     'records', jsonb_build_object(
       'home', jsonb_build_object(
         'season_record', ga.home_record,
@@ -95,7 +95,7 @@ BEGIN
       )
     ),
 
-    -- Edge — what the calculator says about the matchup.
+    -- Edge: what the calculator says about the matchup.
     'edge', jsonb_build_object(
       'score', ga.edge_score,
       'recommended_pick', ga.recommended_pick,
@@ -107,7 +107,7 @@ BEGIN
       'movement', ga.edge_movement
     ),
 
-    -- STUB SECTIONS — populated in follow-up migrations.
+    -- STUB SECTIONS: populated in follow-up migrations.
     'key_players', jsonb_build_object(
       '_todo', 'Join player_recent_form → rosters → teams to surface top 3 per side by avg_performance_score'
     ),
@@ -129,6 +129,6 @@ GRANT EXECUTE ON FUNCTION public.build_game_fact_sheet(TEXT) TO anon, authentica
 COMMENT ON FUNCTION public.build_game_fact_sheet(TEXT) IS
   'Canonical fact sheet for a single matchup. Returns JSONB with matchup, market, '
   'records, edge (populated) and key_players, injuries, market_edge, narrative_hooks '
-  '(stub TODOs — expanded in follow-up migrations). Consumers pass game_key, get back '
+  '(stub TODOs, expanded in follow-up migrations). Consumers pass game_key, get back '
   'a complete view of what the DB knows about this game. Replaces fragmented multi-query '
   'assembly in Node. See memory/project_llm_in_digest_tile.md.';

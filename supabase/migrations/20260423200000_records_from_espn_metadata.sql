@@ -2,7 +2,7 @@
 -- instead of the `standings` table. Diagnostic showed standings is broken for
 -- NHL (100% OT column missing), EPL/MLS (0% matching), NCAAB (0% matching).
 -- ESPN's `records[0].summary` is correct for every sport and every team that
--- has played a game — we already capture it at ingest but weren't using it.
+-- has played a game. We already capture it at ingest but weren't using it.
 --
 -- Display formats pass through as-is (no parsing):
 --   NBA/MLB: "50-32"
@@ -13,7 +13,7 @@
 -- (honest absence beats a wrong number).
 
 -- ============================================================================
--- 1. team_latest_record — canonical "what's this team's record RIGHT NOW"
+-- 1. team_latest_record: canonical "what's this team's record RIGHT NOW"
 --    One row per (sport, team_name) with ESPN-authoritative record string.
 -- ============================================================================
 
@@ -38,13 +38,13 @@ ORDER BY sport, team_name, date DESC;
 
 COMMENT ON VIEW public.team_latest_record IS
   'Authoritative team record sourced from ESPN metadata on most-recent game_results row. '
-  'Replaces current_standings for tile rendering — standings sync is broken for NHL/EPL/MLS/NCAAB. '
+  'Replaces current_standings for tile rendering. Standings sync is broken for NHL/EPL/MLS/NCAAB. '
   'Pass record_str through unchanged; format varies by sport (W-L, W-L-OT, W-D-L).';
 
 GRANT SELECT ON public.team_latest_record TO anon, authenticated, service_role;
 
 -- ============================================================================
--- 2. build_game_fact_sheet — prefer ESPN-metadata record, fall back to
+-- 2. build_game_fact_sheet: prefer ESPN-metadata record, fall back to
 --    game_analysis.home_record only if the team has zero game_results rows
 --    (e.g. NFL/NCAAF in off-season).
 -- ============================================================================
@@ -102,7 +102,7 @@ BEGIN
       'moneyline_away', ga.moneyline_away
     ),
 
-    -- Records — prefer ESPN metadata; fall back to game_analysis column only
+    -- Records: prefer ESPN metadata, fall back to game_analysis column only
     -- if ESPN has no record for that team (off-season sports).
     'records', jsonb_build_object(
       'home', jsonb_build_object(

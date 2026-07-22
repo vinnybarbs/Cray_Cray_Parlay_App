@@ -18,12 +18,12 @@ pg_cron scheduler (hourly)
 ```
 
 ## Benefits of Migration
-✅ **No server dependency** — runs even if your Express server is down  
-✅ **Native database integration** — writes directly to Supabase  
-✅ **Built-in scheduling** — pg_cron instead of external scheduler  
-✅ **Cost efficient** — Edge Functions are free/cheap tier friendly  
-✅ **Monitoring** — Supabase Dashboard shows all runs and logs  
-✅ **Scalability** — automatically handles load  
+✅ **No server dependency**: runs even if your Express server is down  
+✅ **Native database integration**: writes directly to Supabase  
+✅ **Built-in scheduling**: pg_cron instead of external scheduler  
+✅ **Cost efficient**: Edge Functions are free/cheap tier friendly  
+✅ **Monitoring**: Supabase Dashboard shows all runs and logs  
+✅ **Scalability**: automatically handles load  
 
 ## Implementation Strategy
 
@@ -71,10 +71,10 @@ pg_cron scheduler (hourly)
 
 ## Files to Create
 
-1. `supabase/functions/refresh-odds/index.ts` — Edge Function implementation
-2. `supabase/functions/refresh-odds/README.md` — Deployment instructions
-3. `database/enable-pg-cron.sql` — SQL to enable and schedule cron
-4. `docs/EDGE_FUNCTION_SETUP.md` — Complete setup guide
+1. `supabase/functions/refresh-odds/index.ts`: Edge Function implementation
+2. `supabase/functions/refresh-odds/README.md`: Deployment instructions
+3. `database/enable-pg-cron.sql`: SQL to enable and schedule cron
+4. `docs/EDGE_FUNCTION_SETUP.md`: Complete setup guide
 
 ## Next Steps
 

@@ -4,7 +4,7 @@
 -- See: docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md
 
 -- ============================================================================
--- SECTION 1: Schema change — add suggestion_id FK to parlay_legs
+-- SECTION 1: Schema change, add suggestion_id FK to parlay_legs
 -- ============================================================================
 
 ALTER TABLE public.parlay_legs
@@ -13,7 +13,7 @@ ALTER TABLE public.parlay_legs
 CREATE INDEX idx_parlay_legs_suggestion_id ON public.parlay_legs(suggestion_id);
 
 -- ============================================================================
--- SECTION 2: Linkage backfill — populate suggestion_id for existing 113 legs
+-- SECTION 2: Linkage backfill, populate suggestion_id for existing 113 legs
 -- Match on (sport, home_team, away_team, pick, game_date::date).
 -- Tiebreaker: earliest ai_suggestions.created_at.
 -- Expected: all 113 legs get a suggestion_id (70 unique-match + 43 multi-matched).
@@ -162,7 +162,7 @@ $$;
 -- ============================================================================
 -- SECTION 5: settle_parlay_legs()
 -- Propagates outcome from linked ai_suggestions to parlay_legs. Writes all 5
--- state columns atomically. Idempotent — doesn't touch already-consistent rows.
+-- state columns atomically. Idempotent. It doesn't touch already-consistent rows.
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.settle_parlay_legs()
@@ -196,7 +196,7 @@ $$;
 -- Rollup from legs to parent parlay. Two-stage:
 --   1. Early-loss: any lost leg → parlay immediately 'lost' (don't wait for remaining legs).
 --   2. All-won: every leg resolved, no losses, at least one win → parlay 'won'.
--- Stake assumed at $100 flat (no bet_amount column on parlays today — matches
+-- Stake assumed at $100 flat (no bet_amount column on parlays today, matches
 -- existing Railway ParlayOutcomeChecker behavior).
 -- ============================================================================
 

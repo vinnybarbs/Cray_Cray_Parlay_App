@@ -31,8 +31,8 @@
     }
   }
   ```
-- ✅ **Uses cache** (fallbackUsed: false) — indicates cached odds are being served
-- ✅ **Can generate parlays** — frontend can now call this endpoint successfully
+- ✅ **Uses cache** (fallbackUsed: false), which indicates cached odds are being served
+- ✅ **Can generate parlays**: frontend can now call this endpoint successfully
 
 ### Validation Middleware
 - All required fields validated: `selectedSports`, `selectedBetTypes`, `numLegs`, `oddsPlatform`, `riskLevel`, `dateRange`
@@ -139,29 +139,29 @@ node scripts/verify_railway.js
 
 ## 📁 Files Changed (Ready for Deploy)
 
-- `server.js` — POST /cron/refresh-odds route registered
-- `api/refresh-odds.js` — cron handler (rate-limited, config-driven)
-- `Procfile` — Railway startup configuration
-- `Dockerfile` — (optional) container image for deployment
-- `DEPLOY_RAILWAY.md` — deployment checklist and instructions
-- `env.example` — added VITE_API_BASE_URL, CRON_SECRET, Supabase keys
-- `src/components/MainApp.jsx` — API_BASE defaults to Railway URL
-- `src/AppLegacy.jsx` — API_BASE defaults to Railway URL
-- `scripts/verify_railway.js` — verification tool for deployed backend
+- `server.js`: POST /cron/refresh-odds route registered
+- `api/refresh-odds.js`: cron handler (rate-limited, config-driven)
+- `Procfile`: Railway startup configuration
+- `Dockerfile`: (optional) container image for deployment
+- `DEPLOY_RAILWAY.md`: deployment checklist and instructions
+- `env.example`: added VITE_API_BASE_URL, CRON_SECRET, Supabase keys
+- `src/components/MainApp.jsx`: API_BASE defaults to Railway URL
+- `src/AppLegacy.jsx`: API_BASE defaults to Railway URL
+- `scripts/verify_railway.js`: verification tool for deployed backend
 
 ## 🔒 Required Environment Variables (Set in Railway)
 
 All of these must be set in Railway's environment settings:
 
-- `SUPABASE_URL` — from Supabase dashboard
-- `SUPABASE_SERVICE_ROLE_KEY` — from Supabase dashboard (service role, not anon)
-- `SUPABASE_ANON_KEY` — from Supabase dashboard (public anon key)
-- `ODDS_API_KEY` — from the-odds-api
-- `OPENAI_API_KEY` — from OpenAI dashboard
-- `SERPER_API_KEY` — from Serper.dev (optional but recommended for research)
-- `CRON_SECRET` — your own secure random string (used to protect /cron/refresh-odds)
-- `FRONTEND_URL` — (optional) set to your frontend URL if hosted separately
-- `NODE_ENV` — set to `production`
+- `SUPABASE_URL`: from Supabase dashboard
+- `SUPABASE_SERVICE_ROLE_KEY`: from Supabase dashboard (service role, not anon)
+- `SUPABASE_ANON_KEY`: from Supabase dashboard (public anon key)
+- `ODDS_API_KEY`: from the-odds-api
+- `OPENAI_API_KEY`: from OpenAI dashboard
+- `SERPER_API_KEY`: from Serper.dev (optional but recommended for research)
+- `CRON_SECRET`: your own secure random string (used to protect /cron/refresh-odds)
+- `FRONTEND_URL`: (optional) set to your frontend URL if hosted separately
+- `NODE_ENV`: set to `production`
 
 ## 🎯 Expected Behavior After All Steps
 

@@ -24,7 +24,7 @@ BEGIN
     LIMIT 1;
 
     IF v_schema IS NOT NULL THEN
-      RAISE NOTICE 'Found archived odds_cache in schema % — moving back to public', v_schema;
+      RAISE NOTICE 'Found archived odds_cache in schema %, moving back to public', v_schema;
       EXECUTE format('ALTER TABLE %I.%I SET SCHEMA public', v_schema, 'odds_cache');
       RAISE NOTICE 'Moved odds_cache back to public.';
     ELSE

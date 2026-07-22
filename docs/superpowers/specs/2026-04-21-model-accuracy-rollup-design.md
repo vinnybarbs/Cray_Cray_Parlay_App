@@ -1,4 +1,4 @@
-# Model Accuracy Rollup — Design
+# Model Accuracy Rollup Design
 
 **Date:** 2026-04-21
 **Status:** Approved, pending implementation plan
@@ -98,7 +98,7 @@ The unique index is required for `REFRESH MATERIALIZED VIEW CONCURRENTLY` (non-l
 
 **Auto-modes filter for edge dimensions:** `generate_mode IN ('auto_digest', 'AI Edge Advantages', 'Top Picks of the Day', 'Easy Money', 'Heavy Favorites')`. These are the modes where `ai_suggestions.confidence` is a rounded edge score. Chat mode stores arbitrary confidence values that have different semantics.
 
-> **Maintenance note:** This list lives in the MV definition SQL. When a new generation mode is added in code, decide whether its `confidence` field is edge-score-meaning (add to this list, then `REFRESH`) or conversational-meaning (leave out, or add to `chat_confidence`). Getting this wrong silently pollutes the calibration chart — verify by spot-checking a few rows' `confidence` values against the code that wrote them.
+> **Maintenance note:** This list lives in the MV definition SQL. When a new generation mode is added in code, decide whether its `confidence` field is edge-score-meaning (add to this list, then `REFRESH`) or conversational-meaning (leave out, or add to `chat_confidence`). Getting this wrong silently pollutes the calibration chart. Verify by spot-checking a few rows' `confidence` values against the code that wrote them.
 
 ### Period buckets
 
@@ -217,7 +217,7 @@ SUM(CASE
 END) AS roi_units
 ```
 
-ROI math: pushes contribute 0 units (stake returned). Pending and null-odds rows are excluded from `settled_with_odds` so they don't distort `roi_pct`. Rows where `settled_with_odds = 0` get `roi_pct = NULL` (UI renders `—`).
+ROI math: pushes contribute 0 units (stake returned). Pending and null-odds rows are excluded from `settled_with_odds` so they don't distort `roi_pct`. Rows where `settled_with_odds = 0` get `roi_pct = NULL` (UI renders `-`).
 
 ### Refresh strategy
 
@@ -300,7 +300,7 @@ const modelStats = {
 };
 ```
 
-Window shifts from "last 14d" to "last 30d" — this is the window we precomputed, and it aligns with the competitor-research standard (Leans.ai, Dimers, Unabated all use 30d or all-time).
+Window shifts from "last 14d" to "last 30d". This is the window we precomputed, and it aligns with the competitor-research standard (Leans.ai, Dimers, Unabated all use 30d or all-time).
 
 ### Migration
 
@@ -315,7 +315,7 @@ Single migration file `supabase/migrations/YYYYMMDDHHMMSS_model_accuracy_mv.sql`
 
 ### Safe-rollout notes
 
-- The MV creation is additive — no existing table or code breaks at deploy time.
+- The MV creation is additive. No existing table or code breaks at deploy time.
 - The admin endpoint and ResultsPage changes can ship in the same PR as the migration, OR the migration can ship first and the endpoint changes follow in a second PR (MV sits unused between, harmless).
 - Rolling back is `DROP MATERIALIZED VIEW public.mv_model_accuracy; DROP TABLE public.model_accuracy;` + revert of endpoint changes. Dropping the MV doesn't touch source data.
 

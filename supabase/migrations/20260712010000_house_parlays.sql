@@ -18,7 +18,7 @@ create table if not exists public.house_parlays (
   status text not null default 'pending',   -- pending | won | lost | push | void
   settled_at timestamptz,
   created_at timestamptz not null default now(),
-  -- one build per (day, size) — reruns of the builder must not duplicate
+  -- one build per (day, size). Reruns of the builder must not duplicate
   unique (parlay_date, legs_count)
 );
 

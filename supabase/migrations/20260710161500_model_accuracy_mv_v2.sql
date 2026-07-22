@@ -1,6 +1,6 @@
 -- supabase/migrations/20260710161500_model_accuracy_mv_v2.sql
 --
--- mv_model_accuracy v2 — measure what predicts, drop what doesn't.
+-- mv_model_accuracy v2. Measure what predicts, drop what doesn't.
 --
 -- Changes vs v1 (20260421180744):
 --   * edge_integer / edge_bucket dimensions removed. They bucketed the LLM's
@@ -11,7 +11,7 @@
 --     /api/public-stats has been waiting on to publish hit rate by tier.
 --   * New `edge_pp_bucket` dimension on the pick-time signed pp ranges the
 --     calibration loop reads (win % rises monotonically with pp).
---   * `void` outcomes excluded everywhere — voided rows are unsettleable
+--   * `void` outcomes excluded everywhere, since voided rows are unsettleable
 --     picks (UFC, dead markets), not results.
 
 DROP MATERIALIZED VIEW IF EXISTS public.mv_model_accuracy;

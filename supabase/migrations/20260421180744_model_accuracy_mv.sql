@@ -1,5 +1,5 @@
 -- supabase/migrations/20260421180744_model_accuracy_mv.sql
--- Model accuracy rollup materialized view — replaces JS-side aggregation.
+-- Model accuracy rollup materialized view, replacing JS-side aggregation.
 -- See docs/superpowers/specs/2026-04-21-model-accuracy-rollup-design.md
 
 -- 1. Drop the orphan table that was never populated

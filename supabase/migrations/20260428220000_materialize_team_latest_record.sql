@@ -18,7 +18,7 @@
 --   4. UNIQUE INDEX on (sport, team_name) for CONCURRENT refresh
 --   5. Initial REFRESH MATERIALIZED VIEW
 --   6. Recreate current_standings (verbatim definition from migration
---      20260424000000) — references resolve to the matview now
+--      20260424000000). References resolve to the matview now
 --   7. pg_cron job to REFRESH CONCURRENTLY every 15 min
 
 DROP VIEW IF EXISTS public.current_standings;
@@ -56,7 +56,7 @@ REFRESH MATERIALIZED VIEW public.team_latest_record;
 
 GRANT SELECT ON public.team_latest_record TO anon, authenticated, service_role;
 
--- Recreate current_standings (verbatim from 20260424000000) — the join target
+-- Recreate current_standings (verbatim from 20260424000000), the join target
 -- is now the matview, so reads are an index lookup not a recompute.
 CREATE OR REPLACE VIEW public.current_standings AS
 SELECT

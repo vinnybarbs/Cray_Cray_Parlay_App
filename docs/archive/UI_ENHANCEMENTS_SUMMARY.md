@@ -43,7 +43,7 @@ Book: DraftKings
 Picks:
 1. Lakers @ Celtics - Spread: Lakers +3.5 (+110)
 2. Warriors @ Heat - Moneyline: Warriors (-150)
-3. Knicks @ 76ers - Player Props: Over — Shamet +22.5 Points (+105)
+3. Knicks @ 76ers - Player Props: Over - Shamet +22.5 Points (+105)
 ```
 
 #### Features:
@@ -125,7 +125,7 @@ Picks:
 ### Bet Type Handling:
 - **Spread**: "Lakers +3.5"
 - **Moneyline**: "Warriors"
-- **Player Props**: "Over — Shamet +22.5 Points"
+- **Player Props**: "Over - Shamet +22.5 Points"
 - **Totals**: "Over 215.5"
 
 ### Example Outputs:
@@ -150,7 +150,7 @@ Book: DraftKings
 Picks:
 1. Cowboys @ Eagles - Spread: Cowboys +3 (+105)
 2. 49ers @ Seahawks - Totals: Over 48.5 (-110)
-3. Chiefs @ Bills - Player Props: Over — Mahomes +275.5 Pass Yards (+110)
+3. Chiefs @ Bills - Player Props: Over - Mahomes +275.5 Pass Yards (+110)
 ```
 
 ---
@@ -208,7 +208,7 @@ Both enhancements maintain the site's signature tone:
 **Examples:**
 - "Everything updates automatically. You just show up and gamble responsibly (or don't, we're not your dad)."
 - "Five AI agents working harder than your therapist to justify your gambling addiction"
-- "Not just headlines—the system extracts actual facts"
+- "Not just headlines. The system extracts actual facts"
 
 Fun, self-aware, slightly irreverent but informative.
 

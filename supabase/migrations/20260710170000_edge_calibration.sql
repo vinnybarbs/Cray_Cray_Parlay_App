@@ -128,7 +128,7 @@ BEGIN
     source     = EXCLUDED.source,
     updated_at = EXCLUDED.updated_at
   -- Suspended sports (multiplier 0 by manual seed) generate no picks and so
-  -- no new evidence — never let a stale tiny sample resurrect them.
+  -- no new evidence. Never let a stale tiny sample resurrect them.
   WHERE public.edge_calibration.source NOT LIKE '%suspended%';
 
   -- Log in a nested block so a logging failure can never roll back the

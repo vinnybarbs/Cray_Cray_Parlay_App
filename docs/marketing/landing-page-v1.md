@@ -1,4 +1,4 @@
-# Marketing Landing Page — v1 Copy Spec
+# Marketing Landing Page v1 Copy Spec
 
 **Status:** draft for review
 **Locked decisions:**
@@ -35,7 +35,7 @@
 ├─────────────────────────────────────┤
 │  FAQ        6 questions             │
 ├─────────────────────────────────────┤
-│  FOOTER     [v2 — Stage A2]         │
+│  FOOTER     [v2 - Stage A2]         │
 └─────────────────────────────────────┘
 ```
 
@@ -50,8 +50,8 @@
 > Math-graded picks for every game. Per-side edges in plus/minus points. Including the negative ones.
 
 **CTAs:**
-- Primary: `[ Start free trial ]` — amber button, links to `/signup`
-- Secondary: `[ See today's free pick → ]` — ghost button, smooth-scrolls to LIVE POD section
+- Primary: `[ Start free trial ]`: amber button, links to `/signup`
+- Secondary: `[ See today's free pick → ]` : ghost button, smooth-scrolls to LIVE POD section
 
 **Trust strip (below CTAs, mono):**
 > 1,000+ picks graded this week · 30-day hit rate: [LIVE FROM mv_model_accuracy]% · Sportsbook-agnostic
@@ -74,7 +74,7 @@
 > They show you what to bet. We show you what NOT to.
 
 **Body:**
-> Every other picks app — Action Network, OddsJam, Pikkit — has a structural reason it can't warn you off a bad bet.
+> Every other picks app (Action Network, OddsJam, Pikkit) has a structural reason it can't warn you off a bad bet.
 >
 > Action Network is owned by a sportsbook affiliate. OddsJam ideologically only shows positive EV. Pikkit only grades you after the bet. Your sportsbook is the bet.
 >
@@ -87,7 +87,7 @@
 | Shows the trap (−pp edges) | ✓ | ✗ | ✗ | ✗ |
 | Sportsbook-agnostic, no affiliate parent | ✓ | ✗ | ✓ | ✓ |
 | Pre-bet edge grade | ✓ | partial | ✓ | ✗ |
-| Built for $50–500/mo bankrolls | ✓ | ✗ | ✗ | ✓ |
+| Built for $50-500/mo bankrolls | ✓ | ✗ | ✗ | ✓ |
 
 **Voice note:** keep the prose under the table tight. The table does the work; the words frame it.
 
@@ -98,15 +98,15 @@
 **Eyebrow:**
 > Three steps. No vibes.
 
-**Step 1 — Math grades every game**
-> Our edge calculator runs against every market — moneyline, spread, total. Per-side. We compute the model's probability and compare it to the implied probability from the book's line. The gap, in percentage points, is the edge.
-> *Source: `lib/services/edge-calculator.js` — yes, the math is publishable, and yes, we publish it.*
+**Step 1: Math grades every game**
+> Our edge calculator runs against every market: moneyline, spread, total. Per-side. We compute the model's probability and compare it to the implied probability from the book's line. The gap, in percentage points, is the edge.
+> *Source: `lib/services/edge-calculator.js`. Yes, the math is publishable, and yes, we publish it.*
 
-**Step 2 — De-Genny narrates**
-> Once the math picks a side, our in-house LLM writes the rationale in plain English. The AI doesn't pick the bet — the math does. De-Genny just explains why.
+**Step 2: De-Genny narrates**
+> Once the math picks a side, our in-house LLM writes the rationale in plain English. The AI doesn't pick the bet. The math does. De-Genny just explains why.
 > *Counter to the "hallucinated stats" objection from §6 of the marketing context.*
 
-**Step 3 — You lock and build**
+**Step 3: You lock and build**
 > Pick the sides you like, hit "Build Parlay," and we hand you a one-tap deep link to your sportsbook. We never hold your money. We never see your account.
 
 **Layout:**
@@ -127,7 +127,7 @@
 **Body:**
 - Render the live `PickOfTheDay` component (reused from DailyDigest) with the highest-tier pick from today's data
 - If no Sharp Take today, fall back to highest Strong Play
-- If quiet board, show: *"Quiet day — math says skip. We refuse to force a pick. Come back tomorrow."*
+- If quiet board, show: *"Quiet day. Math says skip. We refuse to force a pick. Come back tomorrow."*
 
 **CTA below the tile:**
 > `[ See all of today's picks → ]` (links to `/signup` since digest is gated)
@@ -170,7 +170,7 @@
 > Sportsbook-agnostic. No affiliate kickbacks. Same edge no matter where you bet.
 
 **Body:**
-> We don't make money sending you to a sportsbook. We don't have a parent company that does either. Our entire business is grading the game honestly — including telling you when the line says skip.
+> We don't make money sending you to a sportsbook. We don't have a parent company that does either. Our entire business is grading the game honestly, including telling you when the line says skip.
 >
 > That's why the picks include negative edges. We have no incentive to hide them.
 
@@ -205,7 +205,7 @@ FREE 7-DAY TRIAL
 > No credit card to start. Cancel anytime. We send one email when the trial ends. That's it.
 
 **CTA:**
-> `[ Start free trial ]` — same primary button as hero
+> `[ Start free trial ]` (same primary button as hero)
 
 **TODO:** lock the actual price in Stage A3 (`/pricing-strategy` skill). Placeholder for now.
 
@@ -216,13 +216,13 @@ FREE 7-DAY TRIAL
 Accordion-style. Six questions:
 
 **1. What's a "Trap"?**
-> A pick with a negative per-side edge — meaning the model thinks the side wins less often than the book's line implies. Every other picks app hides these. We label them. *"Trap"* is the only honest reaction to a bad bet that looks tempting.
+> A pick with a negative per-side edge, meaning the model thinks the side wins less often than the book's line implies. Every other picks app hides these. We label them. *"Trap"* is the only honest reaction to a bad bet that looks tempting.
 
 **2. Why publish negative edges? Doesn't that scare people off?**
-> Negative edges are most of the betting universe. If we only published positive ones, we'd be lying about the shape of the market. The Trap label is the differentiator — it's the one thing every other picks app structurally can't show you.
+> Negative edges are most of the betting universe. If we only published positive ones, we'd be lying about the shape of the market. The Trap label is the differentiator. It's the one thing every other picks app structurally can't show you.
 
 **3. How is this different from Action Network or OddsJam?**
-> Action Network is owned by a sportsbook affiliate, so they can't credibly warn you off a book. OddsJam targets +$2K-monthly bankroll arb bettors at $99–199/month. We're built for the $50–500/month bankroll that wants the math without the price tag — and we're the only one that shows you what NOT to bet.
+> Action Network is owned by a sportsbook affiliate, so they can't credibly warn you off a book. OddsJam targets +$2K-monthly bankroll arb bettors at $99-199/month. We're built for the $50-500/month bankroll that wants the math without the price tag, and we're the only one that shows you what NOT to bet.
 
 **4. Is this gambling advice?**
 > No. It's information. We grade games using public data and publish the math. What you do with the picks is on you. We're not licensed as advice; we're not a sportsbook; we don't hold money. *"For entertainment and informational purposes only."*
@@ -231,7 +231,7 @@ Accordion-style. Six questions:
 > Yes. We're an info site about sports betting, which is a +21 activity in every US jurisdiction we know of. We don't sell anything that would change that.
 
 **6. Where does my data go?**
-> Email + (optionally) Google sign-in is all we collect to start. We don't share or sell. Locked picks live on your account so we can grade them later. Payment goes through Stripe directly — we never see your card.
+> Email + (optionally) Google sign-in is all we collect to start. We don't share or sell. Locked picks live on your account so we can grade them later. Payment goes through Stripe directly. We never see your card.
 
 ---
 
@@ -242,8 +242,8 @@ Accordion-style. Six questions:
 | Hero CTAs | New `<HeroCTA primary />` and `<HeroCTA secondary />` |
 | Live POD | `PickOfTheDay` component from `src/pages/DailyDigest.jsx` (extract into shared) |
 | Proof table | Pull from `mv_model_accuracy` directly via existing supabase client |
-| Comparison table | New `<ComparisonTable />` — simple grid using existing tokens |
-| FAQ | New `<FAQ />` — simple accordion using existing `ink-700` borders |
+| Comparison table | New `<ComparisonTable />`, a simple grid using existing tokens |
+| FAQ | New `<FAQ />`, a simple accordion using existing `ink-700` borders |
 
 ---
 
@@ -253,22 +253,22 @@ Accordion-style. Six questions:
 2. Update `src/components/MainApp.jsx` routing: unauthenticated users + root hash see `Landing.jsx`; authenticated users redirect to current form
 3. Move existing form view to `'#/app'` hash for authenticated users
 4. Smooth-scroll behavior on secondary CTA (uses `scrollIntoView({ behavior: 'smooth' })`)
-5. All copy uses existing tokens — no new ones needed
+5. All copy uses existing tokens. No new ones needed
 6. Responsive breakpoints: design mobile-first, scale up at `md:` (768px)
-7. Hit-rate data: fetch once on mount, cache in component state, fallback to "—" if empty
+7. Hit-rate data: fetch once on mount, cache in component state, fallback to "-" if empty
 
 ---
 
 ## Decisions still pending (will ask before building)
 
-1. **Pricing placeholder** — do I leave it as `$[X]/month` or pick a number now (e.g. $19.99)?
-2. **Trust strip data** — show real numbers from `mv_model_accuracy` or hardcode "30-day hit rate: 58%" for v1?
-3. **Comparison table competitors** — keep the 3 I listed (Action, OddsJam, Pikkit) or add ESPN BET to anchor against sportsbook UX?
+1. **Pricing placeholder.** Do I leave it as `$[X]/month` or pick a number now (e.g. $19.99)?
+2. **Trust strip data.** Show real numbers from `mv_model_accuracy` or hardcode "30-day hit rate: 58%" for v1?
+3. **Comparison table competitors.** Keep the 3 I listed (Action, OddsJam, Pikkit) or add ESPN BET to anchor against sportsbook UX?
 
 ---
 
 ## Open questions for v2 (don't block A1)
 
 - Should the landing be a *single page* or split (homepage + `/how-it-works` + `/pricing`)? Single-page for v1 is right; expand once we have traffic data.
-- A/B test the hero — villain-frame vs. quantitative-frame — after launch (Stage E / `ab-test-setup`).
+- A/B test the hero (villain-frame vs. quantitative-frame) after launch (Stage E / `ab-test-setup`).
 - Add a "compared to Action Network" page (`/vs/action-network`) as the first pSEO surface in Stage E.

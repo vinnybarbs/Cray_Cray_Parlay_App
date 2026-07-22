@@ -129,7 +129,7 @@ pg_cron (in Supabase) ──HTTP POST──> Edge Function
                                      ↓
                              Write to Supabase
 ```
-**Dependencies:** None — completely self-contained in Supabase
+**Dependencies:** None. Completely self-contained in Supabase
 
 ## Configuration Options
 
@@ -244,21 +244,21 @@ To remove later, simply delete the route from `server.js`.
 ## Files Delivered
 
 ### Edge Function
-- `supabase/functions/refresh-odds/index.ts` — Main function (TypeScript)
-- `supabase/functions/refresh-odds/README.md` — Deployment guide
+- `supabase/functions/refresh-odds/index.ts`: Main function (TypeScript)
+- `supabase/functions/refresh-odds/README.md`: Deployment guide
 
 ### Database
-- `database/enable-pg-cron.sql` — pg_cron setup & scheduling
+- `database/enable-pg-cron.sql`: pg_cron setup & scheduling
 
 ### Documentation
-- `docs/EDGE_FUNCTION_PLAN.md` — Architecture & rationale
-- `docs/EDGE_FUNCTION_SETUP.md` — Complete step-by-step guide
-- `docs/EDGE_FUNCTION_QUICK_REF.md` — Quick reference
+- `docs/EDGE_FUNCTION_PLAN.md`: Architecture & rationale
+- `docs/EDGE_FUNCTION_SETUP.md`: Complete step-by-step guide
+- `docs/EDGE_FUNCTION_QUICK_REF.md`: Quick reference
 
 ### Commits
-- `214d3df` — Edge Function implementation + docs
-- `6a83581` — Railway build fixes (Node 20)
-- `026b3ed` — Railway deployment config
+- `214d3df`: Edge Function implementation + docs
+- `6a83581`: Railway build fixes (Node 20)
+- `026b3ed`: Railway deployment config
 
 ## Status Summary
 
