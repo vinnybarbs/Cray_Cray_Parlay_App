@@ -134,15 +134,23 @@ async function getPublicLedger(req, res) {
     }
 
     // Fade record: the trap side losing means the fade won.
+    // Trap grading is a CLOSED record. Publication moved to Lean or better
+    // on 2026-07-10, so no new Trap rows reach the record. gradedThrough
+    // tells the UI to present this as an archived stat, not a live one.
     const trapReport = { called: trapPicks.length, fadeWins: 0, fadeLosses: 0, pushes: 0 };
+    let lastTrapSettled = null;
     for (const t of trapPicks) {
       if (t.actual_outcome === 'lost') trapReport.fadeWins++;
       else if (t.actual_outcome === 'won') trapReport.fadeLosses++;
       else trapReport.pushes++;
+      if (t.resolved_at && (!lastTrapSettled || t.resolved_at > lastTrapSettled)) {
+        lastTrapSettled = t.resolved_at;
+      }
     }
     const fadeDecided = trapReport.fadeWins + trapReport.fadeLosses;
     trapReport.fadeRate = fadeDecided > 0
       ? Math.round((trapReport.fadeWins / fadeDecided) * 1000) / 10 : null;
+    trapReport.gradedThrough = lastTrapSettled;
 
     // Hit rates by sport and by bet type, same population as the headline.
     const groupSummaries = (keyFn) => {
@@ -183,8 +191,8 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Nothing removed, nothing edited after publication.',
-        grading: 'One pick per game per day, the final version published before start, at its price. Pre-start revisions replace, never add. Signed model edge in percentage points sets the tier; outcomes graded from final scores by the settlement pipeline.',
+        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Trap grading closed on July 10, 2026, when publication moved to Lean or better. Trap reads now live on the daily board as information and are not graded. Nothing removed, nothing edited after publication.',
+        grading: 'One pick per game per day, the final version published before start, at its price. Pre-start revisions replace, never add. A team appearing on consecutive days is a series: each row is a separate game, settled at that day\'s price. Signed model edge in percentage points sets the tier. Outcomes are graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
       },

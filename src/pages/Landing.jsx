@@ -811,9 +811,12 @@ function TrackRecord({ sportStats, tierStats }) {
 
         {rows.length > 0 ? (
           <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp">
+            <div className="px-5 pt-2.5 bg-ink-950 text-[10px] uppercase tracking-[0.18em] text-signal-pos">
+              Last 30 days only
+            </div>
             <div className="grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-2.5 bg-ink-950 border-b border-ink-800 text-[10px] uppercase tracking-[0.18em] text-ink-400">
               <span>{dimensionLabel}</span>
-              <span className="text-right">Settled</span>
+              <span className="text-right">Settled · 30d</span>
               <span>Hit rate</span>
               <span className="text-right">%</span>
             </div>
@@ -876,6 +879,14 @@ function TrackRecord({ sportStats, tierStats }) {
         {rows.length > 0 && heldBackCount > 0 && (
           <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 text-center">
             // {heldBackCount} {dimensionLabel.toLowerCase()}{heldBackCount === 1 ? '' : 's'} under {25} settled picks held back until the sample is real.
+          </p>
+        )}
+
+        {rows.length > 0 && (
+          <p className="mt-4 text-xs text-ink-400 max-w-2xl leading-relaxed">
+            This table is a rolling 30-day window. The House Ledger keeps the
+            full record since May 10, 2026, so its totals run higher than
+            these. Same pipeline, different window.
           </p>
         )}
 

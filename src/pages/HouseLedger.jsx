@@ -188,6 +188,9 @@ export default function HouseLedger() {
             {/* Per-tier record */}
             {tierOrder.length > 0 && (
               <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-x-auto">
+                <div className="px-4 pt-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500 min-w-[480px]">
+                  Full record · since May 10, 2026 · every settled pick. The landing page table is the last 30 days only, so these totals run higher.
+                </div>
                 <div className="grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500 min-w-[480px]">
                   <span>Tier · edge range</span>
                   <span className="text-right">Settled</span>
@@ -215,7 +218,10 @@ export default function HouseLedger() {
             )}
 
             {/* Traps are fade advice, not bets. The record above only counts
-                actionable picks. A trap side losing means the call was right. */}
+                actionable picks. A trap side losing means the call was right.
+                Trap grading closed 2026-07-10 when publication moved to Lean
+                or better, so this stat no longer moves. Say so, or it reads
+                as a broken counter. */}
             {trapReport && trapReport.called > 0 && (
               <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1">
                 <span className="font-mono text-xs font-bold uppercase tracking-wider text-signal-neg">Traps called</span>
@@ -224,7 +230,15 @@ export default function HouseLedger() {
                 <span className={`font-mono text-sm font-bold tabular-nums ${trapReport.fadeRate >= 55 ? 'text-signal-pos' : 'text-ink-100'}`}>
                   {trapReport.fadeWins}-{trapReport.fadeLosses}{trapReport.fadeRate != null ? ` (${trapReport.fadeRate}%)` : ''}
                 </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full sm:basis-auto sm:ml-auto">a trap is advice to bet against a side, so its loss is our win</span>
+                {trapReport.gradedThrough && (
+                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ink-400 border border-ink-700 rounded-sharp px-1.5 py-0.5">
+                    Closed record · graded May 10 to {fmtDate(trapReport.gradedThrough)}
+                  </span>
+                )}
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full">
+                  a trap is advice to bet against a side, so its loss is our win.
+                  {trapReport.gradedThrough && ' Trap grading closed when publication moved to Lean or better. New trap reads stay on the daily board as information and this number will not change.'}
+                </span>
               </div>
             )}
 
