@@ -3,7 +3,7 @@ import { edgeTier, formatPp } from '../lib/tiers'
 import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
 
-// Yesterday's board — rendered inside the dark-slate empty states on the
+// Yesterday's board, rendered inside the dark-slate empty states on the
 // Digest and The Board. When today has nothing to grade, show what the
 // machine published yesterday and how every pick actually settled. Same
 // receipts posture as the House Ledger, scoped to one day.
@@ -29,7 +29,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
   useEffect(() => {
     // Depend on `open` alone. Including loading/data re-ran the effect on
     // the setLoading(true) render, whose cleanup cancelled the in-flight
-    // fetch — the response was thrown away and the skeleton pulsed forever.
+    // fetch. The response was thrown away and the skeleton pulsed forever.
     if (!open) return
     let cancelled = false
     setLoading(true)
@@ -54,7 +54,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
         onClick={() => setOpen(true)}
         className="mt-5 px-4 py-2 text-xs font-semibold bg-ink-850 hover:bg-ink-800 text-ink-200 rounded-sharp shadow-hairline transition-colors active:scale-95"
       >
-        Yesterday's board — every pick, settled
+        Yesterday's board. Every pick, settled
       </button>
     )
   }
@@ -78,7 +78,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
             <span className="text-ink-200">{dateLabel}</span>
             {s && s.total > 0 && (
               <>
-                <span>{s.won}–{s.lost}{s.push > 0 ? `–${s.push}` : ''}</span>
+                <span>{s.won}-{s.lost}{s.push > 0 ? `-${s.push}` : ''}</span>
                 {s.winRate != null && <span className={s.winRate >= 55 ? 'text-signal-pos' : s.winRate < 50 ? 'text-signal-neg' : ''}>{s.winRate}%</span>}
                 <span title="Profit measured in units, staking 1 unit per pick at the published odds" className={`tabular-nums cursor-help ${s.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.units >= 0 ? '+' : ''}{s.units.toFixed(2)}u at 1u a pick</span>
               </>
@@ -113,7 +113,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
             </>
           )}
           {(!s || s.total === 0) ? (
-            <p className="px-4 py-6 text-sm text-ink-400 text-center">Nothing was published yesterday either — the slate was dark.</p>
+            <p className="px-4 py-6 text-sm text-ink-400 text-center">Nothing was published yesterday either. The slate was dark.</p>
           ) : (
             data.picks.map((p, i) => {
               const tier = edgeTier(p.edge_pp)
@@ -128,7 +128,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                       {tier.label}
                     </span>
                     <span className={`flex-shrink-0 w-14 text-right font-mono text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-                      {p.edge_pp != null ? formatPp(p.edge_pp) : '—'}
+                      {p.edge_pp != null ? formatPp(p.edge_pp) : '-'}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink-100 truncate">
@@ -145,7 +145,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                         ? <p className="text-xs text-ink-200 leading-relaxed max-w-2xl">{p.reasoning}</p>
                         : <p className="text-xs text-ink-500">No written analysis was stored with this pick.</p>}
                       <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
-                        {tier.label}{tier.subtitle && tier.subtitle.toLowerCase() !== tier.label.toLowerCase() ? ` · ${tier.subtitle}` : ''} · published {fmtPublished(p.created_at)} — before the game started
+                        {tier.label}{tier.subtitle && tier.subtitle.toLowerCase() !== tier.label.toLowerCase() ? ` · ${tier.subtitle}` : ''} · published {fmtPublished(p.created_at)}, before the game started
                       </p>
                     </div>
                   )}

@@ -49,7 +49,7 @@ function edgeBadgeClass(score) {
   return 'bg-ink-800 text-ink-300 border border-ink-600'
 }
 
-// edgeTier / formatPp / edgePpForSide now live in src/lib/tiers.js — one
+// edgeTier / formatPp / edgePpForSide now live in src/lib/tiers.js, one
 // grading language shared by digest, generator, landing, and ledger.
 
 // Build a readable pick label for one side using market context already on the game row.
@@ -234,7 +234,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
           </button>
         </div>
 
-        {/* Modal body — scrollable */}
+        {/* Modal body, scrollable */}
         <div className="overflow-y-auto flex-1 p-5 space-y-5">
 
           {loading && (
@@ -318,7 +318,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                 <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-3">Current Lines</div>
                 {hasOdds ? (
                   <div className="space-y-2">
-                    {/* Rows are {market, bookmaker, outcomes:[{name, price, point?}]} —
+                    {/* Rows are {market, bookmaker, outcomes:[{name, price, point?}]}, meaning
                         prices live inside outcomes, not flat columns. */}
                     {odds.map((line, i) => {
                       const marketLabel = { h2h: 'Moneyline', spreads: 'Spread', totals: 'Total' }[line.market] || line.market || 'Line'
@@ -423,7 +423,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
             </div>
           )}
 
-          {/* Recent form — last 5 games each team */}
+          {/* Recent form, last 5 games each team */}
           {(() => {
             const homeResults = data?.homeTeamResults || []
             const awayResults = data?.awayTeamResults || []
@@ -502,7 +502,7 @@ function EdgeChip({ signedPp, size = 'md' }) {
   const padding = size === 'sm' ? 'px-2 py-1' : 'px-2.5 py-1.5'
   const ppSize = size === 'sm' ? 'text-[11px]' : 'text-sm'
   const ppTooltip = pp != null
-    ? `${pp} · ${tier.label} — gap between the model's win-probability and the book's implied probability, in percentage points`
+    ? `${pp} · ${tier.label}. The gap between the model's win-probability and the book's implied probability, in percentage points`
     : 'No model edge available for this side'
   return (
     <div
@@ -510,7 +510,7 @@ function EdgeChip({ signedPp, size = 'md' }) {
       title={ppTooltip}
     >
       <div className={`font-mono font-semibold ${ppSize} ${tier.color} tabular-nums tracking-tight`}>
-        <span className="mr-0.5">{arrow}</span>{pp ?? '—'}
+        <span className="mr-0.5">{arrow}</span>{pp ?? '-'}
       </div>
       <div className={`font-mono text-[9px] uppercase tracking-[0.14em] ${tier.color} mt-0.5`}>{tier.label}</div>
       {tier.subtitle && (
@@ -546,7 +546,7 @@ function MarketRow({ sides, recommendedSide }) {
                 className={`flex-shrink-0 font-mono text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}
                 title={s.signedPp != null ? `${formatPp(s.signedPp)} · ${tier.label}` : 'No model edge for this side'}
               >
-                {hasAnyEdge ? (formatPp(s.signedPp) ?? '—') : '—'}
+                {hasAnyEdge ? (formatPp(s.signedPp) ?? '-') : '-'}
               </span>
             </div>
           )
@@ -624,7 +624,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
 
   // Signed edge in pp for the recommended side. When the math returned a real
   // pick, this reflects that bet's edge. When it didn't (no-edge game), we
-  // fall back to null so the chip renders "—".
+  // fall back to null so the chip renders "-".
   const signedPp = edgePpForSide(game.edges, game.recommended_side)
 
   return (
@@ -658,7 +658,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           </div>
         ) : (
           <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
-            <div className="font-mono text-[11px] text-ink-400">No model edge — every market &lt; 2pp</div>
+            <div className="font-mono text-[11px] text-ink-400">No model edge. Every market &lt; 2pp</div>
           </div>
         )}
 
@@ -678,7 +678,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
                 onClick={() => setExpanded(e => !e)}
                 className="font-mono text-[10px] uppercase tracking-[0.14em] text-signal-pos/80 hover:text-signal-pos mt-1"
               >
-                {expanded ? '— show less' : '+ read more'}
+                {expanded ? '- show less' : '+ read more'}
               </button>
             )}
           </div>
@@ -697,7 +697,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
         )}
       </div>
 
-      {/* Action row — Deep Research. The pick itself is information, not a
+      {/* Action row for Deep Research. The pick itself is information, not a
           button: the machine builds the parlays now. */}
       <div className="px-4 pb-4 pt-0 flex gap-2">
         {gameKey && (
@@ -758,7 +758,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 
   // Split games by whether the math returned an actionable pick. "On the
   // bubble" surfaces games where the model considered the matchup but every
-  // market sat below the +2pp threshold — kept visible (so users see we're
+  // market sat below the +2pp threshold, kept visible (so users see we're
   // not forcing picks) but separated from the actionable list.
   const ppFor = (g) => edgePpForSide(g.edges, g.recommended_side)
   const pickGames = games.filter(g => g.recommended_pick && (ppFor(g) ?? 0) >= 2)
@@ -779,7 +779,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
-      {/* Sport header bar — clickable to collapse/expand */}
+      {/* Sport header bar, clickable to collapse/expand */}
       <button
         onClick={() => setExpanded(e => !e)}
         className="w-full text-left bg-ink-850 px-6 py-4 border-b border-ink-700 hover:bg-ink-800 transition-colors"
@@ -810,7 +810,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         </div>
       </button>
 
-      {/* Collapsed preview — top 3 actionable picks as compact rows */}
+      {/* Collapsed preview, top 3 actionable picks as compact rows */}
       {!expanded && topGames.length > 0 && (
         <div className="px-6 py-3 space-y-2">
           {topGames.map((game, i) => {
@@ -820,12 +820,12 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               <div key={i} className="flex items-center justify-between gap-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
-                    {formatPp(pp) ?? '—'}
+                    {formatPp(pp) ?? '-'}
                   </span>
                   <span className="text-ink-200 truncate">{game.away_team} @ {game.home_team}</span>
                 </div>
                 <span className="font-mono text-signal-pos text-xs font-medium flex-shrink-0 truncate max-w-[140px] tabular-nums">
-                  {game.recommended_pick || '—'}
+                  {game.recommended_pick || '-'}
                 </span>
               </div>
             )
@@ -836,7 +836,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         </div>
       )}
 
-      {/* Expanded body — full tiles */}
+      {/* Expanded body, full tiles */}
       {expanded && (
         <div className="p-6">
           {pickGames.length > 0 ? (
@@ -882,11 +882,11 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             </>
           ) : (
             <div className="rounded-sharp bg-ink-950/40 border border-dashed border-ink-700 px-4 py-6 text-center text-sm text-ink-400">
-              No actionable picks for {meta.label} today — the model considered every game and didn't find an edge ≥ 2pp.
+              No actionable picks for {meta.label} today. The model considered every game and didn't find an edge ≥ 2pp.
             </div>
           )}
 
-          {/* On the bubble — games we analyzed but didn't recommend */}
+          {/* On the bubble, games we analyzed but didn't recommend */}
           {bubbleGames.length > 0 && (
             <details className="mt-6 group">
               <summary className="cursor-pointer list-none flex items-center gap-2 select-none">
@@ -921,7 +921,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 // ─── PickOfTheDay ────────────────────────────────────────────────────────────
 // The single highest-edge tile across all sports today, featured prominently
 // above the sport sections. This IS the "first Sharp Take seen" aha moment for
-// new users — without it, they'd have to expand sport accordions to find the
+// new users. Without it, they'd have to expand sport accordions to find the
 // best play. With it, the value prop lands on first scroll.
 
 function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
@@ -935,7 +935,7 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
 
   // Surface the model's view in human terms when the data is on the row.
   // pre-analyze writes calc_*_prob and implied_*_prob alongside edges, but
-  // they may be absent on older rows — fall back gracefully.
+  // they may be absent on older rows, so fall back gracefully.
   const side = game.recommended_side
   const isHomeSide = side === 'home_ml' || side === 'home_spread'
   const isAwaySide = side === 'away_ml' || side === 'away_spread'
@@ -943,12 +943,12 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
   const impliedProb = isHomeSide ? game.implied_home_prob : isAwaySide ? game.implied_away_prob : null
   const showProbCompare = modelProb != null && impliedProb != null && (side === 'home_ml' || side === 'away_ml')
 
-  // Rank context — "highest of N graded today" gives the headline its bite.
+  // Rank context, "highest of N graded today", gives the headline its bite.
   const totalSignalPicks = (tierCounts?.sharpTakes || 0) + (tierCounts?.strongPlays || 0) + (tierCounts?.plays || 0) + (tierCounts?.leans || 0)
 
   // Track record across same-tier picks (last 30 days). Combines Sharp Take +
   // Strong Play when both are present so a low-volume sport still has signal.
-  // Hidden until ≥10 settled — small samples mislead more than they help.
+  // Hidden until ≥10 settled. Small samples mislead more than they help.
   const trackRecord = (() => {
     const ts = tierStats?.sharpTake
     if (!ts) return null
@@ -960,7 +960,7 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
 
   return (
     <div className="bg-ink-900 rounded-sharp overflow-hidden shadow-hairline-pos">
-      {/* Top bar — featured label + sport context */}
+      {/* Top bar, featured label + sport context */}
       <div className="flex items-center justify-between px-5 py-2 bg-signal-pos-dim/25 border-b border-signal-pos-dim/60">
         <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
           ★ Pick of the Day
@@ -982,7 +982,7 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
             </div>
           </div>
 
-          {/* Edge stat block — sized larger than a regular EdgeChip */}
+          {/* Edge stat block, sized larger than a regular EdgeChip */}
           <div className={`flex flex-col items-end leading-tight flex-shrink-0 rounded-sharp ${tier.bg} px-3 py-2`}>
             <div className={`font-mono text-2xl font-bold ${tier.color} tabular-nums tracking-tight`}>
               <span className="mr-1">{arrow}</span>{pp}
@@ -994,9 +994,9 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
           </div>
         </div>
 
-        {/* Sharp Take track record — last 30d hit rate for same-tier picks.
+        {/* Sharp Take track record. Last 30d hit rate for same-tier picks.
             Hidden until ≥10 settled (see trackRecord derivation above). The
-            point isn't to celebrate the model — it's to show the receipt. */}
+            point isn't to celebrate the model. It's to show the receipt. */}
         {trackRecord && (
           <div className="mt-3 flex items-center justify-between bg-ink-850 shadow-hairline rounded-sharp px-3 py-2 gap-3">
             <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300">
@@ -1014,7 +1014,7 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
           </div>
         )}
 
-        {/* Why this pick — rank context + model-vs-market in human terms */}
+        {/* Why this pick, rank context + model-vs-market in human terms */}
         <div className="mt-4 bg-ink-850 shadow-hairline rounded-sharp px-3 py-2.5">
           <div className="font-mono text-[9px] text-signal-pos uppercase tracking-[0.18em] mb-1.5">Why this pick</div>
           <div className="space-y-1 font-mono text-xs">
@@ -1049,7 +1049,7 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
           </div>
         </div>
 
-        {/* Analysis snippet — surfaces De-Genny's voice on the featured pick.
+        {/* Analysis snippet. Surfaces De-Genny's voice on the featured pick.
             Expandable with the same +read more / −show less pattern as regular tiles. */}
         {game.analysis_snippet && (
           <div className="mt-3">
@@ -1075,7 +1075,7 @@ function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
 // ─── GolfLeaderboard ─────────────────────────────────────────────────────────
 
 function fmtGolfPrice(price) {
-  if (price == null) return '—'
+  if (price == null) return '-'
   const n = Number(price)
   return n > 0 ? `+${n}` : String(n)
 }
@@ -1085,7 +1085,7 @@ function OnDeckRail({ onDeck }) {
   const sports = Object.entries(onDeck || {}).filter(([, games]) => games.length > 0)
   if (sports.length === 0) return null
   const total = sports.reduce((s, [, g]) => s + g.length, 0)
-  const fmtMl = (v) => v == null ? '—' : v > 0 ? `+${v}` : String(v)
+  const fmtMl = (v) => v == null ? '-' : v > 0 ? `+${v}` : String(v)
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
       <button
@@ -1151,7 +1151,7 @@ function GolfFieldBoard({ field }) {
                 {p.position && <span className="ml-2 font-mono text-[10px] text-signal-pos">P{p.position} {p.score}</span>}
               </span>
               <span className="w-14 text-right font-mono text-xs text-ink-200 tabular-nums">{fmtGolfPrice(p.best_price)}</span>
-              <span className="w-14 text-right font-mono text-xs text-ink-400 tabular-nums">{p.consensus_prob != null ? `${(p.consensus_prob * 100).toFixed(1)}%` : '—'}</span>
+              <span className="w-14 text-right font-mono text-xs text-ink-400 tabular-nums">{p.consensus_prob != null ? `${(p.consensus_prob * 100).toFixed(1)}%` : '-'}</span>
               <span className={`w-16 text-right font-mono text-xs tabular-nums ${p.value_pp > 0 ? 'text-signal-pos' : p.value_pp < 0 ? 'text-signal-neg' : 'text-ink-500'}`}>
                 {p.value_pp != null ? `${p.value_pp > 0 ? '+' : ''}${p.value_pp.toFixed(1)}pp` : ''}
               </span>
@@ -1160,7 +1160,7 @@ function GolfFieldBoard({ field }) {
               <p className="px-2 pb-2 pt-1 text-xs text-ink-300 leading-relaxed">{p.note}</p>
             )}
             {openNote === i && !p.note && (
-              <p className="px-2 pb-2 pt-1 text-xs text-ink-500">No research note for this player yet — deeper in the field than the analysis covers.</p>
+              <p className="px-2 pb-2 pt-1 text-xs text-ink-500">No research note for this player yet, deeper in the field than the analysis covers.</p>
             )}
           </div>
         ))}
@@ -1236,7 +1236,7 @@ function GolfLeaderboard({ golf }) {
             </div>
           )}
 
-          {/* Researched field boards — one per tournament with live outright odds */}
+          {/* Researched field boards, one per tournament with live outright odds */}
           {fields.map(f => <GolfFieldBoard key={f.key} field={f} />)}
         </div>
       )}
@@ -1244,7 +1244,7 @@ function GolfLeaderboard({ golf }) {
   )
 }
 
-// ─── QuietDayCard — fallback hero when nothing clears the feature bar ────────
+// ─── QuietDayCard, the fallback hero when nothing clears the feature bar ────────
 // The bar stays at 7pp; on a quiet slate the honest move is to say so and
 // hand the user a next step, not to leave a hole where the hero was.
 
@@ -1260,7 +1260,7 @@ function QuietDayCard({ best, trapCount }) {
       </h2>
       <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
         Nothing on the board cleared the 7-point feature bar, and we don't
-        lower the bar on quiet days — that discipline is what the record is
+        lower the bar on quiet days. That discipline is what the record is
         built on. Here's what's still worth your time:
       </p>
       <div className="mt-5 space-y-3">
@@ -1275,14 +1275,14 @@ function QuietDayCard({ best, trapCount }) {
                 <span className="text-signal-pos/80 ml-2 font-mono text-xs">{formatPp(best.signedPp)}</span>
               </div>
               <div className="text-xs text-ink-400 mt-0.5">
-                {best.sport} · {best.game.away_team} @ {best.game.home_team} · best edge on a quiet board, below our feature bar — size it accordingly
+                {best.sport} · {best.game.away_team} @ {best.game.home_team} · best edge on a quiet board, below our feature bar, so size it accordingly
               </div>
             </div>
           </div>
         )}
         {trapCount > 0 && (
           <p className="text-sm text-ink-300">
-            <span className="text-signal-neg font-bold font-mono">{trapCount}</span> Trap{trapCount !== 1 ? 's' : ''} on the board below — knowing what <span className="text-ink-100">not</span> to bet is half the product.
+            <span className="text-signal-neg font-bold font-mono">{trapCount}</span> Trap{trapCount !== 1 ? 's' : ''} on the board below. Knowing what <span className="text-ink-100">not</span> to bet is half the product.
           </p>
         )}
         <button
@@ -1304,7 +1304,7 @@ export default function DailyDigest({ onBack }) {
   const [error, setError] = useState(null)
   const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
   const [legendOpen, setLegendOpen] = useState(false)
-  // Sharp Take / Strong Play hit-rate over last 30d — surfaces below the
+  // Sharp Take / Strong Play hit-rate over last 30d. Surfaces below the
   // featured pick to anchor the picks-actually-win narrative ("don't trust
   // me, trust the receipt").
   const [tierStats, setTierStats] = useState(null)
@@ -1356,7 +1356,7 @@ export default function DailyDigest({ onBack }) {
   const totalSports = sportSections.length
 
   // Count tiles by tier so we can render a count-first hero ("12 Sharp Takes today").
-  // Cheaper than rendering every tile twice — derived once per data refresh.
+  // Cheaper than rendering every tile twice, derived once per data refresh.
   const tierCounts = useMemo(() => {
     const c = { sharpTakes: 0, strongPlays: 0, plays: 0, leans: 0, traps: 0 }
     if (!data?.gamesBySport) return c
@@ -1374,7 +1374,7 @@ export default function DailyDigest({ onBack }) {
     return c
   }, [data])
 
-  // Pick of the Day — the single highest-edge tile across all sports today.
+  // Pick of the Day, the single highest-edge tile across all sports today.
   // Featured only when it clears the Strong Play tier (>= 7pp) AND has a real
   // recommended_pick string. Settled results showed sub-7pp picks running
   // 46-51%, which is not headline material. Otherwise the callout hides,
@@ -1398,7 +1398,7 @@ export default function DailyDigest({ onBack }) {
 
   // Quiet-day fallback: the best sub-feature-bar edge, so a first session on
   // a quiet board still has a next step instead of a missing hero (audit 40,
-  // funnel leak 5). Never dressed up as a Pick of the Day — labeled honestly.
+  // funnel leak 5). Never dressed up as a Pick of the Day. Labeled honestly.
   const quietBest = useMemo(() => {
     if (!data?.gamesBySport || pickOfTheDay) return null
     let best = null
@@ -1415,7 +1415,7 @@ export default function DailyDigest({ onBack }) {
     return best
   }, [data, pickOfTheDay])
 
-  // Hero trust anchor reads Sharp Take — the ticket. Prefer 30d, fall back
+  // Hero trust anchor reads Sharp Take, the ticket. Prefer 30d, fall back
   // to 7d then all-time; fall back to the overall record only if tier data
   // is absent. The full table lives on the ledger, not here.
   const heroHitRate = (() => {
@@ -1441,7 +1441,7 @@ export default function DailyDigest({ onBack }) {
 
   return (
     <div className="min-h-screen bg-ink-950 text-white font-sans">
-      {/* Top nav bar — the digest is the authenticated home, so there is no
+      {/* Top nav bar. The digest is the authenticated home, so there is no
           "Back". Other surfaces are forward navigation. */}
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
         <span className="text-sm font-semibold text-ink-200">Daily Digest</span>
@@ -1489,7 +1489,7 @@ export default function DailyDigest({ onBack }) {
           </div>
 
           <div className="min-w-0">
-            {/* Count-first headline — math-derived, instantly tells you what's actionable today */}
+            {/* Count-first headline, math-derived, instantly tells you what's actionable today */}
               {data ? (
                 tierCounts.sharpTakes > 0 ? (
                   <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
@@ -1507,7 +1507,7 @@ export default function DailyDigest({ onBack }) {
                   </h1>
                 ) : (
                   <h1 className="font-mono text-2xl md:text-3xl font-bold tracking-tight text-ink-100 leading-tight">
-                    Quiet board — no tiles cleared 7pp today
+                    Quiet board. No tiles cleared 7pp today
                   </h1>
                 )
               ) : (
@@ -1556,20 +1556,20 @@ export default function DailyDigest({ onBack }) {
         {/* Sport sections */}
         {!loading && !error && data && (
           <>
-            {/* Yesterday's board — the same settled receipts the dark-slate
+            {/* Yesterday's board, the same settled receipts the dark-slate
                 card offers, one button away on normal days too. */}
             {sportSections.length > 0 && (
               <div className="-mt-2"><YesterdayBoard /></div>
             )}
 
-            {/* Pick of the Day — the single best edge across all sports, featured
+            {/* Pick of the Day, the single best edge across all sports, featured
                 above the accordions so new users see the aha moment on first scroll. */}
             {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} tierCounts={tierCounts} totalGames={totalGames} tierStats={tierStats} />}
-            {/* Dark slate (no games at all) gets the calendar card below instead —
+            {/* Dark slate (no games at all) gets the calendar card below instead, since
                 the 7pp-bar copy makes no sense when there is nothing to grade. */}
             {!pickOfTheDay && totalGames > 0 && <QuietDayCard best={quietBest} trapCount={tierCounts.traps} />}
 
-            {/* Sport sections — all start collapsed, show 3 game preview */}
+            {/* Sport sections. All start collapsed, show 3 game preview */}
             {sportSections.length === 0 ? (
               <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
                 <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
@@ -1578,7 +1578,7 @@ export default function DailyDigest({ onBack }) {
                 <h2 className="text-xl md:text-2xl font-bold text-ink-100 leading-tight">The slate is dark.</h2>
                 <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
                   Every game on the board has started or settled, and the books haven't
-                  posted the next slate yet. Nothing is broken — there's just nothing
+                  posted the next slate yet. Nothing is broken. There's just nothing
                   to grade until new games go up.
                 </p>
                 {data.firstGameTime && (
@@ -1610,15 +1610,15 @@ export default function DailyDigest({ onBack }) {
               ))
             )}
 
-            {/* Golf — a side dish, not the main course. One collapsed line at
+            {/* Golf is a side dish, not the main course. One collapsed line at
                 the bottom of the sports list; the field boards live inside. */}
             {data.golf && <GolfLeaderboard golf={data.golf} />}
 
-            {/* On deck — the wall of future games the books already price.
+            {/* On deck, the wall of future games the books already price.
                 The board is never "thin", the window is just honest. */}
             <OnDeckRail onDeck={data.onDeck} />
 
-            {/* Bottom CTA — primary action (Chat) gets the amber fill; secondary (Generator) stays ghost so the eye lands on the primary */}
+            {/* Bottom CTA. Primary action (Chat) gets the amber fill; secondary (Generator) stays ghost so the eye lands on the primary */}
             <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 flex flex-col sm:flex-row items-center justify-center gap-3">
               <button
                 onClick={() => { window.location.hash = '#/chat' }}
@@ -1630,7 +1630,7 @@ export default function DailyDigest({ onBack }) {
                 onClick={onBack}
                 className="w-full sm:w-auto px-6 py-3 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-mono font-medium uppercase tracking-[0.12em] text-sm text-ink-200 transition-all active:scale-[0.98]"
               >
-                The Board — filter every pick
+                The Board, filter every pick
               </button>
             </div>
           </>
@@ -1646,10 +1646,10 @@ export default function DailyDigest({ onBack }) {
         />
       )}
 
-      {/* Edge legend modal — teach-once explainer for pp + tier ladder. */}
+      {/* Edge legend modal, a teach-once explainer for pp + tier ladder. */}
       <EdgeLegendModal open={legendOpen} onClose={() => setLegendOpen(false)} />
 
-      {/* Sticky locked-picks bar — visible whenever the user has staged ≥ 1 pick.
+      {/* Sticky locked-picks bar, visible whenever the user has staged ≥ 1 pick.
           Pinned to viewport bottom; the parent container reserves pb-32 to avoid overlap. */}
     </div>
   )
@@ -1676,10 +1676,10 @@ function EdgeLegendModal({ open, onClose }) {
 
   const tiers = [
     { range: '≥ 10pp', label: 'Sharp Take',  sub: 'sharp take',  cls: 'text-signal-pos font-semibold' },
-    { range: '7–10pp', label: 'Strong Play', sub: 'hammer it',   cls: 'text-signal-pos font-semibold' },
-    { range: '4–7pp',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
-    { range: '2–4pp',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
-    { range: '0–2pp',  label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
+    { range: '7-10pp', label: 'Strong Play', sub: 'hammer it',   cls: 'text-signal-pos font-semibold' },
+    { range: '4-7pp',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
+    { range: '2-4pp',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
+    { range: '0-2pp',  label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
     { range: '< 0pp',  label: 'Trap',        sub: 'fade it',     cls: 'text-signal-neg font-semibold' },
   ]
 
@@ -1734,7 +1734,7 @@ function EdgeLegendModal({ open, onClose }) {
 
           <div className="pt-3 border-t border-ink-700">
             <p className="text-ink-300 text-xs leading-relaxed font-mono">
-              Math picks the side. De-Genny narrates. We publish negative edges too — that's why <span className="text-signal-neg">Trap</span> exists.
+              Math picks the side. De-Genny narrates. We publish negative edges too. That's why <span className="text-signal-neg">Trap</span> exists.
             </p>
           </div>
         </div>

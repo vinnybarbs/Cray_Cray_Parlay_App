@@ -51,9 +51,9 @@ const parsePlayerPropPick = (pick) => {
 
   const direction = directionRaw.charAt(0).toUpperCase() + directionRaw.slice(1).toLowerCase();
   // For Over/Under props, don't add + sign - it's a threshold, not a spread
-  // Format: "24.5 — Breece Hall reception yds" (direction is added separately in display)
+  // Format: "24.5 - Breece Hall reception yds" (direction is added separately in display)
   const lineText = `${lineNumber}`;
-  const coreText = `${lineText} — ${playerName} ${marketLabel}`;
+  const coreText = `${lineText} - ${playerName} ${marketLabel}`;
 
   return { direction, coreText };
 }
@@ -70,7 +70,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
       '',
       pick.reasoning || '',
       '',
-      '— via TrapHawk'
+      '- via TrapHawk'
     ]
     navigator.clipboard.writeText(lines.join('\n')).then(() => {
       setCopied(true)
@@ -143,7 +143,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
             <div className="text-xs text-ink-300 mb-1">{pick.betType}</div>
             <div className="text-base font-bold text-white leading-tight">
               {propMeta ? (
-                <span>{propMeta.direction} — {propMeta.coreText}</span>
+                <span>{propMeta.direction} - {propMeta.coreText}</span>
               ) : pick.betType === 'Spread' && pick.point !== undefined && pick.point !== null ? (
                 <span>{pick.pick} {typeof pick.point === 'string' ? pick.point : (pick.point > 0 ? '+' : '')}{typeof pick.point === 'number' ? pick.point : ''} <span className={`${getOddsColor(pick.odds)}`}>{pick.odds}</span></span>
               ) : pick.betType === 'Total' && pick.point !== undefined && pick.point !== null ? (

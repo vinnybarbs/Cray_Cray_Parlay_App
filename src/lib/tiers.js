@@ -2,16 +2,16 @@
 // landing, ledger) speaks signed percentage-point edges and these six tiers.
 // Cutoffs are product law: change them here or nowhere.
 //
-// We deliberately avoid "Lock" — it recreates the "guaranteed-win" mental
+// We deliberately avoid "Lock" because it recreates the "guaranteed-win" mental
 // model the old 10/10 edge_score caused. Negative edges get their own tier
 // so we never silently dress them up.
 
 export const TIERS = [
   { label: 'Sharp Take',  subtitle: 'sharp take', range: '10pp+',   min: 10,        max: Infinity },
-  { label: 'Strong Play', subtitle: 'hammer it',  range: '7–10pp',  min: 7,         max: 10 },
-  { label: 'Play',        subtitle: 'play it',    range: '4–7pp',   min: 4,         max: 7 },
-  { label: 'Lean',        subtitle: 'lean it',    range: '2–4pp',   min: 2,         max: 4 },
-  { label: 'Skip',        subtitle: 'pass on it', range: '0–2pp',   min: 0,         max: 2 },
+  { label: 'Strong Play', subtitle: 'hammer it',  range: '7-10pp',  min: 7,         max: 10 },
+  { label: 'Play',        subtitle: 'play it',    range: '4-7pp',   min: 4,         max: 7 },
+  { label: 'Lean',        subtitle: 'lean it',    range: '2-4pp',   min: 2,         max: 4 },
+  { label: 'Skip',        subtitle: 'pass on it', range: '0-2pp',   min: 0,         max: 2 },
   { label: 'Trap',        subtitle: 'fade it',    range: 'below 0', min: -Infinity, max: 0 },
 ]
 
@@ -24,7 +24,7 @@ export function tierRange(label) {
 // Sharp-Quant aesthetic: graphite frame + amber/crimson signal accent.
 export function edgeTier(signedPp) {
   if (signedPp == null || Number.isNaN(signedPp)) {
-    return { label: '—', subtitle: '', color: 'text-ink-400', bg: 'bg-ink-850 shadow-hairline' }
+    return { label: '-', subtitle: '', color: 'text-ink-400', bg: 'bg-ink-850 shadow-hairline' }
   }
   if (signedPp < 0) {
     return { label: 'Trap', subtitle: 'fade it', color: 'text-signal-neg', bg: 'bg-signal-neg-dim/30 shadow-hairline-neg' }
@@ -61,7 +61,7 @@ export function edgePpForSide(edges, side) {
 
 // Real odds for the recommended side. recommended_odds is captured at
 // analysis time server-side; rows analyzed before that column existed still
-// carry ML prices on the row. When no real price is known we send null —
+// carry ML prices on the row. When no real price is known we send null,
 // never a made-up -110, downstream lock records feed the settlement ledger.
 export function lockOddsFor(game) {
   if (game.recommended_odds != null) return game.recommended_odds

@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 
-// The publishable (anon) key is designed to live in client bundles — data
+// The publishable (anon) key is designed to live in client bundles. Data
 // access is protected by RLS, not by hiding this key. Baking the defaults in
 // removes the silent-failure mode where a build without VITE_ env vars
 // shipped a null client and every auth surface reported "not configured"

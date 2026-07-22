@@ -18,7 +18,7 @@ function timeAgo(ts) {
 }
 
 function fmtDate(ts) {
-  if (!ts) return '—'
+  if (!ts) return '-'
   return new Date(ts).toLocaleString()
 }
 
@@ -28,7 +28,7 @@ function winRate(won, lost) {
   return Math.round((won / settled) * 100)
 }
 
-// Per-table freshness thresholds (hours) — some tables only update daily
+// Per-table freshness thresholds (hours). Some tables only update daily
 const FRESHNESS_THRESHOLDS = {
   game_results: { fresh: 26, stale: 50 },     // Daily backfill at 5 AM
   game_analysis: { fresh: 4, stale: 8 },       // Every 2-3h per sport
@@ -146,7 +146,7 @@ function FeedPanel({ title, sub, children, maxH = 'max-h-[420px]' }) {
 }
 
 function Cell({ label, value, mono = true }) {
-  const display = value == null || value === '' ? '—'
+  const display = value == null || value === '' ? '-'
     : typeof value === 'number' ? (Number.isInteger(value) ? String(value) : value.toFixed(3))
     : String(value)
   return (
@@ -174,7 +174,7 @@ function UpcomingInspectorSection({ analyses }) {
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
       <div className="px-4 py-3 bg-ink-950 border-b border-ink-800">
         <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal-pos">Upcoming game inspector</p>
-        <p className="text-ink-500 text-[11px] mt-0.5">{upcoming.length} analyzed games not yet started — tap one to see every cell the tile is built from</p>
+        <p className="text-ink-500 text-[11px] mt-0.5">{upcoming.length} analyzed games not yet started. Tap one to see every cell the tile is built from</p>
       </div>
       <div className="max-h-[560px] overflow-y-auto">
         {upcoming.length === 0 ? (
@@ -200,7 +200,7 @@ function UpcomingInspectorSection({ analyses }) {
                     <Cell label="stale" value={String(g.stale)} />
                     <Cell label="generated" value={timeAgo(g.generated_at)} />
                     <Cell label="expires" value={timeAgo(g.expires_at)} />
-                    <Cell label="tokens in/out" value={`${g.prompt_tokens ?? '—'} / ${g.completion_tokens ?? '—'}`} />
+                    <Cell label="tokens in/out" value={`${g.prompt_tokens ?? '-'} / ${g.completion_tokens ?? '-'}`} />
                     <Cell label="pick" value={g.recommended_pick} />
                     <Cell label="side" value={g.recommended_side} />
                     <Cell label="pick odds" value={g.recommended_odds} />
@@ -227,7 +227,7 @@ function UpcomingInspectorSection({ analyses }) {
                   <div className="mt-2 space-y-2">
                     <div className="bg-ink-950/60 rounded-sharp px-2.5 py-1.5">
                       <p className="font-mono text-[9px] uppercase tracking-[0.12em] text-ink-500">analysis snippet</p>
-                      <p className="text-xs text-ink-200 leading-relaxed">{g.analysis_snippet || '—'}</p>
+                      <p className="text-xs text-ink-200 leading-relaxed">{g.analysis_snippet || '-'}</p>
                       {g.what_changed && <p className="mt-1 text-[11px] text-signal-pos/80">Changed: {g.what_changed}</p>}
                     </div>
                     {g.news_context && (
@@ -277,7 +277,7 @@ function IntelFeedSection({ intel }) {
             {(r.kind || '?').replace('_', ' ')}
           </span>
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-ink-100 truncate">{r.team || (r.payload?.game || '—')}</p>
+            <p className="text-sm text-ink-100 truncate">{r.team || (r.payload?.game || '-')}</p>
             <p className="text-xs text-ink-400 leading-relaxed">{summarize(r.kind, r.payload)}</p>
           </div>
           <span className="flex-shrink-0 font-mono text-[10px] text-ink-500">{timeAgo(r.created_at)}</span>
@@ -290,7 +290,7 @@ function IntelFeedSection({ intel }) {
 function PipelineRunsSection({ runs }) {
   const [openIdx, setOpenIdx] = React.useState(null)
   return (
-    <FeedPanel title="Pipeline runs" sub={`Last ${runs?.length || 0} cron log rows — tap a row for the raw details`}>
+    <FeedPanel title="Pipeline runs" sub={`Last ${runs?.length || 0} cron log rows. Tap a row for the raw details`}>
       {(!runs || runs.length === 0) ? (
         <p className="px-4 py-8 text-center text-ink-500 text-sm">No runs logged.</p>
       ) : runs.map((r, i) => (
@@ -316,7 +316,7 @@ function PipelineRunsSection({ runs }) {
 function RecentAnalysesSection({ analyses }) {
   const [openIdx, setOpenIdx] = React.useState(null)
   return (
-    <FeedPanel title="Analysis engine output" sub={`Last ${analyses?.length || 0} game analyses — version, pick, tokens; tap for the written text`}>
+    <FeedPanel title="Analysis engine output" sub={`Last ${analyses?.length || 0} game analyses. Version, pick, tokens; tap for the written text`}>
       {(!analyses || analyses.length === 0) ? (
         <p className="px-4 py-8 text-center text-ink-500 text-sm">No analyses in the window.</p>
       ) : analyses.map((a, i) => (
@@ -378,7 +378,7 @@ function CronHealthSection({ cronHealth, recentErrors }) {
               {jobs.map((job) => (
                 <tr key={job.job_name} className="border-b border-ink-800 hover:bg-ink-900/50">
                   <td className="py-2 pr-4 text-ink-200 font-mono text-xs">{job.job_name}</td>
-                  <td className="py-2 pr-4 text-ink-400 font-mono text-xs">{job.schedule || '—'}</td>
+                  <td className="py-2 pr-4 text-ink-400 font-mono text-xs">{job.schedule || '-'}</td>
                   <td className="py-2 pr-4">
                     <div className="flex items-center gap-2">
                       <StatusDot status={job.status} />
@@ -421,7 +421,7 @@ function DataFreshnessSection({ dataFreshness }) {
   const tables = ['news_cache', 'news_articles', 'odds_cache', 'game_results', 'game_analysis']
   return (
     <div className="bg-ink-950 rounded-sharp border border-ink-700 p-5">
-      <SectionHeader title="Data Freshness" sub="Key tables — count and most recent record" />
+      <SectionHeader title="Data Freshness" sub="Key tables with count and most recent record" />
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {tables.map((table) => {
           const d = dataFreshness?.[table]
@@ -560,21 +560,21 @@ function RecentPicksSection({ recentPicks }) {
                     onClick={() => setExpanded(isOpen ? null : i)}
                   >
                     <td className="py-2 pr-3">
-                      <span className="text-ink-200 text-xs capitalize">{pick.sport || '—'}</span>
+                      <span className="text-ink-200 text-xs capitalize">{pick.sport || '-'}</span>
                     </td>
                     <td className="py-2 pr-3">
                       <div>
-                        <p className="text-white text-xs font-medium line-clamp-1">{pick.pick || '—'}</p>
+                        <p className="text-white text-xs font-medium line-clamp-1">{pick.pick || '-'}</p>
                         {pick.game && <p className="text-ink-400 text-xs line-clamp-1">{pick.game}</p>}
                       </div>
                     </td>
                     <td className="py-2 pr-3">
-                      <span className="text-ink-300 text-xs capitalize">{pick.bet_type || '—'}</span>
+                      <span className="text-ink-300 text-xs capitalize">{pick.bet_type || '-'}</span>
                     </td>
                     <td className="py-2 pr-3">
                       {pick.confidence != null ? (
                         <span className="text-signal-pos text-xs font-bold">{pick.confidence}/10</span>
-                      ) : '—'}
+                      ) : '-'}
                     </td>
                     <td className="py-2 pr-3">
                       <OutcomeChip outcome={pick.actual_outcome} />
@@ -611,7 +611,7 @@ export default function AdminDashboard({ onBack }) {
     setLoading(true)
     setError(null)
     try {
-      // Admin auth is the caller's own Supabase session — the server checks
+      // Admin auth is the caller's own Supabase session. The server checks
       // the JWT against its ADMIN_EMAILS allowlist. No shared secret.
       const { data: sessionData } = supabase
         ? await supabase.auth.getSession()
@@ -748,18 +748,18 @@ export default function AdminDashboard({ onBack }) {
               <DataFreshnessSection dataFreshness={data.dataFreshness} />
             </div>
 
-            {/* Upcoming games — every cell the tile is built from */}
+            {/* Upcoming games, every cell the tile is built from */}
             <UpcomingInspectorSection analyses={data.upcomingAnalyses} />
 
-            {/* Model Performance — graded era only, same population as the ledger */}
+            {/* Model Performance. Graded era only, same population as the ledger */}
             <ModelPerformanceSection modelAccuracy={data.modelAccuracy} />
 
-            {/* Recent Picks — the graded digest stream */}
+            {/* Recent Picks, the graded digest stream */}
             <RecentPicksSection recentPicks={data.recentPicks} />
 
             {/* Raw timestamp */}
             <p className="text-ink-700 text-xs text-center pb-4">
-              Data fetched at {data.timestamp ? fmtDate(data.timestamp) : '—'}
+              Data fetched at {data.timestamp ? fmtDate(data.timestamp) : '-'}
             </p>
           </>
         )}

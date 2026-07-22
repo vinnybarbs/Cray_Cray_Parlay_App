@@ -6,10 +6,10 @@ import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tier
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
 
-// The Board — "give me picks for the sports I choose", rebuilt as a filtered
+// The Board, "give me picks for the sports I choose", rebuilt as a filtered
 // view of the same graded edge-tier data the digest serves (audit 40 §3).
 // One grading language (signed pp + six tiers), real odds on every row, no
-// second pick generator, no fake loading theater. Picks are information —
+// second pick generator, no fake loading theater. Picks are information, and
 // the machine builds the parlays (see The House Ledger), so there is no
 // lock/queue/betslip apparatus here.
 
@@ -33,7 +33,7 @@ function formatOdds(odds) {
 // When no side cleared the 2pp pick bar, the edges dict still tells a
 // story: the best available side (usually a Skip) and any genuinely
 // negative side (a Trap to fade). Spotting and explaining traps is the
-// product — a blank "Preview" row throws that away.
+// product. A blank "Preview" row throws that away.
 function sideLabel(side, game) {
   const map = {
     home_ml: `${game.home_team} ML`,
@@ -79,7 +79,7 @@ function PickRow({ row, isOpen, onToggle }) {
         {isPreview ? 'Preview' : tier.label}
       </span>
       <span className={`flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-        {isPreview ? '—' : formatPp(effPp)}
+        {isPreview ? '-' : formatPp(effPp)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
@@ -105,7 +105,7 @@ function PickRow({ row, isOpen, onToggle }) {
       <div className="px-4 pb-3 pt-1 bg-ink-850/40 border-t border-ink-800/50">
         {row.game.analysis_snippet
           ? <p className="text-xs text-ink-200 leading-relaxed max-w-2xl">{row.game.analysis_snippet}</p>
-          : <p className="text-xs text-ink-500">No written analysis yet — the next analysis pass will fill this in.</p>}
+          : <p className="text-xs text-ink-500">No written analysis yet. The next analysis pass will fill this in.</p>}
         {Array.isArray(row.game.key_factors) && row.game.key_factors.length > 0 && (
           <ul className="mt-2 space-y-0.5">
             {row.game.key_factors.slice(0, 4).map((f, i) => (
@@ -130,7 +130,7 @@ export default function GeneratorPage() {
 
   // Filters
   const [selectedSports, setSelectedSports] = useState([]) // empty = all
-  // Default to everything — traps, skips, and previews are content too.
+  // Default to everything. Traps, skips, and previews are content too.
   const [minTier, setMinTier] = useState('all')
 
   useEffect(() => {
@@ -234,7 +234,7 @@ export default function GeneratorPage() {
           </p>
         </div>
 
-        {/* Loading — real skeleton, no theater */}
+        {/* Loading. Real skeleton, no theater */}
         {loading && (
           <div className="space-y-2">
             {[1, 2, 3, 4, 5, 6].map(i => (
@@ -251,7 +251,7 @@ export default function GeneratorPage() {
           </div>
         )}
 
-        {/* Dark slate — no games on the board at all. Distinct from "your
+        {/* Dark slate. No games on the board at all. Distinct from "your
             filter cleared everything" below: this is the calendar, not the
             filters, and it should never read as an outage. */}
         {!loading && !error && allRows.length === 0 && (
@@ -262,7 +262,7 @@ export default function GeneratorPage() {
             <h2 className="text-xl font-bold text-ink-100 leading-tight">The slate is dark.</h2>
             <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
               Every game on the board has started or settled, and the books haven't
-              posted the next slate yet. Nothing is broken — there's just nothing
+              posted the next slate yet. Nothing is broken. There's just nothing
               to grade until new games go up.
             </p>
             {data?.firstGameTime && (
