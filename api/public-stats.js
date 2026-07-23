@@ -81,7 +81,26 @@ module.exports = async (req, res) => {
     });
 
     const bySport = shape(sportRows, 'sport');
-    const tiers = shape(tierRows, 'tier');
+
+    // The Trap row reads from the ALL-TIME bucket, not last_30d. Traps run
+    // about 10 a month, so a 30-day sample never clears the landing page's
+    // 25-pick floor and the namesake stat would stay invisible. All-time is
+    // the honest larger sample; the row carries window: 'all-time' so the
+    // UI can label the wider window.
+    const tiers = shape(tierRows.filter(r => r.dimension_value !== 'Trap'), 'tier');
+    const trapAll = allRows.find(r => r.dimension_type === 'tier' && r.dimension_value === 'Trap');
+    if (trapAll) {
+      const wins = trapAll.won || 0;
+      const losses = trapAll.lost || 0;
+      const decided = wins + losses;
+      tiers.push({
+        tier: 'Trap',
+        wins,
+        losses,
+        hitRate: decided > 0 ? ((wins / decided) * 100).toFixed(1) : null,
+        window: 'all-time',
+      });
+    }
 
     // The hero claim: Sharp Take all-time record with ROI. Only published
     // when the sample is real (100+ decided picks). The number itself is

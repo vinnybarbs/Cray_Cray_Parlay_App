@@ -847,9 +847,12 @@ function TrackRecord({ sportStats, tierStats }) {
                         {tierRange(label) === 'below 0' ? 'edge below 0pp' : `edge ${tierRange(label)}`}
                       </span>
                     )}
+                    {row.window === 'all-time' && (
+                      <span className="ml-2 font-mono text-[10px] uppercase text-signal-pos">all-time</span>
+                    )}
                     {isTrap && (
                       <span className="block text-[10px] font-normal text-ink-400 mt-0.5">
-                        picks we said to fade. Low is the model working
+                        picks we said to fade, full record since May 10. Low is the model working
                       </span>
                     )}
                   </span>
@@ -889,9 +892,10 @@ function TrackRecord({ sportStats, tierStats }) {
 
         {rows.length > 0 && (
           <p className="mt-4 text-xs text-ink-400 max-w-2xl leading-relaxed">
-            This table is a rolling 30-day window. The House Ledger keeps the
-            full record since May 10, 2026, so its totals run higher than
-            these. Same pipeline, different window.
+            This table is a rolling 30-day window, except the Trap row, which
+            is the full record and labeled all-time. The House Ledger keeps
+            the complete history since May 10, 2026, so its totals run higher
+            than these. Same rollup, different windows.
           </p>
         )}
 
