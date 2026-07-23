@@ -38,7 +38,7 @@ const PROP_MARKETS = {
   ]
 };
 
-// Same expansion as refresh-odds/index.ts — 6 US-regulated books for cross-book
+// Same expansion as refresh-odds/index.ts: 6 US-regulated books for cross-book
 // line comparison. No extra API credit cost; bookmakers param is a response-filter.
 const BOOKMAKERS = "draftkings,fanduel,betmgm,caesars,betrivers,fanatics";
 const REGIONS = "us";

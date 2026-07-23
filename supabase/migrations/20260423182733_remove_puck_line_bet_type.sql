@@ -8,7 +8,7 @@
 --   - MV rows naturally rebuild on next refresh
 
 -- 1a. Delete Puck Line rows that already have a duplicate Spread row for the
---     same (home, away, pick, point, date). One such case exists today — a
+--     same (home, away, pick, point, date). One such case exists today, a
 --     double-logged Sharks/Blackhawks bet created within a minute of each other.
 DELETE FROM public.ai_suggestions pl
 WHERE pl.bet_type = 'Puck Line'
@@ -27,7 +27,7 @@ WHERE pl.bet_type = 'Puck Line'
 UPDATE public.ai_suggestions SET bet_type = 'Spread' WHERE bet_type = 'Puck Line';
 UPDATE public.parlay_legs    SET bet_type = 'Spread' WHERE bet_type = 'Puck Line';
 
--- 2. Simplify determine_outcome() — drop the 'Puck Line' case; Spread covers it.
+-- 2. Simplify determine_outcome(). Drop the 'Puck Line' case. Spread covers it.
 --    Same behavior as before (the two branches were identical), just one label.
 CREATE OR REPLACE FUNCTION public.determine_outcome(
   pick TEXT,

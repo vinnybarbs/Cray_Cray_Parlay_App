@@ -3,7 +3,7 @@ const { logger } = require('../shared/logger');
 
 // Admin access = a signed-in Supabase user whose email is on the allowlist.
 // The old scheme (shared secret in the query string, defaulting to admin123,
-// hardcoded in the client bundle) was flagged by the product audit — anyone
+// hardcoded in the client bundle) was flagged by the product audit. Anyone
 // reading the JS source could open the dashboard.
 const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || 'vincemorello12@gmail.com')
   .split(',')
@@ -97,7 +97,7 @@ async function getAdminDashboard(req, res) {
     const modelAccuracyResult = await safeQuery(async () => {
       // Graded-era public record only (May 10 2026 onward, actionable tiers,
       // no soccer v1). The full-history mv_model_accuracy stays reserved for
-      // calibration and the weekly review — it no longer appears on any
+      // calibration and the weekly review. It no longer appears on any
       // dashboard, admin included.
       const { data, error } = await supabase
         .from('mv_public_record')
@@ -107,7 +107,7 @@ async function getAdminDashboard(req, res) {
 
       // ROI intentionally dropped from response. The MV still computes it in
       // roi_units / roi_pct / settled_with_odds columns, but single-leg ROI
-      // isn't a useful metric for a parlay-focused product — per-leg hit rate
+      // isn't a useful metric for a parlay-focused product. Per-leg hit rate
       // is the north-star signal. See memory/project_performance_page_direction.md.
       const keyByValue = (rows) => {
         const out = {};

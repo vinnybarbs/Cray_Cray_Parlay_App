@@ -1,6 +1,6 @@
 // Cron endpoint for the data-integrity agent sweep. Same auth pattern as the
 // other cron endpoints (CRON_SECRET via header or query). Responds 202 and
-// runs in the background — the pg_cron http_post has a 3s timeout.
+// runs in the background because the pg_cron http_post has a 3s timeout.
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { runDataIntegritySweep } = require('../../lib/services/data-integrity-agent.js');

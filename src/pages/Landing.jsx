@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { tierRange } from '../lib/tiers'
 
-// API_BASE matches the rest of the app — Railway in prod, env override locally.
+// API_BASE matches the rest of the app. Railway in prod, env override locally.
 import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
 
-// ─── Landing — public marketing surface ────────────────────────────────────
+// ─── Landing, the public marketing surface ────────────────────────────────────
 // Concept: "Trading terminal as marketing page." Bloomberg-severity layout
-// reframes every section as a terminal artifact — ticker, scorecard, execution
+// reframes every section as a terminal artifact. Ticker, scorecard, execution
 // flow, disclosure, term sheet, filings. Sharp-Quant tokens only; no new
 // colors or fonts. Hero copy is the locked villain frame (2026-05-12).
 
@@ -95,9 +95,9 @@ export default function Landing({ onStartTrial, onSignIn }) {
   )
 }
 
-// ─── Ticker — top scrolling edge feed ──────────────────────────────────────
+// ─── Ticker, the top scrolling edge feed ──────────────────────────────────────
 // Real edges from /api/public-ticker (the old hardcoded demo array showed
-// NBA/NFL numbers in July — instant credibility killer for anyone who knows
+// NBA/NFL numbers in July, an instant credibility killer for anyone who knows
 // sports). Off-season leagues scroll as coverage entries instead: covering
 // every league is the differentiator when most edge tools do one or two.
 
@@ -141,7 +141,7 @@ function Ticker() {
 
   // Lead with the strongest positive edge and alternate signs from there.
   // The API returns edges by magnitude, which on a Trap-heavy slate opened
-  // the reel with six consecutive red entries — a wall of losses as the
+  // the reel with six consecutive red entries, a wall of losses as the
   // very first thing a visitor scans (audit 40, medium 9).
   const pos = rawItems.filter(it => it.ppVal >= 0).sort((a, b) => b.ppVal - a.ppVal)
   const neg = rawItems.filter(it => it.ppVal < 0).sort((a, b) => a.ppVal - b.ppVal)
@@ -160,7 +160,7 @@ function Ticker() {
     }))
 
   // Live edges first, coverage entries woven after. With no live data at all
-  // the reel is coverage-only — never invented numbers.
+  // the reel is coverage-only, never invented numbers.
   const items = [...liveItems, ...coverageItems]
   const row = [...items, ...items] // doubled for seamless loop
   const headline = liveItems.length > 0 ? 'Live edges · today' : `${COVERED_LEAGUES.length} leagues · one board`
@@ -222,7 +222,7 @@ function Nav({ onStartTrial, onSignIn, scrollTo }) {
           <button onClick={scrollTo('terms')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
             Pricing
           </button>
-          {/* Sign in — separate from Start trial so returning users don't have to
+          {/* Sign in is separate from Start trial so returning users don't have to
               parse a trial CTA when they just want to log in. Both routes hit the
               same Auth modal which handles signup + signin flows. */}
           <button
@@ -246,12 +246,12 @@ function Nav({ onStartTrial, onSignIn, scrollTo }) {
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
 function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
-  const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : '—'
+  const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : '-'
   const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : '1,000+'
   // The claim almost nobody else can make with receipts: top-tier picks,
   // all-time record with ROI, straight from the settlement ledger. The API
   // only sends it once the sample passes 100 decided picks, and it renders
-  // whatever the ledger says — good or bad.
+  // whatever the ledger says, good or bad.
   const sharpTakeDisplay = sharpTake
     ? `${sharpTake.hitRate}%${sharpTake.roiPct != null ? ` · ${sharpTake.roiPct >= 0 ? '+' : ''}${sharpTake.roiPct}% ROI` : ''}`
     : null
@@ -295,13 +295,13 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
             </button>
           </div>
 
-          {/* The single strongest friction-killer, directly under the CTA —
+          {/* The single strongest friction-killer, directly under the CTA,
               previously buried in the pricing section (audit 40, medium 10). */}
           <p className="mt-3 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
             7 days free · <span className="text-signal-pos">no card required</span>
           </p>
 
-          {/* Sign in affordance for returning users — small but findable */}
+          {/* Sign in affordance for returning users. Small but findable */}
           <p className="mt-5 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
             Already have an account?{' '}
             <button
@@ -313,7 +313,7 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
           </p>
         </div>
 
-        {/* RIGHT: stat-strip panel — looks like a terminal readout */}
+        {/* RIGHT: stat-strip panel that looks like a terminal readout */}
         <div className="md:col-span-5">
           <div className="bg-ink-900 shadow-hairline rounded-sharp">
             <div className="flex items-center justify-between px-4 py-2 border-b border-ink-800">
@@ -325,23 +325,28 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
                 <span className="text-[9px] uppercase tracking-[0.18em] text-signal-pos">LIVE</span>
               </span>
             </div>
+            {/* Every row states its own window and population. This panel
+                mixes a 30-day all-tier rate with an all-time Sharp Take
+                rate, and unlabeled they read as one contradictory number
+                (57.5 vs 64.2). All rows come from the same rollup,
+                mv_public_record, just different buckets. */}
             <dl className="divide-y divide-ink-800">
-              <StatRow label="Hit rate" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
+              <StatRow label="Hit rate · all tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
               {sharpTakeDisplay && (
                 <StatRow
-                  label={`Sharp Take · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
+                  label={`Sharp Take only · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
                   value={sharpTakeDisplay}
                   tone={sharpTake.hitRate >= 55 ? 'pos' : sharpTake.hitRate >= 50 ? 'neutral' : 'neg'}
                 />
               )}
-              <StatRow label="Picks graded" value={weeklyCount} tone="neutral" />
+              <StatRow label="Picks graded · last 30d" value={weeklyCount} tone="neutral" />
               <StatRow label="Markets covered" value="ML · Spread · Total" tone="neutral" small />
               <StatRow label="Affiliate parent" value="None" tone="pos" small />
             </dl>
           </div>
           <div className="mt-3 flex justify-between text-[9px] uppercase tracking-[0.20em] text-ink-500 px-1">
-            <span>source: settlement ledger</span>
-            <span>refresh: after every settlement</span>
+            <span>source: mv_public_record, same rollup as the ledger</span>
+            <span>refresh: hourly after settlements</span>
           </div>
         </div>
       </div>
@@ -360,13 +365,13 @@ function StatRow({ label, value, tone = 'neutral', big = false, small = false })
   )
 }
 
-// ─── EdgeScorecard — the receipts question, asked of everyone ─────────────
+// ─── EdgeScorecard, the receipts question asked of everyone ─────────────
 
 // One factual, checkable comparison instead of grades. The old version
 // assigned our tier vocabulary to competitors, which without numbers behind
 // it read as name-calling. This version asks the only question that sorts
-// the category — "show me every pick you published, graded, losses
-// included" — and answers it with verifiable facts. Ours links to the proof.
+// the category, "show me every pick you published, graded, losses
+// included", and answers it with verifiable facts. Ours links to the proof.
 function EdgeScorecard() {
   const rows = [
     {
@@ -378,21 +383,21 @@ function EdgeScorecard() {
     },
     {
       name: 'OddsJam',
-      reason: 'Owned by Gambling.com Group, another affiliate business. Flagship math tools now sit in the ~$498 tier — locks out the recreational bettor entirely.',
-      price: '$99–498/mo',
+      reason: 'Owned by Gambling.com Group, another affiliate business. Flagship math tools now sit in the ~$498 tier, which locks out the recreational bettor entirely.',
+      price: '$99-498/mo',
       record: 'None found',
       recordSub: 'free daily picks, no graded record',
     },
     {
       name: 'Pikkit',
-      reason: 'Grades you after the bet (CLV). Different shelf — they measure your history, we publish the decision. Complementary, not competitive.',
+      reason: 'Grades you after the bet (CLV). Different shelf. They measure your history, we publish the decision. Complementary, not competitive.',
       price: 'Free',
       record: 'Yours, not theirs',
       recordSub: 'tracks your bets, publishes no picks',
     },
     {
       name: 'TrapHawk',
-      reason: 'No affiliate parent. Per-side edges including negative ones, every pick timestamped before the game and settled after — losses, ROI, and units included.',
+      reason: 'No affiliate parent. Per-side edges including negative ones, every pick timestamped before the game and settled after, with losses, ROI, and units included.',
       price: '$19.99/mo',
       record: 'The House Ledger',
       recordSub: 'every pick · graded · public',
@@ -469,14 +474,14 @@ function EdgeScorecard() {
         </div>
 
         <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500">
-          // Facts checkable as of July 2026: ownership from public filings, pricing from live subscribe pages. Corrections welcome — that's the point.
+          // Facts checkable as of July 2026: ownership from public filings, pricing from live subscribe pages. Corrections welcome. That's the point.
         </p>
       </div>
     </section>
   )
 }
 
-// ─── ExecutionFlow — How it works, reframed as a trade flow ────────────────
+// ─── ExecutionFlow, How it works reframed as a trade flow ────────────────
 
 function ExecutionFlow() {
   const steps = [
@@ -503,7 +508,7 @@ function ExecutionFlow() {
     {
       n: '03',
       title: 'The machine builds the parlays',
-      body: 'Cross-game combos assembled from the highest-edge legs, published before the games and settled publicly after — win or lose. We never hold money or see your account.',
+      body: 'Cross-game combos assembled from the highest-edge legs, published before the games and settled publicly after, win or lose. We never hold money or see your account.',
       meta: [
         ['// builds',  '2-leg + 3-leg daily · 4pp floor'],
         ['// receipt', 'settled on The House Ledger'],
@@ -552,10 +557,10 @@ function ExecutionFlow() {
   )
 }
 
-// ─── SnapshotTerminal — the real free Pick of the Day ──────────────────────
+// ─── SnapshotTerminal, the real free Pick of the Day ──────────────────────
 // Served by /api/public-pod (highest edge_pp >= 4pp on the upcoming board,
 // longshot MLs fenced at +300). The old version rendered a hardcoded NBA
-// example under a "SEE TODAY'S FREE PICK" CTA — a promise the tile broke.
+// example under a "SEE TODAY'S FREE PICK" CTA, a promise the tile broke.
 // One real pick is the free tease; the full board stays behind the trial.
 
 const TIER_SUBTITLES = {
@@ -602,7 +607,7 @@ function SnapshotTerminal({ tierStats }) {
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
           {quiet
-            ? 'The board is quiet today. When no game clears our Play threshold, we say so — we refuse to force a pick.'
+            ? 'The board is quiet today. When no game clears our Play threshold, we say so. We refuse to force a pick.'
             : 'Same tile, same math as every pick in the paid digest. Refreshes with the morning board.'}
         </p>
 
@@ -644,7 +649,7 @@ function SnapshotTerminal({ tierStats }) {
                 </div>
               </div>
 
-              {/* why this pick — tabular */}
+              {/* why this pick, in tabular form */}
               <div className="border-t border-ink-800">
                 <div className="px-5 md:px-7 py-2 bg-ink-950 border-b border-ink-800">
                   <span className="text-[9px] uppercase tracking-[0.20em] text-signal-pos">
@@ -663,7 +668,7 @@ function SnapshotTerminal({ tierStats }) {
                 </dl>
               </div>
 
-              {/* show the work — inputs + fired signals; weights stay ours */}
+              {/* show the work. Inputs + fired signals; weights stay ours */}
               {work && (
                 <div className="border-t border-ink-800">
                   <button
@@ -693,8 +698,8 @@ function SnapshotTerminal({ tierStats }) {
                         ].filter(r => r[1] != null || r[2] != null).map(([label, a, h]) => (
                           <React.Fragment key={label}>
                             <span className="text-ink-400 py-1.5 border-t border-ink-800">{label}</span>
-                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{a ?? '—'}</span>
-                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{h ?? '—'}</span>
+                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{a ?? '-'}</span>
+                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{h ?? '-'}</span>
                           </React.Fragment>
                         ))}
                       </div>
@@ -727,7 +732,7 @@ function SnapshotTerminal({ tierStats }) {
             <div className="px-5 md:px-7 py-10 text-center">
               <p className="text-ink-300 text-sm">
                 {quiet
-                  ? 'Quiet day — math says skip. No game on the board clears +4pp right now.'
+                  ? 'Quiet day. Math says skip. No game on the board clears +4pp right now.'
                   : 'Pulling today\'s board…'}
               </p>
               {quiet && (
@@ -775,9 +780,9 @@ function FactRow({ label, value, tone }) {
   )
 }
 
-// ─── TrackRecord — proof, with CSS-only sparkline bars ─────────────────────
+// ─── TrackRecord, proof with CSS-only sparkline bars ─────────────────────
 // Renders the most-populated dimension from mv_model_accuracy. The MV has
-// `sport` rows (NBA/NFL/MLB/etc.) but no `tier` rows yet — so sport is the
+// `sport` rows (NBA/NFL/MLB/etc.) but no `tier` rows yet, so sport is the
 // public-facing breakdown. Tier-level lands when the MV materializes it.
 
 function TrackRecord({ sportStats, tierStats }) {
@@ -806,14 +811,17 @@ function TrackRecord({ sportStats, tierStats }) {
           The receipts. <span className="text-ink-400">{headlineKicker} Updated after every settlement.</span>
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          Most picks apps cherry-pick wins. We publish every {dimensionLabel.toLowerCase()} — including the losers. If a {dimensionLabel.toLowerCase()} dips below 50%, you see it.
+          Most picks apps cherry-pick wins. We publish every {dimensionLabel.toLowerCase()}, including the losers. If a {dimensionLabel.toLowerCase()} dips below 50%, you see it.
         </p>
 
         {rows.length > 0 ? (
           <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp">
+            <div className="px-5 pt-2.5 bg-ink-950 text-[10px] uppercase tracking-[0.18em] text-signal-pos">
+              Last 30 days only
+            </div>
             <div className="grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-2.5 bg-ink-950 border-b border-ink-800 text-[10px] uppercase tracking-[0.18em] text-ink-400">
               <span>{dimensionLabel}</span>
-              <span className="text-right">Settled</span>
+              <span className="text-right">Settled · 30d</span>
               <span>Hit rate</span>
               <span className="text-right">%</span>
             </div>
@@ -821,7 +829,7 @@ function TrackRecord({ sportStats, tierStats }) {
               const settled = row.wins + row.losses
               const rate = parseFloat(row.hitRate)
               const label = row[dimensionKey]
-              // Trap is graded on the pick it warns AGAINST — a low hit rate
+              // Trap is graded on the pick it warns AGAINST, so a low hit rate
               // there is the model working, not failing. Styling it in the
               // same red as a losing tier undercut the pitch (audit 40,
               // high 3): invert the coloring and say so.
@@ -836,12 +844,15 @@ function TrackRecord({ sportStats, tierStats }) {
                     {label}
                     {useTiers && tierRange(label) && (
                       <span className="ml-2 font-mono text-[10px] text-ink-500 tabular-nums">
-                        {tierRange(label) === 'below 0' ? 'edge below 0pp' : `edge ${tierRange(label)}`}
+                        {tierRange(label) === '-2pp or worse' ? 'edge -2pp or worse' : `edge ${tierRange(label)}`}
                       </span>
+                    )}
+                    {row.window === 'all-time' && (
+                      <span className="ml-2 font-mono text-[10px] uppercase text-signal-pos">all-time</span>
                     )}
                     {isTrap && (
                       <span className="block text-[10px] font-normal text-ink-400 mt-0.5">
-                        picks we said to fade — low is the model working
+                        picks we said to fade, full record since May 10. Low is the model working
                       </span>
                     )}
                   </span>
@@ -879,10 +890,19 @@ function TrackRecord({ sportStats, tierStats }) {
           </p>
         )}
 
+        {rows.length > 0 && (
+          <p className="mt-4 text-xs text-ink-400 max-w-2xl leading-relaxed">
+            This table is a rolling 30-day window, except the Trap row, which
+            is the full record and labeled all-time. The House Ledger keeps
+            the complete history since May 10, 2026, so its totals run higher
+            than these. Same rollup, different windows.
+          </p>
+        )}
+
         {useTiers && rows.length > 0 && (
           <p className="mt-6 text-xs text-ink-400 max-w-2xl leading-relaxed">
             How to read this: tiers are ranked by edge size, so the middle
-            tiers carry small edges by definition and hover near break-even —
+            tiers carry small edges by definition and hover near break-even, and
             that's the honest shape of the market, not a bug. The money tier
             is <span className="text-signal-pos">Sharp Take</span>, and Trap
             is scored on the picks it told you to avoid, where a low number
@@ -895,7 +915,7 @@ function TrackRecord({ sportStats, tierStats }) {
             onClick={() => { window.location.hash = '#/ledger' }}
             className="inline-flex items-center gap-2 text-signal-pos text-xs font-bold uppercase tracking-[0.18em] hover:underline"
           >
-            Open The House Ledger — every pick, timestamped →
+            Open The House Ledger, every pick timestamped →
           </button>
         </div>
       </div>
@@ -903,7 +923,7 @@ function TrackRecord({ sportStats, tierStats }) {
   )
 }
 
-// ─── Disclosure — regulatory-filing aesthetic for the credibility wedge ──
+// ─── Disclosure, a regulatory-filing aesthetic for the credibility wedge ──
 
 function Disclosure() {
   return (
@@ -925,7 +945,7 @@ function Disclosure() {
             </p>
             <p>
               <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 3.</span>
-              Our entire business is grading games against the public market and publishing the result — <span className="text-signal-pos font-medium">including the bets we believe you should NOT make.</span> The Trap label is the differentiator no affiliate-owned publication can adopt without dismantling its parent's revenue model.
+              Our entire business is grading games against the public market and publishing the result, <span className="text-signal-pos font-medium">including the bets we believe you should NOT make.</span> The Trap label is the differentiator no affiliate-owned publication can adopt without dismantling its parent's revenue model.
             </p>
           </div>
           <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500 pt-6 border-t border-ink-800">
@@ -937,7 +957,7 @@ function Disclosure() {
   )
 }
 
-// ─── TermSheet — pricing as signed-document layout ─────────────────────────
+// ─── TermSheet, pricing as signed-document layout ─────────────────────────
 
 function TermSheet({ onStartTrial }) {
   const included = [
@@ -1023,21 +1043,21 @@ function TermRow({ label, value, tone = 'neutral', big = false }) {
   )
 }
 
-// ─── Filings · Q&A — FAQ as 10-K Q&A document ─────────────────────────────
+// ─── Filings · Q&A, the FAQ as 10-K Q&A document ─────────────────────────────
 
 function Filings() {
   const items = [
     {
       q: 'What\'s a "Trap"?',
-      a: 'A pick with a negative per-side edge — meaning the model thinks the side wins less often than the book\'s line implies. Every other picks app hides these. We label them. "Trap" is the only honest reaction to a bad bet that looks tempting.',
+      a: 'A pick with a negative per-side edge, meaning the model thinks the side wins less often than the book\'s line implies. Every other picks app hides these. We label them. "Trap" is the only honest reaction to a bad bet that looks tempting.',
     },
     {
       q: 'Why publish negative edges? Doesn\'t that scare people off?',
-      a: 'Negative edges are most of the betting universe. If we only published positive ones, we\'d be lying about the shape of the market. The Trap label is the differentiator — it\'s the one thing every other picks app structurally can\'t show you.',
+      a: 'Negative edges are most of the betting universe. If we only published positive ones, we\'d be lying about the shape of the market. The Trap label is the differentiator. It\'s the one thing every other picks app structurally can\'t show you.',
     },
     {
       q: 'How is this different from Action Network or OddsJam?',
-      a: 'Action Network is owned by Better Collective, a publicly-traded sportsbook affiliate — they can\'t credibly warn you off a book. OddsJam targets $2K+ monthly bankroll arb bettors at $99–199/mo. We\'re built for the $50–500/mo bankroll that wants the math without the price tag — and we\'re the only picks app that shows you what NOT to bet.',
+      a: 'Action Network is owned by Better Collective, a publicly-traded sportsbook affiliate, so they can\'t credibly warn you off a book. OddsJam targets $2K+ monthly bankroll arb bettors at $99-199/mo. We\'re built for the $50-500/mo bankroll that wants the math without the price tag, and we\'re the only picks app that shows you what NOT to bet.',
     },
     {
       q: 'Is this gambling advice?',
@@ -1049,7 +1069,7 @@ function Filings() {
     },
     {
       q: 'Where does my data go?',
-      a: 'Email + (optionally) Google sign-in is all we collect to start. We don\'t share or sell. Locked picks live on your account so we can grade them later. Payment goes through Stripe directly — we never see your card.',
+      a: 'Email + (optionally) Google sign-in is all we collect to start. We don\'t share or sell. Locked picks live on your account so we can grade them later. Payment goes through Stripe directly, so we never see your card.',
     },
   ]
   const [open, setOpen] = useState(null)

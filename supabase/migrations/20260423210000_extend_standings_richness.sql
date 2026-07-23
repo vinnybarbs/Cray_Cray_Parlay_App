@@ -16,9 +16,9 @@ ALTER TABLE public.standings
   ADD COLUMN IF NOT EXISTS away_record  TEXT,
   ADD COLUMN IF NOT EXISTS playoff_seed INT;
 
-COMMENT ON COLUMN public.standings.last_10      IS 'ESPN "Last Ten Games" display — e.g. "7-2-1, 0 PTS" (NHL) or "6-4" (NBA).';
-COMMENT ON COLUMN public.standings.home_record  IS 'ESPN home-record display — e.g. "29-10-2" (NHL) or "29-12" (NBA).';
-COMMENT ON COLUMN public.standings.away_record  IS 'ESPN road-record display — e.g. "24-12-5".';
+COMMENT ON COLUMN public.standings.last_10      IS 'ESPN "Last Ten Games" display, e.g. "7-2-1, 0 PTS" (NHL) or "6-4" (NBA).';
+COMMENT ON COLUMN public.standings.home_record  IS 'ESPN home-record display, e.g. "29-10-2" (NHL) or "29-12" (NBA).';
+COMMENT ON COLUMN public.standings.away_record  IS 'ESPN road-record display, e.g. "24-12-5".';
 COMMENT ON COLUMN public.standings.playoff_seed IS 'ESPN current playoff seed (1-8 in most leagues; NULL for non-playoff teams or pre-playoffs).';
 
 -- ============================================================================
@@ -39,7 +39,7 @@ SELECT
   s.point_differential,
   s.streak,
   rank() OVER (PARTITION BY s.conference, s.division ORDER BY s.wins DESC, s.point_differential DESC) AS division_rank,
-  -- New columns (append only — keeps CREATE OR REPLACE happy)
+  -- New columns (append only, keeps CREATE OR REPLACE happy)
   t.sport,
   s.last_10,
   s.home_record,

@@ -11,7 +11,7 @@
 -- next 90 minutes, every 15 minutes, upserting on (game, market, bookmaker).
 -- The last pre-start write wins and stands as the closing line. Precision is
 -- bounded by the hourly odds_cache refresh ('refresh-odds-hourly'), so the
--- captured "close" can be up to ~60 minutes stale. Fine for v1 — tighten by
+-- captured "close" can be up to ~60 minutes stale. Fine for v1. Tighten by
 -- refreshing odds more often near game time when API budget allows.
 
 CREATE TABLE IF NOT EXISTS public.closing_lines (

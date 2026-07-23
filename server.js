@@ -93,18 +93,18 @@ app.get('/api/health', (req, res) => {
 const { getDashboardStatus } = require('./api/dashboard-status');
 app.get('/api/dashboard-status', getDashboardStatus);
 
-// The House Ledger — public append-only settlement record (picks + machine
+// The House Ledger: public append-only settlement record (picks + machine
 // parlays + per-tier ROI). Anon-readable by design.
 const { getPublicLedger } = require('./api/public-ledger');
 app.get('/api/public-ledger', getPublicLedger);
 
-// Public stats — anon-readable proxy over mv_model_accuracy so the Landing's
+// Public stats: anon-readable proxy over mv_model_accuracy so the Landing's
 // Track Record + hero hit-rate render for unauthenticated visitors without
 // loosening RLS on the underlying table.
 const publicStats = require('./api/public-stats');
 app.get('/api/public-stats', publicStats);
 
-// Public ticker + free Pick of the Day — same anon-readable pattern. The
+// Public ticker + free Pick of the Day, same anon-readable pattern. The
 // Landing ticker shows real edges (the hardcoded demo array is gone) and the
 // free-pick CTA resolves to an actual pick.
 const publicTicker = require('./api/public-ticker');
@@ -113,21 +113,21 @@ const publicPod = require('./api/public-pod');
 app.get('/api/public-pod', publicPod);
 
 // Read-only analytics bundle for the weekly review routine (own secret,
-// stored in app_config — not CRON_SECRET).
+// stored in app_config, not CRON_SECRET).
 const reviewBundle = require('./api/review-bundle');
 app.get('/api/review-bundle', reviewBundle);
 
 // Read-only pipeline vitals for the daily 6am sanity-check routine (same
-// report_secret as review-bundle — reads aggregates, can't trigger jobs).
+// report_secret as review-bundle. It reads aggregates, can't trigger jobs).
 const pipelineHealth = require('./api/pipeline-health');
 app.get('/api/pipeline-health', pipelineHealth);
 
-// Yesterday's board — most recent published pick list with settled outcomes.
+// Yesterday's board: most recent published pick list with settled outcomes.
 // Public receipts, shown inside the dark-slate empty states.
 const boardHistory = require('./api/board-history');
 app.get('/api/board-history', boardHistory);
 
-// Golf field analysis — devig outrights + research notes into golf_field.
+// Golf field analysis: devig outrights + research notes into golf_field.
 const analyzeGolf = require('./api/cron/analyze-golf');
 app.post('/cron/analyze-golf', analyzeGolf);
 
@@ -153,7 +153,7 @@ app.use((req, res, next) => {
 });
 
 // Debug: what The Odds API currently lists as active (tennis/golf rotate
-// weekly — this is what refresh-odds discovery sees). Free call, no quota.
+// weekly, and this is what refresh-odds discovery sees). Free call, no quota.
 app.get('/debug/active-sports', async (req, res) => {
   const ODDS_KEY = process.env.ODDS_API_KEY;
   if (!ODDS_KEY) return res.json({ error: 'No ODDS_API_KEY' });

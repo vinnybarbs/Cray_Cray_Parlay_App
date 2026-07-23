@@ -1,6 +1,6 @@
 -- Golf field board: devigged outright odds + per-player research notes.
 -- Populated by /cron/analyze-golf from odds_cache golf_% outrights. This is
--- a DISPLAY/value surface, not graded picks — golf has no h2h edge model.
+-- a DISPLAY/value surface, not graded picks. Golf has no h2h edge model.
 create table if not exists golf_field (
   id bigserial primary key,
   tournament_key text not null,

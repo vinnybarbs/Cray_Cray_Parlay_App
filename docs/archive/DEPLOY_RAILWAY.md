@@ -1,4 +1,4 @@
-Railway deployment checklist — Express backend + frontend (monorepo)
+Railway deployment checklist: Express backend + frontend (monorepo)
 
 Overview
 --------
@@ -11,14 +11,14 @@ Required environment variables
 ------------------------------
 Set these in Railway's environment settings for the service:
 
-- SUPABASE_URL — Supabase project URL
-- SUPABASE_SERVICE_ROLE_KEY — Supabase service role key (server-side only)
-- SUPABASE_ANON_KEY — (optional) frontend anon key
-- ODDS_API_KEY — the-odds-api key (if you want live fetching)
-- OPENAI_API_KEY — OpenAI API key
-- CRON_SECRET — secret used to protect `/cron/refresh-odds` (required for scheduled job)
-- FRONTEND_URL — (optional) the deployed frontend hostname (used in CORS)
-- NODE_ENV — set to "production"
+- SUPABASE_URL: Supabase project URL
+- SUPABASE_SERVICE_ROLE_KEY: Supabase service role key (server-side only)
+- SUPABASE_ANON_KEY: (optional) frontend anon key
+- ODDS_API_KEY: the-odds-api key (if you want live fetching)
+- OPENAI_API_KEY: OpenAI API key
+- CRON_SECRET: secret used to protect `/cron/refresh-odds` (required for scheduled job)
+- FRONTEND_URL: (optional) the deployed frontend hostname (used in CORS)
+- NODE_ENV: set to "production"
 - Any other keys present in `.env.example` that you need (e.g., SERPER_API_KEY, APISPORTS_API_KEY)
 
 Railway setup (quick steps)
@@ -84,7 +84,7 @@ Notes & troubleshooting
 
 Security
 --------
-- Keep `SUPABASE_SERVICE_ROLE_KEY` and `OPENAI_API_KEY` secret — only store them as Railway environment variables.
+- Keep `SUPABASE_SERVICE_ROLE_KEY` and `OPENAI_API_KEY` secret. Only store them as Railway environment variables.
 - Use a strong `CRON_SECRET` and never hard-code it in client code.
 
 Next steps I can take for you

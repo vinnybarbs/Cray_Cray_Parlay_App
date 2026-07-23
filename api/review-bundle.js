@@ -1,6 +1,6 @@
 // Read-only analytics bundle for the weekly model-performance review routine
 // (a scheduled Claude agent on Vince's Max plan). Auth: a dedicated secret in
-// app_config ('report_secret') — deliberately NOT CRON_SECRET, which can
+// app_config ('report_secret'), deliberately NOT CRON_SECRET, which can
 // trigger expensive jobs. This endpoint only reads aggregates.
 
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
@@ -8,7 +8,7 @@ const { supabase } = require('../lib/middleware/supabaseAuth.js');
 module.exports = async function reviewBundle(req, res) {
   try {
     // Two accepted read-only secrets: the original report_secret (weekly
-    // review) and report_secret_2 (daily routine — embedded in its task
+    // review) and report_secret_2 (daily routine, embedded in its task
     // prompt so scheduled runs need no database connector).
     const { data: cfgRows } = await supabase
       .from('app_config').select('key, value').in('key', ['report_secret', 'report_secret_2']);

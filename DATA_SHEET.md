@@ -192,7 +192,7 @@ game_analysis (game_key) -- unique constraint for upserts
 
 ## Core Feature: Parlay Generator (Multi-Agent System)
 
-The parlay generator is the heart of the app. Users select sports, bet types, risk level, number of legs, and their sportsbook — the system runs a multi-agent pipeline that produces a fully-researched parlay with individual leg analysis.
+The parlay generator is the heart of the app. Users select sports, bet types, risk level, number of legs, and their sportsbook, and the system runs a multi-agent pipeline that produces a fully-researched parlay with individual leg analysis.
 
 ### User Inputs
 - **Sports**: NBA, NHL, MLB, NFL, NCAAB, NCAAF, EPL, MLS, UFC, Tennis (multi-select)
@@ -263,14 +263,14 @@ Alternative flow that returns ranked individual picks instead of a parlay:
 - Returns top N picks sorted by confidence, each with reasoning
 
 ### Key Files
-- `api/generate-parlay.js` — API handler, request validation
-- `lib/agents/coordinator.js` — Multi-agent orchestrator (1900+ lines)
-- `lib/agents/odds-agent.js` — Odds collection + sportsbook fallbacks
-- `lib/agents/research-agent.js` — News/article enrichment
-- `lib/agents/analyst-agent.js` — GPT-4o prompt construction + parsing
-- `lib/services/sports-stats.js` — Team/player stats from DB
-- `lib/services/sports-intelligence.js` — ESPN injury/standings data
-- `shared/oddsCalculations.js` — Parlay math (American to decimal, combined odds, payouts)
+- `api/generate-parlay.js`: API handler, request validation
+- `lib/agents/coordinator.js`: Multi-agent orchestrator (1900+ lines)
+- `lib/agents/odds-agent.js`: Odds collection + sportsbook fallbacks
+- `lib/agents/research-agent.js`: News/article enrichment
+- `lib/agents/analyst-agent.js`: GPT-4o prompt construction + parsing
+- `lib/services/sports-stats.js`: Team/player stats from DB
+- `lib/services/sports-intelligence.js`: ESPN injury/standings data
+- `shared/oddsCalculations.js`: Parlay math (American to decimal, combined odds, payouts)
 
 ---
 
@@ -308,12 +308,12 @@ Alternative flow that returns ranked individual picks instead of a parlay:
 
 ## Known Issues / Tech Debt
 
-1. **API-Sports dependency** — Being replaced by ESPN. Some sync code still references it.
-2. **Team name normalization** — ESPN names don't always match Odds API names (e.g., "LA Clippers" vs "Los Angeles Clippers"). `team_aliases` table helps but isn't comprehensive.
-3. **Golf/Tennis** — Tournament sports have different data models than team sports. Golf is leaderboard-based, tennis is match-based but tournament-scoped.
-4. **Player props settlement** — Currently skipped (marked as push). Need player stat ingestion to resolve.
-5. **Empty tables** — Several tables exist but are unused: `player_stats`, `player_aliases`, `games`, `external_mappings`, `model_accuracy`, `news_embeddings`. Candidates for cleanup.
-6. **Duplicate cron patterns** — Multiple variants of the same job exist from debugging iterations (check-parlay-outcomes with -fixed, -generous, -safe suffixes).
+1. **API-Sports dependency.** Being replaced by ESPN. Some sync code still references it.
+2. **Team name normalization.** ESPN names don't always match Odds API names (e.g., "LA Clippers" vs "Los Angeles Clippers"). `team_aliases` table helps but isn't comprehensive.
+3. **Golf/Tennis.** Tournament sports have different data models than team sports. Golf is leaderboard-based, tennis is match-based but tournament-scoped.
+4. **Player props settlement.** Currently skipped (marked as push). Need player stat ingestion to resolve.
+5. **Empty tables.** Several tables exist but are unused: `player_stats`, `player_aliases`, `games`, `external_mappings`, `model_accuracy`, `news_embeddings`. Candidates for cleanup.
+6. **Duplicate cron patterns.** Multiple variants of the same job exist from debugging iterations (check-parlay-outcomes with -fixed, -generous, -safe suffixes).
 
 ---
 

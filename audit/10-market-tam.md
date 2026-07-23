@@ -1,4 +1,4 @@
-# Market size and pricing — audit phase 1
+# Market size and pricing (audit phase 1)
 
 Researched 2026-07-11 via multi-source web research with adversarial claim
 verification (103 agents, 3-vote verification per claim; refuted claims

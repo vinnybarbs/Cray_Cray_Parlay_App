@@ -1,11 +1,11 @@
-// Public-stats endpoint — proxies mv_public_record (the ledger-population
+// Public-stats endpoint. Proxies mv_public_record (the ledger-population
 // rollup: graded era, actionable tiers, no soccer v1) to the Landing without
 // requiring auth, so the Track Record section + hero hit-rate render for
 // unauthenticated visitors. Uses the service role key server-side so RLS
 // can stay strict on the underlying table (anon SELECT remains blocked).
 //
 // Response shape: { overall: {wins,losses,push,total,hitRate}, tiers: [...] }
-// All fields safe to expose publicly — just aggregate W/L/% per tier.
+// All fields safe to expose publicly, just aggregate W/L/% per tier.
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -17,7 +17,7 @@ function getSupabase() {
 }
 
 module.exports = async (req, res) => {
-  // CORS — Landing is served from the same origin in production but local
+  // CORS: Landing is served from the same origin in production but local
   // dev runs on a different port. Be permissive for GET reads.
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -81,10 +81,29 @@ module.exports = async (req, res) => {
     });
 
     const bySport = shape(sportRows, 'sport');
-    const tiers = shape(tierRows, 'tier');
+
+    // The Trap row reads from the ALL-TIME bucket, not last_30d. Traps run
+    // about 10 a month, so a 30-day sample never clears the landing page's
+    // 25-pick floor and the namesake stat would stay invisible. All-time is
+    // the honest larger sample; the row carries window: 'all-time' so the
+    // UI can label the wider window.
+    const tiers = shape(tierRows.filter(r => r.dimension_value !== 'Trap'), 'tier');
+    const trapAll = allRows.find(r => r.dimension_type === 'tier' && r.dimension_value === 'Trap');
+    if (trapAll) {
+      const wins = trapAll.won || 0;
+      const losses = trapAll.lost || 0;
+      const decided = wins + losses;
+      tiers.push({
+        tier: 'Trap',
+        wins,
+        losses,
+        hitRate: decided > 0 ? ((wins / decided) * 100).toFixed(1) : null,
+        window: 'all-time',
+      });
+    }
 
     // The hero claim: Sharp Take all-time record with ROI. Only published
-    // when the sample is real (100+ decided picks) — the number itself is
+    // when the sample is real (100+ decided picks). The number itself is
     // whatever the ledger says, good or bad. That is the brand.
     const stRow = allRows.find(r => r.dimension_type === 'tier' && r.dimension_value === 'Sharp Take');
     let sharpTakeAllTime = null;

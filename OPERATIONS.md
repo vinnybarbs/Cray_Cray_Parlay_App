@@ -31,7 +31,7 @@ API roles stripped from RPC functions.
 | Job | Schedule | What it does |
 |---|---|---|
 | refresh-odds-hourly | */20 | refresh odds_cache (name is historical) |
-| sync-standings | :30 every 2h | ESPN standings — the season-record source of truth; must lead the analyses |
+| sync-standings | :30 every 2h | ESPN standings, the season-record source of truth; must lead the analyses |
 | pre-analyze-mlb (and per-sport peers) | :45 every 3h | math picks edges (devig baselines + calibration multipliers), LLM narrates, writes game_analysis + ai_suggestions with edge snapshot (pipeline_version 6) |
 | settlement | trigger on game_results + 06:15 safety | grades picks, refreshes MV |
 | capture_closing_lines | */15 | snapshot odds for games starting within 90 min (CLV) |
@@ -45,8 +45,8 @@ API roles stripped from RPC functions.
 `POST /cron/data-integrity?secret=CRON_SECRET` (responds 202, runs async).
 Three sub-agents on the Anthropic API with server-side web search:
 
-- injury scout — claude-opus-4-8 (judgment-heavy)
-- records verifier, weather scout — claude-sonnet-5 (lookups)
+- injury scout: claude-opus-4-8 (judgment-heavy)
+- records verifier, weather scout: claude-sonnet-5 (lookups)
 
 Writes `agent_intel` (kinds: record_mismatch, injury, weather, agent_error)
 and logs started/skipped/summary rows to `cron_job_logs`

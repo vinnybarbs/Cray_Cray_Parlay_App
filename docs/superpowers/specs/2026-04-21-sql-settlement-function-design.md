@@ -1,19 +1,19 @@
-# SQL Settlement Function — Design
+# SQL Settlement Function Design
 
 **Date:** 2026-04-21
 **Status:** Approved, pending implementation plan
 **Owner:** Vinny
-**Spec 1 of 2** — follow-up spec covers ESPN backfill coverage (UFC parser, EPL, Tennis)
+**Spec 1 of 2.** Follow-up spec covers ESPN backfill coverage (UFC parser, EPL, Tennis)
 **Related code:** [lib/services/parlay-outcome-checker.js](../../../lib/services/parlay-outcome-checker.js), [lib/services/ai-suggestion-outcome-checker.js](../../../lib/services/ai-suggestion-outcome-checker.js), [supabase/functions/check-outcomes/index.ts](../../../supabase/functions/check-outcomes/index.ts), [supabase/functions/check-parlay-outcomes/index.ts](../../../supabase/functions/check-parlay-outcomes/index.ts)
 
 ## Problem
 
 The current settlement pipeline has four interconnected defects:
 
-1. **Duplicate writers, inconsistent state on `parlay_legs`.** Railway `ParlayOutcomeChecker` writes `outcome` + `settled_at`; Supabase edge function `check-parlay-outcomes` writes `game_completed` + `leg_result` + `resolved_at`. All 124 existing rows have the first set and the second NULL — the edge function never matched anything. Two code paths that both claim to settle legs.
+1. **Duplicate writers, inconsistent state on `parlay_legs`.** Railway `ParlayOutcomeChecker` writes `outcome` + `settled_at`; Supabase edge function `check-parlay-outcomes` writes `game_completed` + `leg_result` + `resolved_at`. All 124 existing rows have the first set and the second NULL. The edge function never matched anything. Two code paths that both claim to settle legs.
 2. **`check-outcomes` edge function's `checkUserParlays()` is a TODO stub** returning `{checked: 0, resolved: 0}` hardcoded. The "parlays_checked: 0" every run in `cron_job_logs` is by design, not a bug we could fix in place.
-3. **`games_fetched: 0` every run** — the same edge function's `cacheGames()` upsert silently fails (missing NOT-NULL columns). `game_results` gets populated by a separate Railway cron `backfill-game-results-daily` instead; the edge function's fetch path is dead code.
-4. **Sport coverage gaps** surface as ~400 stale pending AI suggestions. EPL and Tennis are not in the edge function's sport list; UFC is in the list but `parseGames()` silently returns 0 (MMA event format has no home/away). These coverage gaps are **out of scope for this spec** — they're handled in the follow-up Spec 2 (ESPN backfill coverage). What this spec fixes: once game_results rows land (from any source), they settle correctly.
+3. **`games_fetched: 0` every run.** The same edge function's `cacheGames()` upsert silently fails (missing NOT-NULL columns). `game_results` gets populated by a separate Railway cron `backfill-game-results-daily` instead; the edge function's fetch path is dead code.
+4. **Sport coverage gaps** surface as ~400 stale pending AI suggestions. EPL and Tennis are not in the edge function's sport list; UFC is in the list but `parseGames()` silently returns 0 (MMA event format has no home/away). These coverage gaps are **out of scope for this spec**. They're handled in the follow-up Spec 2 (ESPN backfill coverage). What this spec fixes: once game_results rows land (from any source), they settle correctly.
 
 Plus two architectural consequences:
 
@@ -31,7 +31,7 @@ Plus two architectural consequences:
 
 ## Non-goals
 
-- **UFC, EPL, Tennis sport-coverage fixes.** Those are fixes to Railway's ESPN scrapers (populating `game_results`), separate concern. This spec's settlement function will settle any sport whose game_results rows exist and match a pick — solving the coverage gap is Spec 2.
+- **UFC, EPL, Tennis sport-coverage fixes.** Those are fixes to Railway's ESPN scrapers (populating `game_results`), separate concern. This spec's settlement function will settle any sport whose game_results rows exist and match a pick. Solving the coverage gap is Spec 2.
 - **Player Props settlement.** 79 picks (4% of dataset) need a player-stats lookup path. Deferred to its own followup spec.
 - **Real-time / live game settlement.** Current Railway backfill runs once a day at 5 AM UTC. Same cadence post-spec. If we later want minute-by-minute live resolution, that's a Railway cron cadence change.
 - **Enforcing `ai_suggestions.parlay_id` reverse link.** The reverse linkage (`ai_suggestions.parlay_id` pointing back to the parent parlay) stays partially-populated legacy data. This spec uses the forward linkage only (`parlay_legs.suggestion_id`).
@@ -43,7 +43,7 @@ Plus two architectural consequences:
 ```
                  ┌───────────────────────┐
                  │  Railway Node cron    │
-                 │ backfill-game-results │ (unchanged — fires once/day 5 UTC)
+                 │ backfill-game-results │ (unchanged, fires once/day 5 UTC)
                  │   → game_results      │
                  └───────────┬───────────┘
                              │ INSERT/UPDATE
@@ -89,9 +89,9 @@ ALTER TABLE public.parlay_legs
 CREATE INDEX idx_parlay_legs_suggestion_id ON public.parlay_legs(suggestion_id);
 ```
 
-No NOT NULL constraint — some legacy legs may remain NULL if they can't be backfilled cleanly. New parlay-creation code paths (Spec 1 scope) will set this column going forward.
+No NOT NULL constraint. Some legacy legs may remain NULL if they can't be backfilled cleanly. New parlay-creation code paths (Spec 1 scope) will set this column going forward.
 
-### Data cleanup — already executed
+### Data cleanup (already executed)
 
 Before writing this spec, the following happened in the brainstorming session (atomic transaction, verified):
 
@@ -137,8 +137,8 @@ Expected: all 113 legs get `suggestion_id` set (70 unique-match + 43 multi-match
 **Update [services/parlay-tracker.js](../../../services/parlay-tracker.js) (or wherever `parlay_legs` rows get inserted)** to write `suggestion_id` for new legs. When the user locks a generator pick into a parlay, the code already has the `ai_suggestions.id` in hand; it just needs to include it in the insert payload.
 
 Exact file location and insert call need to be located during implementation. Grep for `from\('parlay_legs'\)\s*\.insert|INSERT INTO parlay_legs` turned up:
-- `services/parlay-tracker.js` — expected primary location
-- `create_parlay_legs_table.js` — one-shot setup script, ignore
+- `services/parlay-tracker.js`: expected primary location
+- `create_parlay_legs_table.js`: one-shot setup script, ignore
 
 ### Retirement of Supabase edge functions
 
@@ -151,9 +151,9 @@ SELECT cron.unschedule('check-parlay-outcomes-30min-generous');
 SELECT cron.unschedule('check-parlay-outcomes');  -- Railway-facing one
 ```
 
-The last one is the Railway-facing cron (`0 * * * *` calling `api/cron/check-parlays`). With the new SQL pipeline, Railway's `ParlayOutcomeChecker` and `AISuggestionOutcomeChecker` become dead code — their functionality lives in Postgres now.
+The last one is the Railway-facing cron (`0 * * * *` calling `api/cron/check-parlays`). With the new SQL pipeline, Railway's `ParlayOutcomeChecker` and `AISuggestionOutcomeChecker` become dead code. Their functionality lives in Postgres now.
 
-**Edge function source files** (`supabase/functions/check-outcomes/`, `supabase/functions/check-parlay-outcomes/`) are not deleted by this spec — they stay in the repo as archived code. A followup cleanup PR can delete them once we've observed the new pipeline is stable for a week.
+**Edge function source files** (`supabase/functions/check-outcomes/`, `supabase/functions/check-parlay-outcomes/`) are not deleted by this spec. They stay in the repo as archived code. A followup cleanup PR can delete them once we've observed the new pipeline is stable for a week.
 
 ### The `determine_outcome()` function details
 
@@ -315,7 +315,7 @@ DECLARE
   all_won_count INT;
 BEGIN
   -- Mark any pending parlay as LOST if any of its legs lost
-  -- (early-loss detection — don't wait for remaining legs to play out)
+  -- (early-loss detection, don't wait for remaining legs to play out)
   -- Stake assumed at $100 flat (no bet_amount column on parlays table today;
   -- matches existing Railway ParlayOutcomeChecker behavior).
   UPDATE public.parlays p
@@ -359,7 +359,7 @@ END;
 $$;
 ```
 
-Two-stage UPDATE: early-loss first, then full-win. If a parlay has both a lost leg and enough won legs, the first UPDATE gets it and the second ignores it. All-push parlays (rare edge) are not handled specifically — they'd have zero "won" legs and zero "lost" legs, which means neither UPDATE fires. Left deliberately: an all-push parlay is a stake-refund situation and the UI should surface that, but it's a pathological case worth a followup not a main-path fix.
+Two-stage UPDATE: early-loss first, then full-win. If a parlay has both a lost leg and enough won legs, the first UPDATE gets it and the second ignores it. All-push parlays (rare edge) are not handled specifically. They'd have zero "won" legs and zero "lost" legs, which means neither UPDATE fires. Left deliberately: an all-push parlay is a stake-refund situation and the UI should surface that, but it's a pathological case worth a followup not a main-path fix.
 
 `profit_loss` assumes default $100 stake when `potential_payout` is null. Matches the existing Railway logic.
 
@@ -443,10 +443,10 @@ Single file at `supabase/migrations/<timestamp>_sql_settlement_function.sql` doe
 1. `ALTER TABLE parlay_legs ADD COLUMN suggestion_id ...`
 2. `CREATE INDEX idx_parlay_legs_suggestion_id ...`
 3. Linkage backfill (the CTE update above)
-4. `CREATE OR REPLACE FUNCTION determine_outcome(...) ...` through `run_settlement()` — five functions
+4. `CREATE OR REPLACE FUNCTION determine_outcome(...) ...` through `run_settlement()` (five functions)
 5. `CREATE TRIGGER trg_settle_on_game_results ...`
 6. `SELECT cron.schedule('settlement_daily_safety', ...)`
-7. `SELECT cron.unschedule('check-outcomes-midnight')` — 4 unschedule calls
+7. `SELECT cron.unschedule('check-outcomes-midnight')` (4 unschedule calls)
 8. `GRANT EXECUTE ON FUNCTION ... TO anon, authenticated, service_role`
 9. Commit records results via the final `SELECT run_settlement()` call
 
@@ -457,7 +457,7 @@ Before declaring complete:
 1. **Linkage coverage.** After migration, `SELECT COUNT(*) FILTER (WHERE suggestion_id IS NULL) FROM parlay_legs` returns 0.
 2. **Trigger fires.** `INSERT INTO game_results (<dummy>)` causes a row in `cron_job_logs` with `job_name = 'run_settlement'`. (Or just observe next Railway backfill run.)
 3. **Multi-day parlay correctness.** Manually fabricate a parlay with one lost leg and two pending legs → verify `settle_parlays()` marks it lost.
-4. **Stale backlog cleared.** Pre-migration `SELECT COUNT(*) FROM ai_suggestions WHERE actual_outcome='pending' AND game_date < NOW() - INTERVAL '24 hours'` minus post-migration same query shows hundreds of settled rows (bounded by game_results coverage — NCAAB / NBA / NHL / MLB / MLS should mostly settle; UFC / EPL / Tennis stay pending until Spec 2).
+4. **Stale backlog cleared.** Pre-migration `SELECT COUNT(*) FROM ai_suggestions WHERE actual_outcome='pending' AND game_date < NOW() - INTERVAL '24 hours'` minus post-migration same query shows hundreds of settled rows (bounded by game_results coverage, so NCAAB / NBA / NHL / MLB / MLS should mostly settle; UFC / EPL / Tennis stay pending until Spec 2).
 5. **parlay_legs state columns consistent.** `SELECT COUNT(*) FROM parlay_legs WHERE outcome IS NOT NULL AND (game_completed IS NOT TRUE OR leg_result IS NULL OR resolved_at IS NULL)` returns 0 after migration.
 6. **Old pg_cron jobs unscheduled.** `SELECT * FROM cron.job WHERE jobname IN ('check-outcomes-midnight', 'check-outcomes-morning', 'check-parlay-outcomes-30min-generous', 'check-parlay-outcomes')` returns 0 rows.
 7. **Future pick creation writes `suggestion_id`.** After implementation, lock a parlay through the UI and verify the new `parlay_legs` row has `suggestion_id` populated.
@@ -481,15 +481,15 @@ DROP FUNCTION IF EXISTS public.determine_outcome(TEXT, TEXT, NUMERIC, TEXT, TEXT
 -- 3. Re-schedule the old crons (cron command bodies are in archived migration files)
 -- See: docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md "Retirement of Supabase edge functions"
 
--- 4. Drop the new column (optional — leaving it doesn't hurt)
+-- 4. Drop the new column (optional, leaving it doesn't hurt)
 -- ALTER TABLE public.parlay_legs DROP COLUMN suggestion_id;
 ```
 
-`parlay_legs` data on the 113 rows with refreshed state columns is NOT reverted — the outcome values are correct, the other state columns just become populated. Not a "rollback" concern. If a specific incorrect settlement is discovered, it's fixed by manual UPDATE, not by reverting the whole feature.
+`parlay_legs` data on the 113 rows with refreshed state columns is NOT reverted. The outcome values are correct, the other state columns just become populated. Not a "rollback" concern. If a specific incorrect settlement is discovered, it's fixed by manual UPDATE, not by reverting the whole feature.
 
 ## Out-of-scope follow-ups (queued)
 
-1. **Spec 2 — ESPN backfill coverage.** Fix UFC MMA parser in Railway cron; add EPL (`soccer/eng.1`) to Railway backfill; research Tennis data source (no ESPN scoreboard, API-Sports cancelled — this is research first).
+1. **Spec 2: ESPN backfill coverage.** Fix UFC MMA parser in Railway cron; add EPL (`soccer/eng.1`) to Railway backfill; research Tennis data source (no ESPN scoreboard, API-Sports cancelled, so this is research first).
 2. **Player Props settlement.** Add a `settle_player_props()` function that joins ai_suggestions to `player_game_stats`. Separate bet-type logic, different data source.
 3. **Delete dead edge function source files** (`supabase/functions/check-outcomes/`, `supabase/functions/check-parlay-outcomes/`) after a week of observed stability. Cleanup PR, not architectural.
 4. **Fix parlay creation code path to set `suggestion_id`.** This IS in scope for the implementation PR, but might need separate follow-up if the parlay-tracker file has surprises.

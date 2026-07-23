@@ -12,10 +12,10 @@ import HouseLedger from './pages/HouseLedger'
 
 // App-level router. HashRouter (mounted in main.jsx) keeps every pre-existing
 // #/digest-style URL working unchanged. The old MainApp flag-and-overlay
-// navigation is gone — browser Back/Forward now work everywhere.
+// navigation is gone. Browser Back/Forward now work everywhere.
 
 // While AuthContext hydrates the Supabase session, isAuthenticated is briefly
-// false — which would flash Landing (or bounce a deep link) for a returning
+// false, which would flash Landing (or bounce a deep link) for a returning
 // user. Block every route behind a minimal splash until auth resolves.
 function Splash() {
   return (
@@ -31,7 +31,7 @@ function Splash() {
 // Root: marketing landing for visitors, digest for members. Because this is
 // a plain redirect on auth state (not a sign-in-transition listener), Google
 // OAuth's full-redirect round trip gets the same first screen as email
-// signups — the digest. That closes audit-40 funnel leak #1.
+// signups, the digest. That closes audit-40 funnel leak #1.
 function Home() {
   const { isAuthenticated } = useAuth()
   const [showAuth, setShowAuth] = useState(false)
@@ -87,7 +87,7 @@ export default function App() {
       <Route path="/generator" element={<GeneratorPage />} />
       <Route path="/chat" element={<ChatRoute />} />
       <Route path="/results" element={<ResultsRoute />} />
-      {/* The House Ledger is deliberately public — it IS the marketing. */}
+      {/* The House Ledger is deliberately public. It IS the marketing. */}
       <Route path="/ledger" element={<HouseLedger />} />
       <Route path="/admin" element={<AdminRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />

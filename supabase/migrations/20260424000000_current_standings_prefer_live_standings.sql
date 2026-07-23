@@ -8,12 +8,12 @@
 --   * ESPN stamps PRE-game records on each game_results row, so the stamp is
 --     ALWAYS 1 game lagged relative to a team's current W-L
 --   * Standings table (synced every 6h from ESPN's standings page) is
---     POST-game — actually current
+--     POST-game, actually current
 --
 -- Real-world observation: Cubs played Apr 22 (7-2 W), their record entering
 -- that game per ESPN metadata = "15-9", their actual record after = "16-9".
 -- Standings shows 16-9. team_latest_record still returns 15-9. Every user-
--- facing tile was showing 15-9 — "1 game behind" the truth for every MLB team
+-- facing tile was showing 15-9, "1 game behind" the truth for every MLB team
 -- that played yesterday.
 --
 -- Fix: build `record` sport-aware from standings.{wins,losses,ties}, fall

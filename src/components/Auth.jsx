@@ -8,7 +8,7 @@ export default function Auth({ onClose }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  // Signup succeeded but Supabase requires email confirmation — the user has
+  // Signup succeeded but Supabase requires email confirmation. The user has
   // no session yet. Closing the modal here silently dropped them back on the
   // landing page with no explanation (audit 40, funnel leak 2).
   const [confirmationSent, setConfirmationSent] = useState(false)
@@ -22,7 +22,7 @@ export default function Auth({ onClose }) {
 
     try {
       // The OAuth round trip must return to wherever the app is actually
-      // served — origin covers localhost and production alike.
+      // served. Origin covers localhost and production alike.
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -52,7 +52,7 @@ export default function Auth({ onClose }) {
       if (error) {
         setError(error.message)
       } else if (isSignUp && data && !data.session) {
-        // Account created, confirmation email pending — no session until the
+        // Account created, confirmation email pending. No session until the
         // user clicks the link. Show them what to do instead of vanishing.
         setConfirmationSent(true)
       } else {

@@ -21,7 +21,7 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          sport: { type: 'string', description: 'Sport name or slug — accepts nba, mlb, nfl, nhl, ncaab, epl, mls, ufc, tennis, golf, world cup, champions league, etc. Rotating tournaments (World Cup, tennis events, golf majors) resolve automatically to whatever is live.' },
+          sport: { type: 'string', description: 'Sport name or slug. Accepts nba, mlb, nfl, nhl, ncaab, epl, mls, ufc, tennis, golf, world cup, champions league, etc. Rotating tournaments (World Cup, tennis events, golf majors) resolve automatically to whatever is live.' },
           team: { type: 'string', description: 'Optional team name to filter by (e.g. "Lakers", "Duke")' },
           market_type: { type: 'string', description: 'Market type: h2h (moneyline), spreads, totals, player_points, player_rebounds, player_assists, player_pass_yds, player_rush_yds, player_receptions' },
           bookmaker: { type: 'string', description: 'Bookmaker: draftkings or fanduel. Default draftkings.' }
@@ -67,7 +67,7 @@ const TOOLS = [
       parameters: {
         type: 'object',
         properties: {
-          sport: { type: 'string', description: 'Sport name or slug — accepts nba, mlb, world cup, tennis, etc. Rotating tournaments resolve automatically.' },
+          sport: { type: 'string', description: 'Sport name or slug. Accepts nba, mlb, world cup, tennis, etc. Rotating tournaments resolve automatically.' },
           days: { type: 'number', description: 'How many days ahead to look (1-7). Default 2.' }
         },
         required: ['sport']
@@ -166,7 +166,7 @@ const TOOLS = [
 // Resolve whatever the model calls a sport ("world cup", "World Cup",
 // "soccer_fifa_world_cup", "tennis") to the slug(s) actually present in
 // odds_cache right now. Tournament keys rotate weekly, so this must NEVER
-// be a hardcoded list — that exact disease blinded this chat to the 2026
+// be a hardcoded list. That exact disease blinded this chat to the 2026
 // World Cup while the rest of the site covered it. 5-minute cache.
 let _sportSlugCache = { at: 0, slugs: [] };
 async function resolveSportSlugs(input) {
@@ -393,7 +393,7 @@ async function executeTool(name, args) {
 
         const newsCache = [...teamIntel, ...(sportLevel || [])];
 
-        // Get articles — prefer enriched but also include recent unenriched ones
+        // Get articles. Prefer enriched but also include recent unenriched ones
         let articlesQuery = supabase
           .from('news_articles')
           .select('title, published_at, betting_summary, injury_mentions, sentiment, summary')
@@ -676,13 +676,13 @@ function getMountainTimeContext() {
   return { mt, todayMT, tomorrowDate };
 }
 
-const SYSTEM_PROMPT = `You are De-Genny, the TrapHawk AI — a sharp, opinionated sports betting degenerate who ALWAYS has a take.
+const SYSTEM_PROMPT = `You are De-Genny, the TrapHawk AI, a sharp, opinionated sports betting degenerate who ALWAYS has a take.
 
-PERSONALITY: Confident. Convicted. Funny. Sarcastic. You roast bad teams, clown public bettors, and talk trash like you're at the sportsbook with your boys. You're the degenerate friend who somehow always does the research. Never wishy-washy, never "it could go either way." You ALWAYS pick a side. Throw in jokes, trash talk, and hot takes — but back them up with cold hard data.
+PERSONALITY: Confident. Convicted. Funny. Sarcastic. You roast bad teams, clown public bettors, and talk trash like you're at the sportsbook with your boys. You're the degenerate friend who somehow always does the research. Never wishy-washy, never "it could go either way." You ALWAYS pick a side. Throw in jokes, trash talk, and hot takes, but back them up with cold hard data.
 
-TIMEZONE: The user is in MOUNTAIN TIME (America/Denver). When they say "today" they mean Mountain Time today. Game times in tool results are UTC — convert to Mountain Time (UTC-6 in MDT, UTC-7 in MST) when talking to the user. A game at "2026-04-02T02:00:00Z" is 8:00 PM MT on April 1st — that's TODAY not tomorrow.
+TIMEZONE: The user is in MOUNTAIN TIME (America/Denver). When they say "today" they mean Mountain Time today. Game times in tool results are UTC. Convert to Mountain Time (UTC-6 in MDT, UTC-7 in MST) when talking to the user. A game at "2026-04-02T02:00:00Z" is 8:00 PM MT on April 1st. That's TODAY not tomorrow.
 
-ABSOLUTE RULES — VIOLATION OF THESE MEANS YOU FAILED:
+ABSOLUTE RULES (VIOLATION OF THESE MEANS YOU FAILED):
 1. NEVER EVER fabricate statistics, records, ATS data, streaks, or trends. If a tool didn't return it, YOU DON'T KNOW IT. Say "my data shows X" only when X came from a tool.
 2. ALWAYS call tools FIRST. You MUST call at least search_odds + get_injuries + get_recent_scores before making ANY pick. No exceptions.
 3. ALWAYS COMMIT TO A PICK. No "tossups." No "lean." PICK A SIDE AND OWN IT.
@@ -691,7 +691,7 @@ ABSOLUTE RULES — VIOLATION OF THESE MEANS YOU FAILED:
 
 YOUR TOOLS (use them aggressively):
 - search_odds → ACTUAL lines and moneylines (REQUIRED for every pick)
-- get_injuries → who's hurt (REQUIRED — this creates edges)
+- get_injuries → who's hurt (REQUIRED, this creates edges)
 - get_recent_scores → actual recent game results and scores
 - get_standings → records and conference rankings
 - get_news → articles with analysis, insider takes
@@ -713,7 +713,7 @@ MATH-GROUNDED PICKING (read this carefully):
 - search_odds results also include a \`math_pick\` field showing the math-recommended pick for the entire game.
 - A POSITIVE edge_pp means our model thinks this side has value vs the market. A NEGATIVE edge_pp means our model says it's a trap.
 - PREFER the math_pick. If you want to recommend something different, you MUST cite a specific reason (e.g., a tool returned an injury that the math doesn't see). Never silently override.
-- Edges of +2pp or higher are tradable; below ±2pp is noise — don't make a big deal of it.
+- Edges of +2pp or higher are tradable; below ±2pp is noise, so don't make a big deal of it.
 
 FORMAT:
 🔒 TEAM -3.5 (-110)
@@ -727,12 +727,14 @@ Why this hits:
 Confidence: 🔥🔥🔥🔥 (4/5)
 
 WHAT YOU MUST NEVER DO:
-- Say "Team X is 0-5 ATS" unless a tool returned ATS data (they won't — we don't have ATS data)
-- Say "Team X has covered in Y of last Z games" — we don't track covers
+- Say "Team X is 0-5 ATS" unless a tool returned ATS data (they won't, we don't have ATS data)
+- Say "Team X has covered in Y of last Z games". We don't track covers
 - Say "Team X is on a 7-game winning streak" unless get_recent_scores showed 7 consecutive wins
 - Invent any statistic. If unsure, call another tool or say "my data doesn't show that"
 
-Keep it punchy. For entertainment — gamble responsibly.`;
+WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas.
+
+Keep it punchy. For entertainment only. Gamble responsibly.`;
 
 async function chatPicksHandler(req, res) {
   const startTime = Date.now();
@@ -766,7 +768,7 @@ async function chatPicksHandler(req, res) {
       ...messages
     ];
 
-    // First call REQUIRES tool use — forces the model to gather data before answering
+    // First call REQUIRES tool use. This forces the model to gather data before answering
     let response = await callClaude(systemContent, fullMessages, 'required');
 
     // Handle tool calls (may need multiple rounds)
@@ -859,7 +861,7 @@ async function callClaude(system, messages, toolChoice = 'auto') {
 async function extractAndStorePicks(responseText) {
   if (!responseText || responseText.length < 50) return 0;
 
-  // Quick check — does this look like it contains picks?
+  // Quick check: does this look like it contains picks?
   const hasPickSignals = /🔒|spread|moneyline|over|under|(-\d{3}|\+\d{3})|\d+\.\d+/i.test(responseText);
   if (!hasPickSignals) return 0;
 
@@ -947,7 +949,7 @@ Return ONLY valid JSON array with this format:
             tier = edgeTier(edgePp);
           }
         }
-      } catch { /* snapshot is best-effort — never block saving the pick */ }
+      } catch { /* snapshot is best-effort, never block saving the pick */ }
 
       const { error } = await supabase
         .from('ai_suggestions')

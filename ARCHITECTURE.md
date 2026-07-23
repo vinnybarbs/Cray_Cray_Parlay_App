@@ -1,4 +1,4 @@
-# Cray Cray Parlay App – System Architecture
+# Cray Cray Parlay App System Architecture
 
 This document describes how the frontend, backend, Supabase, cron jobs, and external services fit together in this project.
 
@@ -6,10 +6,10 @@ This document describes how the frontend, backend, Supabase, cron jobs, and exte
 
 ## 1. High-Level Components
 
-1. **Frontend (Vite + React)** – Browser UI where you configure and view parlays.
-2. **Backend API (Node/Express)** – Main application server, hosted on **Railway** in production.
-3. **Data Platform (Supabase)** – Postgres database + Edge Functions + pg_cron jobs.
-4. **External Data Sources** – Odds API, Serper (search), and RSS feeds.
+1. **Frontend (Vite + React)**: Browser UI where you configure and view parlays.
+2. **Backend API (Node/Express)**: Main application server, hosted on **Railway** in production.
+3. **Data Platform (Supabase)**: Postgres database + Edge Functions + pg_cron jobs.
+4. **External Data Sources**: Odds API, Serper (search), and RSS feeds.
 
 Each has its own environment configuration and deployment path.
 
@@ -56,10 +56,10 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 **Main app:** `server.js` (Express). Routes under `/api` and `/cron`:
 
-- `api/health.js` – basic health check
-- `api/generate-parlay.js` – generates parlays
-- `api/suggest-picks.js` – suggestions endpoint
-- `/cron/refresh-odds` route (in server or a cron route file) – used by external schedulers
+- `api/health.js`: basic health check
+- `api/generate-parlay.js`: generates parlays
+- `api/suggest-picks.js`: suggestions endpoint
+- `/cron/refresh-odds` route (in server or a cron route file): used by external schedulers
 
 **Local commands:**
 
@@ -117,18 +117,18 @@ https://craycrayparlayapp-production.up.railway.app
 Key tables:
 
 - **Odds & games**
-  - `odds_cache` – core & prop odds for games.
-  - `games` – game metadata.
+  - `odds_cache`: core & prop odds for games.
+  - `games`: game metadata.
   - `teams`, `team_aliases`, `players`, `player_aliases`.
 - **Parlay domain**
-  - `parlays`, `parlay_legs` – user parlays and legs.
-  - `user_stats_daily` – daily user stats.
+  - `parlays`, `parlay_legs`: user parlays and legs.
+  - `user_stats_daily`: daily user stats.
 - **Research / intelligence**
-  - `news_cache` – Serper-based intelligence cache (`sport`, `team_name`, `search_type`, `articles`, `summary`).
-  - `news_sources`, `news_articles`, `news_embeddings` – RSS ingestion.
+  - `news_cache`: Serper-based intelligence cache (`sport`, `team_name`, `search_type`, `articles`, `summary`).
+  - `news_sources`, `news_articles`, `news_embeddings`: RSS ingestion.
 - **Monitoring**
-  - `api_call_log` – Serper API usage.
-  - `cron_job_logs` – Edge Function cron runs.
+  - `api_call_log`: Serper API usage.
+  - `cron_job_logs`: Edge Function cron runs.
 
 Supabase Postgres is the **single source of truth** for odds, parlays, research, and RSS content.
 
@@ -260,11 +260,11 @@ Responsibilities:
 
 Key methods:
 
-- `getTeamIntelligence(sport, teamName)` – loads:
+- `getTeamIntelligence(sport, teamName)`: loads:
   - `injuries`, `analystPicks`, `teamNews` from `news_cache`.
   - Additional headlines from `news_articles` via a fuzzy match on title/summary/content.
-- `getMatchupIntelligence(sport, homeTeam, awayTeam)` – bundles both teams + betting trends.
-- `getAgentContext(sport, homeTeam, awayTeam)` – generates a text summary for agents.
+- `getMatchupIntelligence(sport, homeTeam, awayTeam)`: bundles both teams + betting trends.
+- `getAgentContext(sport, homeTeam, awayTeam)`: generates a text summary for agents.
 
 ### 6.2 Analyst Agent
 

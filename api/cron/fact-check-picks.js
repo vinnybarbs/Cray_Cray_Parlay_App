@@ -148,7 +148,7 @@ async function runFactCheck(pick, realData, playbook = '') {
 
 PICK BEING CHECKED:
 - Game: ${pick.away_team} @ ${pick.home_team}
-- Bet: ${pick.bet_type} — ${pick.pick} (${pick.odds})
+- Bet: ${pick.bet_type} - ${pick.pick} (${pick.odds})
 - Confidence: ${pick.confidence}/10
 - Reasoning: ${pick.reasoning}
 
@@ -176,9 +176,9 @@ Respond in this exact JSON format:
   "summary": "One-line verdict on this analysis quality"
 }`;
 
-  // Verification is a judgment call — Sonnet over the utility tier.
+  // Verification is a judgment call, so Sonnet over the utility tier.
   // 2000 tokens: sonnet enumerating every claim overran the old 1000 cap,
-  // truncating the JSON mid-array — same failure mode that killed
+  // truncating the JSON mid-array, the same failure mode that killed
   // pre-analyze on 7/12. Keep headroom on any json: true call.
   const parsed = await complete({
     model: MODELS.NARRATION,

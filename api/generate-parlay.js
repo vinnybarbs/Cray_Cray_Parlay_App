@@ -233,43 +233,31 @@ ${marketAvailabilityNote}
 4. CONSIDER THE RESEARCH DATA when making picks - injuries, trends, recent form are CRITICAL factors
 5. In your reasoning, reference specific research insights when available
 6. Do not include games that have already started or have already finished
-7. Do not conflict same-game bets, moneyline or spread on one team and another leg shouldn't be moneyline or spread on the other team. Similarly an over on a prop bet shoudn't have an under on the same bet as another leg
-8. If you take a team or pick for moneyline, do not reapeat as another leg against the spread
-9. do NOT repeat the same exact bet as multiple legs
-10. Work with whatever markets are available - do not complain about missing data
+7. Never combine conflicting bets. No moneyline or spread on both teams in one game, and no over and under on the same prop
+8. If you take a team on the moneyline, do not repeat that team against the spread as another leg
+9. Do NOT repeat the same exact bet as multiple legs
+10. Work with whatever markets are available. Do not complain about missing data
+11. WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas
 
 ${oddsContext}
 
 YOUR TASK:
-Create a ${numLegs}-leg parlay using VARIETY across different bet types and games. 
+Create a ${numLegs}-leg parlay spread across different games.
 
-CRITICAL REQUIREMENTS:
+PARLAY STRUCTURE (FIXED):
 - You MUST create exactly ${numLegs} legs (not fewer)
-- MIX bet types: If user selected multiple types (spreads, totals, props), use a variety
-- PREFER different games when available, BUT if limited games:
-  * Use MULTIPLE BET TYPES from the same game (e.g., spread + total + player props)
-  * Different players for props to avoid correlation
-  * Mix of moneyline/spread + totals + player props from same game
+- One leg per game. Every leg comes from a DIFFERENT game in the data
+- MIX bet types: If the user selected multiple types (spreads, totals, props), use a variety across the legs
 - Prioritize HIGH PROBABILITY bets that match the ${riskLevel} risk level
-- USE THE RESEARCH DATA to inform your picks - don't just pick favorites blindly
-- If you have both regular markets (spreads/totals/ML) AND props, combine them for variety
+- USE THE RESEARCH DATA to inform your picks. Don't just pick favorites blindly
 
-SAME GAME STRATEGY (when few games available):
-- Game 1: Team A spread + Over total + Player X rushing yards + Player Y receiving yards
-- This creates 4 legs from one game using different bet types
-- Avoid conflicting bets (don't bet opposing spreads/moneylines)
+THIN SLATE FALLBACK (ONLY when the data has fewer games than ${numLegs}):
+- You may take a second bet from a game, using a different bet type (e.g., spread + player prop)
+- Never more than 2 legs from one game, and use different players for props to avoid correlation
+- Never combine conflicting or correlated bets from the same game
+- NEVER build the whole parlay from a single game when more games are available
 
-Example for limited games scenario:
-- Eagles @ Giants: Eagles -6.5 spread (-110)
-- Eagles @ Giants: Over 47.5 total (-110)  
-- Eagles @ Giants: Hurts Over 250.5 pass yards (-120)
-- Eagles @ Giants: Saquon Over 75.5 rush yards (+105)
-- Eagles @ Giants: AJ Brown anytime TD (+180)
-- Dolphins @ Jets: Dolphins ML (+150)
-- Dolphins @ Jets: Under 44.5 total (-105)
-- Dolphins @ Jets: Tua Over 275.5 pass yards (-115)
-
-DO NOT create fewer than ${numLegs} legs unless there literally aren't enough unique games in the data.
+DO NOT create fewer than ${numLegs} legs unless there literally aren't enough games and bet types in the data.
 
 REQUIRED FORMAT:
 

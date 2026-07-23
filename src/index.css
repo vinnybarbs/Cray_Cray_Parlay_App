@@ -31,7 +31,7 @@
 
   --radius-sharp: 2px;
 
-  /* Hairline insets — terminal-panel borders that don't affect layout. */
+  /* Hairline insets. Terminal-panel borders that don't affect layout. */
   --shadow-hairline:        inset 0 0 0 1px var(--color-ink-600);
   --shadow-hairline-bright: inset 0 0 0 1px var(--color-ink-500);
   --shadow-hairline-pos:    inset 0 0 0 1px var(--color-signal-pos-dim);
@@ -46,7 +46,7 @@
     font-family: var(--font-sans);
     font-feature-settings: "ss01", "cv11";
   }
-  /* Tabular figures wherever mono numerics appear — keeps columns aligned. */
+  /* Tabular figures wherever mono numerics appear, keeps columns aligned. */
   .font-mono {
     font-variant-numeric: tabular-nums;
   }

@@ -1,6 +1,6 @@
 -- supabase/migrations/20260422151910_add_epl_mls_to_backfill_cron.sql
 -- The backfill-game-results-daily pg_cron job was calling the Railway endpoint
--- with sports=NBA,NCAAB,NFL,NHL,MLB — EPL and MLS were silently excluded.
+-- with sports=NBA,NCAAB,NFL,NHL,MLB . EPL and MLS were silently excluded.
 -- Result: 51 EPL + 120 MLS picks stuck pending forever because game_results
 -- had zero soccer rows for settle_ai_suggestions() to match against.
 --

@@ -11,10 +11,13 @@ const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
 const { getClient: getClaude, MODELS, extractJson } = require('../../lib/services/claude.js');
+const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
+const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
+const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 
 // Map odds_cache sport slugs to display sport names. Tennis (and golf)
 // tournament keys ROTATE weekly and are discovered dynamically by the
-// refresh-odds edge function, so they resolve by prefix — never enumerate
+// refresh-odds edge function, so they resolve by prefix. Never enumerate
 // tournaments here (the old static list went dark the Monday after Wimbledon).
 const SLUG_TO_SPORT = {
   americanfootball_nfl: 'NFL',
@@ -37,7 +40,23 @@ const SLUG_TO_SPORT = {
 // markets and never modeled the draw, so its soccer edges were structurally
 // inflated (EPL ML settled 17-54). Soccer games still get preview analyses
 // for the digest, but no picks publish until a real three-way model exists.
-const PREVIEW_ONLY_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+// Sports whose edges come from dedicated models running in SHADOW MODE:
+// edges are computed and stored on the board (game_analysis) so the tiles
+// show the read, but no pick reaches the record (ai_suggestions) until the
+// model calibrates on settled shadow reads. Soccer uses the three-way 1X2
+// module, tennis and UFC use market-consensus player models. Designs and
+// un-shadow criteria live in docs/models/.
+const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'Tennis', 'UFC']);
+
+// ATP slams are best of five. Everything else, including all WTA events,
+// is best of three. The tennis model prices the reliability gap between
+// the two formats.
+const BO5_TENNIS_KEYS = new Set([
+  'tennis_atp_aus_open_singles',
+  'tennis_atp_french_open',
+  'tennis_atp_wimbledon',
+  'tennis_atp_us_open'
+]);
 
 function slugToSport(slug) {
   if (!slug) return slug;
@@ -95,7 +114,8 @@ async function getUpcomingGames(sports) {
         home_team: row.home_team,
         away_team: row.away_team,
         game_date: row.commence_time,
-        markets: {}
+        markets: {},
+        h2hRows: []
       };
     }
 
@@ -103,6 +123,13 @@ async function getUpcomingGames(sports) {
     const existing = games[key].markets[row.market_type];
     if (!existing || row.bookmaker === 'draftkings') {
       games[key].markets[row.market_type] = row.outcomes;
+    }
+
+    // Keep EVERY book's moneyline row. The tennis, UFC, and soccer models
+    // build a cross-book consensus, and collapsing to one book above
+    // starves them of their core signal.
+    if (row.market_type === 'h2h') {
+      games[key].h2hRows.push({ bookmaker: row.bookmaker, market_type: 'h2h', outcomes: row.outcomes });
     }
   }
 
@@ -119,7 +146,7 @@ function extractOddsContext(game) {
     over_odds: null, under_odds: null
   };
 
-  // Spread — capture both point (line) and price (juice) per side
+  // Spread: capture both point (line) and price (juice) per side
   const spreads = game.markets['spreads'];
   if (spreads) {
     const homeSpread = spreads.find(o => o.name === game.home_team);
@@ -128,7 +155,7 @@ function extractOddsContext(game) {
     if (awaySpread) { ctx.spread_away_odds = awaySpread.price; }
   }
 
-  // Total — capture O/U line and juice per side
+  // Total: capture O/U line and juice per side
   const totals = game.markets['totals'];
   if (totals) {
     const over = totals.find(o => o.name === 'Over');
@@ -153,6 +180,23 @@ function extractOddsContext(game) {
 // pick goes through one helper.
 const { formatAmericanOdds, buildPickText, resolveOddsForSide: resolveOddsForPick } = pickGrader;
 
+// Draw is its own 1X2 side. The pick text carries no team name on purpose:
+// settlement matches team picks on pick.includes(team_name), and a draw
+// pick must never match either team.
+function buildDrawPickText(game) {
+  const h2h = game.markets && game.markets['h2h'];
+  const draw = Array.isArray(h2h) ? h2h.find(o => o && o.name === 'Draw') : null;
+  if (!draw || draw.price == null) return 'Draw';
+  return `Draw ${formatAmericanOdds(draw.price)}`;
+}
+
+// Draw price for storage paths that resolve odds by side.
+function drawPrice(game) {
+  const h2h = game.markets && game.markets['h2h'];
+  const draw = Array.isArray(h2h) ? h2h.find(o => o && o.name === 'Draw') : null;
+  return draw && draw.price != null ? draw.price : null;
+}
+
 /**
  * Get relevant news snippets for a game's teams.
  *
@@ -161,14 +205,14 @@ const { formatAmericanOdds, buildPickText, resolveOddsForSide: resolveOddsForPic
  * matched unrelated Brooklyn Nets articles about assistant coach Fernandez.
  * Full-name matching may miss articles that use short forms (e.g., "Lakers"
  * alone instead of "Los Angeles Lakers"), but fewer false matches beats
- * hallucinated cross-sport context — source-of-truth > coverage.
+ * hallucinated cross-sport context. Source-of-truth beats coverage.
  */
 async function getNewsContext(homeTeam, awayTeam, sport) {
   try {
     const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
     // Strip chars that break PostgREST filter syntax (commas, parens).
-    // Apostrophes are fine — supabase-js URL-encodes them.
+    // Apostrophes are fine, supabase-js URL-encodes them.
     const homeQuery = homeTeam.replace(/[(),]/g, '').trim();
     const awayQuery = awayTeam.replace(/[(),]/g, '').trim();
     if (!homeQuery || !awayQuery) return null;
@@ -277,7 +321,7 @@ async function getRankingsContext(homeTeam, awayTeam) {
       }
     }
 
-    // Secondary source: rankings_cache (AP Top 25 — adds rank for college teams).
+    // Secondary source: rankings_cache (AP Top 25, adds rank for college teams).
     // Full-team-name match, same rationale as standings block above.
     const { data: rankData } = await supabase
       .from('rankings_cache')
@@ -466,7 +510,7 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   // Emit the actual season record whenever we have it (from current_standings).
   // Previously this only fired when `rank` was populated, which is college-only.
   // NBA/MLB/NHL etc. have no AP-style ranking, so their real season record never
-  // made it into the prompt — the model was left with only the EdgeCalculator's
+  // made it into the prompt. The model was left with only the EdgeCalculator's
   // "last 20 games" record (mislabeled as Season record) and ended up writing
   // wrong records into snippets. This path is the single source of truth for
   // the full-season W-L.
@@ -481,14 +525,14 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
     contextParts.push(`${game.away_team} season record: ${rankCtx.away_record}${rankStr}${streakStr}`);
   }
 
-  if (homeTrend) contextParts.push(`${game.home_team} last ${homeTrend.games.length}: ${homeTrend.record} — ${homeTrend.games.join('; ')}`);
-  if (awayTrend) contextParts.push(`${game.away_team} last ${awayTrend.games.length}: ${awayTrend.record} — ${awayTrend.games.join('; ')}`);
+  if (homeTrend) contextParts.push(`${game.home_team} last ${homeTrend.games.length}: ${homeTrend.record} (${homeTrend.games.join('; ')})`);
+  if (awayTrend) contextParts.push(`${game.away_team} last ${awayTrend.games.length}: ${awayTrend.record} (${awayTrend.games.join('; ')})`);
 
   if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
 
-  // Statistical edge block — inject only when EdgeCalculator has REAL record/form data.
+  // Statistical edge block. Inject only when EdgeCalculator has REAL record/form data.
   // Sports without a stats source (Tennis, UFC, sometimes MLS) previously got the
   // calculator's no-data fallback (~53% / 47% defaults) surfaced as prompt input,
   // producing identical-looking "calculated win probability" numbers on every tile.
@@ -496,7 +540,7 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   // Trimmed to a tight 2-line signal (math-edge conclusion + recent form) now that
   // the prompt already carries the actual season record from current_standings.
   // Intermediate math inputs (calculated win prob, implied prob, pt diff, schedule
-  // strength, adjustments, last-20 record) removed — they were noise the model
+  // strength, adjustments, last-20 record) removed. They were noise the model
   // parroted incorrectly and are redundant with the real season record.
   const hasRealEdgeData = edgeData
     && edgeData.factors
@@ -510,7 +554,7 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
     const edgeLines = [`--- STATISTICAL EDGE ---`];
 
     // Per-side edges, signed. The LLM should pick the side with the
-    // largest positive edge — anything < +2pp is market noise; ML picks
+    // largest positive edge. Anything < +2pp is market noise; ML picks
     // hit hardest historically when their edge is real.
     const fmt = (e) => e == null ? 'N/A' : `${e >= 0 ? '+' : ''}${(e * 100).toFixed(1)}pp`;
     if (ed.edges) {
@@ -549,11 +593,11 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   let refinementBlock = '';
   if (priorAnalysis) {
     refinementBlock = `
-REFINEMENT CONTEXT — This is pass #${priorAnalysis.version + 1} on this game.
+REFINEMENT CONTEXT: This is pass #${priorAnalysis.version + 1} on this game.
 YOUR PRIOR ANALYSIS (${priorAnalysis.version === 1 ? 'initial' : 'pass #' + priorAnalysis.version}):
   Pick: ${priorAnalysis.prior_pick}
   Analysis: ${priorAnalysis.prior_snippet}
-  (Edge score is computed from our model, not your judgment — last pass: ${priorAnalysis.prior_edge}/10)
+  (Edge score is computed from our model, not your judgment. Last pass: ${priorAnalysis.prior_edge}/10)
 
 YOUR TASK: Compare the current data above to your prior analysis. What changed?
 - New injury reports? Line movement? Recent game results?
@@ -564,34 +608,34 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
   }
 
   // The pick is chosen by the math (edge-calculator.pickBestSide). The LLM's
-  // job is to JUSTIFY that pick with specific data — not to override it. This
+  // job is to JUSTIFY that pick with specific data, not to override it. This
   // is the structural fix for the "LLM picks the wrong side because of
   // narrative" problem (e.g., OKC -10.5 picked over Lakers +10.5 despite a
   // +18pp model edge on the Lakers side).
   const edgePpForPrompt = mathPick ? mathPick.signedEdge * 100 : null;
   const pickBlock = mathPick && edgePpForPrompt >= 2
-    ? `\nOUR MODEL'S PICK (fixed — do not change):
+    ? `\nOUR MODEL'S PICK (fixed, do not change):
   Side: ${mathPick.recommended_side}
   Pick text: ${mathPick.recommended_pick}
   Model edge: ${edgePpForPrompt.toFixed(1)}pp vs market
   Your job is to JUSTIFY this pick using the matchup data above. If the data
   contradicts the model's pick, say so honestly in the analysis (we'd rather
   catch a model mistake than confidently bullshit). Do NOT write a different
-  pick — that's chosen by our math.\n`
+  pick. That's chosen by our math.\n`
     : mathPick && edgePpForPrompt < 0
-    ? `\nOUR MODEL'S READ (display only — this is NOT a bet):
-  Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp — NEGATIVE.
+    ? `\nOUR MODEL'S READ (display only, this is NOT a bet):
+  Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp, which is NEGATIVE.
   Every side of this game is priced worse than fair. This is a TRAP: explain
   in 2-3 sentences why the market has this game priced tight or why the
   popular side is overvalued. Advise staying away. Never call it a pick.\n`
     : mathPick
-    ? `\nOUR MODEL'S READ (display only — this is NOT a bet):
-  Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp — below our 2pp betting floor.
+    ? `\nOUR MODEL'S READ (display only, this is NOT a bet):
+  Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp, below our 2pp betting floor.
   Write a 2-3 sentence read on the matchup and say plainly that the value
   isn't there. This is a SKIP. Never call it a pick.\n`
     : `\nOUR MODEL HAS NO EDGE DATA on this game. Your job is to write a 2-3
   sentence preview from the matchup data above. Do not recommend a pick, do
-  not mention edges, thresholds, or implied probabilities — just preview the
+  not mention edges, thresholds, or implied probabilities. Just preview the
   matchup like a knowledgeable fan would.\n`;
 
   const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Justify our model's pick using the data below.
@@ -613,6 +657,7 @@ CRITICAL RULES:
 - NEVER name a tournament round or stage (final, semifinal, third-place match,
   quarterfinal) unless the matchup data or news above EXPLICITLY states it for
   THIS game. Calling a third-place playoff "the final" destroys credibility.
+- WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas.
 
 Respond in EXACTLY this JSON format (no markdown):
 {
@@ -620,7 +665,7 @@ Respond in EXACTLY this JSON format (no markdown):
   "key_factors": ["factor1 with numbers", "factor2 with numbers", "factor3 with numbers"]${priorAnalysis ? ',\n  "what_changed": "Explain what changed since last analysis (injuries, line movement, new results)"' : ''}
 }
 
-Key factors MUST include specific numbers/records. Do NOT include recommended_pick, recommended_side, or edge_score — those are determined by the math, not by you.`;
+Key factors MUST include specific numbers/records. Do NOT include recommended_pick, recommended_side, or edge_score. Those are determined by the math, not by you.`;
 
   try {
     const claude = getClaude();
@@ -632,7 +677,7 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
       // ~150-200. The old 600 cap truncated most responses mid-JSON, so
       // nearly every analysis parsed as null (broke the whole board 7/11).
       max_tokens: 1500,
-      // Narration only — the math already picked the side. Thinking stays
+      // Narration only. The math already picked the side. Thinking stays
       // off to keep the per-game cost/latency profile of the old setup.
       thinking: { type: 'disabled' },
       messages: [{ role: 'user', content: prompt }],
@@ -647,7 +692,7 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
     const parsed = extractJson(content);
     if (!parsed || !parsed.analysis) throw new Error(`Unparseable model response: ${content.slice(0, 120)}`);
 
-    // Pick is now math-derived — return it alongside the LLM's analysis text.
+    // Pick is now math-derived. Return it alongside the LLM's analysis text.
     // LLM is no longer allowed to change recommended_pick / recommended_side.
     return {
       analysis_snippet: parsed.analysis,
@@ -661,7 +706,7 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
     };
   } catch (err) {
     console.error(`AI analysis failed for ${game.game_key}:`, err.message);
-    // Surface the real reason to the caller — cron_job_logs used to record
+    // Surface the real reason to the caller. cron_job_logs used to record
     // only "AI returned null", which hid a truncation bug for 12 hours.
     return { error: err.message };
   }
@@ -670,7 +715,7 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
 // All supported sports. Entries ending in '%' are prefix patterns resolved
 // against odds_cache at query time (tennis tournament keys rotate weekly).
 // Golf is deliberately absent: its markets are outright-winner fields, which
-// don't fit the h2h edge model — golf odds land in odds_cache for display,
+// don't fit the h2h edge model. Golf odds land in odds_cache for display,
 // not for pre-analysis.
 const ALL_SPORT_SLUGS = [
   'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
@@ -722,7 +767,7 @@ async function runPreAnalysis(sportSlugs) {
     const sportNames = sportSlugs.map(s => slugToSport(s)).join(', ');
     console.log(`\n🧠 CRON: Pre-analyzing ${sportNames}...`);
 
-    // Started marker — a run that dies mid-flight (deploy restart, crash)
+    // Started marker. A run that dies mid-flight (deploy restart, crash)
     // leaves this row with no completion row after it, instead of vanishing
     // without a trace (which hid failures on 7/12).
     try {
@@ -736,7 +781,7 @@ async function runPreAnalysis(sportSlugs) {
 
     // Filter out hypothetical future-round matchups (e.g., championship lines
     // posted before semifinals are played). If a team has a game within 48h,
-    // skip any later game for that team — they have to win the earlier one first.
+    // skip any later game for that team. They have to win the earlier one first.
     const now = Date.now();
     const cutoff48h = now + 48 * 60 * 60 * 1000;
     const teamEarliestGame = {};
@@ -782,7 +827,7 @@ async function runPreAnalysis(sportSlugs) {
 
     if (games.length === 0) {
       console.log('No upcoming games found');
-      // Log the empty run — bare returns left "started" rows with no
+      // Log the empty run. Bare returns left "started" rows with no
       // completion, which read as mid-flight deaths and burned a morning
       // of debugging a phantom hang (7/12).
       try {
@@ -807,7 +852,7 @@ async function runPreAnalysis(sportSlugs) {
       if (age < 3 * 60 * 60 * 1000 && !ea.stale) {
         existingKeys.add(ea.game_key); // Fresh, skip
       } else {
-        // Stale — store prior analysis for refinement
+        // Stale, so store prior analysis for refinement
         priorAnalysisMap[ea.game_key] = {
           prior_snippet: ea.analysis_snippet,
           prior_edge: ea.edge_score,
@@ -858,7 +903,7 @@ async function runPreAnalysis(sportSlugs) {
         const oddsCtx = extractOddsContext(game);
         const sportDisplay = slugToSport(game.sport) || game.sport.toUpperCase();
 
-        // National-team tournaments must NEVER read club tables — "England"
+        // National-team tournaments must NEVER read club tables. "England"
         // is contained in "New England Revolution", and the bidirectional
         // name match fed the Revolution's MLS record into a World Cup
         // semifinal preview. News + web-verified intel only.
@@ -866,7 +911,7 @@ async function runPreAnalysis(sportSlugs) {
         const nationalTeams = NATIONAL_TEAM_SPORTS.has(sportDisplay);
         const emptyRankCtx = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
 
-        // Fetch context in parallel — DB queries + news
+        // Fetch context in parallel: DB queries + news
         const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
           nationalTeams ? null : getInjuryContext(game.home_team, game.away_team),
@@ -887,44 +932,94 @@ async function runPreAnalysis(sportSlugs) {
           console.log(`  🔄 Refinement pass #${prior.version + 1} for ${game.game_key} (prior edge: ${prior.prior_edge}/10)`);
         }
 
-        // Calculate statistical edge BEFORE passing to AI
+        // Calculate statistical edge BEFORE passing to AI. Team sports use
+        // the core calculator. Tennis, UFC, and the soccer family use their
+        // dedicated models (docs/models/), market-consensus based and in
+        // shadow mode until calibrated.
         let edgeData = null;
         try {
-          edgeData = await edgeCalc.calculateEdge(game);
+          if (sportDisplay === 'Tennis') {
+            edgeData = await tennisModel.calculateTennisEdge({
+              home_team: game.home_team,
+              away_team: game.away_team,
+              books: tennisModel.booksFromOddsRows(game.h2hRows || [], game.home_team, game.away_team),
+              best_of: BO5_TENNIS_KEYS.has(game.sport) ? 5 : 3,
+              tour: String(game.sport || '').startsWith('tennis_wta') ? 'wta' : 'atp'
+            });
+          } else if (sportDisplay === 'UFC') {
+            edgeData = await ufcModel.computeUfcEdge({
+              home_team: game.home_team,
+              away_team: game.away_team,
+              books: game.h2hRows || [],
+              markets: game.markets
+            });
+          } else if (SHADOW_SPORTS.has(sportDisplay)) {
+            // The remaining shadow sports are the soccer family: three-way
+            // 1X2 with the draw as its own side.
+            edgeData = soccer1x2.calculateSoccer1x2Edges({
+              homeTeam: game.home_team,
+              awayTeam: game.away_team,
+              books: soccer1x2.fromOddsCacheRows(game.h2hRows || [], game.home_team, game.away_team)
+            });
+          } else {
+            edgeData = await edgeCalc.calculateEdge(game);
+          }
           if (edgeData) {
             const edgeSign = edgeData.edge !== null ? (edgeData.edge >= 0 ? '+' : '') + (edgeData.edge * 100).toFixed(1) + '%' : 'N/A';
-            console.log(`  📐 Edge: ${edgeSign} on ${edgeData.edgeSide || '?'} (${edgeData.confidence}) — home ${(edgeData.homeWinProb * 100).toFixed(1)}% vs implied ${edgeData.impliedHomeProb !== null ? (edgeData.impliedHomeProb * 100).toFixed(1) + '%' : 'N/A'}`);
+            console.log(`  📐 Edge: ${edgeSign} on ${edgeData.edgeSide || '?'} (${edgeData.confidence}), home ${(edgeData.homeWinProb * 100).toFixed(1)}% vs implied ${edgeData.impliedHomeProb !== null ? (edgeData.impliedHomeProb * 100).toFixed(1) + '%' : 'N/A'}`);
           }
         } catch (edgeErr) {
           console.warn(`  Edge calc failed for ${game.game_key}: ${edgeErr.message}`);
         }
 
-        // MATH PICKS, LLM NARRATES — choose side+market from per-side edges,
+        // MATH PICKS, LLM NARRATES: choose side+market from per-side edges,
         // then ask the LLM only to justify it. The previous flow let the LLM
         // pick its own side, which broke when narrative ("5-game win streak")
         // overruled the per-side edge data (e.g., OKC -10.5 chosen over the
         // +18pp Lakers +10.5 cover edge).
         let mathPick = null;
-        const previewOnly = PREVIEW_ONLY_SPORTS.has(sportDisplay);
         // No minimum edge for DISPLAY: a negative best side is a Trap read,
-        // 0-2pp is a Skip — the board shows what the math sees either way
+        // 0-2pp is a Skip. The board shows what the math sees either way
         // (Vince: "just because there might not be sharp takes doesn't mean
         // we shouldn't show what we have"). The RECORD gate stays at 2pp in
-        // the auto-save below.
-        const bestSide = (edgeData && !previewOnly) ? edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }) : null;
-        if (previewOnly) console.log(`  Soccer preview-only — no pick published (${game.game_key})`);
-        if (bestSide) {
-          const pickText = buildPickText(bestSide.side, oddsCtx, game);
+        // the auto-save below, and SHADOW_SPORTS never reach the record at
+        // all. Three-way soccer results carry a draw side the core picker
+        // does not know, so they use the 1X2 picker.
+        const bestSide = edgeData
+          ? (edgeData.edges && 'draw' in edgeData.edges
+              ? soccer1x2.pickBest1x2Side(edgeData, { minEdgePp: -100 })
+              : edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }))
+          : null;
+        // Directional read selection. An actionable pick is the BEST side
+        // at +2pp or better. A Trap is the OVERPRICED side at -2pp or
+        // worse: the read names the side you should not bet, so grading
+        // the fade is honest. Everything between -2 and +2 is a Skip,
+        // board only. Before 2026-07-23 the trap read named the least-bad
+        // side, which was not a directional claim.
+        let readSide = bestSide;
+        if (bestSide && bestSide.signedEdge * 100 < 2 && edgeData?.edges) {
+          let worst = null;
+          for (const [side, val] of Object.entries(edgeData.edges)) {
+            if (val == null) continue;
+            if (!worst || val < worst.signedEdge) worst = { side, signedEdge: val };
+          }
+          if (worst && worst.signedEdge * 100 <= -2) readSide = worst;
+        }
+        if (readSide) {
+          const pickText = readSide.side === 'draw'
+            ? buildDrawPickText(game)
+            : buildPickText(readSide.side, oddsCtx, game);
           if (pickText) {
             mathPick = {
-              recommended_side: bestSide.side,
+              recommended_side: readSide.side,
               recommended_pick: pickText,
-              signedEdge: bestSide.signedEdge,
+              signedEdge: readSide.signedEdge,
             };
-            console.log(`  🎯 Math pick: ${pickText} (${bestSide.side}, edge ${(bestSide.signedEdge * 100).toFixed(1)}pp)`);
+            const kind = readSide.signedEdge * 100 <= -2 ? 'Trap read' : 'Math pick';
+            console.log(`  🎯 ${kind}: ${pickText} (${readSide.side}, edge ${(readSide.signedEdge * 100).toFixed(1)}pp)`);
           }
         } else {
-          console.log(`  ⚪ No-edge game — every market < +2pp`);
+          console.log(`  ⚪ No-edge game, every market < +2pp`);
         }
 
         const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick);
@@ -960,9 +1055,11 @@ async function runPreAnalysis(sportSlugs) {
             recommended_pick: result.recommended_pick,
             recommended_side: result.recommended_side,
             // Real price of the recommended side at analysis time. The digest
-            // lock payload reads this — it must never fall back to a made-up
+            // lock payload reads this. It must never fall back to a made-up
             // -110, the ledger records it.
-            recommended_odds: resolveOddsForPick(oddsCtx, result.recommended_side) ?? null,
+            recommended_odds: result.recommended_side === 'draw'
+              ? drawPrice(game)
+              : resolveOddsForPick(oddsCtx, result.recommended_side) ?? null,
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
@@ -995,11 +1092,11 @@ async function runPreAnalysis(sportSlugs) {
             // so the chatbot + parlay generator can read the same math the
             // tile uses, without re-running calculateEdge.
             edges: edgeData ? edgeData.edges : null,
-            // Same dict before the ±15pp cap — calibration needs the raw signal.
+            // Same dict before the ±15pp cap. Calibration needs the raw signal.
             edges_raw: edgeData ? edgeData.edgesRaw : null,
             // Merge factors + adjustments + confidence into edge_factors so the
             // fact sheet's edge.adjustments[] path resolves. Calculator returns
-            // them as separate top-level keys on edgeData — flatten for storage.
+            // them as separate top-level keys on edgeData, so flatten for storage.
             edge_factors: edgeData ? {
               ...edgeData.factors,
               adjustments: edgeData.adjustments || [],
@@ -1019,11 +1116,24 @@ async function runPreAnalysis(sportSlugs) {
             totalPromptTokens += result.prompt_tokens || 0;
             totalCompletionTokens += result.completion_tokens || 0;
 
-            // Publish to the RECORD only at Lean or better (>= 2pp). Trap
-            // and Skip reads live on the board as information, not as bets.
+            // Publish to the RECORD at Lean or better (>= 2pp), and publish
+            // Trap reads (the named side at -2pp or worse) too. Traps are
+            // the product's namesake and get graded on their own separate
+            // record, where the named side losing means the call was
+            // right. Only Skip (the -2 to +2 noise band) stays
+            // display-only: it carries no read in either direction. (Trap
+            // publication was paused 2026-07-10 to 2026-07-23 while the
+            // record presentation was reworked.)
             const displayEdgePp = edgeData?.edges?.[result.recommended_side] != null
               ? edgeData.edges[result.recommended_side] * 100 : null;
-            if (result.recommended_pick && displayEdgePp != null && displayEdgePp >= 2) {
+            if (SHADOW_SPORTS.has(sportDisplay)) {
+              // Shadow mode: the board shows the read and game_analysis
+              // stores the edges for calibration measurement, but nothing
+              // reaches the graded record until the model proves out.
+              if (displayEdgePp != null) {
+                console.log(`  👻 Shadow (${sportDisplay}): ${displayEdgePp.toFixed(1)}pp stored, no pick published`);
+              }
+            } else if (result.recommended_pick && displayEdgePp != null && (displayEdgePp >= 2 || displayEdgePp <= -2)) {
               try {
                 // Derive bet type from the math-chosen side, NOT regex on the
                 // pick text. ML picks include the price ("+310"), which the
@@ -1054,7 +1164,7 @@ async function runPreAnalysis(sportSlugs) {
 
                 // ONE settled bet per game per day. A refinement pass REVISES
                 // the day's row (pick, odds, even the market can change while
-                // the line moves) instead of inserting a sibling — 4 re-picks
+                // the line moves) instead of inserting a sibling. 4 re-picks
                 // of the same loser used to count as 4 losses. created_at
                 // stays the FIRST publish time (the receipts stamp);
                 // last_revised_at tracks the final pre-game version. Settled
@@ -1085,18 +1195,28 @@ async function runPreAnalysis(sportSlugs) {
                               : isAwayMl ? edgeData?.impliedAwayProb ?? null : null,
                 };
 
-                const { data: existingPick } = await supabase
+                // ONE row per GAME, across ALL board days, not just today's
+                // session. A game analyzed on each of the 2-3 days it sits
+                // on the board used to get a fresh row per daily session,
+                // so one loss settled as two or three (Angels @ Cardinals
+                // 2026-07-20 landed at +101 Sharp Take AND -108 Strong
+                // Play). Search any auto_digest session for this exact
+                // game and revise the newest pending row instead. Matching
+                // on exact game_date keeps doubleheaders separate.
+                const { data: existingPicks } = await supabase
                   .from('ai_suggestions')
                   .select('id, actual_outcome')
-                  .eq('session_id', sessionId)
+                  .like('session_id', 'auto_digest%')
                   .eq('home_team', game.home_team)
                   .eq('away_team', game.away_team)
                   .eq('game_date', game.game_date)
-                  .maybeSingle();
+                  .order('created_at', { ascending: false })
+                  .limit(1);
+                const existingPick = existingPicks?.[0] || null;
 
                 let sugErr = null;
                 if (existingPick && existingPick.actual_outcome !== 'pending') {
-                  console.log(`  Pick already settled for ${game.game_key} — not revising`);
+                  console.log(`  Pick already settled for ${game.game_key}, not revising`);
                 } else if (existingPick) {
                   ({ error: sugErr } = await supabase
                     .from('ai_suggestions')

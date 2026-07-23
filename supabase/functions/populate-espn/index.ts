@@ -4,13 +4,13 @@
 // - Accepts POST body { sport: 'NFL'|'NBA'|'MLB'|'NHL'|'NCAAF', full_sync?: boolean }
 // - Idempotent: upserts by team_id/player_id and stores provider_ids. Logs to cron_job_logs and api_call_log.
 
-// In the repo's TypeScript checks the Deno symbol may not be defined — declare it for static checks.
+// In the repo's TypeScript checks the Deno symbol may not be defined, so declare it for static checks.
 declare const Deno: any;
 const SUPABASE_URL = Deno?.env?.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno?.env?.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.warn('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured — function can still run in read-only mode.');
+  console.warn('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not configured. Function can still run in read-only mode.');
 }
 
 type SportKey = 'NFL' | 'NBA' | 'MLB' | 'NHL' | 'NCAAF';

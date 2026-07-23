@@ -1,4 +1,4 @@
-// CRON: Golf field analysis — devig outright-winner odds into fair win
+// CRON: Golf field analysis. Devigs outright-winner odds into fair win
 // probabilities, flag price-vs-consensus value, and write a researched note
 // per player. This is a rich-data surface, NOT graded picks: golf has no
 // h2h edge model, so nothing here feeds ai_suggestions or the ledger.
@@ -61,7 +61,7 @@ async function getNewsLines(playerName) {
       .order('published_at', { ascending: false })
       .limit(2);
     if (!data || data.length === 0) return null;
-    return data.map(a => a.betting_summary ? `${a.title} — ${a.betting_summary}` : a.title).join(' | ');
+    return data.map(a => a.betting_summary ? `${a.title}: ${a.betting_summary}` : a.title).join(' | ');
   } catch {
     return null;
   }
@@ -185,7 +185,9 @@ async function runGolfAnalysis() {
           return `- ${bits.join(' | ')}`;
         }).join('\n');
 
-        const prompt = `You are a golf betting researcher writing one tight note per player for the ${tournamentName}. Use ONLY the data below — never invent results, stats, rankings, or injuries. If all you have is the price, write what the market is saying about them at that price.
+        const prompt = `You are a golf betting researcher writing one tight note per player for the ${tournamentName}. Use ONLY the data below. Never invent results, stats, rankings, or injuries. If all you have is the price, write what the market is saying about them at that price.
+
+WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas.
 
 ${lines}
 

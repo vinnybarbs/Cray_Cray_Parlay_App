@@ -104,7 +104,7 @@ export default function ResultsPage({ onBack }) {
   const [modelStatsByPeriod, setModelStatsByPeriod] = useState({ last_7d: null, last_30d: null, all: null })
   const [modelPeriod, setModelPeriod] = useState('last_30d')
   const [loading, setLoading] = useState(true)
-  const [tab, setTab] = useState('model') // 'my-bets' | 'model' — default to model so new users see hit-rate data, not an empty "My Bets"
+  const [tab, setTab] = useState('model') // 'my-bets' | 'model'. Default to model so new users see hit-rate data, not an empty "My Bets"
   const [tabAutoSet, setTabAutoSet] = useState(false)
 
   const modelStats = modelStatsByPeriod[modelPeriod]
@@ -261,7 +261,7 @@ export default function ResultsPage({ onBack }) {
         </button>
       </header>
 
-      {/* Tabs — terminal-style segmented control matching MarketTabs */}
+      {/* Tabs, a terminal-style segmented control matching MarketTabs */}
       <div className="flex items-stretch border-b border-ink-700">
         <button
           onClick={() => { setTab('my-bets'); setTabAutoSet(true); }}
@@ -308,7 +308,7 @@ export default function ResultsPage({ onBack }) {
               <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-8 text-center">
                 <p className="font-mono text-sm text-ink-200 mb-2">Sign in to track your bets.</p>
                 <p className="font-mono text-[11px] text-ink-400 leading-relaxed max-w-sm mx-auto">
-                  We grade every locked pick against the model — you'll see your hit-rate next to ours.
+                  We grade every locked pick against the model, and you'll see your hit-rate next to ours.
                 </p>
               </div>
             ) : parlays.length === 0 ? (
@@ -326,7 +326,7 @@ export default function ResultsPage({ onBack }) {
           </>
         ) : (
           <>
-            {/* Period — terminal-style segmented control */}
+            {/* Period, a terminal-style segmented control */}
             <div className="flex items-stretch mb-5 rounded-sharp shadow-hairline overflow-hidden">
               {[
                 { key: 'last_7d',  label: '7 days' },
@@ -350,7 +350,7 @@ export default function ResultsPage({ onBack }) {
             {/* Model Stats */}
             {modelStats ? (
               <>
-                {/* Hero hit-rate — the headline trust signal */}
+                {/* Hero hit-rate, the headline trust signal */}
                 <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 mb-5">
                   <div className="font-mono text-[10px] text-ink-400 uppercase tracking-[0.18em] mb-2">
                     Overall hit rate · {modelPeriod === 'last_7d' ? 'last 7 days' : modelPeriod === 'last_30d' ? 'last 30 days' : 'all time'}
@@ -362,7 +362,7 @@ export default function ResultsPage({ onBack }) {
                         : Number(modelStats.winRate) >= 50 ? 'text-ink-100'
                         : 'text-signal-neg'
                     }`}>
-                      {modelStats.winRate === 'N/A' ? '—' : `${modelStats.winRate}%`}
+                      {modelStats.winRate === 'N/A' ? '-' : `${modelStats.winRate}%`}
                     </span>
                     <span className="font-mono text-sm text-ink-400 tabular-nums">
                       {modelStats.wins}W &nbsp;·&nbsp; {modelStats.losses}L &nbsp;·&nbsp; {modelStats.total} settled
@@ -370,7 +370,7 @@ export default function ResultsPage({ onBack }) {
                   </div>
                 </div>
 
-                {/* By Bet Type — the sharp-curious persona's data. Promoted above By Sport. */}
+                {/* By Bet Type, the sharp-curious persona's data. Promoted above By Sport. */}
                 {Object.keys(modelStats.byBetType || {}).length > 0 && (
                   <>
                     <h3 className="font-mono text-[10px] text-ink-400 uppercase tracking-[0.18em] mb-2.5">By bet type</h3>

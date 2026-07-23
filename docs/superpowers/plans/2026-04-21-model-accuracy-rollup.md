@@ -1,8 +1,8 @@
-# Model Accuracy Rollup — Implementation Plan
+# Model Accuracy Rollup Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace the 1000-row-capped JavaScript aggregation in the admin and user-facing model-performance UIs with a Postgres materialized view that precomputes win/loss/push/pending + ROI by sport, bet_type, edge score, generate_mode, chat_confidence, across three rolling windows — refreshed by pg_cron after each settlement run.
+**Goal:** Replace the 1000-row-capped JavaScript aggregation in the admin and user-facing model-performance UIs with a Postgres materialized view that precomputes win/loss/push/pending + ROI by sport, bet_type, edge score, generate_mode, chat_confidence, across three rolling windows, refreshed by pg_cron after each settlement run.
 
 **Architecture:** One materialized view (`public.mv_model_accuracy`) grained at `(period_bucket, dimension_type, dimension_value)`. Refreshed concurrently twice daily. Both consumers read the MV with a single `.eq('period_bucket', …)` query; no JS aggregation. Orphan `public.model_accuracy` table dropped in the same migration. Odds-capture bug on auto_digest picks fixed separately so ROI math populates on new picks immediately.
 
@@ -22,7 +22,7 @@
 | `src/pages/AdminDashboard.jsx` | MODIFY | Period selector dropdown; split calibration into two sections (edge + chat); ROI card; By Generate Mode section |
 | `src/pages/ResultsPage.jsx` | MODIFY | Read model stats from MV at `period_bucket='last_30d'` instead of in-page aggregation |
 
-**No new tests are added** — the repo's test infrastructure (Jest in `__tests__/`) is API-endpoint-focused and this work is data-pipeline + UI. Verification uses SQL spot-checks and `curl` of the live admin endpoint per the spec's verification section.
+**No new tests are added.** The repo's test infrastructure (Jest in `__tests__/`) is API-endpoint-focused and this work is data-pipeline + UI. Verification uses SQL spot-checks and `curl` of the live admin endpoint per the spec's verification section.
 
 ---
 
@@ -31,7 +31,7 @@
 The fix is already applied to `api/cron/pre-analyze-games.js` in the working tree. This task is about reviewing + committing it cleanly before the MV work starts, so ROI math works on new auto_digest picks from the moment the MV lands.
 
 **Files:**
-- Modify: `api/cron/pre-analyze-games.js` (already edited — review only)
+- Modify: `api/cron/pre-analyze-games.js` (already edited, review only)
 
 - [ ] **Step 1: Review the diff**
 
@@ -91,7 +91,7 @@ One migration file does everything: drops the orphan, creates the MV + unique in
 
 ```sql
 -- supabase/migrations/20260421180744_model_accuracy_mv.sql
--- Model accuracy rollup materialized view — replaces JS-side aggregation.
+-- Model accuracy rollup materialized view. Replaces JS-side aggregation.
 -- See docs/superpowers/specs/2026-04-21-model-accuracy-rollup-design.md
 
 -- 1. Drop the orphan table that was never populated
@@ -297,7 +297,7 @@ SELECT cron.schedule(
 );
 ```
 
-Note on block 2–7 formatting: the first `FROM picks_periods` in block 1 names each aggregate column. Blocks 2–7 rely on positional matching inside `UNION ALL` — the column names come from block 1. This is standard Postgres `UNION ALL` behavior; the column list at the outer SELECT (`period_bucket, dimension_type, dimension_value, won, ...`) confirms the final names.
+Note on block 2-7 formatting: the first `FROM picks_periods` in block 1 names each aggregate column. Blocks 2-7 rely on positional matching inside `UNION ALL`, so the column names come from block 1. This is standard Postgres `UNION ALL` behavior; the column list at the outer SELECT (`period_bucket, dimension_type, dimension_value, won, ...`) confirms the final names.
 
 - [ ] **Step 2: Commit the migration file**
 
@@ -333,7 +333,7 @@ Use Supabase MCP `execute_sql`:
 SELECT COUNT(*) AS row_count FROM public.mv_model_accuracy;
 ```
 
-Expected: `row_count` between 100 and 200 (approximately 140 at current data volume — see spec Dimensions section).
+Expected: `row_count` between 100 and 200 (approximately 140 at current data volume, see spec Dimensions section).
 
 - [ ] **Step 3: Verify row distribution by dimension_type**
 
@@ -394,7 +394,7 @@ FROM cron.job
 WHERE jobname LIKE 'refresh_mv_model_accuracy_%';
 ```
 
-Expected: two rows — `refresh_mv_model_accuracy_morning` (`10 6 * * *`) and `refresh_mv_model_accuracy_midnight` (`10 0 * * *`).
+Expected: two rows, `refresh_mv_model_accuracy_morning` (`10 6 * * *`) and `refresh_mv_model_accuracy_midnight` (`10 0 * * *`).
 
 ---
 
@@ -407,7 +407,7 @@ Replace the six existing `.select()` + JS-loop aggregations with one MV read per
 
 - [ ] **Step 1: Replace the model-accuracy aggregation block**
 
-Locate the existing block in `api/admin-dashboard.js` — three `safeQuery` calls for `overallAccuracyResult`, `sportBreakdownResult`, and `betTypeBreakdownResult` (the contiguous block of `.select('actual_outcome')` / `.select('sport, actual_outcome')` / `.select('bet_type, actual_outcome')` and their loop aggregations). Replace that entire block with:
+Locate the existing block in `api/admin-dashboard.js`: three `safeQuery` calls for `overallAccuracyResult`, `sportBreakdownResult`, and `betTypeBreakdownResult` (the contiguous block of `.select('actual_outcome')` / `.select('sport, actual_outcome')` / `.select('bet_type, actual_outcome')` and their loop aggregations). Replace that entire block with:
 
 ```js
 // --- 3. Model Accuracy: single MV read, slice by dimension ---
@@ -470,7 +470,7 @@ const modelAccuracyResult = await safeQuery(async () => {
 
 - [ ] **Step 2: Remove the now-unused `confidenceCalibrationResult` block**
 
-Locate the `safeQuery` call that builds `confidenceCalibrationResult` (selects `confidence, actual_outcome` from `ai_suggestions`, loops through buckets). Delete it entirely — it is now supplied by the MV via `edgeCalibration` and `chatConfidenceCalibration`.
+Locate the `safeQuery` call that builds `confidenceCalibrationResult` (selects `confidence, actual_outcome` from `ai_suggestions`, loops through buckets). Delete it entirely. It is now supplied by the MV via `edgeCalibration` and `chatConfidenceCalibration`.
 
 - [ ] **Step 3: Update the final `res.json(...)` response**
 
@@ -595,7 +595,7 @@ const fetchData = useCallback(async () => {
 
 - [ ] **Step 3: Add the dropdown to the sticky header**
 
-Locate the header's refresh button (around line 545 — `<button onClick={fetchData}...>Refresh</button>`). Insert a dropdown BEFORE the refresh button, inside the same flex container:
+Locate the header's refresh button (around line 545, `<button onClick={fetchData}...>Refresh</button>`). Insert a dropdown BEFORE the refresh button, inside the same flex container:
 
 ```jsx
 <select
@@ -663,7 +663,7 @@ function CalibrationSection({ title, subtitle, calibration }) {
                   style={{ width: `${winPct}%` }} />
               </div>
               <div className="text-[10px] mt-1 text-gray-600">
-                {total === 0 ? '—' : isCalibrated ? '✓ calibrated' : winPct > expected ? '↑ underconfident' : '↓ overconfident'}
+                {total === 0 ? '-' : isCalibrated ? '✓ calibrated' : winPct > expected ? '↑ underconfident' : '↓ overconfident'}
               </div>
             </div>
           )
@@ -693,7 +693,7 @@ Locate where `<ConfidenceCalibrationSection calibration={data.confidenceCalibrat
 
 - [ ] **Step 3: Add the ROI card to the quick-stats row**
 
-Locate the quick-stats grid (around line 580 — the four `<StatCard>` in a `grid-cols-2 sm:grid-cols-4` grid). Add a fifth StatCard for ROI after the "Total Parlays" card, and widen the grid to 5 columns on large screens:
+Locate the quick-stats grid (around line 580, the four `<StatCard>` in a `grid-cols-2 sm:grid-cols-4` grid). Add a fifth StatCard for ROI after the "Total Parlays" card, and widen the grid to 5 columns on large screens:
 
 ```jsx
 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -721,7 +721,7 @@ Locate the quick-stats grid (around line 580 — the four `<StatCard>` in a `gri
     label="ROI"
     value={data.modelAccuracy?.roi?.pct != null
       ? `${data.modelAccuracy.roi.pct >= 0 ? '+' : ''}${data.modelAccuracy.roi.pct.toFixed(1)}%`
-      : '—'}
+      : '-'}
     sub={data.modelAccuracy?.roi?.units != null
       ? `${data.modelAccuracy.roi.units >= 0 ? '+' : ''}${data.modelAccuracy.roi.units.toFixed(2)} units`
       : 'no settled odds'}
@@ -762,7 +762,7 @@ function ByModeSection({ byMode }) {
                   roi > 0 ? 'text-green-400' :
                   roi < 0 ? 'text-red-400' : 'text-gray-400'
                 }`}>
-                  {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+                  {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '-'}
                 </span>
               </div>
             )
@@ -775,7 +775,7 @@ function ByModeSection({ byMode }) {
 
 - [ ] **Step 5: Render `ByModeSection` in the main return**
 
-Locate the main render (around line 613 — after `<ModelPerformanceSection modelAccuracy={data.modelAccuracy} />`). Add the By Mode section right after:
+Locate the main render (around line 613, after `<ModelPerformanceSection modelAccuracy={data.modelAccuracy} />`). Add the By Mode section right after:
 
 ```jsx
 <ModelPerformanceSection modelAccuracy={data.modelAccuracy} />
@@ -794,7 +794,7 @@ Verify in the browser:
 - Edge Score Performance section renders with up to 10 tiles, sorted 1→10
 - De-Genny Confidence Calibration section appears separately below (or hides if no chat rows)
 - By Generate Mode section shows all pick-generation modes with ROI column
-- Period dropdown still works — changing it updates every section
+- Period dropdown still works, and changing it updates every section
 
 - [ ] **Step 7: Commit**
 
@@ -876,7 +876,7 @@ Locate the stats grid around line 271 (`<div className="grid grid-cols-4 gap-3 m
     label="ROI"
     value={modelStats.roi_pct != null
       ? `${modelStats.roi_pct >= 0 ? '+' : ''}${modelStats.roi_pct.toFixed(1)}%`
-      : '—'}
+      : '-'}
     color={modelStats.roi_pct == null ? 'gray'
       : modelStats.roi_pct > 0 ? 'green'
       : modelStats.roi_pct < 0 ? 'red'
@@ -907,7 +907,7 @@ Locate the By-Sport render block (around lines 281-295). Replace the `Object.ent
           roi > 0 ? 'text-green-400' :
           roi < 0 ? 'text-red-400' : 'text-gray-400'
         }`}>
-          {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+          {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '-'}
         </span>
       </div>
     </div>
@@ -937,7 +937,7 @@ Locate the By-Mode render block (around lines 301-315). Apply the same ROI-colum
           roi > 0 ? 'text-green-400' :
           roi < 0 ? 'text-red-400' : 'text-gray-400'
         }`}>
-          {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '—'}
+          {roi != null ? `${roi >= 0 ? '+' : ''}${roi.toFixed(1)}%` : '-'}
         </span>
       </div>
     </div>
@@ -953,7 +953,7 @@ npm run dev
 
 Open the user Results page, switch to the "Model" tab, verify:
 - Overall win rate number matches the MV's `last_30d` overall row (cross-check via SQL in Supabase: `SELECT * FROM mv_model_accuracy WHERE period_bucket='last_30d' AND dimension_type='overall'`)
-- ROI StatCard renders with sign (or `—` if no settled-with-odds rows)
+- ROI StatCard renders with sign (or `-` if no settled-with-odds rows)
 - By-sport rows show an ROI column alongside W/L/Win%
 - By-mode rows show an ROI column alongside W/L/Win%
 
@@ -981,9 +981,9 @@ Execute each item from the Verification section of the spec against the live dep
    ```sql
    SELECT COUNT(*) FROM public.mv_model_accuracy;
    ```
-   Expected: 100–200.
+   Expected: 100-200.
 
-2. **NBA truth check** — run the "MV says / Ground truth" pair from Task 3 Step 4. Numbers must match.
+2. **NBA truth check.** Run the "MV says / Ground truth" pair from Task 3 Step 4. Numbers must match.
 
 3. **Admin endpoint sanity**:
    ```bash
@@ -1012,7 +1012,7 @@ Execute each item from the Verification section of the spec against the live dep
 git log --oneline origin/main..HEAD
 ```
 
-Expected: commits from Tasks 1–7 all present.
+Expected: commits from Tasks 1-7 all present.
 
 ```bash
 git push
@@ -1021,7 +1021,7 @@ git push
 - [ ] **Step 3: Open the PR**
 
 ```bash
-gh pr create --title "Model accuracy rollup MV — fix stuck % on admin + user dashboards" --body "$(cat <<'EOF'
+gh pr create --title "Model accuracy rollup MV: fix stuck % on admin + user dashboards" --body "$(cat <<'EOF'
 ## Summary
 - Creates `public.mv_model_accuracy` materialized view with 7 dimension types × 3 period buckets, refreshed by pg_cron after each `check-outcomes` run
 - Fixes auto_digest odds-capture bug in `pre-analyze-games.js` so ROI math populates on new picks
@@ -1031,7 +1031,7 @@ gh pr create --title "Model accuracy rollup MV — fix stuck % on admin + user d
 Implements [docs/superpowers/specs/2026-04-21-model-accuracy-rollup-design.md](docs/superpowers/specs/2026-04-21-model-accuracy-rollup-design.md).
 
 ## Test plan
-- [ ] `SELECT COUNT(*) FROM public.mv_model_accuracy` returns 100–200 rows
+- [ ] `SELECT COUNT(*) FROM public.mv_model_accuracy` returns 100-200 rows
 - [ ] MV `NBA` sport row matches direct `ai_suggestions` groupby
 - [ ] `curl /api/admin/dashboard` returns `overall.total` > 1000 when true
 - [ ] Period dropdown toggles numbers visibly
@@ -1049,10 +1049,10 @@ EOF
 
 ## Out of scope for this plan (queued follow-ups)
 
-These are deliberately excluded — do not attempt in this PR:
+These are deliberately excluded. Do not attempt in this PR:
 
 1. **Historical odds backfill** on the 1,278 auto_digest picks missing `odds`. Separate script/task.
 2. **CLV capture and column**. Requires new cron that snaps closing lines.
 3. **Settlement bug fixes**: EPL/Tennis/UFC coverage in `check-outcomes`, `games_fetched: 0` upsert bug, `parlay_legs` half-settlement.
 4. **pgvector pregame retrieval**: populate `news_embeddings`/`unified_vectors`, rewrite pick generation to use semantic retrieval.
-5. **Parlay correlation warnings**, **public game brief pages**, **Bolt/Lock visual flag** — queued from competitor research.
+5. **Parlay correlation warnings**, **public game brief pages**, **Bolt/Lock visual flag**, all queued from competitor research.

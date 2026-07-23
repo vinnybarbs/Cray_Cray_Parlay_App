@@ -58,7 +58,7 @@ async function fetchScoreboard(sport, sportPath, dateStr) {
       //                     / STATUS_END_PENALTY_SHOOTOUT (cup PKs)
       //   MMA: STATUS_FIGHT_OVER
       // Previously only the first two were accepted, so every finished soccer
-      // match silently hit the `continue` below and got dropped — the real
+      // match silently hit the `continue` below and got dropped. That is the real
       // reason 0 EPL/MLS rows ever landed in game_results.
       const status = event.status?.type?.name;
       const COMPLETED_STATUSES = new Set([

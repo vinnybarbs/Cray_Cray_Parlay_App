@@ -4,7 +4,7 @@ import { edgeTier, tierRange, TIERS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 
-// The House Ledger — the public, append-only settlement record. This page is
+// The House Ledger is the public, append-only settlement record. This page is
 // the product's proof asset and its FTC substantiation surface at the same
 // time: every pick published before the game, settled after, losers included,
 // ROI and units alongside win rate. Anyone can read it, signed in or not.
@@ -12,29 +12,29 @@ import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
 
 function fmtDate(iso) {
-  if (!iso) return '—'
+  if (!iso) return '-'
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 function fmtDateTime(iso) {
-  return fmtGameDateTime(iso) || '—'
+  return fmtGameDateTime(iso) || '-'
 }
 
 function fmtOdds(odds) {
-  if (odds == null) return '—'
+  if (odds == null) return '-'
   const n = parseInt(odds, 10)
   if (Number.isNaN(n)) return String(odds)
   return n > 0 ? `+${n}` : String(n)
 }
 
 function fmtUnits(u) {
-  if (u == null) return '—'
+  if (u == null) return '-'
   return `${u >= 0 ? '+' : ''}${u.toFixed(2)}u`
 }
 
 function OutcomeChip({ outcome, tier }) {
-  // The feed and records only contain actionable picks (Lean and up) — traps
-  // are split into their own fade report — so outcomes read straight here.
+  // The feed and records only contain actionable picks (Lean and up), and traps
+  // are split into their own fade report, so outcomes read straight here.
   const map = {
     won:  { label: 'WON',  cls: 'bg-signal-pos-dim/40 text-signal-pos shadow-hairline-pos' },
     lost: { label: 'LOST', cls: 'bg-signal-neg-dim/40 text-signal-neg shadow-hairline-neg' },
@@ -135,7 +135,7 @@ export default function HouseLedger() {
             Every pick. Published before. Settled after.
           </h1>
           <p className="mt-3 text-ink-300 max-w-2xl leading-relaxed text-sm">
-            This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The headline is the Sharp Take record — the tier this product exists to find. The full tier table shows where the rest of the edges live.
+            This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The headline is the Sharp Take record, the tier this product exists to find. The full tier table shows where the rest of the edges live.
           </p>
         </div>
 
@@ -151,7 +151,7 @@ export default function HouseLedger() {
 
         {!loading && !error && data && (
           <>
-            {/* Sharp Take is the headline number — it is the product. The
+            {/* Sharp Take is the headline number. It is the product. The
                 all-tier record drops to one line; the full table follows. */}
             {(byTier['Sharp Take'] || overall) && (() => {
               const sharp = byTier['Sharp Take']
@@ -161,15 +161,15 @@ export default function HouseLedger() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-signal-pos">{sharp ? 'Sharp Take record' : 'Record (all tiers)'}</p>
-                      <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-ink-100">{h.won}–{h.lost}{h.push > 0 && <span className="text-ink-400 text-base">–{h.push}</span>}</p>
+                      <p className="mt-1 text-2xl font-bold font-mono tabular-nums text-ink-100">{h.won}-{h.lost}{h.push > 0 && <span className="text-ink-400 text-base">-{h.push}</span>}</p>
                     </div>
                     <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Hit rate</p>
-                      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${h.winRate >= 55 ? 'text-signal-pos' : h.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{h.winRate != null ? `${h.winRate}%` : '—'}</p>
+                      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${h.winRate >= 55 ? 'text-signal-pos' : h.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{h.winRate != null ? `${h.winRate}%` : '-'}</p>
                     </div>
                     <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">ROI at 1u stakes</p>
-                      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${h.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{h.roi != null ? `${h.roi >= 0 ? '+' : ''}${h.roi}%` : '—'}</p>
+                      <p className={`mt-1 text-2xl font-bold font-mono tabular-nums ${h.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{h.roi != null ? `${h.roi >= 0 ? '+' : ''}${h.roi}%` : '-'}</p>
                     </div>
                     <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
                       <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">Units</p>
@@ -178,7 +178,7 @@ export default function HouseLedger() {
                   </div>
                   {sharp && overall && (
                     <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
-                      All graded tiers: {overall.won}–{overall.lost}{overall.winRate != null ? ` (${overall.winRate}%)` : ''} · {fmtUnits(overall.units)} · full table below
+                      All graded tiers: {overall.won}-{overall.lost}{overall.winRate != null ? ` (${overall.winRate}%)` : ''} · {fmtUnits(overall.units)} · full table below
                     </p>
                   )}
                 </div>
@@ -188,6 +188,9 @@ export default function HouseLedger() {
             {/* Per-tier record */}
             {tierOrder.length > 0 && (
               <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-x-auto">
+                <div className="px-4 pt-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500 min-w-[480px]">
+                  Full record · since May 10, 2026 · every settled pick. The landing page table is the last 30 days only, so these totals run higher.
+                </div>
                 <div className="grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500 min-w-[480px]">
                   <span>Tier · edge range</span>
                   <span className="text-right">Settled</span>
@@ -197,7 +200,7 @@ export default function HouseLedger() {
                 </div>
                 {tierOrder.map(label => {
                   const s = byTier[label]
-                  const t = edgeTier(label === 'Sharp Take' ? 11 : label === 'Strong Play' ? 8 : label === 'Play' ? 5 : label === 'Lean' ? 3 : label === 'Skip' ? 1 : -1)
+                  const t = edgeTier(label === 'Sharp Take' ? 11 : label === 'Strong Play' ? 8 : label === 'Play' ? 5 : label === 'Lean' ? 3 : label === 'Skip' ? 1 : -3)
                   return (
                     <div key={label} className="grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-3 border-t border-ink-800 items-center min-w-[480px]">
                       <span>
@@ -205,8 +208,8 @@ export default function HouseLedger() {
                         <span className="ml-2 font-mono text-[10px] text-ink-500">{tierRange(label)}</span>
                       </span>
                       <span className="text-right font-mono text-sm tabular-nums text-ink-300">{s.settled}</span>
-                      <span className={`text-right font-mono text-sm font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '—'}</span>
-                      <span className={`text-right font-mono text-sm tabular-nums ${s.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.roi != null ? `${s.roi >= 0 ? '+' : ''}${s.roi}%` : '—'}</span>
+                      <span className={`text-right font-mono text-sm font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '-'}</span>
+                      <span className={`text-right font-mono text-sm tabular-nums ${s.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.roi != null ? `${s.roi >= 0 ? '+' : ''}${s.roi}%` : '-'}</span>
                       <span className={`text-right font-mono text-sm tabular-nums ${s.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(s.units)}</span>
                     </div>
                   )
@@ -214,22 +217,32 @@ export default function HouseLedger() {
               </div>
             )}
 
-            {/* Traps are fade advice, not bets — the record above only counts
-                actionable picks. A trap side losing means the call was right. */}
+            {/* The Trap Record: the namesake stat, graded live on its own
+                ledger. A trap names an overpriced side, so that side LOSING
+                means the call was right. It stays out of the actionable
+                record above because its win condition is inverted; a correct
+                trap must never render as a lost bet. */}
             {trapReport && trapReport.called > 0 && (
-              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="font-mono text-xs font-bold uppercase tracking-wider text-signal-neg">Traps called</span>
-                <span className="font-mono text-sm tabular-nums text-ink-100">{trapReport.called}</span>
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-l-2 border-signal-neg">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-signal-neg">The Trap Record</span>
+                <span className="font-mono text-sm tabular-nums text-ink-100">{trapReport.called} called</span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">fading them went</span>
                 <span className={`font-mono text-sm font-bold tabular-nums ${trapReport.fadeRate >= 55 ? 'text-signal-pos' : 'text-ink-100'}`}>
-                  {trapReport.fadeWins}–{trapReport.fadeLosses}{trapReport.fadeRate != null ? ` (${trapReport.fadeRate}%)` : ''}
+                  {trapReport.fadeWins}-{trapReport.fadeLosses}{trapReport.fadeRate != null ? ` (${trapReport.fadeRate}%)` : ''}
                 </span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full sm:basis-auto sm:ml-auto">a trap is advice to bet against a side — its loss is our win</span>
+                {trapReport.lastGraded && (
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+                    last graded {fmtDate(trapReport.lastGraded)}
+                  </span>
+                )}
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full">
+                  a trap names a side priced 2pp or more below fair. When that side loses, the call was right. Graded on its own record because the win condition is inverted, never mixed into the pick record above.
+                </span>
               </div>
             )}
 
 
-            {/* Hit rates by sport and by bet type — same population as the
+            {/* Hit rates by sport and by bet type. Same population as the
                 headline record above. */}
             {(Object.keys(bySport).length > 0 || Object.keys(byBetType).length > 0) && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -245,7 +258,7 @@ export default function HouseLedger() {
                       <div key={label} className="grid grid-cols-[1fr_64px_64px_72px] gap-2 px-4 py-2.5 border-t border-ink-800 items-center">
                         <span className="text-sm text-ink-100 font-medium truncate">{label}</span>
                         <span className="text-right font-mono text-sm tabular-nums text-ink-300">{s.settled}</span>
-                        <span className={`text-right font-mono text-sm font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '—'}</span>
+                        <span className={`text-right font-mono text-sm font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '-'}</span>
                         <span className={`text-right font-mono text-sm tabular-nums ${s.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(s.units)}</span>
                       </div>
                     ))}
@@ -264,7 +277,7 @@ export default function HouseLedger() {
                   if (settled.length === 0) return null
                   return (
                     <p className="font-mono text-xs text-ink-300 mb-1 tabular-nums">
-                      Parlay record: <span className="font-bold text-ink-100">{won}–{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own — never mixed into the pick record
+                      Parlay record: <span className="font-bold text-ink-100">{won}-{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own, never mixed into the pick record
                     </p>
                   )
                 })()}
@@ -277,7 +290,7 @@ export default function HouseLedger() {
               </div>
             )}
 
-            {/* Open picks — publish-before-start proof */}
+            {/* Open picks, the publish-before-start proof */}
             {data.openPicks?.length > 0 && (
               <div>
                 <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Open picks · published, not yet settled</h2>

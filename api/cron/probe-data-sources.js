@@ -12,7 +12,7 @@
  *
  * This is our insurance against ESPN silently changing shape. The last time
  * ESPN added new soccer status types (STATUS_FULL_TIME, etc) we missed every
- * EPL/MLS game for weeks before noticing — the probe would have caught it
+ * EPL/MLS game for weeks before noticing. The probe would have caught it
  * because events_seen would have stayed flat or dropped to zero.
  *
  * POST /cron/probe-data-sources?secret=...
@@ -40,7 +40,7 @@ const ESPN_PROBES = [
 ];
 
 // Shape assertions per source. If any required key is missing the probe is
-// flagged 'shape_mismatch' even when the call returned 200 — that's the
+// flagged 'shape_mismatch' even when the call returned 200. That's the
 // silent-break case we care about most.
 const ESPN_REQUIRED_KEYS = ['events'];
 const ODDS_API_REQUIRED_KEYS = ['id', 'sport_key', 'home_team', 'away_team', 'commence_time'];
@@ -106,7 +106,7 @@ async function probeEspnCoreUfc() {
 }
 
 async function probeOddsApi(supabase) {
-  // Don't burn an Odds API call — instead read odds_cache freshness as a proxy.
+  // Don't burn an Odds API call. Instead read odds_cache freshness as a proxy.
   // If the hourly cron is writing, the source is alive.
   const t0 = Date.now();
   try {

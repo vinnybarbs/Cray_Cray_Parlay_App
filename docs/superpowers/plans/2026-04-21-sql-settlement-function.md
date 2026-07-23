@@ -21,11 +21,11 @@
 | `supabase/migrations/20260421194030_sql_settlement_function.sql` | CREATE | Schema change + linkage backfill + 5 SQL functions + trigger + cron + unschedule old |
 | `src/components/MainApp.jsx` | MODIFY | Capture returned `ai_suggestions.id` on parlay-lock insert and pass it as `suggestion_id` on each `parlay_legs` row |
 
-**No new tests** — verification is SQL-based (spot-check function outputs with known inputs, verify post-migration state). The repo's Jest suite in `__tests__/` isn't set up for SQL function testing, and adding that infra belongs in its own spec.
+**No new tests.** Verification is SQL-based (spot-check function outputs with known inputs, verify post-migration state). The repo's Jest suite in `__tests__/` isn't set up for SQL function testing, and adding that infra belongs in its own spec.
 
 **Dead code flagged but NOT deleted this PR:**
 - `services/parlay-tracker.js` (Knex-based; not in any active code path)
-- `supabase/functions/check-outcomes/` and `supabase/functions/check-parlay-outcomes/` (edge function sources) — retire the CRONS in this PR, delete the source in a cleanup followup after 1 week of observed stability.
+- `supabase/functions/check-outcomes/` and `supabase/functions/check-parlay-outcomes/` (edge function sources): retire the CRONS in this PR, delete the source in a cleanup followup after 1 week of observed stability.
 
 ---
 
@@ -38,7 +38,7 @@ Create a single SQL migration file that, in one transaction, does all DB-side wo
 
 - [ ] **Step 1: Create the migration file skeleton**
 
-The full SQL for each section is **verbatim from the spec** at `docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md`. Read that file and copy the SQL exactly — do not rewrite. The migration file is the concatenation of these sections, in order, with a file header:
+The full SQL for each section is **verbatim from the spec** at `docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md`. Read that file and copy the SQL exactly. Do not rewrite. The migration file is the concatenation of these sections, in order, with a file header:
 
 ```sql
 -- supabase/migrations/20260421194030_sql_settlement_function.sql
@@ -47,7 +47,7 @@ The full SQL for each section is **verbatim from the spec** at `docs/superpowers
 -- See: docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md
 
 -- ============================================================================
--- SECTION 1: Schema change — add suggestion_id FK to parlay_legs
+-- SECTION 1: Schema change. Add suggestion_id FK to parlay_legs
 -- ============================================================================
 
 ALTER TABLE public.parlay_legs
@@ -56,14 +56,14 @@ ALTER TABLE public.parlay_legs
 CREATE INDEX idx_parlay_legs_suggestion_id ON public.parlay_legs(suggestion_id);
 
 -- ============================================================================
--- SECTION 2: Linkage backfill — populate suggestion_id for existing 113 legs
+-- SECTION 2: Linkage backfill. Populate suggestion_id for existing 113 legs
 -- Match on (sport, home_team, away_team, pick, game_date::date).
 -- Tiebreaker: earliest ai_suggestions.created_at.
 -- Expected: all 113 legs get a suggestion_id (0 unique=70, 43 multi-matched).
 -- ============================================================================
 
 -- COPY the "Linkage backfill (runs once, during migration)" SQL block
--- from spec section under that heading — it's a WITH ... UPDATE statement.
+-- from spec section under that heading. It's a WITH ... UPDATE statement.
 -- ============================================================================
 -- SECTION 3: determine_outcome() helper function
 -- ============================================================================
@@ -88,7 +88,7 @@ CREATE INDEX idx_parlay_legs_suggestion_id ON public.parlay_legs(suggestion_id);
 -- ============================================================================
 
 -- COPY from spec section "The settle_parlays() function" (note: this was
--- updated in self-review — profit_loss now uses flat $100 stake for loss
+-- updated in self-review. profit_loss now uses flat $100 stake for loss
 -- and `potential_payout - 100` for win).
 
 -- ============================================================================
@@ -154,20 +154,20 @@ Expected: between 250 and 320 lines.
 grep -cE "^CREATE OR REPLACE FUNCTION|^CREATE TRIGGER|^SELECT cron\.(schedule|unschedule)|^ALTER TABLE|^CREATE INDEX|^GRANT EXECUTE" supabase/migrations/20260421194030_sql_settlement_function.sql
 ```
 
-Expected count: **14** — broken down as:
+Expected count: **14**, broken down as:
 - 5 `CREATE OR REPLACE FUNCTION` (determine_outcome, settle_ai_suggestions, settle_parlay_legs, settle_parlays, run_settlement)
 - 1 `CREATE TRIGGER`
 - 1 `SELECT cron.schedule` (daily safety)
 - 4 `SELECT cron.unschedule` (retire old)
 - 1 `ALTER TABLE`
 - 1 `CREATE INDEX`
-- (GRANT EXECUTE counts as 5, but grep-counted only if they're at line-start — may be 5 or 0 depending on indentation. If the total comes out as 19 instead of 14, that's GRANT EXECUTE lines also matching; both are acceptable.)
+- (GRANT EXECUTE counts as 5, but grep-counted only if they're at line-start, so the count may be 5 or 0 depending on indentation. If the total comes out as 19 instead of 14, that's GRANT EXECUTE lines also matching; both are acceptable.)
 
 - [ ] **Step 4: Commit the migration file**
 
 ```bash
 git add supabase/migrations/20260421194030_sql_settlement_function.sql
-git commit -m "feat: SQL settlement function — migration file
+git commit -m "feat: SQL settlement function migration file
 
 Single migration introducing:
 - parlay_legs.suggestion_id FK column + linkage backfill for 113 existing legs
@@ -182,7 +182,7 @@ Single migration introducing:
 
 ## Task 2: Apply migration via Supabase MCP + verify DB state
 
-Apply the migration to the live Supabase DB and verify every piece landed correctly. No code changes — this is a DB-only task using the `mcp__claude_ai_Supabase__apply_migration` tool.
+Apply the migration to the live Supabase DB and verify every piece landed correctly. No code changes. This is a DB-only task using the `mcp__claude_ai_Supabase__apply_migration` tool.
 
 **Files:** none modified; applying file created in Task 1.
 
@@ -224,7 +224,7 @@ SELECT
 FROM public.parlay_legs;
 ```
 
-Expected: `total_legs=113, linked=113, unlinked=0`. If any legs are unlinked, the backfill match logic has a bug or a leg slipped through — investigate before continuing.
+Expected: `total_legs=113, linked=113, unlinked=0`. If any legs are unlinked, the backfill match logic has a bug or a leg slipped through. Investigate before continuing.
 
 - [ ] **Step 4: Verify all 5 functions exist**
 
@@ -335,7 +335,7 @@ SELECT public.determine_outcome('Kansas', 'Moneyline', NULL, 'Kansas', 'Duke', N
 
 Expected: `'pending'`.
 
-If any of these return the wrong value, the SQL logic has a bug. Fix in a follow-up commit to Task 1's migration file (append an amending migration — do NOT edit the already-applied file). Report as `BLOCKED` and flag the discrepancy before moving on.
+If any of these return the wrong value, the SQL logic has a bug. Fix in a follow-up commit to Task 1's migration file (append an amending migration, do NOT edit the already-applied file). Report as `BLOCKED` and flag the discrepancy before moving on.
 
 ---
 
@@ -355,7 +355,7 @@ SELECT
 FROM ai_suggestions;
 ```
 
-Expected baseline approximately: `stale_pending_suggestions ~400, half_settled_legs ~113, pending_parlays ~5-7`. Record the exact numbers — you'll compare to post-settlement.
+Expected baseline approximately: `stale_pending_suggestions ~400, half_settled_legs ~113, pending_parlays ~5-7`. Record the exact numbers. You'll compare to post-settlement.
 
 - [ ] **Step 2: Run retroactive settlement**
 
@@ -376,7 +376,7 @@ GROUP BY sport
 ORDER BY still_stale_pending DESC;
 ```
 
-Expected: NBA / NHL / MLB / NCAAB stale_pending counts approximately 0 (their game_results are populated). EPL / UFC / Tennis still have high pending counts — those are **expected to remain pending** until Spec 2 fixes the ESPN backfill coverage.
+Expected: NBA / NHL / MLB / NCAAB stale_pending counts approximately 0 (their game_results are populated). EPL / UFC / Tennis still have high pending counts. Those are **expected to remain pending** until Spec 2 fixes the ESPN backfill coverage.
 
 - [ ] **Step 4: Verify parlay_legs state columns fully consistent**
 
@@ -476,11 +476,11 @@ const legsToInsert = selectedPicks.map((pick, index) => ({
 }))
 ```
 
-Only one line changed: added `suggestion_id: insertedSuggestions?.[index]?.id ?? null,` after `parlay_id`. The `?? null` fallback means if ai_suggestions insert failed silently and returned no data, the leg still writes — just without the linkage. Settlement will still work via trigger when game_results arrive, it just won't have the propagation shortcut.
+Only one line changed: added `suggestion_id: insertedSuggestions?.[index]?.id ?? null,` after `parlay_id`. The `?? null` fallback means if ai_suggestions insert failed silently and returned no data, the leg still writes, just without the linkage. Settlement will still work via trigger when game_results arrive, it just won't have the propagation shortcut.
 
 - [ ] **Step 3: Handle the picksError case more carefully**
 
-The existing code at [line 744-747](src/components/MainApp.jsx#L744-L747) logs picksError but doesn't abort. Under the new flow, `insertedSuggestions` will be `null` if `picksError` is set, which means `legsToInsert` will have `suggestion_id: null` for every leg. That's graceful degradation — legs still insert, just without linkage. No change needed here; the `?? null` handles it.
+The existing code at [line 744-747](src/components/MainApp.jsx#L744-L747) logs picksError but doesn't abort. Under the new flow, `insertedSuggestions` will be `null` if `picksError` is set, which means `legsToInsert` will have `suggestion_id: null` for every leg. That's graceful degradation. Legs still insert, just without linkage. No change needed here; the `?? null` handles it.
 
 - [ ] **Step 4: Sanity check with grep**
 
@@ -544,7 +544,7 @@ Expected: new branch registered on remote.
 - [ ] **Step 3: Open the PR**
 
 ```bash
-gh pr create --title "SQL settlement function — atomic settle via Postgres trigger" --body "$(cat <<'EOF'
+gh pr create --title "SQL settlement function: atomic settle via Postgres trigger" --body "$(cat <<'EOF'
 ## Summary
 
 Replaces the multi-writer settlement pipeline (Railway \`ParlayOutcomeChecker\` + Supabase edge functions \`check-outcomes\` and \`check-parlay-outcomes\`) with a single Postgres-side pipeline: five SQL functions triggered by \`game_results\` inserts, plus a daily safety-net \`pg_cron\`.
@@ -553,13 +553,13 @@ Replaces the multi-writer settlement pipeline (Railway \`ParlayOutcomeChecker\` 
 
 ## What's in this PR
 
-- New migration \`supabase/migrations/20260421194030_sql_settlement_function.sql\` — applied to production during implementation (verified in Task 2 steps)
-- \`src/components/MainApp.jsx\` — parlay-lock flow now captures returned \`ai_suggestions.id\` values and sets \`parlay_legs.suggestion_id\` for each new leg
+- New migration \`supabase/migrations/20260421194030_sql_settlement_function.sql\`: applied to production during implementation (verified in Task 2 steps)
+- \`src/components/MainApp.jsx\`: parlay-lock flow now captures returned \`ai_suggestions.id\` values and sets \`parlay_legs.suggestion_id\` for each new leg
 - Orphan-leg cleanup (11 legs + 1 dangling parlay) was executed earlier via SQL; not part of this PR code, but a prerequisite for the linkage backfill to reach 100%
 
 ## Scope boundary
 
-**In scope:** settlement of any pick whose game appears in \`game_results\`. **Out of scope:** ESPN backfill coverage for UFC (MMA parser), EPL (\`soccer/eng.1\`), Tennis (no ESPN source). Those are Spec 2 — see [docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md](docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md) "Non-goals".
+**In scope:** settlement of any pick whose game appears in \`game_results\`. **Out of scope:** ESPN backfill coverage for UFC (MMA parser), EPL (\`soccer/eng.1\`), Tennis (no ESPN source). Those are Spec 2. See [docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md](docs/superpowers/specs/2026-04-21-sql-settlement-function-design.md) "Non-goals".
 
 ## Retroactive settlement results (from Task 4 verification)
 
@@ -600,9 +600,9 @@ Return the URL in the final status report.
 
 ## Out of scope for this plan (queued follow-ups)
 
-These are deliberately excluded — do not attempt in this PR:
+These are deliberately excluded. Do not attempt in this PR:
 
-1. **Spec 2 — ESPN backfill coverage.** Fix UFC MMA parser in Railway cron; add EPL (`soccer/eng.1`) to Railway backfill; research Tennis data source.
+1. **Spec 2: ESPN backfill coverage.** Fix UFC MMA parser in Railway cron; add EPL (`soccer/eng.1`) to Railway backfill; research Tennis data source.
 2. **Player Props settlement.** 79 picks require `player_game_stats` lookup. Own followup spec.
 3. **Delete dead edge function source files** (`supabase/functions/check-outcomes/`, `supabase/functions/check-parlay-outcomes/`) after 1 week of observed stability.
 4. **Retire `lib/services/parlay-outcome-checker.js` + `ai-suggestion-outcome-checker.js`.** Node files become dead once the new pipeline is stable. Delete in a cleanup PR.
