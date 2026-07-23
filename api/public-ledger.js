@@ -275,7 +275,7 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps have their own separately graded record: a trap names an overpriced side, and the call is right when that side loses. Traps are never mixed into the actionable win/loss record because their win condition is inverted. Nothing removed, nothing edited after publication.',
+        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps have their own separately graded record: a trap names a side priced at least 2 percentage points below fair, and the call is right when that side loses. Traps are never mixed into the actionable win/loss record because their win condition is inverted. Nothing removed, nothing edited after publication.',
         grading: 'One pick per game, the final version published before start, at its price. Revisions replace, never add, including when a game sits on the board across more than one day. A team appearing on consecutive days is a series: each row is a separate game, settled at that day\'s price. Signed model edge in percentage points sets the tier. Outcomes are graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',

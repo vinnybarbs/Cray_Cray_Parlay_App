@@ -200,7 +200,7 @@ export default function HouseLedger() {
                 </div>
                 {tierOrder.map(label => {
                   const s = byTier[label]
-                  const t = edgeTier(label === 'Sharp Take' ? 11 : label === 'Strong Play' ? 8 : label === 'Play' ? 5 : label === 'Lean' ? 3 : label === 'Skip' ? 1 : -1)
+                  const t = edgeTier(label === 'Sharp Take' ? 11 : label === 'Strong Play' ? 8 : label === 'Play' ? 5 : label === 'Lean' ? 3 : label === 'Skip' ? 1 : -3)
                   return (
                     <div key={label} className="grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-3 border-t border-ink-800 items-center min-w-[480px]">
                       <span>
@@ -236,7 +236,7 @@ export default function HouseLedger() {
                   </span>
                 )}
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full">
-                  a trap names an overpriced side. When that side loses, the call was right. Graded on its own record because the win condition is inverted, never mixed into the pick record above.
+                  a trap names a side priced 2pp or more below fair. When that side loses, the call was right. Graded on its own record because the win condition is inverted, never mixed into the pick record above.
                 </span>
               </div>
             )}

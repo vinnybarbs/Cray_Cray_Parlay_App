@@ -844,7 +844,7 @@ function TrackRecord({ sportStats, tierStats }) {
                     {label}
                     {useTiers && tierRange(label) && (
                       <span className="ml-2 font-mono text-[10px] text-ink-500 tabular-nums">
-                        {tierRange(label) === 'below 0' ? 'edge below 0pp' : `edge ${tierRange(label)}`}
+                        {tierRange(label) === '-2pp or worse' ? 'edge -2pp or worse' : `edge ${tierRange(label)}`}
                       </span>
                     )}
                     {row.window === 'all-time' && (

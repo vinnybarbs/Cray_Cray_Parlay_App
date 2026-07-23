@@ -990,17 +990,33 @@ async function runPreAnalysis(sportSlugs) {
               ? soccer1x2.pickBest1x2Side(edgeData, { minEdgePp: -100 })
               : edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }))
           : null;
-        if (bestSide) {
-          const pickText = bestSide.side === 'draw'
+        // Directional read selection. An actionable pick is the BEST side
+        // at +2pp or better. A Trap is the OVERPRICED side at -2pp or
+        // worse: the read names the side you should not bet, so grading
+        // the fade is honest. Everything between -2 and +2 is a Skip,
+        // board only. Before 2026-07-23 the trap read named the least-bad
+        // side, which was not a directional claim.
+        let readSide = bestSide;
+        if (bestSide && bestSide.signedEdge * 100 < 2 && edgeData?.edges) {
+          let worst = null;
+          for (const [side, val] of Object.entries(edgeData.edges)) {
+            if (val == null) continue;
+            if (!worst || val < worst.signedEdge) worst = { side, signedEdge: val };
+          }
+          if (worst && worst.signedEdge * 100 <= -2) readSide = worst;
+        }
+        if (readSide) {
+          const pickText = readSide.side === 'draw'
             ? buildDrawPickText(game)
-            : buildPickText(bestSide.side, oddsCtx, game);
+            : buildPickText(readSide.side, oddsCtx, game);
           if (pickText) {
             mathPick = {
-              recommended_side: bestSide.side,
+              recommended_side: readSide.side,
               recommended_pick: pickText,
-              signedEdge: bestSide.signedEdge,
+              signedEdge: readSide.signedEdge,
             };
-            console.log(`  🎯 Math pick: ${pickText} (${bestSide.side}, edge ${(bestSide.signedEdge * 100).toFixed(1)}pp)`);
+            const kind = readSide.signedEdge * 100 <= -2 ? 'Trap read' : 'Math pick';
+            console.log(`  🎯 ${kind}: ${pickText} (${readSide.side}, edge ${(readSide.signedEdge * 100).toFixed(1)}pp)`);
           }
         } else {
           console.log(`  ⚪ No-edge game, every market < +2pp`);
@@ -1101,12 +1117,13 @@ async function runPreAnalysis(sportSlugs) {
             totalCompletionTokens += result.completion_tokens || 0;
 
             // Publish to the RECORD at Lean or better (>= 2pp), and publish
-            // Trap reads (negative edge) too. Traps are the product's
-            // namesake and get graded on their own separate record, where
-            // the named side losing means the call was right. Only Skip
-            // (the 0-2pp dead zone) stays display-only: it carries no read
-            // in either direction. (Trap publication was paused 2026-07-10
-            // to 2026-07-23 while the record presentation was reworked.)
+            // Trap reads (the named side at -2pp or worse) too. Traps are
+            // the product's namesake and get graded on their own separate
+            // record, where the named side losing means the call was
+            // right. Only Skip (the -2 to +2 noise band) stays
+            // display-only: it carries no read in either direction. (Trap
+            // publication was paused 2026-07-10 to 2026-07-23 while the
+            // record presentation was reworked.)
             const displayEdgePp = edgeData?.edges?.[result.recommended_side] != null
               ? edgeData.edges[result.recommended_side] * 100 : null;
             if (SHADOW_SPORTS.has(sportDisplay)) {
@@ -1116,7 +1133,7 @@ async function runPreAnalysis(sportSlugs) {
               if (displayEdgePp != null) {
                 console.log(`  👻 Shadow (${sportDisplay}): ${displayEdgePp.toFixed(1)}pp stored, no pick published`);
               }
-            } else if (result.recommended_pick && displayEdgePp != null && (displayEdgePp >= 2 || displayEdgePp < 0)) {
+            } else if (result.recommended_pick && displayEdgePp != null && (displayEdgePp >= 2 || displayEdgePp <= -2)) {
               try {
                 // Derive bet type from the math-chosen side, NOT regex on the
                 // pick text. ML picks include the price ("+310"), which the
