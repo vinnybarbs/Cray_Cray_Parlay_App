@@ -2,12 +2,18 @@
 
 **URL**: https://www.actionnetwork.com
 **Generated**: 2026-05-12
-**Depth**: quick scan
+**Updated**: 2026-07-11 (live WebFetch of homepage and /subscribe, plus current third-party reviews)
+**Depth**: quick scan, refreshed
 
-> Note on methodology: WebFetch was unavailable in this environment. All page-level content was reconstructed from WebSearch result snippets of actionnetwork.com pages plus third-party reviews. Exact headline wording on the homepage hero could not be verified verbatim and is marked as such below.
+## Changes since May 2026 (verified July 11, 2026)
+1. **New subscribe-page headline: "More edges. Less noise."** This is the exact wording on actionnetwork.com/subscribe today. They are now marketing on the word "edges," which moves toward our territory even though the product still shows directional signals, not signed magnitudes.
+2. **Pricing restructure.** The live subscribe page now lists PRO Weekly $14.99/week, PRO Monthly $24.99/month, PRO Annual $99.99/year ("Best Value"). That is a monthly cut from $29.99 and an annual raise from $59.88. The old $49 paid 4-day trial no longer appears on the subscribe page. Oddsplays' July 2026 review quotes $19.99/month, so promo pricing at our exact price point appears to be in market.
+3. **No new parlay product found.** Parlay surface is unchanged: free parlay calculator, PRO "Parlay Builder Tools" and "Same Game Parlay Tools," SGP QuickSlip from scoreboard/game pages, and Playbook AI parsing parlays from tweets into betslips. No machine-built, edge-graded parlay combinations.
+4. **Still no published house win rate.** Homepage and subscribe page show zero win-rate or graded-record claims. Third-party reviews continue to flag delayed odds and thin depth, and users report the "unverified bets" area functions as a dumping ground for losses.
+5. **Org note**: Brandon Cohen, VP of Product and Strategy, stepped down September 2025 (per CB Insights/Tracxn profiles).
 
 ## At a Glance
-- **Tagline (positioning line)**: "The most trusted source for sports betting insights & analytics." Stated mission: *"to help make you a smarter bettor."*
+- **Tagline (positioning line)**: "The most trusted source for sports betting insights & analytics." Stated mission: *"to help make you a smarter bettor."* Subscribe-page headline as of July 2026: **"More edges. Less noise."** The homepage itself leads with rotating pick content (World Cup best bets, UFC picks) rather than a static hero.
 - **What they actually do**: A subscription sports-betting media-and-data platform. The free app is a bet tracker + odds comparator + content hub; the paid tiers (PRO / LABS) unlock public-money percentages, sharp-money signals, expert picks, projections, and proprietary betting-system filters across NFL/NBA/MLB/CFB/CBB.
 - **Target audience**: Mainstream US sports bettors who already have accounts at DraftKings, FanDuel, BetMGM, Caesars, or bet365, ranging from casual (free bet tracker users) to "sharp-curious" subscribers who want public/sharp split data without having to model it themselves. Heavier on mass-market than degen.
 - **Founded / scale**: Founded October 2017 by The Chernin Group via roll-up of Sports Insights, FantasyLabs, and the SportsAction app. Mark Cuban was an early investor in predecessor entities. Acquired by Better Collective A/S (Copenhagen) on May 3, 2021 for **$240M cash + shares**. CEO since 2018: Patrick Keane (ex-Bleacher Report board member). Chief Content Officer: Chad Millman (ex-EIC of ESPN The Magazine + ESPN.com).
@@ -62,12 +68,25 @@
 | Tier | Monthly | Annual | Notes |
 |------|---------|--------|-------|
 | Free app | $0 | $0 | Bet tracker + BetSync + odds + % of bets + some content |
-| Action PRO | **$29.99 / mo** (or $19.99 / week) | **$59.88 / yr** (= $4.99/mo equiv) | The everything-tier most of their data lives in |
-| Action LABS | **$249 / mo** | **$1,499.88 / yr** (= $124.99/mo equiv) | Pro-data power users; custom system builder |
+| Action PRO (as of 2026-07-11) | **$24.99 / mo** (or $14.99 / week) | **$99.99 / yr** (= $8.33/mo equiv) | Live subscribe page. Oddsplays (July 2026) quotes $19.99/mo, so promo pricing exists |
+| Action LABS | **$249 / mo** | **$1,499.88 / yr** (= $124.99/mo equiv) | Pro-data power users; custom system builder (not re-verified in July) |
 
-- **Free trial**: None. They sell a **$49 / 4-day** paid trial of PRO.
+- **Free trial**: None visible. The old $49 / 4-day paid trial no longer appears on the subscribe page.
 - **Money-back**: No refunds for partial billing periods.
-- **Notable**: Annual discount is unusually aggressive (~83% off monthly equivalent). Strong signal that monthly is a price-anchor / churn-shield and they prioritize annual conversions hard.
+- **Notable**: They compressed the monthly-to-annual gap (annual raised, monthly cut). At promo pricing ($19.99/mo) they now match our price exactly. Our price umbrella from May is mostly gone.
+
+## Track-Record Transparency (verified July 2026)
+- **House picks**: no published, graded win rate anywhere on the homepage or subscribe page. Expert picks are narrative. Third-party coverage says top cappers claim 55-60% with **no independent audit**.
+- **User records**: the "Verified Bets & Leaderboard" system (launched Dec 2021) verifies user-logged bets with anti-gaming rules (locked to consensus lines, unalterable after placing, 0.5-3 units, no live bets/futures/huge favorites, same side max twice). BetSync wagers at supported books auto-verify.
+- **Auditability holes**: users report verified bets can be deleted from records and that "unverified bets" pages act as a dumping ground for losses (oddsplays, July 2026). There is no settlement ledger, no CLV reporting, no all-picks graded history for their own experts.
+- **Net**: verification applies to community bettors, not to Action Network's own editorial picks. Our published 63.5% top-tier win rate with a full settlement ledger has no counterpart on their platform.
+
+## Parlay Features (verified July 2026)
+- Free **Parlay Calculator** (payout math only, user enters legs and odds).
+- PRO includes **Parlay Builder Tools** and **Same Game Parlay Tools** per third-party feature lists; these are assistive, not a dedicated SGP pricing model (ProfitDuel notes it "is not a dedicated SGP calculator").
+- **SGP QuickSlip**: one-tap slip and tracking of popular NFL Same Game Parlays from scoreboard/game pages.
+- **Playbook AI**: parses single bets or multi-leg parlays from tweets/Discord (text or screenshot) into preloaded betslips at DK/FD/BetMGM/Caesars/bet365.
+- **What they do not do**: no machine-built parlay combinations, no per-leg edge grading, no correlation-aware parlay EV, no graded parlay history. Parlay content is distribution and convenience, not math.
 
 ## Reviews / Sentiment (from web search)
 **Praise themes**
