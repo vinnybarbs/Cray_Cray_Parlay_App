@@ -41,6 +41,26 @@ function unitProfit(oddsStr, outcome) {
   return price > 0 ? price / 100 : 100 / Math.abs(price);
 }
 
+// One row per GAME. When a game sat on the board across several daily
+// sessions before it started, each session published its own row, so a
+// single loss could settle two or three times (and hit two tiers). The
+// methodology promises the final version published before start, so keep
+// only the row with the newest revision timestamp per (matchup, start
+// time). Exact start-time matching keeps doubleheaders separate. The raw
+// rows stay in the database untouched, the ledger is append-only; this
+// only fixes what gets counted.
+function finalVersionOnly(rows) {
+  const winners = new Map();
+  for (const r of rows) {
+    const key = `${r.home_team}|${r.away_team}|${r.game_date}`;
+    const ts = r.last_revised_at || r.created_at || '';
+    const prev = winners.get(key);
+    const prevTs = prev ? (prev.last_revised_at || prev.created_at || '') : '';
+    if (!prev || ts > prevTs) winners.set(key, r);
+  }
+  return rows.filter(r => winners.get(`${r.home_team}|${r.away_team}|${r.game_date}`) === r);
+}
+
 function summarize(rows) {
   const out = { settled: 0, won: 0, lost: 0, push: 0, units: 0, winRate: null, roi: null };
   for (const r of rows) {
@@ -77,7 +97,7 @@ async function getPublicLedger(req, res) {
       for (let page = 0; page < 20; page++) {
         const { data, error } = await supabase
           .from('ai_suggestions')
-          .select('id, sport, bet_type, pick, odds, edge_pp, tier, game_date, created_at, resolved_at, actual_outcome')
+          .select('id, sport, home_team, away_team, bet_type, pick, odds, edge_pp, tier, game_date, created_at, last_revised_at, resolved_at, actual_outcome')
           .like('session_id', 'auto_digest%')
           .in('actual_outcome', ['won', 'lost', 'push'])
           .order('resolved_at', { ascending: false })
@@ -94,7 +114,7 @@ async function getPublicLedger(req, res) {
     const openPicks = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('ai_suggestions')
-        .select('id, sport, bet_type, pick, odds, edge_pp, tier, game_date, created_at, actual_outcome')
+        .select('id, sport, home_team, away_team, bet_type, pick, odds, edge_pp, tier, game_date, created_at, last_revised_at, actual_outcome')
         .like('session_id', 'auto_digest%')
         .eq('actual_outcome', 'pending')
         .not('sport', 'in', '("EPL","MLS","Soccer","World Cup","Champions League","Copa America","Euros")')
@@ -114,7 +134,8 @@ async function getPublicLedger(req, res) {
     // appear nowhere on the site. Soccer returns as v2 with a real
     // three-way model.
     const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
-    const nonSoccer = settledPicks.filter(r => !SOCCER_SPORTS.has(r.sport));
+    const nonSoccer = finalVersionOnly(settledPicks).filter(r => !SOCCER_SPORTS.has(r.sport));
+    const openUnique = finalVersionOnly(openPicks);
 
     // The public record begins at the graded era (2026-05-10, when edge
     // grading went live). Ungraded picks before that were development
@@ -133,10 +154,12 @@ async function getPublicLedger(req, res) {
       byTier[tier].push(row);
     }
 
-    // Fade record: the trap side losing means the fade won.
-    // Trap grading is a CLOSED record. Publication moved to Lean or better
-    // on 2026-07-10, so no new Trap rows reach the record. gradedThrough
-    // tells the UI to present this as an archived stat, not a live one.
+    // The Trap Record: the product's namesake stat, graded live on its own
+    // ledger. A trap names an overpriced side, so the named side LOSING
+    // means the call was right. It stays separate from the actionable
+    // record above because its win condition is inverted. (Publication was
+    // paused 2026-07-10 to 2026-07-23 while this presentation was
+    // reworked; lastGraded makes any future gap visible.)
     const trapReport = { called: trapPicks.length, fadeWins: 0, fadeLosses: 0, pushes: 0 };
     let lastTrapSettled = null;
     for (const t of trapPicks) {
@@ -150,7 +173,7 @@ async function getPublicLedger(req, res) {
     const fadeDecided = trapReport.fadeWins + trapReport.fadeLosses;
     trapReport.fadeRate = fadeDecided > 0
       ? Math.round((trapReport.fadeWins / fadeDecided) * 1000) / 10 : null;
-    trapReport.gradedThrough = lastTrapSettled;
+    trapReport.lastGraded = lastTrapSettled;
 
     // Hit rates by sport and by bet type, same population as the headline.
     const groupSummaries = (keyFn) => {
@@ -191,14 +214,15 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps (fade calls) are reported separately because they are advice to bet against a side, not on it. Trap grading closed on July 10, 2026, when publication moved to Lean or better. Trap reads now live on the daily board as information and are not graded. Nothing removed, nothing edited after publication.',
-        grading: 'One pick per game per day, the final version published before start, at its price. Pre-start revisions replace, never add. A team appearing on consecutive days is a series: each row is a separate game, settled at that day\'s price. Signed model edge in percentage points sets the tier. Outcomes are graded from final scores by the settlement pipeline.',
+        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps have their own separately graded record: a trap names an overpriced side, and the call is right when that side loses. Traps are never mixed into the actionable win/loss record because their win condition is inverted. Nothing removed, nothing edited after publication.',
+        grading: 'One pick per game, the final version published before start, at its price. Revisions replace, never add, including when a game sits on the board across more than one day. A team appearing on consecutive days is a series: each row is a separate game, settled at that day\'s price. Signed model edge in percentage points sets the tier. Outcomes are graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
       },
       summary,
       picks: actionablePicks.slice(0, 250),
-      openPicks,
+      trapPicks: trapPicks.slice(0, 100),
+      openPicks: openUnique,
       parlays,
     });
   } catch (err) {

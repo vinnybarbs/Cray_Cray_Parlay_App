@@ -1020,11 +1020,16 @@ async function runPreAnalysis(sportSlugs) {
             totalPromptTokens += result.prompt_tokens || 0;
             totalCompletionTokens += result.completion_tokens || 0;
 
-            // Publish to the RECORD only at Lean or better (>= 2pp). Trap
-            // and Skip reads live on the board as information, not as bets.
+            // Publish to the RECORD at Lean or better (>= 2pp), and publish
+            // Trap reads (negative edge) too. Traps are the product's
+            // namesake and get graded on their own separate record, where
+            // the named side losing means the call was right. Only Skip
+            // (the 0-2pp dead zone) stays display-only: it carries no read
+            // in either direction. (Trap publication was paused 2026-07-10
+            // to 2026-07-23 while the record presentation was reworked.)
             const displayEdgePp = edgeData?.edges?.[result.recommended_side] != null
               ? edgeData.edges[result.recommended_side] * 100 : null;
-            if (result.recommended_pick && displayEdgePp != null && displayEdgePp >= 2) {
+            if (result.recommended_pick && displayEdgePp != null && (displayEdgePp >= 2 || displayEdgePp < 0)) {
               try {
                 // Derive bet type from the math-chosen side, NOT regex on the
                 // pick text. ML picks include the price ("+310"), which the
@@ -1086,14 +1091,24 @@ async function runPreAnalysis(sportSlugs) {
                               : isAwayMl ? edgeData?.impliedAwayProb ?? null : null,
                 };
 
-                const { data: existingPick } = await supabase
+                // ONE row per GAME, across ALL board days, not just today's
+                // session. A game analyzed on each of the 2-3 days it sits
+                // on the board used to get a fresh row per daily session,
+                // so one loss settled as two or three (Angels @ Cardinals
+                // 2026-07-20 landed at +101 Sharp Take AND -108 Strong
+                // Play). Search any auto_digest session for this exact
+                // game and revise the newest pending row instead. Matching
+                // on exact game_date keeps doubleheaders separate.
+                const { data: existingPicks } = await supabase
                   .from('ai_suggestions')
                   .select('id, actual_outcome')
-                  .eq('session_id', sessionId)
+                  .like('session_id', 'auto_digest%')
                   .eq('home_team', game.home_team)
                   .eq('away_team', game.away_team)
                   .eq('game_date', game.game_date)
-                  .maybeSingle();
+                  .order('created_at', { ascending: false })
+                  .limit(1);
+                const existingPick = existingPicks?.[0] || null;
 
                 let sugErr = null;
                 if (existingPick && existingPick.actual_outcome !== 'pending') {

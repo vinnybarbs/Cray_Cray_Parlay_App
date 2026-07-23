@@ -217,27 +217,26 @@ export default function HouseLedger() {
               </div>
             )}
 
-            {/* Traps are fade advice, not bets. The record above only counts
-                actionable picks. A trap side losing means the call was right.
-                Trap grading closed 2026-07-10 when publication moved to Lean
-                or better, so this stat no longer moves. Say so, or it reads
-                as a broken counter. */}
+            {/* The Trap Record: the namesake stat, graded live on its own
+                ledger. A trap names an overpriced side, so that side LOSING
+                means the call was right. It stays out of the actionable
+                record above because its win condition is inverted; a correct
+                trap must never render as a lost bet. */}
             {trapReport && trapReport.called > 0 && (
-              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="font-mono text-xs font-bold uppercase tracking-wider text-signal-neg">Traps called</span>
-                <span className="font-mono text-sm tabular-nums text-ink-100">{trapReport.called}</span>
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-l-2 border-signal-neg">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-signal-neg">The Trap Record</span>
+                <span className="font-mono text-sm tabular-nums text-ink-100">{trapReport.called} called</span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">fading them went</span>
                 <span className={`font-mono text-sm font-bold tabular-nums ${trapReport.fadeRate >= 55 ? 'text-signal-pos' : 'text-ink-100'}`}>
                   {trapReport.fadeWins}-{trapReport.fadeLosses}{trapReport.fadeRate != null ? ` (${trapReport.fadeRate}%)` : ''}
                 </span>
-                {trapReport.gradedThrough && (
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ink-400 border border-ink-700 rounded-sharp px-1.5 py-0.5">
-                    Closed record · graded May 10 to {fmtDate(trapReport.gradedThrough)}
+                {trapReport.lastGraded && (
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+                    last graded {fmtDate(trapReport.lastGraded)}
                   </span>
                 )}
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full">
-                  a trap is advice to bet against a side, so its loss is our win.
-                  {trapReport.gradedThrough && ' Trap grading closed when publication moved to Lean or better. New trap reads stay on the daily board as information and this number will not change.'}
+                  a trap names an overpriced side. When that side loses, the call was right. Graded on its own record because the win condition is inverted, never mixed into the pick record above.
                 </span>
               </div>
             )}
