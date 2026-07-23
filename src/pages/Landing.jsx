@@ -325,23 +325,28 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
                 <span className="text-[9px] uppercase tracking-[0.18em] text-signal-pos">LIVE</span>
               </span>
             </div>
+            {/* Every row states its own window and population. This panel
+                mixes a 30-day all-tier rate with an all-time Sharp Take
+                rate, and unlabeled they read as one contradictory number
+                (57.5 vs 64.2). All rows come from the same rollup,
+                mv_public_record, just different buckets. */}
             <dl className="divide-y divide-ink-800">
-              <StatRow label="Hit rate" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
+              <StatRow label="Hit rate · all tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
               {sharpTakeDisplay && (
                 <StatRow
-                  label={`Sharp Take · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
+                  label={`Sharp Take only · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
                   value={sharpTakeDisplay}
                   tone={sharpTake.hitRate >= 55 ? 'pos' : sharpTake.hitRate >= 50 ? 'neutral' : 'neg'}
                 />
               )}
-              <StatRow label="Picks graded" value={weeklyCount} tone="neutral" />
+              <StatRow label="Picks graded · last 30d" value={weeklyCount} tone="neutral" />
               <StatRow label="Markets covered" value="ML · Spread · Total" tone="neutral" small />
               <StatRow label="Affiliate parent" value="None" tone="pos" small />
             </dl>
           </div>
           <div className="mt-3 flex justify-between text-[9px] uppercase tracking-[0.20em] text-ink-500 px-1">
-            <span>source: settlement ledger</span>
-            <span>refresh: after every settlement</span>
+            <span>source: mv_public_record, same rollup as the ledger</span>
+            <span>refresh: hourly after settlements</span>
           </div>
         </div>
       </div>

@@ -189,13 +189,74 @@ async function getPublicLedger(req, res) {
       );
     };
 
-    const summary = {
-      overall: summarize(actionablePicks),
-      byTier: Object.fromEntries(Object.entries(byTier).map(([t, rows]) => [t, summarize(rows)])),
-      bySport: groupSummaries(r => r.sport),
-      byBetType: groupSummaries(r => r.bet_type),
-      trapReport,
+    // SINGLE SOURCE OF TRUTH. Every public surface quotes mv_public_record:
+    // the landing page reads it through /api/public-stats, and the ledger
+    // headline aggregates come from the same MV's 'all' bucket, so
+    // "overall Sharp Take" is byte-identical everywhere on the site and
+    // moves in lockstep when the rollup refreshes (hourly, after the
+    // settlement windows). The raw-row math above stays only as a
+    // fallback for when the MV read fails.
+    const mvAll = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('mv_public_record')
+        .select('*')
+        .eq('period_bucket', 'all');
+      if (error) throw error;
+      return data || [];
+    }) || [];
+
+    const ACTIONABLE_TIERS = new Set(['Lean', 'Play', 'Strong Play', 'Sharp Take']);
+    const shapeMvRow = (r) => {
+      const won = r.won || 0;
+      const lost = r.lost || 0;
+      const push = r.push || 0;
+      const decided = won + lost;
+      const units = r.roi_units != null ? Math.round(Number(r.roi_units) * 100) / 100 : 0;
+      return {
+        settled: won + lost + push, won, lost, push, units,
+        winRate: decided > 0 ? Math.round((won / decided) * 1000) / 10 : null,
+        roi: decided > 0 ? Math.round((units / decided) * 1000) / 10 : null,
+      };
     };
+    const mvDim = (type) => mvAll.filter(r => r.dimension_type === type);
+    const mvOverall = mvDim('overall')[0] || null;
+
+    let summary;
+    if (mvOverall) {
+      const dimObj = (rows) => Object.fromEntries(
+        rows.map(r => [r.dimension_value, shapeMvRow(r)])
+          .sort((a, b) => b[1].settled - a[1].settled)
+      );
+      // The MV grades traps with raw outcomes (the named side's own W/L),
+      // so the fade record inverts: trap side lost means the fade won.
+      const trapRow = mvDim('tier').find(r => r.dimension_value === 'Trap');
+      if (trapRow) {
+        trapReport.called = (trapRow.won || 0) + (trapRow.lost || 0) + (trapRow.push || 0);
+        trapReport.fadeWins = trapRow.lost || 0;
+        trapReport.fadeLosses = trapRow.won || 0;
+        trapReport.pushes = trapRow.push || 0;
+        const decided = trapReport.fadeWins + trapReport.fadeLosses;
+        trapReport.fadeRate = decided > 0
+          ? Math.round((trapReport.fadeWins / decided) * 1000) / 10 : null;
+      }
+      summary = {
+        overall: shapeMvRow(mvOverall),
+        byTier: dimObj(mvDim('tier').filter(r => ACTIONABLE_TIERS.has(r.dimension_value))),
+        bySport: dimObj(mvDim('sport')),
+        byBetType: dimObj(mvDim('bet_type')),
+        trapReport,
+        source: 'mv_public_record',
+      };
+    } else {
+      summary = {
+        overall: summarize(actionablePicks),
+        byTier: Object.fromEntries(Object.entries(byTier).map(([t, rows]) => [t, summarize(rows)])),
+        bySport: groupSummaries(r => r.sport),
+        byBetType: groupSummaries(r => r.bet_type),
+        trapReport,
+        source: 'raw_rows_fallback',
+      };
+    }
 
     // Machine-built house parlays (pending + settled). Missing table (before
     // the migration lands) degrades to an empty list, never a 500.
@@ -218,6 +279,7 @@ async function getPublicLedger(req, res) {
         grading: 'One pick per game, the final version published before start, at its price. Revisions replace, never add, including when a game sits on the board across more than one day. A team appearing on consecutive days is a series: each row is a separate game, settled at that day\'s price. Signed model edge in percentage points sets the tier. Outcomes are graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',
+        rollup: 'All headline numbers on this page and the landing page come from one database rollup, mv_public_record, refreshed hourly after settlement runs. Same source, different time windows where labeled.',
       },
       summary,
       picks: actionablePicks.slice(0, 250),
