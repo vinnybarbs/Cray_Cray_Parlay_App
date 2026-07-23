@@ -11,6 +11,9 @@ const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
 const { getClient: getClaude, MODELS, extractJson } = require('../../lib/services/claude.js');
+const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
+const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
+const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 
 // Map odds_cache sport slugs to display sport names. Tennis (and golf)
 // tournament keys ROTATE weekly and are discovered dynamically by the
@@ -37,7 +40,23 @@ const SLUG_TO_SPORT = {
 // markets and never modeled the draw, so its soccer edges were structurally
 // inflated (EPL ML settled 17-54). Soccer games still get preview analyses
 // for the digest, but no picks publish until a real three-way model exists.
-const PREVIEW_ONLY_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+// Sports whose edges come from dedicated models running in SHADOW MODE:
+// edges are computed and stored on the board (game_analysis) so the tiles
+// show the read, but no pick reaches the record (ai_suggestions) until the
+// model calibrates on settled shadow reads. Soccer uses the three-way 1X2
+// module, tennis and UFC use market-consensus player models. Designs and
+// un-shadow criteria live in docs/models/.
+const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'Tennis', 'UFC']);
+
+// ATP slams are best of five. Everything else, including all WTA events,
+// is best of three. The tennis model prices the reliability gap between
+// the two formats.
+const BO5_TENNIS_KEYS = new Set([
+  'tennis_atp_aus_open_singles',
+  'tennis_atp_french_open',
+  'tennis_atp_wimbledon',
+  'tennis_atp_us_open'
+]);
 
 function slugToSport(slug) {
   if (!slug) return slug;
@@ -95,7 +114,8 @@ async function getUpcomingGames(sports) {
         home_team: row.home_team,
         away_team: row.away_team,
         game_date: row.commence_time,
-        markets: {}
+        markets: {},
+        h2hRows: []
       };
     }
 
@@ -103,6 +123,13 @@ async function getUpcomingGames(sports) {
     const existing = games[key].markets[row.market_type];
     if (!existing || row.bookmaker === 'draftkings') {
       games[key].markets[row.market_type] = row.outcomes;
+    }
+
+    // Keep EVERY book's moneyline row. The tennis, UFC, and soccer models
+    // build a cross-book consensus, and collapsing to one book above
+    // starves them of their core signal.
+    if (row.market_type === 'h2h') {
+      games[key].h2hRows.push({ bookmaker: row.bookmaker, market_type: 'h2h', outcomes: row.outcomes });
     }
   }
 
@@ -152,6 +179,23 @@ function extractOddsContext(game) {
 // Re-exported from the shared pick-grader module so everything that formats a
 // pick goes through one helper.
 const { formatAmericanOdds, buildPickText, resolveOddsForSide: resolveOddsForPick } = pickGrader;
+
+// Draw is its own 1X2 side. The pick text carries no team name on purpose:
+// settlement matches team picks on pick.includes(team_name), and a draw
+// pick must never match either team.
+function buildDrawPickText(game) {
+  const h2h = game.markets && game.markets['h2h'];
+  const draw = Array.isArray(h2h) ? h2h.find(o => o && o.name === 'Draw') : null;
+  if (!draw || draw.price == null) return 'Draw';
+  return `Draw ${formatAmericanOdds(draw.price)}`;
+}
+
+// Draw price for storage paths that resolve odds by side.
+function drawPrice(game) {
+  const h2h = game.markets && game.markets['h2h'];
+  const draw = Array.isArray(h2h) ? h2h.find(o => o && o.name === 'Draw') : null;
+  return draw && draw.price != null ? draw.price : null;
+}
 
 /**
  * Get relevant news snippets for a game's teams.
@@ -888,10 +932,38 @@ async function runPreAnalysis(sportSlugs) {
           console.log(`  🔄 Refinement pass #${prior.version + 1} for ${game.game_key} (prior edge: ${prior.prior_edge}/10)`);
         }
 
-        // Calculate statistical edge BEFORE passing to AI
+        // Calculate statistical edge BEFORE passing to AI. Team sports use
+        // the core calculator. Tennis, UFC, and the soccer family use their
+        // dedicated models (docs/models/), market-consensus based and in
+        // shadow mode until calibrated.
         let edgeData = null;
         try {
-          edgeData = await edgeCalc.calculateEdge(game);
+          if (sportDisplay === 'Tennis') {
+            edgeData = await tennisModel.calculateTennisEdge({
+              home_team: game.home_team,
+              away_team: game.away_team,
+              books: tennisModel.booksFromOddsRows(game.h2hRows || [], game.home_team, game.away_team),
+              best_of: BO5_TENNIS_KEYS.has(game.sport) ? 5 : 3,
+              tour: String(game.sport || '').startsWith('tennis_wta') ? 'wta' : 'atp'
+            });
+          } else if (sportDisplay === 'UFC') {
+            edgeData = await ufcModel.computeUfcEdge({
+              home_team: game.home_team,
+              away_team: game.away_team,
+              books: game.h2hRows || [],
+              markets: game.markets
+            });
+          } else if (SHADOW_SPORTS.has(sportDisplay)) {
+            // The remaining shadow sports are the soccer family: three-way
+            // 1X2 with the draw as its own side.
+            edgeData = soccer1x2.calculateSoccer1x2Edges({
+              homeTeam: game.home_team,
+              awayTeam: game.away_team,
+              books: soccer1x2.fromOddsCacheRows(game.h2hRows || [], game.home_team, game.away_team)
+            });
+          } else {
+            edgeData = await edgeCalc.calculateEdge(game);
+          }
           if (edgeData) {
             const edgeSign = edgeData.edge !== null ? (edgeData.edge >= 0 ? '+' : '') + (edgeData.edge * 100).toFixed(1) + '%' : 'N/A';
             console.log(`  📐 Edge: ${edgeSign} on ${edgeData.edgeSide || '?'} (${edgeData.confidence}), home ${(edgeData.homeWinProb * 100).toFixed(1)}% vs implied ${edgeData.impliedHomeProb !== null ? (edgeData.impliedHomeProb * 100).toFixed(1) + '%' : 'N/A'}`);
@@ -906,16 +978,22 @@ async function runPreAnalysis(sportSlugs) {
         // overruled the per-side edge data (e.g., OKC -10.5 chosen over the
         // +18pp Lakers +10.5 cover edge).
         let mathPick = null;
-        const previewOnly = PREVIEW_ONLY_SPORTS.has(sportDisplay);
         // No minimum edge for DISPLAY: a negative best side is a Trap read,
         // 0-2pp is a Skip. The board shows what the math sees either way
         // (Vince: "just because there might not be sharp takes doesn't mean
         // we shouldn't show what we have"). The RECORD gate stays at 2pp in
-        // the auto-save below.
-        const bestSide = (edgeData && !previewOnly) ? edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }) : null;
-        if (previewOnly) console.log(`  Soccer preview-only, no pick published (${game.game_key})`);
+        // the auto-save below, and SHADOW_SPORTS never reach the record at
+        // all. Three-way soccer results carry a draw side the core picker
+        // does not know, so they use the 1X2 picker.
+        const bestSide = edgeData
+          ? (edgeData.edges && 'draw' in edgeData.edges
+              ? soccer1x2.pickBest1x2Side(edgeData, { minEdgePp: -100 })
+              : edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }))
+          : null;
         if (bestSide) {
-          const pickText = buildPickText(bestSide.side, oddsCtx, game);
+          const pickText = bestSide.side === 'draw'
+            ? buildDrawPickText(game)
+            : buildPickText(bestSide.side, oddsCtx, game);
           if (pickText) {
             mathPick = {
               recommended_side: bestSide.side,
@@ -963,7 +1041,9 @@ async function runPreAnalysis(sportSlugs) {
             // Real price of the recommended side at analysis time. The digest
             // lock payload reads this. It must never fall back to a made-up
             // -110, the ledger records it.
-            recommended_odds: resolveOddsForPick(oddsCtx, result.recommended_side) ?? null,
+            recommended_odds: result.recommended_side === 'draw'
+              ? drawPrice(game)
+              : resolveOddsForPick(oddsCtx, result.recommended_side) ?? null,
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
@@ -1029,7 +1109,14 @@ async function runPreAnalysis(sportSlugs) {
             // to 2026-07-23 while the record presentation was reworked.)
             const displayEdgePp = edgeData?.edges?.[result.recommended_side] != null
               ? edgeData.edges[result.recommended_side] * 100 : null;
-            if (result.recommended_pick && displayEdgePp != null && (displayEdgePp >= 2 || displayEdgePp < 0)) {
+            if (SHADOW_SPORTS.has(sportDisplay)) {
+              // Shadow mode: the board shows the read and game_analysis
+              // stores the edges for calibration measurement, but nothing
+              // reaches the graded record until the model proves out.
+              if (displayEdgePp != null) {
+                console.log(`  👻 Shadow (${sportDisplay}): ${displayEdgePp.toFixed(1)}pp stored, no pick published`);
+              }
+            } else if (result.recommended_pick && displayEdgePp != null && (displayEdgePp >= 2 || displayEdgePp < 0)) {
               try {
                 // Derive bet type from the math-chosen side, NOT regex on the
                 // pick text. ML picks include the price ("+310"), which the
