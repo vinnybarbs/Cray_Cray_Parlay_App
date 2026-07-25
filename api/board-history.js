@@ -4,6 +4,7 @@
 // published yesterday and how it actually went, instead of a blank page.
 
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
+const { sportDayISO, daysAgo } = require('../lib/services/sport-day.js');
 
 // Same 1u math as the House Ledger. The two surfaces must never disagree.
 function unitProfit(oddsStr, outcome) {
@@ -20,7 +21,7 @@ module.exports = async function boardHistory(req, res) {
     // Default: the most recent digest day that actually published picks
     // (searching today backward). On a dark-slate evening that's usually
     // today's settled board; on a dark Monday it's Sunday's. Session ids
-    // are keyed on the UTC date.
+    // are keyed on the Eastern game-day, matching pre-analyze-games' writer.
     const requested = String(req.query.date || '').trim();
     let date = /^\d{4}-\d{2}-\d{2}$/.test(requested) ? requested : null;
     if (!date) {
@@ -28,7 +29,7 @@ module.exports = async function boardHistory(req, res) {
       // day with picks (was 8 serial count queries, slow enough that the
       // button felt dead).
       const candidates = Array.from({ length: 8 }, (_, i) =>
-        `auto_digest_${new Date(Date.now() - i * 24 * 3600e3).toISOString().split('T')[0]}`);
+        `auto_digest_${sportDayISO(daysAgo(i))}`);
       const { data: latest } = await supabase
         .from('ai_suggestions')
         .select('session_id')
@@ -36,7 +37,7 @@ module.exports = async function boardHistory(req, res) {
         .order('session_id', { ascending: false })
         .limit(1);
       date = latest?.[0]?.session_id?.replace('auto_digest_', '')
-        || new Date(Date.now() - 24 * 3600e3).toISOString().split('T')[0];
+        || sportDayISO(daysAgo(1));
     }
 
     const { data, error } = await supabase

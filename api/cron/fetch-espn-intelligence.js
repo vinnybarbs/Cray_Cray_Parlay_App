@@ -11,6 +11,7 @@
 
 const { supabase } = require('../../lib/middleware/supabaseAuth');
 const { logger } = require('../../shared/logger');
+const { sportDayCompact, daysAgo } = require('../../lib/services/sport-day.js');
 
 const FETCH_TIMEOUT = 10000;
 
@@ -87,13 +88,9 @@ async function fetchInjuries(sport) {
 
 // Fetch today's and yesterday's scores
 async function fetchRecentScores(sport) {
-  const today = new Date();
-  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
-
-  const dates = [
-    today.toISOString().split('T')[0].replace(/-/g, ''),
-    yesterday.toISOString().split('T')[0].replace(/-/g, '')
-  ];
+  // ESPN's dates= param buckets by US Eastern game-day; the UTC date is
+  // already tomorrow during the US evening slate.
+  const dates = [sportDayCompact(), sportDayCompact(daysAgo(1))];
 
   const allGames = [];
 

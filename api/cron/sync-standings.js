@@ -8,18 +8,19 @@
  */
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
+const { sportDayParts } = require('../../lib/services/sport-day.js');
 
 const ESPN_STANDINGS = 'https://site.api.espn.com/apis/v2/sports';
 
 const SPORT_CONFIGS = {
   NBA:   { path: 'basketball/nba',                        season: () => currentSeason('NBA') },
   NHL:   { path: 'hockey/nhl',                            season: () => currentSeason('NHL') },
-  MLB:   { path: 'baseball/mlb',                          season: () => new Date().getFullYear() },
+  MLB:   { path: 'baseball/mlb',                          season: () => currentSeason('MLB') },
   NFL:   { path: 'football/nfl',                          season: () => currentSeason('NFL') },
   NCAAB: { path: 'basketball/mens-college-basketball',    season: () => currentSeason('NCAAB'), groups: 50 },
   NCAAF: { path: 'football/college-football',             season: () => currentSeason('NCAAF'), groups: 80 },
   EPL:   { path: 'soccer/eng.1',                          season: () => currentSeason('EPL') },
-  MLS:   { path: 'soccer/usa.1',                          season: () => new Date().getFullYear() }
+  MLS:   { path: 'soccer/usa.1',                          season: () => currentSeason('MLS') }
 };
 
 /**
@@ -30,7 +31,8 @@ const SPORT_CONFIGS = {
 function currentSeason(sport) {
   // Use current year for all sports. The current_standings view filters
   // WHERE season = EXTRACT(YEAR FROM CURRENT_DATE), so we must match.
-  return new Date().getFullYear();
+  // Eastern year, so a Dec 31 evening run doesn't flip to next year early.
+  return sportDayParts().year;
 }
 
 function sleep(ms) {

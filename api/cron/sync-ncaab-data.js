@@ -8,6 +8,7 @@
  */
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
+const { sportDayISO, sportDayCompact, sportDayParts, daysAgo } = require('../../lib/services/sport-day.js');
 
 const ESPN_BASE = 'http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
 
@@ -42,13 +43,10 @@ async function syncNCAABData(req, res) {
 
     // ─── 1. Fetch today's + yesterday's scoreboard ───
     console.log('📊 Phase 1: Fetching NCAAB scoreboards...');
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    for (const date of [yesterday, today]) {
+    // Eastern game-days: after 8pm ET the UTC date is already tomorrow,
+    // which used to skip the slate currently being played.
+    for (const dateStr of [sportDayCompact(daysAgo(1)), sportDayCompact()]) {
       try {
-        const dateStr = `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
         const data = await fetchJSON(`${ESPN_BASE}/scoreboard?dates=${dateStr}&limit=100`);
 
         const games = [];
@@ -60,11 +58,9 @@ async function syncNCAABData(req, res) {
           const away = comp.competitors?.find(c => c.homeAway === 'away');
           if (!home || !away) continue;
 
-          const eventDate = new Date(event.date);
-          const dateOnly = `${eventDate.getFullYear()}-${String(eventDate.getMonth() + 1).padStart(2, '0')}-${String(eventDate.getDate()).padStart(2, '0')}`;
+          const dateOnly = sportDayISO(event.date);
 
-          const yr = eventDate.getFullYear();
-          const mo = eventDate.getMonth() + 1;
+          const { year: yr, month: mo } = sportDayParts(event.date);
           const season = mo >= 9 ? `${yr}-${yr + 1}` : `${yr - 1}-${yr}`;
 
           games.push({

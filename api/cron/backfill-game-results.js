@@ -7,6 +7,7 @@
  */
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
+const { sportDayISO, sportDayCompact, sportDayParts, daysAgo } = require('../../lib/services/sport-day.js');
 
 const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
 
@@ -24,14 +25,6 @@ const SPORT_PATHS = {
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function formatDateStr(date) {
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function formatDateISO(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 async function fetchScoreboard(sport, sportPath, dateStr) {
@@ -75,12 +68,11 @@ async function fetchScoreboard(sport, sportPath, dateStr) {
       const awayScore = parseInt(away.score, 10);
       if (isNaN(homeScore) || isNaN(awayScore)) continue;
 
-      const eventDate = new Date(event.date);
-      const dateOnly = formatDateISO(eventDate);
+      // Eastern game-day: an 8pm ET start already has tomorrow's UTC date.
+      const dateOnly = sportDayISO(event.date);
 
       // Derive season from date (e.g., NCAAB 2025-26 season, NBA 2025-26)
-      const year = eventDate.getFullYear();
-      const month = eventDate.getMonth() + 1;
+      const { year, month } = sportDayParts(event.date);
       const season = month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
 
       games.push({
@@ -144,9 +136,7 @@ async function backfillGameResults(req, res) {
       let sportInserted = 0;
 
       for (let d = 0; d < days; d++) {
-        const date = new Date();
-        date.setDate(date.getDate() - d);
-        const dateStr = formatDateStr(date);
+        const dateStr = sportDayCompact(daysAgo(d));
 
         const games = await fetchScoreboard(sport, sportPath, dateStr);
 

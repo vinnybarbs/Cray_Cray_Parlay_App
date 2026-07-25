@@ -14,6 +14,7 @@ const { getClient: getClaude, MODELS, extractJson } = require('../../lib/service
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
+const { sportDayISO } = require('../../lib/services/sport-day.js');
 
 // Map odds_cache sport slugs to display sport names. Tennis (and golf)
 // tournament keys ROTATE weekly and are discovered dynamically by the
@@ -1171,7 +1172,10 @@ async function runPreAnalysis(sportSlugs) {
                 // rows are never touched, and only unstarted games get
                 // analyzed, so the settled bet is always the last version
                 // published before start.
-                const sessionId = `auto_digest_${new Date().toISOString().split('T')[0]}`;
+                // Keyed on the Eastern game-day (board-history reads the same
+                // keys); the UTC date used to roll the session at 5-6pm MT,
+                // mid-slate.
+                const sessionId = `auto_digest_${sportDayISO()}`;
                 const pickPayload = {
                   sport: sportDisplay,
                   bet_type: betType,

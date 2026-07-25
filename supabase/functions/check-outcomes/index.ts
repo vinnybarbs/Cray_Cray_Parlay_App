@@ -13,6 +13,36 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.0';
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// ─── US Eastern game-day helpers ───
+// Ported inline from lib/services/sport-day.js (edge functions can't require
+// Node modules). ESPN's `dates=` param buckets by US Eastern, and a US
+// evening game (8pm ET or later) already carries the NEXT day's UTC date, so
+// toISOString() bucketing misattributes late games.
+const EASTERN_TZ = 'America/New_York';
+
+// en-CA gives YYYY-MM-DD directly; Intl handles EST/EDT transitions.
+const easternDateFmt = new Intl.DateTimeFormat('en-CA', {
+  timeZone: EASTERN_TZ,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+
+/** Eastern game-day as YYYY-MM-DD. */
+function sportDayISO(date: Date = new Date()): string {
+  return easternDateFmt.format(date);
+}
+
+/** Eastern game-day as YYYYMMDD (ESPN `dates=` param format). */
+function sportDayCompact(date: Date = new Date()): string {
+  return sportDayISO(date).replace(/-/g, '');
+}
+
+/** The instant n*24h before `from`. */
+function daysAgo(n: number, from: Date = new Date()): Date {
+  return new Date(from.getTime() - n * 24 * 60 * 60 * 1000);
+}
+
 serve(async (req: Request) => {
   console.log('🔍 Check Outcomes Edge Function triggered');
   
@@ -91,9 +121,8 @@ async function processOutcomes(supabase: any) {
  * Fetch yesterday's games from ESPN Scoreboard API
  */
 async function fetchYesterdaysGames(supabase: any): Promise<number> {
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const dateStr = formatDate(yesterday);
+  // "Yesterday" as an Eastern game-day, matching ESPN's date buckets.
+  const dateStr = sportDayCompact(daysAgo(1));
   
   const sports = ['NFL', 'NBA', 'MLB', 'NHL', 'NCAAB', 'MLS', 'UFC'];
   const baseUrl = 'http://site.api.espn.com/apis/site/v2/sports';
@@ -159,7 +188,8 @@ function parseGames(data: any, sport: string): any[] {
       games.push({
         espn_event_id: event.id,
         sport,
-        date: new Date(event.date).toISOString().split('T')[0],
+        // Eastern game-day: an 8pm ET start already has tomorrow's UTC date.
+        date: sportDayISO(new Date(event.date)),
         home_team_name: homeTeam.team.displayName,
         away_team_name: awayTeam.team.displayName,
         home_score: parseInt(homeTeam.score) || null,
@@ -238,17 +268,22 @@ async function checkAISuggestions(supabase: any) {
  * Check a single suggestion
  */
 async function checkSuggestion(supabase: any, suggestion: any): Promise<boolean> {
-  const gameDate = new Date(suggestion.game_date).toISOString().split('T')[0];
-  
-  // Check game date ±1 day to handle timezone edge cases
-  const gd = new Date(gameDate);
-  const dayBefore = new Date(gd); dayBefore.setDate(gd.getDate() - 1);
-  const dayAfter = new Date(gd); dayAfter.setDate(gd.getDate() + 1);
-  const dates = [
-    dayBefore.toISOString().split('T')[0],
-    gameDate,
-    dayAfter.toISOString().split('T')[0]
-  ];
+  // suggestion.game_date is usually a date-only string that IS already the
+  // game-day bucket — new Date() would read it as midnight UTC (the prior US
+  // evening), so a timezone conversion would shift it back a day. Use
+  // date-only strings verbatim; only genuine timestamps get converted to the
+  // Eastern game-day.
+  const raw = suggestion.game_date;
+  const gameDate = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? raw
+    : sportDayISO(new Date(raw));
+
+  // Check game date ±1 day to handle timezone edge cases (pure calendar
+  // math anchored at UTC noon, immune to the runtime's local timezone).
+  const gd = new Date(`${gameDate}T12:00:00Z`);
+  const dates = [-1, 0, 1].map(off =>
+    new Date(gd.getTime() + off * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  );
 
   const { data: games, error } = await supabase
     .from('game_results')
@@ -328,13 +363,6 @@ function normalizeStatus(status: string): string {
   if (s.includes('scheduled')) return 'scheduled';
   if (s.includes('progress')) return 'in_progress';
   return s;
-}
-
-function formatDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
 }
 
 function sleep(ms: number): Promise<void> {
