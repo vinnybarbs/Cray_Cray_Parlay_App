@@ -26,13 +26,11 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function formatDateStr(date) {
-  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function formatDateISO(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
+// Game days are US Eastern calendar dates (see lib/services/sport-day.js).
+// The old local-getter formatters stamped every 00:00Z+ start (any game
+// from 8pm ET) with the NEXT day's date on a UTC server, which skewed
+// last-N form windows, ATS cutoffs, and freshness ordering downstream.
+const { sportDayISO, sportDayCompact, sportDayParts, daysAgo } = require('../../lib/services/sport-day.js');
 
 async function fetchScoreboard(sport, sportPath, dateStr) {
   try {
@@ -75,12 +73,10 @@ async function fetchScoreboard(sport, sportPath, dateStr) {
       const awayScore = parseInt(away.score, 10);
       if (isNaN(homeScore) || isNaN(awayScore)) continue;
 
-      const eventDate = new Date(event.date);
-      const dateOnly = formatDateISO(eventDate);
+      const dateOnly = sportDayISO(event.date);
 
-      // Derive season from date (e.g., NCAAB 2025-26 season, NBA 2025-26)
-      const year = eventDate.getFullYear();
-      const month = eventDate.getMonth() + 1;
+      // Derive season from the Eastern game day (e.g., NCAAB 2025-26 season)
+      const { year, month } = sportDayParts(event.date);
       const season = month >= 9 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
 
       games.push({
@@ -144,9 +140,8 @@ async function backfillGameResults(req, res) {
       let sportInserted = 0;
 
       for (let d = 0; d < days; d++) {
-        const date = new Date();
-        date.setDate(date.getDate() - d);
-        const dateStr = formatDateStr(date);
+        // ESPN's ?dates= buckets are Eastern days, so walk back in Eastern.
+        const dateStr = sportDayCompact(daysAgo(d));
 
         const games = await fetchScoreboard(sport, sportPath, dateStr);
 
