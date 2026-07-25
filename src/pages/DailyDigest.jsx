@@ -1362,10 +1362,12 @@ export default function DailyDigest({ onBack }) {
     if (!data?.gamesBySport) return c
     for (const games of Object.values(data.gamesBySport)) {
       for (const g of games) {
+        // Traps are detector calls (lure + negative edge), not any tile
+        // whose recommended side happens to be negative.
+        c.traps += Array.isArray(g.trap_calls) ? g.trap_calls.length : 0
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp == null) continue
-        if (pp < 0) c.traps++
-        else if (pp >= 10) c.sharpTakes++
+        if (pp >= 10) c.sharpTakes++
         else if (pp >= 7) c.strongPlays++
         else if (pp >= 4) c.plays++
         else if (pp >= 2) c.leans++
@@ -1679,8 +1681,8 @@ function EdgeLegendModal({ open, onClose }) {
     { range: '7-10pp', label: 'Strong Play', sub: 'hammer it',   cls: 'text-signal-pos font-semibold' },
     { range: '4-7pp',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
     { range: '2-4pp',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
-    { range: '0-2pp',  label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
-    { range: '< 0pp',  label: 'Trap',        sub: 'fade it',     cls: 'text-signal-neg font-semibold' },
+    { range: '-2-2pp', label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
+    { range: 'baited', label: 'Trap',        sub: 'fade it',     cls: 'text-signal-neg font-semibold' },
   ]
 
   return (
@@ -1734,7 +1736,7 @@ function EdgeLegendModal({ open, onClose }) {
 
           <div className="pt-3 border-t border-ink-700">
             <p className="text-ink-300 text-xs leading-relaxed font-mono">
-              Math picks the side. De-Genny narrates. We publish negative edges too. That's why <span className="text-signal-neg">Trap</span> exists.
+              Math picks the side. De-Genny narrates. A <span className="text-signal-neg">Trap</span> is a side the casual bettor wants, priced 2pp or more below fair. We name the bait so you don't take it.
             </p>
           </div>
         </div>

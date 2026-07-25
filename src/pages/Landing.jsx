@@ -1049,7 +1049,7 @@ function Filings() {
   const items = [
     {
       q: 'What\'s a "Trap"?',
-      a: 'A pick with a negative per-side edge, meaning the model thinks the side wins less often than the book\'s line implies. Every other picks app hides these. We label them. "Trap" is the only honest reaction to a bad bet that looks tempting.',
+      a: 'A side the average bettor is drawn to that the model prices at least 2 points below fair. We score the bait (hot streaks, heavy favorites, home teams, juicy plus-money lines, popular Overs) and only call Trap when a tempting side is also a bad price. A bad bet nobody wants isn\'t a trap. A bad bet everybody wants is the product.',
     },
     {
       q: 'Why publish negative edges? Doesn\'t that scare people off?',

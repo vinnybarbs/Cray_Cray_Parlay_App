@@ -14,6 +14,7 @@ const { getClient: getClaude, MODELS, extractJson } = require('../../lib/service
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
+const trapDetector = require('../../lib/services/trap-detector.js');
 
 // Map odds_cache sport slugs to display sport names. Tennis (and golf)
 // tournament keys ROTATE weekly and are discovered dynamically by the
@@ -990,20 +991,29 @@ async function runPreAnalysis(sportSlugs) {
               ? soccer1x2.pickBest1x2Side(edgeData, { minEdgePp: -100 })
               : edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }))
           : null;
+        // Trap detection runs independent of pick selection: a Trap is a
+        // side the casual bettor is drawn to (lure score from chalk,
+        // streaks, home lean, juicy-dog pricing, popular Overs) that the
+        // model prices at -2pp or worse. The mere inverse of a pick is NOT
+        // a trap and no longer gets a callout. See lib/services/trap-detector.js.
+        const trapCalls = trapDetector.detectTraps({
+          edgeData, oddsCtx, game, sport: sportDisplay, rankCtx
+        });
+        if (trapCalls.length > 0) {
+          const t = trapCalls[0];
+          console.log(`  🪤 Trap detected: ${t.side} lure ${t.lure_score} at ${t.edge_pp}pp (${t.signals.map(s => s.key).join(', ')})`);
+        }
+
         // Directional read selection. An actionable pick is the BEST side
-        // at +2pp or better. A Trap is the OVERPRICED side at -2pp or
-        // worse: the read names the side you should not bet, so grading
-        // the fade is honest. Everything between -2 and +2 is a Skip,
-        // board only. Before 2026-07-23 the trap read named the least-bad
-        // side, which was not a directional claim.
+        // at +2pp or better. When no side clears that bar, the strongest
+        // DETECTED trap becomes the read: it names the side you should not
+        // bet, so grading the fade is honest. A negative side with no lure
+        // is a Skip like any other noise, not a trap read. Before
+        // 2026-07-24 the trap read was just the most negative side, which
+        // made every trap the mirror of the board's math.
         let readSide = bestSide;
-        if (bestSide && bestSide.signedEdge * 100 < 2 && edgeData?.edges) {
-          let worst = null;
-          for (const [side, val] of Object.entries(edgeData.edges)) {
-            if (val == null) continue;
-            if (!worst || val < worst.signedEdge) worst = { side, signedEdge: val };
-          }
-          if (worst && worst.signedEdge * 100 <= -2) readSide = worst;
+        if (bestSide && bestSide.signedEdge * 100 < 2 && trapCalls.length > 0) {
+          readSide = { side: trapCalls[0].side, signedEdge: trapCalls[0].edge_pp / 100 };
         }
         if (readSide) {
           const pickText = readSide.side === 'draw'
@@ -1101,7 +1111,11 @@ async function runPreAnalysis(sportSlugs) {
               ...edgeData.factors,
               adjustments: edgeData.adjustments || [],
               confidence: edgeData.confidence || null
-            } : null
+            } : null,
+            // Detector-qualified traps (lure >= threshold AND <= -2pp),
+            // strongest first. The board renders these as their own tiles,
+            // independent of the pick.
+            trap_calls: trapCalls.length > 0 ? trapCalls : null
           };
 
           const { error } = await supabase
@@ -1133,7 +1147,9 @@ async function runPreAnalysis(sportSlugs) {
               if (displayEdgePp != null) {
                 console.log(`  👻 Shadow (${sportDisplay}): ${displayEdgePp.toFixed(1)}pp stored, no pick published`);
               }
-            } else if (result.recommended_pick && displayEdgePp != null && (displayEdgePp >= 2 || displayEdgePp <= -2)) {
+            } else if (result.recommended_pick && displayEdgePp != null
+                       && (displayEdgePp >= 2
+                           || (displayEdgePp <= -2 && trapCalls.some(t => t.side === result.recommended_side)))) {
               try {
                 // Derive bet type from the math-chosen side, NOT regex on the
                 // pick text. ML picks include the price ("+310"), which the
@@ -1193,6 +1209,16 @@ async function runPreAnalysis(sportSlugs) {
                             : isAwayMl ? edgeData?.awayWinProb ?? null : null,
                   implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null
                               : isAwayMl ? edgeData?.impliedAwayProb ?? null : null,
+                  // Trap rows carry their lure evidence so the trap record
+                  // can later be analyzed by signal, not just by edge.
+                  lure_score: (() => {
+                    const t = trapCalls.find(t => t.side === side);
+                    return t ? t.lure_score : null;
+                  })(),
+                  trap_signals: (() => {
+                    const t = trapCalls.find(t => t.side === side);
+                    return t ? t.signals : null;
+                  })(),
                 };
 
                 // ONE row per GAME, across ALL board days, not just today's

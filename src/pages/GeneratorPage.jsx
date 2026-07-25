@@ -31,9 +31,10 @@ function formatOdds(odds) {
 }
 
 // When no side cleared the 2pp pick bar, the edges dict still tells a
-// story: the best available side (usually a Skip) and any genuinely
-// negative side (a Trap to fade). Spotting and explaining traps is the
-// product. A blank "Preview" row throws that away.
+// story: the best available side (usually a Skip). Traps are NOT derived
+// here anymore. A trap is a detector call (lure + negative edge), served
+// as game.trap_calls, and it renders on its own tile in the trap section,
+// never as a red footnote inside a pick tile.
 function sideLabel(side, game) {
   const map = {
     home_ml: `${game.home_team} ML`,
@@ -53,12 +54,7 @@ function edgeStory(game) {
   const toPp = (v) => Math.round(v * 1000) / 10
   const sorted = [...entries].sort((a, b) => b[1] - a[1])
   const story = { bestSide: sorted[0][0], bestPp: toPp(sorted[0][1]) }
-  const [worstSide, worstVal] = sorted[sorted.length - 1]
-  if (toPp(worstVal) <= -2) {
-    story.trapSide = worstSide
-    story.trapPp = toPp(worstVal)
-  }
-  if (story.bestPp === 0 && !story.trapSide) return null
+  if (story.bestPp === 0) return null
   return story
 }
 
@@ -70,7 +66,10 @@ function PickRow({ row, isOpen, onToggle }) {
   const effPp = row.pp != null ? row.pp : story ? story.bestPp : null
   const showBestSide = row.pp == null && story
   const isPreview = effPp == null
-  const tier = edgeTier(effPp)
+  // A negative best side with no detected lure is not a Trap anymore, it
+  // is a game to pass on. Detector-qualified traps render in the trap
+  // section, never as pick rows.
+  const tier = edgeTier(effPp != null && effPp <= -2 ? -1 : effPp)
   const odds = formatOdds(row.odds)
   return (
     <div>
@@ -87,11 +86,6 @@ function PickRow({ row, isOpen, onToggle }) {
             || (showBestSide ? `best side: ${sideLabel(story.bestSide, row.game)}` : `${row.game.away_team} @ ${row.game.home_team}`)}
           {odds && <span className="ml-2 font-mono text-xs text-ink-300">{odds}</span>}
         </div>
-        {story?.trapSide && (
-          <div className="text-xs text-signal-neg truncate font-mono">
-            trap · fade {sideLabel(story.trapSide, row.game)} ({formatPp(story.trapPp)})
-          </div>
-        )}
         <div className="text-xs text-ink-400 truncate">
           {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} @ {row.game.home_team} · below the 2pp pick bar</> : <> · analysis, no graded side</>}
           {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
@@ -115,6 +109,41 @@ function PickRow({ row, isOpen, onToggle }) {
         )}
       </div>
     )}
+    </div>
+  )
+}
+
+// A trap tile is its own thing, not a pick tile in red. It leads with the
+// bait (why the side looks good to a casual bettor) and closes with the
+// math (how overpriced it actually is). That contrast IS the product.
+function TrapRow({ row }) {
+  const t = row.trap
+  const bait = (t.signals || []).map(s => s.label).join(' · ')
+  return (
+    <div className="w-full flex items-center gap-3 px-4 py-3 border-t border-ink-800">
+      <span className="flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider text-signal-neg bg-signal-neg-dim/30 shadow-hairline-neg">
+        Trap
+      </span>
+      <span className="flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums text-signal-neg">
+        {formatPp(t.edge_pp)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold text-ink-100 truncate">
+          {sideLabel(t.side, row.game)}
+        </div>
+        {bait && (
+          <div className="text-xs text-ink-300 truncate">
+            the bait: {bait}
+          </div>
+        )}
+        <div className="text-xs text-ink-400 truncate">
+          {row.sport} · {row.game.away_team} @ {row.game.home_team}
+          {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
+        </div>
+      </div>
+      <span className="flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-signal-neg">
+        fade it
+      </span>
     </div>
   )
 }
@@ -152,16 +181,34 @@ export default function GeneratorPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Flatten gamesBySport into graded pick rows.
+  // Flatten gamesBySport into graded pick rows. Games whose published read
+  // IS a trap (negative pp) belong to the trap section below, not the pick
+  // list, so the same call never renders twice.
   const allRows = useMemo(() => {
     if (!data?.gamesBySport) return []
     const rows = []
     for (const [sport, games] of Object.entries(data.gamesBySport)) {
       for (const g of games) {
-        rows.push({ sport, game: g, pp: edgePpForSide(g.edges, g.recommended_side) })
+        const pp = edgePpForSide(g.edges, g.recommended_side)
+        if (pp != null && pp <= -2) continue
+        rows.push({ sport, game: g, pp })
       }
     }
     return rows.sort((a, b) => (b.pp ?? -999) - (a.pp ?? -999))
+  }, [data])
+
+  // Detector-qualified traps, one tile per call. Sorted by how seductive
+  // the bait is, then by how overpriced the side is.
+  const trapRows = useMemo(() => {
+    if (!data?.gamesBySport) return []
+    const rows = []
+    for (const [sport, games] of Object.entries(data.gamesBySport)) {
+      for (const g of games) {
+        if (!Array.isArray(g.trap_calls)) continue
+        for (const t of g.trap_calls) rows.push({ sport, game: g, trap: t })
+      }
+    }
+    return rows.sort((a, b) => (b.trap.lure_score - a.trap.lure_score) || (a.trap.edge_pp - b.trap.edge_pp))
   }, [data])
 
   const sports = useMemo(() => [...new Set(allRows.map(r => r.sport))], [allRows])
@@ -254,7 +301,7 @@ export default function GeneratorPage() {
         {/* Dark slate. No games on the board at all. Distinct from "your
             filter cleared everything" below: this is the calendar, not the
             filters, and it should never read as an outage. */}
-        {!loading && !error && allRows.length === 0 && (
+        {!loading && !error && allRows.length === 0 && trapRows.length === 0 && (
           <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
             <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
               Slate status
@@ -309,6 +356,24 @@ export default function GeneratorPage() {
                 )
               })
             )}
+          </div>
+        )}
+
+        {/* The trap board. Traps are their own calls with their own tiles:
+            the bait a casual bettor sees, against the price the model sees.
+            Not the inverse of any pick. */}
+        {!loading && !error && trapRows.length > 0 && (
+          <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500">
+              <span className="text-signal-neg">Traps</span>
+              <span>looks like a good bet · isn't</span>
+              <span className="ml-auto flex-shrink-0">{trapRows.filter(r => selectedSports.length === 0 || selectedSports.includes(r.sport)).length} called</span>
+            </div>
+            {trapRows
+              .filter(r => selectedSports.length === 0 || selectedSports.includes(r.sport))
+              .map(r => (
+                <TrapRow key={`${pickIdFor(r.game)}-${r.trap.side}`} row={r} />
+              ))}
           </div>
         )}
 
