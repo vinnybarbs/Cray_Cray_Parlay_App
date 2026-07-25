@@ -1,77 +1,76 @@
 # TODO
 
-Working backlog. Added 2026-07-11 after the calibration and closing-line work
-landed. Target for the business items is NFL season readiness (September).
+Working backlog, rewritten 2026-07-25 to match shipped reality. Target for
+the business items is NFL season readiness (September). History: the 7/11
+version of this file listed the site name (resolved: TrapHawk), the
+generator front end (rebuilt as The Board), and deep-link risk (deep links
+decommissioned with the betslip apparatus). Those are done and gone.
 
-## To revisit (Vince, 2026-07-11)
+## Watching
 
-### 1. Site name
-"Cray Cray for Parlays" carries the degen voice, but the product has moved
-toward math-graded edges, calibration, and published receipts, which is the
-sharp side of the two personas in `.agents/product-marketing-context.md`.
-Decide whether the name still fits the product being sold, and check domain
-and trademark availability for any candidate before attaching to one.
+- UTC day-boundary sweep running in a cloud session (2026-07-25). Follow-up
+  when it lands: one-time repair of historical game_results dates written
+  +1 day for 00:00Z+ starts.
+- Trap detector first live pass (shipped 2026-07-25, commit 1c93553): next
+  pre-analyze writes game_analysis.trap_calls. Review trap volume and lure
+  weights on the Board after a full slate. Calibrate lure weights once ~100
+  settled trap rows exist under the new regime (docs/models/trap-detector.md).
+- Machine parlays 3-8 as of 7/20. Within variance for high-variance builds.
+  Watch, not a bug yet.
 
-### 2. Front end of the initial selection generator
-The interactive pick generator flow (mode selection, suggest-picks output,
-BetslipBuilder handoff) predates the digest-first design and the Sharp-Quant
-look of the Landing and DailyDigest. Review the whole first-run flow for look,
-feel, and speed, and bring it up to the same visual standard. The generator is
-the first thing a trial user touches after signup, so it carries conversion
-weight.
+## Build queue (ranked)
 
-### 3. Deep link reverse engineering risk
-The one-tap betslip deep links into DraftKings and FanDuel are built on
-undocumented URL formats. Assess how likely they are to break or be blocked,
-what the failure looks like to a paying user, and whether the books' terms
-create exposure. Decide on a fallback behavior when a deep link stops working
-(at minimum, copy-the-pick with a plain link to the book).
+1. De-Genny grading-language rewire. api/chat-picks.js and the lib/agents
+   chain still speak confidence-out-of-10 and EASY MONEY/medium/high risk
+   vocab. Rewire suggestions to graded edge data (game_analysis edges) and
+   tier vocabulary. Decide whether the multi-agent coordinator chain
+   survives now that machine parlays are the product.
+2. First CLV report. v_pick_clv has been accumulating since 7/11 and has
+   never been read. Positive clv_pp means the pick beat the close.
+3. UFC settlement path. UFC picks never grade. Must exist before the UFC
+   shadow model can ever be promoted. UFC Spread markets should never
+   generate at all.
+4. Shadow model promotion decisions (UFC, tennis, soccer 1X2) once the
+   daily 150-read checks accumulate enough settled sample.
+5. Polish queue: mobile nav hamburger, accessibility pass (aria-expanded,
+   prefers-reduced-motion, AA contrast), real 1200x630 og:image, promote
+   Sharp Take ROI on the landing hero, delete leftover vercel.json, golf
+   notes reframed as this-week's-form.
 
-### 4. Sports that silently fail
-Inventory and fix every sport that quietly produces nothing today:
-- Tennis and UFC: analyzed but never get edges because the foundational-data
-  guard needs team records/standings that individual sports lack. Wimbledon
-  ran dark in July. Either build an individual-sport data path (rankings,
-  recent match form) or formally drop them from coverage claims.
-- Soccer (EPL and MLS): suspended on purpose via edge_calibration multiplier 0
-  until the model handles three-way (draw) markets. Reactivation is a manual
-  seed change plus a draw-aware edge model.
-- UFC also has no settlement path (its picks never grade), and "UFC Spread"
-  markets should never generate at all.
-The product rule should be that a sport is either on the board with working
-edges and settlement, or it is not claimed as covered. No silent middle.
+## NFL season deadline (September)
 
-## Standing pre-season items
-
-- ~~RLS pass on the exposed public tables~~ DONE 2026-07-11
-  (migration 20260711110000_rls_lockdown.sql: 34 tables locked, ai_suggestions
-  insert/update policies fixed, analytics grants tightened).
-- ~~Enable leaked-password protection in Supabase Auth~~ DONE 2026-07-11
-  (Vince enabled it in the dashboard).
-- Update `seasonal_context` in ai_instructions in late August so NFL pick
+- Late August: update seasonal_context in ai_instructions so NFL pick
   generation turns on in September.
-- Billing. The page sells $19.99/month with a 7-day trial and nothing
-  collects it yet.
-- Week-one NFL check: confirm settlement grades NFL correctly and watch the
-  first Monday `refresh_edge_calibration` runs as NFL builds its own sample
-  (starts at the 0.75 global multiplier until 80 settled picks per market).
-- First CLV report once a week of closing-line data accumulates
-  (`v_pick_clv`, positive clv_pp means the pick beat the close).
+- Week one: confirm settlement grades NFL correctly and watch the Monday
+  refresh_edge_calibration runs as NFL builds its own sample (0.75 global
+  multiplier until 80 settled picks per market).
+- Player prop pick engine. Prop odds already flow into odds_cache via
+  refresh-odds; no pick engine exists post-decom. The big pre-season build.
+- Billing go/no-go. Deferred by decision until the product is loved, but
+  the page sells $19.99/month with a 7-day trial and nothing collects it.
+  Needs a decision before NFL launch.
 
-## From the legal audit (2026-07-11)
+## Founder tasks (Vince only)
 
-- ESPN data migration: DEFERRED by decision (Vince, 2026-07-11). The audit
-  flagged unofficial ESPN endpoints as a blocker before charging money
-  (Disney ToU prohibits commercial use, see audit/60-legal-ip.md). Vince's
-  call: the exposure is contract/ToS risk, not illegality, and the public
-  endpoints stay in the backend for now as an accepted risk. Revisit if a
-  cease-and-desist arrives, an endpoint breaks mid-season, or revenue makes
-  the exposure worth pricing a licensed source (The Odds API scores,
-  SportsDataIO). The reliability risk (endpoints breaking during NFL season)
-  still argues for an eventual migration on engineering grounds.
-- File trademark for the full name "Cray Cray for Parlays" (Class 41, expect
-  a PARLAYS disclaimer) after a one-hour clearance review. Register "The
-  House Ledger" mark alongside.
+- Domain categorization submissions for traphawk.io: Palo Alto
+  (urlfiltering.paloaltonetworks.com, request Sports), Zscaler, Fortinet,
+  Cisco Talos, McAfee/Skyhigh. Do well before September so corporate
+  networks can reach the site. Also allowlist traphawk.io in your own
+  network's DNS filter.
+- TRAPHAWK trademark: one-hour clearance review, then Class 41 ITU filing.
+  Register "The House Ledger" mark alongside.
+- Click "Run now" once on each scheduled task (daily check, Monday weekly
+  review) to pre-approve tools so runs go hands-free.
+- Google OAuth consent-screen rebrand (cosmetic), @traphawk social handles.
+- Answer: what is the untracked "Colorado Rockies/" folder in the repo?
+
+## Parked by explicit decision
+
+- ESPN data migration: accepted ToS/contract risk (Vince, 7/11). Revisit
+  only if an endpoint breaks, a C&D arrives, or revenue justifies a licensed
+  source (The Odds API scores, SportsDataIO).
+- Instagram pipeline: playbook in audit/50-marketing-instagram.md, sequenced
+  after product work.
 - Trade-secret hygiene checklist from audit/60: NDAs with DTSA notice,
   access controls, dated internal description of the secret, IP assignment
   in contractor agreements. Never publish model internals.
