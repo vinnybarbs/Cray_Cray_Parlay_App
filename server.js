@@ -4,19 +4,13 @@ require('dotenv').config(); // This will load .env if .env.local doesn't exist
 
 const express = require('express');
 const cors = require('cors');
-const generateParlayHandler = require('./api/generate-parlay');
-const { suggestPicksHandler } = require('./api/suggest-picks');
 const { logger } = require('./shared/logger');
-const { parlayRateLimiter, generalRateLimiter } = require('./lib/middleware/rateLimiter');
-const { validateParlayRequest, sanitizeInput } = require('./lib/middleware/validation');
+const { generalRateLimiter } = require('./lib/middleware/rateLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
 const path = require('path');
-
-// Progress tracking for SSE
-const progressClients = new Map(); // requestId -> [response objects]
 
 // Enhanced CORS for deployment
 app.use(cors({
@@ -276,99 +270,14 @@ app.get('/debug/supabase', (req, res) => {
 //   // await refreshOddsModule(req, res);
 // });
 
-// SSE endpoint for real-time progress updates
-app.get('/api/generate-parlay-stream/:requestId', (req, res) => {
-  const { requestId } = req.params;
-  
-  console.log(`🔌 SSE Client connected: ${requestId}`);
-  
-  // Set SSE headers
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.flushHeaders(); // Flush headers immediately
-  
-  // Add this client to the progress tracking
-  if (!progressClients.has(requestId)) {
-    progressClients.set(requestId, []);
-  }
-  progressClients.get(requestId).push(res);
-  
-  // Send initial connection message
-  res.write(`data: ${JSON.stringify({ type: 'connected', requestId })}\n\n`);
-  console.log(`✅ SSE Client registered: ${requestId} (${progressClients.get(requestId).length} clients)`);
-  
-  // Clean up on client disconnect
-  req.on('close', () => {
-    const clients = progressClients.get(requestId);
-    if (clients) {
-      const index = clients.indexOf(res);
-      if (index > -1) clients.splice(index, 1);
-      if (clients.length === 0) progressClients.delete(requestId);
-    }
-  });
-});
-
-// Helper function to emit progress to all connected clients
-global.emitProgress = (requestId, phase, status, details = {}) => {
-  const clients = progressClients.get(requestId);
-  if (!clients || clients.length === 0) return;
-  
-  const message = JSON.stringify({ 
-    type: 'progress',
-    phase,      // 'odds', 'research', 'analysis'
-    status,     // 'active', 'complete'
-    details,    // optional: { gameCount, researchCount, etc }
-    timestamp: Date.now()
-  });
-  
-  clients.forEach(client => {
-    try {
-      client.write(`data: ${message}\n\n`);
-    } catch (err) {
-      // Client disconnected
-    }
-  });
-};
-
-// Helper to emit completion and close connections
-global.emitComplete = (requestId) => {
-  const clients = progressClients.get(requestId);
-  if (!clients) return;
-  
-  const message = JSON.stringify({ type: 'complete', timestamp: Date.now() });
-  clients.forEach(client => {
-    try {
-      client.write(`data: ${message}\n\n`);
-      client.end();
-    } catch (err) {
-      // Already closed
-    }
-  });
-  
-  progressClients.delete(requestId);
-};
-
-// Apply stricter rate limiting and validation to parlay generation
-app.post('/api/generate-parlay', 
-  parlayRateLimiter.middleware(),
-  sanitizeInput,
-  validateParlayRequest,
-  generateParlayHandler
-);
+// The legacy multi-agent generator (/api/generate-parlay, /api/suggest-picks,
+// and their SSE progress stream) was retired 2026-07-28. The pick engine is
+// the pre-analyze-games cron pipeline; recover the old stack from git history
+// if it's ever needed again.
 
 // Chat-based AI pick generator
 const { chatPicksHandler } = require('./api/chat-picks');
 app.post('/api/chat-picks', generalRateLimiter.middleware(), chatPicksHandler);
-
-// Add suggest-picks endpoint for pick builder
-app.post('/api/suggest-picks',
-  parlayRateLimiter.middleware(),
-  sanitizeInput,
-  validateParlayRequest,
-  suggestPicksHandler
-);
 
 // Removed test endpoint for player props validation
 // const testPlayerProps = require('./api/test-player-props');

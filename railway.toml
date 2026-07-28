@@ -5,7 +5,7 @@ buildCommand = "npm install && npm run build"
 [deploy]
 startCommand = "npm start"
 
-# Daily sync at 6 AM PT (14:00 UTC)
-[[crons]]
-schedule = "0 14 * * *"
-command = "node scripts/populate-apisports.js"
+# No Railway crons. All scheduled work runs through pg_cron in Supabase —
+# see docs/PIPELINE.md for the full inventory. (The old daily
+# populate-apisports.js cron was removed 2026-07-28: API-Sports is banned
+# from this stack.)
