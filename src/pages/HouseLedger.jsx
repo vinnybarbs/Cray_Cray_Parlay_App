@@ -46,42 +46,6 @@ function OutcomeChip({ outcome, tier }) {
   return <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider ${m.cls}`}>{m.label}</span>
 }
 
-function ParlayCard({ parlay }) {
-  const legs = Array.isArray(parlay.legs) ? parlay.legs : []
-  const odds = parlay.combined_odds > 0 ? `+${parlay.combined_odds}` : String(parlay.combined_odds)
-  return (
-    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
-      <div className="flex items-center gap-3 mb-3">
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">
-          {fmtDate(parlay.parlay_date)} · {parlay.legs_count}-leg machine build
-        </span>
-        <span className="ml-auto font-mono text-sm font-bold tabular-nums text-ink-100">{odds}</span>
-        <OutcomeChip outcome={parlay.status} />
-      </div>
-      <div className="space-y-1.5">
-        {legs.map((leg, i) => (
-          <div key={i} className="flex items-center gap-2 text-xs">
-            <span className="font-mono text-ink-500 w-4 flex-shrink-0">{i + 1}.</span>
-            <span className="text-ink-100 font-medium truncate">{leg.pick}</span>
-            <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(leg.odds)}</span>
-            <span className="font-mono text-signal-pos/80 flex-shrink-0 tabular-nums">+{Number(leg.edge_pp).toFixed(1)}pp</span>
-            <span className="ml-auto text-ink-500 flex-shrink-0">{leg.sport}</span>
-          </div>
-        ))}
-      </div>
-      <div className="mt-3 pt-2 border-t border-ink-800 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
-        {parlay.model_win_prob != null ? (
-          <>model {(Number(parlay.model_win_prob) * 100).toFixed(1)}% to hit · fair {(Number(parlay.fair_win_prob) * 100).toFixed(1)}% · edge +{Number(parlay.combined_edge_pp).toFixed(1)}pp</>
-        ) : (
-          <>combined edge +{Number(parlay.combined_edge_pp).toFixed(1)}pp</>
-        )}
-        {' '}· published {fmtDateTime(parlay.created_at)}
-        {parlay.settled_at && <> · settled {fmtDateTime(parlay.settled_at)}</>}
-      </div>
-    </div>
-  )
-}
-
 export default function HouseLedger() {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
@@ -267,28 +231,33 @@ export default function HouseLedger() {
               </div>
             )}
 
-            {/* Machine-built parlays */}
-            {data.parlays?.length > 0 && (
-              <div>
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Machine-built parlays</h2>
-                {(() => {
-                  const settled = data.parlays.filter(p => p.status === 'won' || p.status === 'lost')
-                  const won = settled.filter(p => p.status === 'won').length
-                  if (settled.length === 0) return null
-                  return (
-                    <p className="font-mono text-xs text-ink-300 mb-1 tabular-nums">
-                      Parlay record: <span className="font-bold text-ink-100">{won}-{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own, never mixed into the pick record
-                    </p>
-                  )
-                })()}
-                <p className="text-sm text-ink-300 mb-4 max-w-2xl">
-                  Parlays the machine assembles from its own highest-edge legs, cross-game only, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
+            {/* Machine-built parlays — pulled from the board while the builder
+                is retooled. The settled record stays visible (receipts never
+                get deleted), but no new builds are shown until the combo model
+                earns its way back. Restore ParlayCard from git history when it
+                does. */}
+            <div>
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Machine-built parlays</h2>
+              {(() => {
+                const settled = (data.parlays || []).filter(p => p.status === 'won' || p.status === 'lost')
+                const won = settled.filter(p => p.status === 'won').length
+                if (settled.length === 0) return null
+                return (
+                  <p className="font-mono text-xs text-ink-300 mb-1 tabular-nums">
+                    Parlay record: <span className="font-bold text-ink-100">{won}-{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own, never mixed into the pick record
+                  </p>
+                )
+              })()}
+              <div className="bg-ink-900 rounded-sharp border border-dashed border-ink-700 p-6 text-center max-w-2xl">
+                <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 mb-2">Benched</p>
+                <p className="text-sm text-ink-200 leading-relaxed">
+                  We pulled machine-built parlays off the board. The combo record wasn't good enough to publish, and we don't dress that up. The record above stays, losers included. Builds return when the model earns it.
                 </p>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {data.parlays.map(p => <ParlayCard key={p.id} parlay={p} />)}
-                </div>
+                <p className="text-xs text-ink-500 mt-2">
+                  Every individual leg still settles as a pick in the record above.
+                </p>
               </div>
-            )}
+            </div>
 
             {/* Open picks, the publish-before-start proof */}
             {data.openPicks?.length > 0 && (

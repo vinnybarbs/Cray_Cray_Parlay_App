@@ -507,11 +507,11 @@ function ExecutionFlow() {
     },
     {
       n: '03',
-      title: 'The machine builds the parlays',
-      body: 'Cross-game combos assembled from the highest-edge legs, published before the games and settled publicly after, win or lose. We never hold money or see your account.',
+      title: 'Every pick settles in public',
+      body: 'Published before the games, settled on The House Ledger after, win or lose. Losers stay on the record. We never hold money or see your account.',
       meta: [
-        ['// builds',  '2-leg + 3-leg daily · 4pp floor'],
         ['// receipt', 'settled on The House Ledger'],
+        ['// record',  'losers included, always'],
         ['// holds',   'we hold nothing'],
       ],
     },
@@ -965,7 +965,6 @@ function TermSheet({ onStartTrial }) {
     'Per-side edges, signed and tier-graded',
     'Negative edges visible (Trap label)',
     'De-Genny chat for picks on demand',
-    'Machine-built parlays · published and settled on The House Ledger',
     'Settlement tracking · every pick graded after the game',
     'Hit rate by tier and sport · refreshed after every settlement',
   ]

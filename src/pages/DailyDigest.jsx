@@ -752,8 +752,10 @@ function InjurySection({ content }) {
 
 // ─── SportSection ────────────────────────────────────────────────────────────
 
-function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch, upcomingCount }) {
-  const [expanded, setExpanded] = useState(isDefaultExpanded)
+function SportSection({ sport, games, injuries, onDeepResearch, upcomingCount }) {
+  // Every sport starts minimized: the collapsed 3-pick preview is the scan
+  // surface, and the whole preview (not just the header arrow) expands it.
+  const [expanded, setExpanded] = useState(false)
   const meta = getSportMeta(sport)
 
   // Split games by whether the math returned an actionable pick. "On the
@@ -810,9 +812,16 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         </div>
       </button>
 
-      {/* Collapsed preview, top 3 actionable picks as compact rows */}
+      {/* Collapsed preview, top 3 actionable picks as compact rows. The whole
+          preview is tappable to expand, same as the header arrow. */}
       {!expanded && topGames.length > 0 && (
-        <div className="px-6 py-3 space-y-2">
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setExpanded(true)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(true) } }}
+          className="px-6 py-3 space-y-2 cursor-pointer hover:bg-ink-850/50 transition-colors"
+        >
           {topGames.map((game, i) => {
             const pp = ppFor(game)
             const tier = edgeTier(pp)
@@ -830,9 +839,9 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               </div>
             )
           })}
-          {pickGames.length > 3 && (
-            <p className="font-mono text-[10px] text-ink-500 text-center pt-1 uppercase tracking-[0.14em]">Tap to see all {pickGames.length} picks</p>
-          )}
+          <p className="font-mono text-[10px] text-ink-500 text-center pt-1 uppercase tracking-[0.14em]">
+            {pickGames.length > 3 ? `Tap to see all ${pickGames.length} picks` : 'Tap to expand'}
+          </p>
         </div>
       )}
 
@@ -1597,13 +1606,12 @@ export default function DailyDigest({ onBack }) {
                 </p>
               </div>
             ) : (
-              sportSections.map(([sport, games], i) => (
+              sportSections.map(([sport, games]) => (
                 <SportSection
                   key={sport}
                   sport={sport}
                   games={games}
                   injuries={data.injuries}
-                  isDefaultExpanded={i === 0}
                   onDeepResearch={handleOpenDeepResearch}
                   upcomingCount={data.upcomingCounts?.[sport] || 0}
                 />
@@ -1714,6 +1722,18 @@ function EdgeLegendModal({ open, onClose }) {
             </p>
             <p className="text-ink-300 text-xs leading-relaxed mt-2 font-mono">
               Example: <span className="tabular-nums text-signal-pos">+6.2pp</span> on a Strong Play means the model thinks that side wins 6.2 percentage points more often than the −110 line implies.
+            </p>
+          </div>
+
+          <div>
+            <div className="font-mono text-[10px] text-signal-pos uppercase tracking-[0.18em] mb-1.5">
+              What feeds the number
+            </div>
+            <p className="text-ink-200 text-sm leading-relaxed">
+              Each side's win probability blends <span className="text-signal-pos font-semibold">11 weighted signals</span>: season record, recent form, strength of schedule, home advantage, home/road venue splits, win streaks, playoff seeding, injury impact, sport-specific scoring distributions, devigged prices from live books, and calibration multipliers tuned on our own settled picks.
+            </p>
+            <p className="text-ink-300 text-xs leading-relaxed mt-2 font-mono">
+              Every signal is weighted and capped per sport, and the net move from baseline is capped at ±15%, so no single hot streak or headline can hijack the number. Tennis, UFC, and soccer run their own dedicated models.
             </p>
           </div>
 
