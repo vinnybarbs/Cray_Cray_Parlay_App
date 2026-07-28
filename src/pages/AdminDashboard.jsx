@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 import { API_BASE_URL as API_BASE } from '../config'
+import SignOutButton from '../components/SignOutButton'
 
 // ─── Utility helpers ──────────────────────────────────────────────────────────
 
@@ -684,6 +685,7 @@ export default function AdminDashboard({ onBack }) {
                 </>
               ) : 'Refresh'}
             </button>
+            <SignOutButton />
           </div>
         </div>
       </div>

@@ -82,7 +82,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
       <style>{TERMINAL_CSS}</style>
       <Ticker />
       <Nav onStartTrial={onStartTrial} onSignIn={onSignIn} scrollTo={scrollTo} />
-      <Hero stats={stats} sharpTake={sharpTake} onStartTrial={onStartTrial} onSignIn={onSignIn} onSeePick={scrollTo('snapshot')} />
+      <Hero stats={stats} sharpTake={sharpTake} tierStats={tierStats} onStartTrial={onStartTrial} onSignIn={onSignIn} onSeePick={scrollTo('snapshot')} />
       <EdgeScorecard />
       <ExecutionFlow />
       <SnapshotTerminal tierStats={tierStats} />
@@ -245,15 +245,26 @@ function Nav({ onStartTrial, onSignIn, scrollTo }) {
 
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
-function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
+function Hero({ stats, sharpTake, tierStats, onStartTrial, onSignIn, onSeePick }) {
   const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : '-'
   const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : '1,000+'
-  // The claim almost nobody else can make with receipts: top-tier picks,
-  // all-time record with ROI, straight from the settlement ledger. The API
-  // only sends it once the sample passes 100 decided picks, and it renders
-  // whatever the ledger says, good or bad.
-  const sharpTakeDisplay = sharpTake
-    ? `${sharpTake.hitRate}%${sharpTake.roiPct != null ? ` · ${sharpTake.roiPct >= 0 ? '+' : ''}${sharpTake.roiPct}% ROI` : ''}`
+
+  // The headline number is the last-30d Sharp Take rate, from the SAME
+  // per-tier rollup the receipts table below renders. Two different Sharp
+  // Take percentages on one page (all-time up top, 30d in the table) read
+  // as a contradiction no label fully repairs, and the Sharp Takes are the
+  // money. Same ≥25-settled floor as the table so the windows stay honest.
+  const sharp30 = (tierStats || []).find(t => t.tier === 'Sharp Take')
+  const sharp30Settled = sharp30 ? (sharp30.wins || 0) + (sharp30.losses || 0) : 0
+  const sharp30Row = sharp30Settled >= 25
+    ? { rate: parseFloat(sharp30.hitRate), settled: sharp30Settled }
+    : null
+
+  // All-time Sharp Take keeps only its ROI claim here (the API gates it on a
+  // 100-decided sample). Its hit rate is deliberately NOT shown, so the 30d
+  // number above is the only Sharp Take percentage on the page.
+  const roiDisplay = sharpTake?.roiPct != null
+    ? `${sharpTake.roiPct >= 0 ? '+' : ''}${sharpTake.roiPct}% ROI`
     : null
 
   return (
@@ -325,18 +336,31 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
                 <span className="text-[9px] uppercase tracking-[0.18em] text-signal-pos">LIVE</span>
               </span>
             </div>
-            {/* Every row states its own window and population. This panel
-                mixes a 30-day all-tier rate with an all-time Sharp Take
-                rate, and unlabeled they read as one contradictory number
-                (57.5 vs 64.2). All rows come from the same rollup,
-                mv_public_record, just different buckets. */}
+            {/* Sharp Take leads and gets the big type: it's the money tier,
+                and its number here is the SAME 30d figure as the receipts
+                table below, so the page never shows two conflicting Sharp
+                Take percentages. The all-tier rate demotes to a supporting
+                row. All rows come from the same rollup, mv_public_record. */}
             <dl className="divide-y divide-ink-800">
-              <StatRow label="Hit rate · all tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
-              {sharpTakeDisplay && (
+              {sharp30Row ? (
+                <>
+                  <StatRow
+                    label={`Sharp Take · last 30d (${sharp30Row.settled.toLocaleString()} settled)`}
+                    value={`${sharp30Row.rate}%`}
+                    tone={sharp30Row.rate >= 55 ? 'pos' : sharp30Row.rate >= 50 ? 'neutral' : 'neg'}
+                    big
+                  />
+                  <StatRow label="All tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} small />
+                </>
+              ) : (
+                <StatRow label="Hit rate · all tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
+              )}
+              {roiDisplay && (
                 <StatRow
-                  label={`Sharp Take only · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
-                  value={sharpTakeDisplay}
-                  tone={sharpTake.hitRate >= 55 ? 'pos' : sharpTake.hitRate >= 50 ? 'neutral' : 'neg'}
+                  label={`Sharp Take ROI · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
+                  value={roiDisplay}
+                  tone={sharpTake.roiPct >= 0 ? 'pos' : 'neg'}
+                  small
                 />
               )}
               <StatRow label="Picks graded · last 30d" value={weeklyCount} tone="neutral" />

@@ -4,6 +4,7 @@ import { edgeTier, formatPp, edgePpForSide } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
+import SignOutButton from '../components/SignOutButton'
 
 const SPORT_META = {
   NBA:   { emoji: '🏀', label: 'NBA' },
@@ -1472,6 +1473,7 @@ export default function DailyDigest({ onBack }) {
         >
           {loading ? '...' : '↻ Refresh'}
         </button>
+        <SignOutButton />
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">

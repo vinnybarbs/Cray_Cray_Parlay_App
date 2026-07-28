@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../contexts/AuthContext'
 
 import { API_BASE_URL as API_BASE } from '../config'
+import SignOutButton from '../components/SignOutButton'
 
 function StatCard({ label, value, sub, color = 'yellow' }) {
   const colorMap = {
@@ -252,13 +253,16 @@ export default function ResultsPage({ onBack }) {
         <h1 className="font-mono text-sm font-semibold uppercase tracking-[0.14em] text-ink-100">
           Track Record
         </h1>
-        <button
-          onClick={triggerSettlement}
-          className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 hover:text-signal-pos transition-colors"
-          title="Manually run the settlement check on pending bets"
-        >
-          ↻ Settle
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={triggerSettlement}
+            className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 hover:text-signal-pos transition-colors"
+            title="Manually run the settlement check on pending bets"
+          >
+            ↻ Settle
+          </button>
+          <SignOutButton />
+        </div>
       </header>
 
       {/* Tabs, a terminal-style segmented control matching MarketTabs */}

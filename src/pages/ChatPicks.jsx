@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 
 import { API_BASE_URL as API_BASE } from '../config'
+import SignOutButton from '../components/SignOutButton'
 
 const STARTERS = [
   "What NCAAB games are on tonight?",
@@ -105,9 +106,10 @@ export default function ChatPicks({ onBack }) {
         >
           &larr;
         </button>
-        <h1 className="flex-1 text-center text-base font-bold text-signal-pos pr-10">
+        <h1 className="flex-1 text-center text-base font-bold text-signal-pos">
           Try asking De-Genny anything!
         </h1>
+        <SignOutButton />
       </header>
 
       {/* Messages - scrollable area */}

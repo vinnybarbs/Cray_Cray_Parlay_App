@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { edgeTier, tierRange, TIERS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
+import SignOutButton from '../components/SignOutButton'
 
 // The House Ledger is the public, append-only settlement record. This page is
 // the product's proof asset and its FTC substantiation surface at the same
@@ -88,6 +89,7 @@ export default function HouseLedger() {
         >
           Home
         </button>
+        <SignOutButton />
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">

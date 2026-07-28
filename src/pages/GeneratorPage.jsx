@@ -5,6 +5,7 @@ import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tier
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
+import SignOutButton from '../components/SignOutButton'
 
 // The Board, "give me picks for the sports I choose", rebuilt as a filtered
 // view of the same graded edge-tier data the digest serves (audit 40 §3).
@@ -120,7 +121,7 @@ function PickRow({ row, isOpen, onToggle }) {
 }
 
 export default function GeneratorPage() {
-  const { isAuthenticated, signOut } = useAuth()
+  const { isAuthenticated } = useAuth()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -191,7 +192,7 @@ export default function GeneratorPage() {
           <button onClick={() => navigate('/chat')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">De-Genny</button>
           <button onClick={() => navigate('/results')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Results</button>
           <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
-          <button onClick={signOut} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Sign out</button>
+          <SignOutButton />
         </div>
       </div>
 
