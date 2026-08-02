@@ -32,6 +32,7 @@ API roles stripped from RPC functions.
 |---|---|---|
 | refresh-odds-hourly | */20 | refresh odds_cache (name is historical) |
 | sync-standings | :30 every 2h | ESPN standings, the season-record source of truth; must lead the analyses |
+| sync-tennis-data | :05 every 4h | ESPN ATP/WTA rankings + completed singles results into tennis_rankings / tennis_match_results; feeds the tennis pre-analysis context (runs 20 min before pre-analyze-Tennis); self-backfills 21 days when the results table is empty |
 | pre-analyze-mlb (and per-sport peers) | :45 every 3h | math picks edges (devig baselines + calibration multipliers), LLM narrates, writes game_analysis + ai_suggestions with edge snapshot (pipeline_version 6) |
 | settlement | trigger on game_results + 06:15 safety | grades picks, refreshes MV |
 | capture_closing_lines | */15 | snapshot odds for games starting within 90 min (CLV) |
