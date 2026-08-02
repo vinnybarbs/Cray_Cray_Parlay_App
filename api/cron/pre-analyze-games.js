@@ -10,7 +10,7 @@ const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
-const { getClient: getClaude, MODELS, extractJson } = require('../../lib/services/claude.js');
+const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson } = require('../../lib/services/claude.js');
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
@@ -676,7 +676,7 @@ CRITICAL RULES:
 - NEVER name a tournament round or stage (final, semifinal, third-place match,
   quarterfinal) unless the matchup data or news above EXPLICITLY states it for
   THIS game. Calling a third-place playoff "the final" destroys credibility.
-- WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas.
+- ${WRITING_STYLE}
 
 Respond in EXACTLY this JSON format (no markdown):
 {

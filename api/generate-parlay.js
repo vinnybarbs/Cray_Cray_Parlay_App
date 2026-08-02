@@ -1,5 +1,6 @@
 // Multi-Agent Parlay Generation API
 const { MultiAgentCoordinator } = require('../lib/agents/coordinator');
+const { WRITING_STYLE } = require('../lib/services/claude');
 const { SPORT_SLUGS, MARKET_MAPPING, BOOKMAKER_MAPPING } = require('../shared/constants');
 const { calculateParlay } = require('../shared/oddsCalculations');
 const { createLogger } = require('../shared/logger');
@@ -237,7 +238,7 @@ ${marketAvailabilityNote}
 8. If you take a team on the moneyline, do not repeat that team against the spread as another leg
 9. Do NOT repeat the same exact bet as multiple legs
 10. Work with whatever markets are available. Do not complain about missing data
-11. WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas
+11. ${WRITING_STYLE}
 
 ${oddsContext}
 

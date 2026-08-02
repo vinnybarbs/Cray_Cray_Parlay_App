@@ -185,9 +185,8 @@ async function runGolfAnalysis() {
           return `- ${bits.join(' | ')}`;
         }).join('\n');
 
+        // Writing style is injected by complete() at the system level.
         const prompt = `You are a golf betting researcher writing one tight note per player for the ${tournamentName}. Use ONLY the data below. Never invent results, stats, rankings, or injuries. If all you have is the price, write what the market is saying about them at that price.
-
-WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas.
 
 ${lines}
 
