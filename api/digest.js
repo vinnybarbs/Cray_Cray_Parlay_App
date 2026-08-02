@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../shared/logger');
+const { getTennisContext } = require('../lib/services/tennis-data');
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -453,6 +454,14 @@ async function deepResearch(req, res) {
       }));
     });
 
+    // 4b. Tennis: player rankings, recent results, workload, and H2H from
+    // the tennis tables. The team-sport sections below (news_cache injuries,
+    // game_results form) have no tennis rows, so without this the modal
+    // rendered only odds for tennis matches.
+    const tennisResult = sport === 'Tennis'
+      ? await safeQuery(() => getTennisContext(supabase, home_team, away_team))
+      : null;
+
     // 5. Last 5 games for each team from game_results
     const [homeResultsResult, awayResultsResult] = await Promise.all([
       safeQuery(async () => {
@@ -489,6 +498,7 @@ async function deepResearch(req, res) {
       odds: oddsResult || [],
       homeTeamResults: homeResultsResult || [],
       awayTeamResults: awayResultsResult || [],
+      tennis: tennisResult || null,
     });
   } catch (err) {
     logger.error('Deep research endpoint error', { error: err.message, game_key });

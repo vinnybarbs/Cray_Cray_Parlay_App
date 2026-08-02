@@ -620,6 +620,11 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
   // is the structural fix for the "LLM picks the wrong side because of
   // narrative" problem (e.g., OKC -10.5 picked over Lakers +10.5 despite a
   // +18pp model edge on the Lakers side).
+  // Every verdict gets the SAME analytical depth. Skips and Traps used to be
+  // told "2-3 sentences", which threw away research we'd already paid to
+  // gather and made most tiles read thin (Vince: "we do the work and have
+  // the data, so why wouldn't I have it on the site"). Only the verdict
+  // framing differs between branches now, never the depth.
   const edgePpForPrompt = mathPick ? mathPick.signedEdge * 100 : null;
   const pickBlock = mathPick && edgePpForPrompt >= 2
     ? `\nOUR MODEL'S PICK (fixed, do not change):
@@ -633,18 +638,24 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
     : mathPick && edgePpForPrompt < 0
     ? `\nOUR MODEL'S READ (display only, this is NOT a bet):
   Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp, which is NEGATIVE.
-  Every side of this game is priced worse than fair. This is a TRAP: explain
-  in 2-3 sentences why the market has this game priced tight or why the
-  popular side is overvalued. Advise staying away. Never call it a pick.\n`
+  Every side of this game is priced worse than fair. This is a TRAP. Write
+  the same full 3-5 sentence analysis of the matchup as you would for a
+  pick, citing the records, form, and factors above, then explain why the
+  market has this game priced tight or why the popular side is overvalued,
+  and advise staying away. Never call it a pick.\n`
     : mathPick
     ? `\nOUR MODEL'S READ (display only, this is NOT a bet):
   Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp, below our 2pp betting floor.
-  Write a 2-3 sentence read on the matchup and say plainly that the value
-  isn't there. This is a SKIP. Never call it a pick.\n`
-    : `\nOUR MODEL HAS NO EDGE DATA on this game. Your job is to write a 2-3
-  sentence preview from the matchup data above. Do not recommend a pick, do
-  not mention edges, thresholds, or implied probabilities. Just preview the
-  matchup like a knowledgeable fan would.\n`;
+  This is a SKIP, but the reader still gets the full breakdown. Write the
+  same full 3-5 sentence analysis of the matchup as you would for a pick,
+  citing the records, form, and factors above, then say plainly that the
+  market is priced about right and the value isn't there. Never call it a
+  pick.\n`
+    : `\nOUR MODEL HAS NO EDGE DATA on this game. Write the same full 3-5
+  sentence analysis of the matchup as you would for any other game, citing
+  the records, form, and factors above like an expert handicapper. Do not
+  recommend a pick, do not mention edges, thresholds, or implied
+  probabilities.\n`;
 
   const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Justify our model's pick using the data below.
 ${refinementBlock}

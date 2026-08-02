@@ -481,6 +481,81 @@ function DeepResearchModal({ gameKey, game, onClose }) {
               </div>
             )
           })()}
+
+          {/* Tennis player form: rank, 30-day record, workload, recent
+              matches, H2H. Sourced from tennis_rankings/tennis_match_results,
+              the team-sport sections above are always empty for tennis. */}
+          {(() => {
+            const tennis = data?.tennis
+            if (!tennis) return null
+            const players = [tennis.home, tennis.away].filter(Boolean)
+            const hasAny = players.some(p => p.rank != null || (p.recentLines || []).length > 0)
+            if (!hasAny) return null
+
+            const renderPlayer = (p) => (
+              <div key={p.key}>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs text-ink-200 font-medium truncate">{p.name}</span>
+                  {p.rank != null && (
+                    <span className="flex-shrink-0 text-[10px] font-mono bg-ink-800 text-ink-200 rounded px-1.5 py-0.5 tabular-nums">
+                      {(p.tour || '').toUpperCase()} #{p.rank}
+                    </span>
+                  )}
+                </div>
+                {(p.record30d || p.matchesLast14 > 0) && (
+                  <div className="text-[11px] text-ink-400 font-mono tabular-nums mb-1.5">
+                    {p.record30d && <span>Last 30d: {p.record30d}</span>}
+                    {p.record30d && p.matchesLast14 > 0 && <span className="text-ink-600"> · </span>}
+                    {p.matchesLast14 > 0 && (
+                      <span className={p.matchesLast14 >= 5 ? 'text-orange-400' : ''}>
+                        {p.matchesLast14} match{p.matchesLast14 !== 1 ? 'es' : ''} in 14d{p.matchesLast14 >= 5 ? ' · heavy load' : ''}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {(p.recentLines || []).length > 0 ? (
+                  <div className="space-y-1">
+                    {p.recentLines.map((line, i) => (
+                      <div key={i} className="flex items-start gap-2 text-xs">
+                        <span className={`px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${
+                          line.startsWith('W') ? 'bg-green-900 text-green-300' : 'bg-signal-neg-dim text-signal-neg'
+                        }`}>
+                          {line.startsWith('W') ? 'W' : 'L'}
+                        </span>
+                        <span className="text-ink-300 leading-snug">{line.replace(/^[WL] /, '')}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-ink-500 italic">No recent results stored.</p>
+                )}
+              </div>
+            )
+
+            const h2h = tennis.h2h || []
+            const homeWins = h2h.filter(m => m.winner_key === tennis.home?.key).length
+            const awayWins = h2h.length - homeWins
+            const leader = homeWins >= awayWins ? tennis.home : tennis.away
+            const h2hRecord = homeWins >= awayWins ? `${homeWins}-${awayWins}` : `${awayWins}-${homeWins}`
+
+            return (
+              <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
+                <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-3">Player Form</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {players.map(renderPlayer)}
+                </div>
+                <div className="mt-3 pt-3 border-t border-ink-700 text-xs text-ink-300">
+                  {h2h.length > 0 ? (
+                    <span>Head-to-head: <span className="text-ink-100 font-medium">{leader?.name}</span> leads {h2hRecord}
+                      {h2h[0]?.score && <span className="text-ink-400"> · last meeting {h2h[0].winner_name} won {h2h[0].score}</span>}
+                    </span>
+                  ) : (
+                    <span className="text-ink-400">Head-to-head: no prior meeting in stored results.</span>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
       </div>
