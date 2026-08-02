@@ -8,7 +8,7 @@ const { logger } = require('../shared/logger');
 const { supabase } = require('../lib/middleware/supabaseAuth');
 const aiInstructions = require('../lib/services/ai-instructions');
 const pickGrader = require('../lib/services/pick-grader');
-const { getClient: getClaude, complete, MODELS } = require('../lib/services/claude');
+const { getClient: getClaude, complete, MODELS, WRITING_STYLE } = require('../lib/services/claude');
 
 // Tool definitions the model can call to query our database (legacy
 // chat-completions shape; converted to Anthropic tool shape below).
@@ -732,7 +732,7 @@ WHAT YOU MUST NEVER DO:
 - Say "Team X is on a 7-game winning streak" unless get_recent_scores showed 7 consecutive wins
 - Invent any statistic. If unsure, call another tool or say "my data doesn't show that"
 
-WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas.
+${WRITING_STYLE}
 
 Keep it punchy. For entertainment only. Gamble responsibly.`;
 

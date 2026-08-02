@@ -440,6 +440,10 @@ app.post('/cron/probe-data-sources', probeDataSources);
 const syncStandings = require('./api/cron/sync-standings');
 app.post('/cron/sync-standings', syncStandings);
 
+// Sync ATP/WTA rankings + recent match results from ESPN (tennis pre-match context)
+const syncTennisData = require('./api/cron/sync-tennis-data');
+app.post('/cron/sync-tennis-data', syncTennisData);
+
 // Add cron endpoint to pre-analyze upcoming games with GPT-4o-mini
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);

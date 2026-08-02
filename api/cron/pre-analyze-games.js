@@ -10,8 +10,9 @@ const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
-const { getClient: getClaude, MODELS, extractJson } = require('../../lib/services/claude.js');
+const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson } = require('../../lib/services/claude.js');
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
+const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
@@ -493,7 +494,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
  * Generate AI analysis for a single game. Returns the analysis fields on
  * success, or { error } on failure so the caller can log the real reason.
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null) {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null, tennisCtx = null) {
   const sportDisplay = slugToSport(game.sport) || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -528,6 +529,12 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
 
   if (homeTrend) contextParts.push(`${game.home_team} last ${homeTrend.games.length}: ${homeTrend.record} (${homeTrend.games.join('; ')})`);
   if (awayTrend) contextParts.push(`${game.away_team} last ${awayTrend.games.length}: ${awayTrend.record} (${awayTrend.games.join('; ')})`);
+
+  // Tennis: rankings, recent results, workload, and H2H from the tennis
+  // tables (sync-tennis-data cron). The team-sport context fetchers above
+  // all read tables with no tennis rows, so without this block a tennis
+  // prompt carried only odds and every card said "records not available".
+  if (tennisCtx) contextParts.push(tennisCtx);
 
   if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
@@ -613,6 +620,11 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
   // is the structural fix for the "LLM picks the wrong side because of
   // narrative" problem (e.g., OKC -10.5 picked over Lakers +10.5 despite a
   // +18pp model edge on the Lakers side).
+  // Every verdict gets the SAME analytical depth. Skips and Traps used to be
+  // told "2-3 sentences", which threw away research we'd already paid to
+  // gather and made most tiles read thin (Vince: "we do the work and have
+  // the data, so why wouldn't I have it on the site"). Only the verdict
+  // framing differs between branches now, never the depth.
   const edgePpForPrompt = mathPick ? mathPick.signedEdge * 100 : null;
   const pickBlock = mathPick && edgePpForPrompt >= 2
     ? `\nOUR MODEL'S PICK (fixed, do not change):
@@ -626,18 +638,24 @@ YOUR TASK: Compare the current data above to your prior analysis. What changed?
     : mathPick && edgePpForPrompt < 0
     ? `\nOUR MODEL'S READ (display only, this is NOT a bet):
   Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp, which is NEGATIVE.
-  Every side of this game is priced worse than fair. This is a TRAP: explain
-  in 2-3 sentences why the market has this game priced tight or why the
-  popular side is overvalued. Advise staying away. Never call it a pick.\n`
+  Every side of this game is priced worse than fair. This is a TRAP. Write
+  the same full 3-5 sentence analysis of the matchup as you would for a
+  pick, citing the records, form, and factors above, then explain why the
+  market has this game priced tight or why the popular side is overvalued,
+  and advise staying away. Never call it a pick.\n`
     : mathPick
     ? `\nOUR MODEL'S READ (display only, this is NOT a bet):
   Best available side: ${mathPick.recommended_pick} at ${edgePpForPrompt.toFixed(1)}pp, below our 2pp betting floor.
-  Write a 2-3 sentence read on the matchup and say plainly that the value
-  isn't there. This is a SKIP. Never call it a pick.\n`
-    : `\nOUR MODEL HAS NO EDGE DATA on this game. Your job is to write a 2-3
-  sentence preview from the matchup data above. Do not recommend a pick, do
-  not mention edges, thresholds, or implied probabilities. Just preview the
-  matchup like a knowledgeable fan would.\n`;
+  This is a SKIP, but the reader still gets the full breakdown. Write the
+  same full 3-5 sentence analysis of the matchup as you would for a pick,
+  citing the records, form, and factors above, then say plainly that the
+  market is priced about right and the value isn't there. Never call it a
+  pick.\n`
+    : `\nOUR MODEL HAS NO EDGE DATA on this game. Write the same full 3-5
+  sentence analysis of the matchup as you would for any other game, citing
+  the records, form, and factors above like an expert handicapper. Do not
+  recommend a pick, do not mention edges, thresholds, or implied
+  probabilities.\n`;
 
   const prompt = `${playbook ? playbook + '\n\n---\n\n' : ''}You are a sharp sports betting analyst writing for a premium picks service. Justify our model's pick using the data below.
 ${refinementBlock}
@@ -658,7 +676,7 @@ CRITICAL RULES:
 - NEVER name a tournament round or stage (final, semifinal, third-place match,
   quarterfinal) unless the matchup data or news above EXPLICITLY states it for
   THIS game. Calling a third-place playoff "the final" destroys credibility.
-- WRITING STYLE: Plain punctuation only. Never use em dashes, en dashes, or semicolons in your output. Use periods and commas.
+- ${WRITING_STYLE}
 
 Respond in EXACTLY this JSON format (no markdown):
 {
@@ -910,22 +928,40 @@ async function runPreAnalysis(sportSlugs) {
         // semifinal preview. News + web-verified intel only.
         const NATIONAL_TEAM_SPORTS = new Set(['World Cup', 'Euros', 'Copa America']);
         const nationalTeams = NATIONAL_TEAM_SPORTS.has(sportDisplay);
+        // Tennis skips every team-sport fetcher: standings, injuries,
+        // game_results, and player_game_stats have no tennis rows, and the
+        // surname-based mascot matching can only produce false positives
+        // ("Fernandez" matching a Nets assistant coach). Tennis context
+        // comes from the tennis tables instead.
+        const isTennis = sportDisplay === 'Tennis';
+        const skipTeamCtx = nationalTeams || isTennis;
         const emptyRankCtx = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
 
         // Fetch context in parallel: DB queries + news
-        const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx] = await Promise.all([
+        const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx, tennisData] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
-          nationalTeams ? null : getInjuryContext(game.home_team, game.away_team),
-          nationalTeams ? Promise.resolve(emptyRankCtx) : getRankingsContext(game.home_team, game.away_team),
-          nationalTeams ? null : getRecentResults(game.home_team, game.sport),
-          nationalTeams ? null : getRecentResults(game.away_team, game.sport),
+          skipTeamCtx ? null : getInjuryContext(game.home_team, game.away_team),
+          skipTeamCtx ? Promise.resolve(emptyRankCtx) : getRankingsContext(game.home_team, game.away_team),
+          skipTeamCtx ? null : getRecentResults(game.home_team, game.sport),
+          skipTeamCtx ? null : getRecentResults(game.away_team, game.sport),
           getPastAccuracy(game.sport),
-          nationalTeams ? null : getPlayerStatsContext(game.home_team, game.away_team, game.sport),
+          skipTeamCtx ? null : getPlayerStatsContext(game.home_team, game.away_team, game.sport),
           // Web-verified injuries/weather/record warnings from the data
           // integrity agent (empty string when no fresh intel exists).
-          getIntelContext(supabase, game.home_team, game.away_team)
+          getIntelContext(supabase, game.home_team, game.away_team),
+          isTennis ? getTennisContext(supabase, game.home_team, game.away_team) : null
         ]);
         const newsCtx = `${newsCtxRaw || ''}${intelCtx || ''}` || null;
+        const tennisCtx = isTennis ? formatTennisContext(tennisData) : null;
+        if (isTennis) {
+          // Surface tour rank and 30-day match record through the standard
+          // rank/record storage fields so tiles and the digest show them.
+          // The prompt gets the precise wording via tennisCtx, so the
+          // "season record" prompt lines stay suppressed (rankCtx records
+          // stay null until after analyzeGame runs).
+          if (tennisData?.home?.rank != null) rankCtx.home_rank = tennisData.home.rank;
+          if (tennisData?.away?.rank != null) rankCtx.away_rank = tennisData.away.rank;
+        }
 
         // Get prior analysis for refinement loop
         const prior = priorAnalysisMap[game.game_key] || null;
@@ -1032,7 +1068,16 @@ async function runPreAnalysis(sportSlugs) {
           console.log(`  ⚪ No-edge game, every market < +2pp`);
         }
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick);
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx);
+
+        // After the prompt is built: expose the tennis 30-day match record
+        // through the stored record fields (tiles/digest), without letting
+        // the prompt mislabel it as a season record. The prompt already got
+        // the precisely-worded version inside tennisCtx.
+        if (isTennis) {
+          if (tennisData?.home?.record30d) rankCtx.home_record = tennisData.home.record30d;
+          if (tennisData?.away?.record30d) rankCtx.away_record = tennisData.away.record30d;
+        }
 
         if (!result || result.error) {
           const reason = result?.error || 'AI returned null';
