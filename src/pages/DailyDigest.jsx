@@ -725,8 +725,14 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           <EdgeChip signedPp={signedPp} />
         </div>
 
-        {/* Recommended pick */}
-        {game.recommended_pick ? (
+        {/* Recommended read. A trap read (negative edge) must never render
+            in pick-green: the text names the side NOT to bet. */}
+        {game.recommended_pick && signedPp != null && signedPp <= -2 ? (
+          <div className="bg-signal-neg-dim/30 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-signal-neg/40">
+            <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">Trap · fade this side</div>
+            <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+          </div>
+        ) : game.recommended_pick ? (
           <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
             <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick</div>
             <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
@@ -788,6 +794,58 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
   )
 }
 
+// ─── TrapCard ────────────────────────────────────────────────────────────────
+// One tile per detector trap call, independent of the game's pick tile. The
+// trap names the side the casual bettor is drawn to (lure signals) that the
+// model prices 2pp or more below fair. Fading it is the advice.
+
+function TrapCard({ game, trap, gameKey, onDeepResearch }) {
+  const side = trap.side
+  const baitText = sidePickText(game, side)
+  const edgePp = trap.edge_pp != null ? Number(trap.edge_pp) : edgePpForSide(game.edges, side)
+  const signals = Array.isArray(trap.signals) ? trap.signals : []
+
+  return (
+    <div className="bg-ink-900 rounded-sharp overflow-hidden flex flex-col border border-signal-neg/40 shadow-hairline">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-signal-neg-dim/30 border-b border-signal-neg/30">
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal-neg font-semibold">🪤 Trap</span>
+        <span className="font-mono text-[11px] text-signal-neg tabular-nums font-semibold">{edgePp != null ? `${edgePp.toFixed(1)}pp` : ''}</span>
+      </div>
+      <div className="p-4 flex-1">
+        <div className="font-mono font-medium text-ink-100 text-sm leading-tight tracking-tight mb-0.5">
+          {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
+        </div>
+        {game.game_date && (
+          <div className="font-mono text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
+        )}
+        <div className="bg-signal-neg-dim/20 rounded-sharp px-3 py-2 mb-3 border border-signal-neg/30">
+          <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">The bait · fade it</div>
+          <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{baitText || side}</div>
+        </div>
+        {signals.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {signals.map((s, i) => (
+              <span key={i} className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-ink-850 text-ink-300 shadow-hairline">
+                {s.label || s.key}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {gameKey && (
+        <div className="px-4 pb-4 pt-0">
+          <button
+            onClick={() => onDeepResearch(game, gameKey)}
+            className="w-full py-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-300 hover:text-ink-100 bg-ink-850 hover:bg-ink-800 rounded-sharp shadow-hairline transition-all active:scale-[0.98]"
+          >
+            <span className="text-signal-neg">+</span> Research
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── InjurySection ──────────────────────────────────────────────────────────
 
 function InjurySection({ content }) {
@@ -833,11 +891,16 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 
   // Split games by whether the math returned an actionable pick. "On the
   // bubble" surfaces games where the model considered the matchup but every
-  // market sat below the +2pp threshold, kept visible (so users see we're
-  // not forcing picks) but separated from the actionable list.
+  // market sat below the +2pp threshold. Every graded game renders: the
+  // work is done and the data exists, so the user gets it all (Vince,
+  // 2026-08-02). Traps are detector calls rendered as their OWN tiles,
+  // independent of the pick, since one game can carry both.
   const ppFor = (g) => edgePpForSide(g.edges, g.recommended_side)
   const pickGames = games.filter(g => g.recommended_pick && (ppFor(g) ?? 0) >= 2)
   const bubbleGames = games.filter(g => !pickGames.includes(g))
+  const trapEntries = games.flatMap(g =>
+    (Array.isArray(g.trap_calls) ? g.trap_calls : []).map(trap => ({ game: g, trap }))
+  )
 
   // Top 3 actionable picks for the collapsed preview / top tile grid.
   const topGames = pickGames.slice(0, 3)
@@ -865,7 +928,9 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             <div className="min-w-0">
               <h2 className="font-mono text-base font-semibold text-ink-100 uppercase tracking-[0.06em]">{meta.label}</h2>
               <p className="font-mono text-[11px] text-ink-400 tabular-nums">
-                {pickGames.length} pick{pickGames.length !== 1 ? 's' : ''}
+                {games.length} graded
+                <span className="text-ink-500"> · {pickGames.length} pick{pickGames.length !== 1 ? 's' : ''}</span>
+                {trapEntries.length > 0 && <span className="text-signal-neg"> · {trapEntries.length} trap{trapEntries.length !== 1 ? 's' : ''}</span>}
                 {bubbleGames.length > 0 && <span className="text-ink-500"> · {bubbleGames.length} on the bubble</span>}
                 {upcomingCount > 0 && <span className="text-ink-500"> · {upcomingCount} next 24h</span>}
                 {!expanded && topSignedPp != null && (
@@ -961,14 +1026,37 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             </div>
           )}
 
-          {/* On the bubble, games we analyzed but didn't recommend */}
+          {/* Traps: detector calls rendered as their own highlighted tiles,
+              independent of the pick grid. Knowing what NOT to bet is half
+              the product, so these never hide behind a collapsed section. */}
+          {trapEntries.length > 0 && (
+            <div className="mt-6">
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal-neg mb-3 font-medium">
+                Traps · the bait the public wants
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {trapEntries.map(({ game, trap }, i) => (
+                  <TrapCard
+                    key={`${game.home_team}-${game.away_team}-trap-${i}`}
+                    game={game}
+                    trap={trap}
+                    gameKey={getGameKey(game)}
+                    onDeepResearch={onDeepResearch}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Every other graded game, open by default: the research exists
+              for all of them, so all of them show. */}
           {bubbleGames.length > 0 && (
-            <details className="mt-6 group">
+            <details className="mt-6 group" open>
               <summary className="cursor-pointer list-none flex items-center gap-2 select-none">
                 <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 font-medium">
                   On the bubble
                 </span>
-                <span className="font-mono text-[10px] text-ink-500 tabular-nums">{bubbleGames.length} game{bubbleGames.length !== 1 ? 's' : ''} · model has no edge</span>
+                <span className="font-mono text-[10px] text-ink-500 tabular-nums">{bubbleGames.length} more graded game{bubbleGames.length !== 1 ? 's' : ''} · below the 2pp pick floor</span>
                 <span className="ml-auto text-ink-400 text-xs group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

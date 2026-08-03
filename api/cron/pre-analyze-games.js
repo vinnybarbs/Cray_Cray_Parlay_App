@@ -199,6 +199,77 @@ function drawPrice(game) {
   return draw && draw.price != null ? draw.price : null;
 }
 
+// Bet type + line from the math-chosen side, NOT regex on the pick text.
+// ML picks include the price ("+310"), which the old regex misclassified
+// as a Spread. Shared by pick and trap publication.
+function deriveBetTypeAndPoint(side, oddsCtx) {
+  if (side === 'home_spread' || side === 'away_spread') {
+    return {
+      betType: 'Spread',
+      point: oddsCtx.spread != null
+        ? (side === 'away_spread' ? -oddsCtx.spread : oddsCtx.spread)
+        : null,
+    };
+  }
+  if (side === 'over' || side === 'under') {
+    return { betType: 'Total', point: oddsCtx.total ?? null };
+  }
+  return { betType: 'Moneyline', point: null };
+}
+
+/**
+ * ONE row per GAME per domain, across ALL board days. A refinement pass
+ * REVISES the newest pending row (pick, odds, even the market can change
+ * while the line moves) instead of inserting a sibling: 4 re-picks of the
+ * same loser used to count as 4 losses. created_at stays the FIRST publish
+ * time (the receipts stamp); last_revised_at tracks the final pre-game
+ * version. Settled rows are never touched.
+ *
+ * Picks and traps are SEPARATE domains: a trap call and a pick can coexist
+ * on one game (trap on one side, value on another), so a trap must never
+ * revise a pick row or vice versa. The partial unique index
+ * uq_ai_suggestions_auto_digest_game keys on session_id, which differs
+ * between the two domains (auto_digest_ vs auto_digest_trap_).
+ */
+async function upsertDailySuggestion(game, payload, sessionId, { trapDomain = false } = {}) {
+  let query = supabase
+    .from('ai_suggestions')
+    .select('id, actual_outcome')
+    .like('session_id', 'auto_digest%')
+    .eq('home_team', game.home_team)
+    .eq('away_team', game.away_team)
+    .eq('game_date', game.game_date);
+  query = trapDomain
+    ? query.eq('tier', 'Trap')
+    : query.or('tier.neq.Trap,tier.is.null');
+  const { data: existingRows } = await query
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const existing = existingRows?.[0] || null;
+
+  if (existing && existing.actual_outcome !== 'pending') {
+    return { status: 'settled' };
+  }
+  if (existing) {
+    const { error } = await supabase
+      .from('ai_suggestions')
+      .update({ ...payload, last_revised_at: new Date().toISOString() })
+      .eq('id', existing.id);
+    return { status: error ? 'error' : 'revised', error };
+  }
+  const { error } = await supabase
+    .from('ai_suggestions')
+    .insert({
+      session_id: sessionId,
+      home_team: game.home_team,
+      away_team: game.away_team,
+      game_date: game.game_date,
+      actual_outcome: 'pending',
+      ...payload,
+    });
+  return { status: error ? 'error' : 'published', error };
+}
+
 /**
  * Get relevant news snippets for a game's teams.
  *
@@ -1175,14 +1246,13 @@ async function runPreAnalysis(sportSlugs) {
             totalPromptTokens += result.prompt_tokens || 0;
             totalCompletionTokens += result.completion_tokens || 0;
 
-            // Publish to the RECORD at Lean or better (>= 2pp), and publish
-            // Trap reads (the named side at -2pp or worse) too. Traps are
-            // the product's namesake and get graded on their own separate
-            // record, where the named side losing means the call was
-            // right. Only Skip (the -2 to +2 noise band) stays
-            // display-only: it carries no read in either direction. (Trap
-            // publication was paused 2026-07-10 to 2026-07-23 while the
-            // record presentation was reworked.)
+            // Publication. Picks (>= +2pp) and traps (detector calls at
+            // <= -2pp with real lure) publish INDEPENDENTLY: a game can
+            // carry both a pick on one side and a trap on another, and
+            // 40 straight MLB trap calls died unpublished between 7/23 and
+            // 8/2 because the trap only published when it was the game's
+            // ONLY read. Only Skip (the -2 to +2 noise band) stays
+            // display-only: it carries no read in either direction.
             const displayEdgePp = edgeData?.edges?.[result.recommended_side] != null
               ? edgeData.edges[result.recommended_side] * 100 : null;
             if (SHADOW_SPORTS.has(sportDisplay)) {
@@ -1192,26 +1262,11 @@ async function runPreAnalysis(sportSlugs) {
               if (displayEdgePp != null) {
                 console.log(`  👻 Shadow (${sportDisplay}): ${displayEdgePp.toFixed(1)}pp stored, no pick published`);
               }
-            } else if (result.recommended_pick && displayEdgePp != null
-                       && (displayEdgePp >= 2
-                           || (displayEdgePp <= -2 && trapCalls.some(t => t.side === result.recommended_side)))) {
+            } else {
+              if (result.recommended_pick && displayEdgePp != null && displayEdgePp >= 2) {
               try {
-                // Derive bet type from the math-chosen side, NOT regex on the
-                // pick text. ML picks include the price ("+310"), which the
-                // old regex misclassified as a Spread.
-                let betType = 'Moneyline';
-                let point = null;
                 const side = result.recommended_side;
-                if (side === 'home_spread' || side === 'away_spread') {
-                  betType = 'Spread';
-                  point = oddsCtx.spread != null
-                    ? (side === 'away_spread' ? -oddsCtx.spread : oddsCtx.spread)
-                    : null;
-                } else if (side === 'over' || side === 'under') {
-                  betType = 'Total';
-                  point = oddsCtx.total ?? null;
-                }
-
+                const { betType, point } = deriveBetTypeAndPoint(side, oddsCtx);
                 const pickOdds = formatAmericanOdds(resolveOddsForPick(oddsCtx, result.recommended_side));
 
                 // Snapshot the edge that justified this pick. The analysis
@@ -1223,15 +1278,6 @@ async function runPreAnalysis(sportSlugs) {
                 const isHomeMl = side === 'home_ml';
                 const isAwayMl = side === 'away_ml';
 
-                // ONE settled bet per game per day. A refinement pass REVISES
-                // the day's row (pick, odds, even the market can change while
-                // the line moves) instead of inserting a sibling. 4 re-picks
-                // of the same loser used to count as 4 losses. created_at
-                // stays the FIRST publish time (the receipts stamp);
-                // last_revised_at tracks the final pre-game version. Settled
-                // rows are never touched, and only unstarted games get
-                // analyzed, so the settled bet is always the last version
-                // published before start.
                 const sessionId = `auto_digest_${new Date().toISOString().split('T')[0]}`;
                 const pickPayload = {
                   sport: sportDisplay,
@@ -1266,52 +1312,74 @@ async function runPreAnalysis(sportSlugs) {
                   })(),
                 };
 
-                // ONE row per GAME, across ALL board days, not just today's
-                // session. A game analyzed on each of the 2-3 days it sits
-                // on the board used to get a fresh row per daily session,
-                // so one loss settled as two or three (Angels @ Cardinals
-                // 2026-07-20 landed at +101 Sharp Take AND -108 Strong
-                // Play). Search any auto_digest session for this exact
-                // game and revise the newest pending row instead. Matching
-                // on exact game_date keeps doubleheaders separate.
-                const { data: existingPicks } = await supabase
-                  .from('ai_suggestions')
-                  .select('id, actual_outcome')
-                  .like('session_id', 'auto_digest%')
-                  .eq('home_team', game.home_team)
-                  .eq('away_team', game.away_team)
-                  .eq('game_date', game.game_date)
-                  .order('created_at', { ascending: false })
-                  .limit(1);
-                const existingPick = existingPicks?.[0] || null;
-
-                let sugErr = null;
-                if (existingPick && existingPick.actual_outcome !== 'pending') {
+                const saved = await upsertDailySuggestion(game, pickPayload, sessionId, { trapDomain: false });
+                if (saved.status === 'settled') {
                   console.log(`  Pick already settled for ${game.game_key}, not revising`);
-                } else if (existingPick) {
-                  ({ error: sugErr } = await supabase
-                    .from('ai_suggestions')
-                    .update({ ...pickPayload, last_revised_at: new Date().toISOString() })
-                    .eq('id', existingPick.id));
-                  if (!sugErr) console.log(`  ✏️ Revised day's pick: ${result.recommended_pick} (${sportDisplay})`);
+                } else if (saved.error) {
+                  console.warn(`  Auto-save pick result: ${saved.error.message}`);
                 } else {
-                  ({ error: sugErr } = await supabase
-                    .from('ai_suggestions')
-                    .insert({
-                      session_id: sessionId,
-                      home_team: game.home_team,
-                      away_team: game.away_team,
-                      game_date: game.game_date,
-                      actual_outcome: 'pending',
-                      ...pickPayload,
-                    }));
-                  if (!sugErr) console.log(`  ✅ Published pick: ${result.recommended_pick} (${sportDisplay})`);
-                }
-                if (sugErr) {
-                  console.warn(`  Auto-save pick result: ${sugErr.message}`);
+                  console.log(`  ${saved.status === 'revised' ? '✏️ Revised' : '✅ Published'} pick: ${result.recommended_pick} (${sportDisplay})`);
                 }
               } catch (e) {
                 console.error(`  ❌ Auto-save exception: ${e.message}`);
+              }
+              }
+
+              // Trap publication, independent of the pick above. The
+              // strongest detector call publishes to its own domain
+              // (session auto_digest_trap_, tier Trap) so the Trap Record
+              // grades live even when the same game also has a pick.
+              if (trapCalls.length > 0) {
+                try {
+                  const t = trapCalls[0];
+                  const tPickText = t.side === 'draw'
+                    ? buildDrawPickText(game)
+                    : buildPickText(t.side, oddsCtx, game);
+                  const tOddsRaw = t.side === 'draw'
+                    ? drawPrice(game)
+                    : resolveOddsForPick(oddsCtx, t.side);
+                  const tEdge = edgeData?.edges?.[t.side]
+                    ?? (t.edge_pp != null ? t.edge_pp / 100 : null);
+                  const tEdgeRaw = edgeData?.edgesRaw?.[t.side] ?? tEdge;
+                  const tEdgePp = tEdge != null ? Math.round(tEdge * 1000) / 10 : null;
+                  const tTier = pickGrader.edgeTier(tEdgePp);
+
+                  if (tPickText && tEdgePp != null && tTier === 'Trap') {
+                    const { betType, point } = deriveBetTypeAndPoint(t.side, oddsCtx);
+                    const trapPayload = {
+                      sport: sportDisplay,
+                      bet_type: betType,
+                      pick: tPickText,
+                      point: point,
+                      odds: formatAmericanOdds(tOddsRaw),
+                      confidence: Math.min(10, Math.max(1, Math.round(Math.abs(tEdgePp)))),
+                      reasoning: `Trap call: ${tPickText} is the bait (lure ${t.lure_score}: ${(t.signals || []).map(s => s.key).join(', ')}). ${result.analysis_snippet || ''}`.trim(),
+                      risk_level: 'Medium',
+                      generate_mode: 'auto_digest',
+                      pipeline_version: 6,
+                      edge_pp: tEdgePp,
+                      edge_pp_raw: tEdgeRaw != null ? Math.round(tEdgeRaw * 1000) / 10 : null,
+                      tier: tTier,
+                      model_prob: t.side === 'home_ml' ? edgeData?.homeWinProb ?? null
+                                : t.side === 'away_ml' ? edgeData?.awayWinProb ?? null : null,
+                      implied_prob: t.side === 'home_ml' ? edgeData?.impliedHomeProb ?? null
+                                  : t.side === 'away_ml' ? edgeData?.impliedAwayProb ?? null : null,
+                      lure_score: t.lure_score,
+                      trap_signals: t.signals || null,
+                    };
+                    const trapSessionId = `auto_digest_trap_${new Date().toISOString().split('T')[0]}`;
+                    const saved = await upsertDailySuggestion(game, trapPayload, trapSessionId, { trapDomain: true });
+                    if (saved.status === 'settled') {
+                      console.log(`  Trap already settled for ${game.game_key}, not revising`);
+                    } else if (saved.error) {
+                      console.warn(`  Trap-save result: ${saved.error.message}`);
+                    } else {
+                      console.log(`  ${saved.status === 'revised' ? '✏️ Revised' : '🪤 Published'} trap: ${tPickText} (${sportDisplay}, ${tEdgePp}pp)`);
+                    }
+                  }
+                } catch (e) {
+                  console.error(`  ❌ Trap-save exception: ${e.message}`);
+                }
               }
             }
           }
