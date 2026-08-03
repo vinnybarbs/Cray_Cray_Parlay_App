@@ -119,6 +119,9 @@ async function getDigest(req, res) {
         .select('sport, actual_outcome, pick, home_team, away_team, bet_type, resolved_at')
         .gt('resolved_at', cutoff)
         .in('actual_outcome', ['won', 'lost'])
+        // Traps grade on an inverted win condition (named side losing is a
+        // correct call), so counting them here would misstate recent results.
+        .or('tier.neq.Trap,tier.is.null')
         .order('resolved_at', { ascending: false });
 
       if (error) throw error;

@@ -134,8 +134,15 @@ async function getPublicLedger(req, res) {
     // appear nowhere on the site. Soccer returns as v2 with a real
     // three-way model.
     const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
-    const nonSoccer = finalVersionOnly(settledPicks).filter(r => !SOCCER_SPORTS.has(r.sport));
-    const openUnique = finalVersionOnly(openPicks);
+    // Dedupe picks and traps SEPARATELY. Traps publish independently of
+    // picks (same game can carry both), so a game-level dedupe would drop
+    // whichever row revised earlier. Mirrors mv_public_record v3.
+    const dedupeByDomain = (rows) => [
+      ...finalVersionOnly(rows.filter(r => r.tier !== 'Trap')),
+      ...finalVersionOnly(rows.filter(r => r.tier === 'Trap')),
+    ];
+    const nonSoccer = dedupeByDomain(settledPicks).filter(r => !SOCCER_SPORTS.has(r.sport));
+    const openUnique = dedupeByDomain(openPicks);
 
     // The public record begins at the graded era (2026-05-10, when edge
     // grading went live). Ungraded picks before that were development
