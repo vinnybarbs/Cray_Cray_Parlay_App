@@ -41,7 +41,7 @@ async function getDigest(req, res) {
       const { data, error } = await supabase
         .from('game_analysis')
         .select(
-          'game_key, home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, recommended_odds, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, sport, analysis_version, edge_movement, what_changed, edges, trap_calls, model_used'
+          'game_key, home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, recommended_odds, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, sport, analysis_version, edge_movement, what_changed, edges, trap_calls, calc_home_prob, calc_away_prob, model_used'
         )
         .eq('stale', false)
         .gt('expires_at', new Date().toISOString())
@@ -119,9 +119,10 @@ async function getDigest(req, res) {
         .select('sport, actual_outcome, pick, home_team, away_team, bet_type, resolved_at')
         .gt('resolved_at', cutoff)
         .in('actual_outcome', ['won', 'lost'])
-        // Traps grade on an inverted win condition (named side losing is a
-        // correct call), so counting them here would misstate recent results.
-        .or('tier.neq.Trap,tier.is.null')
+        // Traps grade inverted (named side losing is a correct call) and
+        // Legs are tracked material, not bets. Counting either here would
+        // misstate recent results.
+        .or('tier.not.in.("Trap","Leg"),tier.is.null')
         .order('resolved_at', { ascending: false });
 
       if (error) throw error;

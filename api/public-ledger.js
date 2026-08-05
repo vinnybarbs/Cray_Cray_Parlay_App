@@ -134,12 +134,14 @@ async function getPublicLedger(req, res) {
     // appear nowhere on the site. Soccer returns as v2 with a real
     // three-way model.
     const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
-    // Dedupe picks and traps SEPARATELY. Traps publish independently of
-    // picks (same game can carry both), so a game-level dedupe would drop
-    // whichever row revised earlier. Mirrors mv_public_record v3.
+    // Dedupe picks, traps, and legs SEPARATELY. All three publish
+    // independently (same game can carry all three), so a game-level
+    // dedupe would drop whichever rows revised earlier. Mirrors
+    // mv_public_record v5.
     const dedupeByDomain = (rows) => [
-      ...finalVersionOnly(rows.filter(r => r.tier !== 'Trap')),
+      ...finalVersionOnly(rows.filter(r => r.tier !== 'Trap' && r.tier !== 'Leg')),
       ...finalVersionOnly(rows.filter(r => r.tier === 'Trap')),
+      ...finalVersionOnly(rows.filter(r => r.tier === 'Leg')),
     ];
     const nonSoccer = dedupeByDomain(settledPicks).filter(r => !SOCCER_SPORTS.has(r.sport));
     const openUnique = dedupeByDomain(openPicks);
@@ -149,9 +151,10 @@ async function getPublicLedger(req, res) {
     // output, pre-launch R&D, and is not shown (decision 2026-07-12).
     const graded = nonSoccer.filter(r => r.tier != null);
 
-    const isActionable = (row) => !['Trap', 'Skip'].includes(row.tier);
+    const isActionable = (row) => !['Trap', 'Skip', 'Leg'].includes(row.tier);
     const actionablePicks = graded.filter(isActionable);
     const trapPicks = graded.filter(r => r.tier === 'Trap');
+    const legPicks = graded.filter(r => r.tier === 'Leg');
 
     // Per-tier and overall record over the actionable settled history.
     const byTier = {};
@@ -181,6 +184,20 @@ async function getPublicLedger(req, res) {
     trapReport.fadeRate = fadeDecided > 0
       ? Math.round((trapReport.fadeWins / fadeDecided) * 1000) / 10 : null;
     trapReport.lastGraded = lastTrapSettled;
+
+    // The Leg Pool: sides the model grades 70%+ to win on games with no
+    // betting edge. High hit probability, thin payout, only a parlay leg.
+    // Outcomes read straight (won means the leg hit), never mixed into the
+    // pick record because there was no betting value at the price.
+    const legReport = { tracked: legPicks.length, hits: 0, misses: 0, pushes: 0 };
+    for (const l of legPicks) {
+      if (l.actual_outcome === 'won') legReport.hits++;
+      else if (l.actual_outcome === 'lost') legReport.misses++;
+      else legReport.pushes++;
+    }
+    const legDecided = legReport.hits + legReport.misses;
+    legReport.hitRate = legDecided > 0
+      ? Math.round((legReport.hits / legDecided) * 1000) / 10 : null;
 
     // Hit rates by sport and by bet type, same population as the headline.
     const groupSummaries = (keyFn) => {
@@ -246,12 +263,24 @@ async function getPublicLedger(req, res) {
         trapReport.fadeRate = decided > 0
           ? Math.round((trapReport.fadeWins / decided) * 1000) / 10 : null;
       }
+      // Leg outcomes read straight: won means the leg hit.
+      const legRow = mvDim('tier').find(r => r.dimension_value === 'Leg');
+      if (legRow) {
+        legReport.tracked = (legRow.won || 0) + (legRow.lost || 0) + (legRow.push || 0) + (legRow.pending || 0);
+        legReport.hits = legRow.won || 0;
+        legReport.misses = legRow.lost || 0;
+        legReport.pushes = legRow.push || 0;
+        const decided = legReport.hits + legReport.misses;
+        legReport.hitRate = decided > 0
+          ? Math.round((legReport.hits / decided) * 1000) / 10 : null;
+      }
       summary = {
         overall: shapeMvRow(mvOverall),
         byTier: dimObj(mvDim('tier').filter(r => ACTIONABLE_TIERS.has(r.dimension_value))),
         bySport: dimObj(mvDim('sport')),
         byBetType: dimObj(mvDim('bet_type')),
         trapReport,
+        legReport,
         source: 'mv_public_record',
       };
     } else {
@@ -261,6 +290,7 @@ async function getPublicLedger(req, res) {
         bySport: groupSummaries(r => r.sport),
         byBetType: groupSummaries(r => r.bet_type),
         trapReport,
+        legReport,
         source: 'raw_rows_fallback',
       };
     }
@@ -282,7 +312,7 @@ async function getPublicLedger(req, res) {
       status: 'ok',
       generated_at: new Date().toISOString(),
       methodology: {
-        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps have their own separately graded record: a trap names a side priced at least 2 percentage points below fair, and the call is right when that side loses. Traps are never mixed into the actionable win/loss record because their win condition is inverted. Nothing removed, nothing edited after publication.',
+        population: 'Every actionable pick published since May 10, 2026, when edge grading went live. That is the start of the graded record. Traps have their own separately graded record: a trap names a side priced at least 2 percentage points below fair, and the call is right when that side loses. Traps are never mixed into the actionable win/loss record because their win condition is inverted. Legs are also tracked separately: a Leg is a side the model grades 70 percent or better to win on a game with no betting edge, high hit probability at a thin payout, graded on its own line and used only as parlay material. Nothing removed, nothing edited after publication.',
         grading: 'One pick per game, the final version published before start, at its price. Revisions replace, never add, including when a game sits on the board across more than one day. A team appearing on consecutive days is a series: each row is a separate game, settled at that day\'s price. Signed model edge in percentage points sets the tier. Outcomes are graded from final scores by the settlement pipeline.',
         stakes: 'Records assume 1 unit per pick at the published odds. Pushes return the stake.',
         timestamps: 'published_at is the database write time, before the game starts. settled_at is when the outcome was graded.',

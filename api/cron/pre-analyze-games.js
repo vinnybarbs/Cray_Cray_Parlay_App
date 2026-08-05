@@ -225,13 +225,14 @@ function deriveBetTypeAndPoint(side, oddsCtx) {
  * time (the receipts stamp); last_revised_at tracks the final pre-game
  * version. Settled rows are never touched.
  *
- * Picks and traps are SEPARATE domains: a trap call and a pick can coexist
- * on one game (trap on one side, value on another), so a trap must never
- * revise a pick row or vice versa. The partial unique index
+ * Picks, traps, and legs are SEPARATE domains: one game can carry a pick
+ * on one side, a trap on another, and a high-probability leg, so a row in
+ * one domain must never revise a row in another. The partial unique index
  * uq_ai_suggestions_auto_digest_game keys on session_id, which differs
- * between the two domains (auto_digest_ vs auto_digest_trap_).
+ * across the domains (auto_digest_ vs auto_digest_trap_ vs
+ * auto_digest_leg_).
  */
-async function upsertDailySuggestion(game, payload, sessionId, { trapDomain = false } = {}) {
+async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick' } = {}) {
   let query = supabase
     .from('ai_suggestions')
     .select('id, actual_outcome')
@@ -239,9 +240,9 @@ async function upsertDailySuggestion(game, payload, sessionId, { trapDomain = fa
     .eq('home_team', game.home_team)
     .eq('away_team', game.away_team)
     .eq('game_date', game.game_date);
-  query = trapDomain
-    ? query.eq('tier', 'Trap')
-    : query.or('tier.neq.Trap,tier.is.null');
+  query = domain === 'trap' ? query.eq('tier', 'Trap')
+        : domain === 'leg' ? query.eq('tier', 'Leg')
+        : query.or('tier.not.in.("Trap","Leg"),tier.is.null');
   const { data: existingRows } = await query
     .order('created_at', { ascending: false })
     .limit(1);
@@ -1312,7 +1313,7 @@ async function runPreAnalysis(sportSlugs) {
                   })(),
                 };
 
-                const saved = await upsertDailySuggestion(game, pickPayload, sessionId, { trapDomain: false });
+                const saved = await upsertDailySuggestion(game, pickPayload, sessionId, { domain: 'pick' });
                 if (saved.status === 'settled') {
                   console.log(`  Pick already settled for ${game.game_key}, not revising`);
                 } else if (saved.error) {
@@ -1368,7 +1369,7 @@ async function runPreAnalysis(sportSlugs) {
                       trap_signals: t.signals || null,
                     };
                     const trapSessionId = `auto_digest_trap_${new Date().toISOString().split('T')[0]}`;
-                    const saved = await upsertDailySuggestion(game, trapPayload, trapSessionId, { trapDomain: true });
+                    const saved = await upsertDailySuggestion(game, trapPayload, trapSessionId, { domain: 'trap' });
                     if (saved.status === 'settled') {
                       console.log(`  Trap already settled for ${game.game_key}, not revising`);
                     } else if (saved.error) {
@@ -1379,6 +1380,62 @@ async function runPreAnalysis(sportSlugs) {
                   }
                 } catch (e) {
                   console.error(`  ❌ Trap-save exception: ${e.message}`);
+                }
+              }
+
+              // Leg tracking: high percent to hit, bad payout, only a leg.
+              // A Skip game's short-priced favorite never published
+              // anywhere, so its hits were invisible to calibration and
+              // unavailable to the parlay builder. When the model makes
+              // one side very likely to WIN but the game has no betting
+              // edge, that side publishes as tier Leg in its own domain:
+              // never in the pick record, graded on its own line, and a
+              // backfill pool for machine parlays.
+              const LEG_PROB_FLOOR = 0.70;
+              const publishedPick = mathPick && mathPick.signedEdge * 100 >= 2;
+              if (!publishedPick && edgeData && edgeData.homeWinProb != null && edgeData.awayWinProb != null) {
+                try {
+                  const legSide = edgeData.homeWinProb >= edgeData.awayWinProb ? 'home_ml' : 'away_ml';
+                  const legProb = Math.max(edgeData.homeWinProb, edgeData.awayWinProb);
+                  const legEdge = edgeData?.edges?.[legSide] ?? null;
+                  const legIsTrapSide = trapCalls.some(t => t.side === legSide);
+                  if (legProb >= LEG_PROB_FLOOR && !legIsTrapSide && legEdge != null && legEdge * 100 > -2) {
+                    const legText = buildPickText(legSide, oddsCtx, game);
+                    const legOdds = resolveOddsForPick(oddsCtx, legSide);
+                    if (legText && legOdds != null) {
+                      const legEdgeRaw = edgeData?.edgesRaw?.[legSide] ?? legEdge;
+                      const legPayload = {
+                        sport: sportDisplay,
+                        bet_type: 'Moneyline',
+                        pick: legText,
+                        point: null,
+                        odds: formatAmericanOdds(legOdds),
+                        confidence: Math.min(10, Math.round(legProb * 10)),
+                        reasoning: `Leg: ${legText} grades ${(legProb * 100).toFixed(0)}% to hit but carries no betting value at the price. High hit probability, thin payout. Tracked as a parlay leg, never a pick.`,
+                        risk_level: 'Low',
+                        generate_mode: 'auto_digest',
+                        pipeline_version: 6,
+                        edge_pp: Math.round(legEdge * 1000) / 10,
+                        edge_pp_raw: legEdgeRaw != null ? Math.round(legEdgeRaw * 1000) / 10 : null,
+                        tier: 'Leg',
+                        model_prob: legSide === 'home_ml' ? edgeData.homeWinProb : edgeData.awayWinProb,
+                        implied_prob: legSide === 'home_ml' ? edgeData.impliedHomeProb ?? null : edgeData.impliedAwayProb ?? null,
+                        lure_score: null,
+                        trap_signals: null,
+                      };
+                      const legSessionId = `auto_digest_leg_${new Date().toISOString().split('T')[0]}`;
+                      const saved = await upsertDailySuggestion(game, legPayload, legSessionId, { domain: 'leg' });
+                      if (saved.status === 'settled') {
+                        console.log(`  Leg already settled for ${game.game_key}, not revising`);
+                      } else if (saved.error) {
+                        console.warn(`  Leg-save result: ${saved.error.message}`);
+                      } else {
+                        console.log(`  ${saved.status === 'revised' ? '✏️ Revised' : '🦵 Published'} leg: ${legText} (${(legProb * 100).toFixed(0)}% to hit)`);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  console.error(`  ❌ Leg-save exception: ${e.message}`);
                 }
               }
             }

@@ -62,9 +62,14 @@ function ParlayCard({ parlay }) {
         {legs.map((leg, i) => (
           <div key={i} className="flex items-center gap-2 text-xs">
             <span className="font-mono text-ink-500 w-4 flex-shrink-0">{i + 1}.</span>
-            <span className="text-ink-100 font-medium truncate">{leg.pick}</span>
+            <span className="min-w-0">
+              <span className="text-ink-100 font-medium truncate block">{leg.pick}</span>
+              {leg.away_team && leg.home_team && (
+                <span className="text-ink-500 text-[11px] truncate block">{leg.away_team} @ {leg.home_team}</span>
+              )}
+            </span>
             <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(leg.odds)}</span>
-            <span className="font-mono text-signal-pos/80 flex-shrink-0 tabular-nums">+{Number(leg.edge_pp).toFixed(1)}pp</span>
+            <span className="font-mono text-signal-pos/80 flex-shrink-0 tabular-nums">{Number(leg.edge_pp) >= 0 ? '+' : ''}{Number(leg.edge_pp).toFixed(1)}pp</span>
             <span className="ml-auto text-ink-500 flex-shrink-0">{leg.sport}</span>
           </div>
         ))}
@@ -108,6 +113,7 @@ export default function HouseLedger() {
   const overall = data?.summary?.overall
   const byTier = data?.summary?.byTier || {}
   const trapReport = data?.summary?.trapReport
+  const legReport = data?.summary?.legReport
   const bySport = data?.summary?.bySport || {}
   const byBetType = data?.summary?.byBetType || {}
   const tierOrder = TIERS.map(t => t.label).filter(l => byTier[l])
@@ -241,6 +247,23 @@ export default function HouseLedger() {
               </div>
             )}
 
+            {/* The Leg Pool: high hit probability, thin payout, only a
+                parlay leg. Tracked so its hits feed calibration and the
+                machine parlay builder, never mixed into the pick record. */}
+            {legReport && legReport.tracked > 0 && (
+              <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-l-2 border-ink-500">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-ink-200">The Leg Pool</span>
+                <span className="font-mono text-sm tabular-nums text-ink-100">{legReport.tracked} tracked</span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">hit</span>
+                <span className={`font-mono text-sm font-bold tabular-nums ${legReport.hitRate >= 70 ? 'text-signal-pos' : 'text-ink-100'}`}>
+                  {legReport.hits}-{legReport.misses}{legReport.hitRate != null ? ` (${legReport.hitRate}%)` : ''}
+                </span>
+                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full">
+                  a leg is a side the model grades 70% or better to win on a game with no betting edge. High chance to hit, bad payout, so it is never a pick. Tracked here because those hits calibrate the model and feed the machine parlays.
+                </span>
+              </div>
+            )}
+
 
             {/* Hit rates by sport and by bet type. Same population as the
                 headline record above. */}
@@ -276,7 +299,12 @@ export default function HouseLedger() {
                   {data.openPicks.map(p => (
                     <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800 first:border-t-0 text-xs">
                       <OutcomeChip outcome="pending" />
-                      <span className="text-ink-100 font-medium truncate">{p.pick}</span>
+                      <span className="min-w-0">
+                        <span className="text-ink-100 font-medium truncate block">{p.pick}</span>
+                        {p.away_team && p.home_team && (
+                          <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}</span>
+                        )}
+                      </span>
                       <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
                       {p.edge_pp != null && <span className="font-mono text-signal-pos/80 tabular-nums flex-shrink-0">+{Number(p.edge_pp).toFixed(1)}pp</span>}
                       <span className="ml-auto font-mono text-[10px] text-ink-500 flex-shrink-0">published {fmtDateTime(p.created_at)}</span>
@@ -298,7 +326,12 @@ export default function HouseLedger() {
                       <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800 first:border-t-0 text-xs">
                         <OutcomeChip outcome={p.actual_outcome} />
                         <span className={`hidden sm:inline font-mono text-[10px] font-bold uppercase tracking-wider w-20 flex-shrink-0 ${t.color}`}>{p.tier || t.label}</span>
-                        <span className="text-ink-100 font-medium truncate">{p.pick}</span>
+                        <span className="min-w-0">
+                          <span className="text-ink-100 font-medium truncate block">{p.pick}</span>
+                          {p.away_team && p.home_team && (
+                            <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}</span>
+                          )}
+                        </span>
                         <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
                         <span className="ml-auto font-mono text-[10px] text-ink-500 flex-shrink-0">{fmtDate(p.resolved_at)}</span>
                       </div>
