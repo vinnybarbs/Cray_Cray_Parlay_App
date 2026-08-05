@@ -444,6 +444,10 @@ app.post('/cron/sync-standings', syncStandings);
 const syncTennisData = require('./api/cron/sync-tennis-data');
 app.post('/cron/sync-tennis-data', syncTennisData);
 
+// Sync UFC fighter records + fight results from ESPN (pre-fight context)
+const syncUfcData = require('./api/cron/sync-ufc-data');
+app.post('/cron/sync-ufc-data', syncUfcData);
+
 // Add cron endpoint to pre-analyze upcoming games with GPT-4o-mini
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);

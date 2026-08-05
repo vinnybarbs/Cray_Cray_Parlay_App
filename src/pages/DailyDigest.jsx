@@ -481,6 +481,62 @@ function DeepResearchModal({ gameKey, game, onClose }) {
             )
           })()}
 
+          {/* UFC fighter form: career records, recent fights, layoff, H2H.
+              Sourced from ufc_fighters/ufc_fight_results, the team-sport
+              sections above are always empty for UFC. */}
+          {(() => {
+            const ufc = data?.ufc
+            if (!ufc) return null
+            const fighters = [ufc.home, ufc.away].filter(Boolean)
+            const hasAny = fighters.some(f => f.record != null || (f.recentLines || []).length > 0)
+            if (!hasAny) return null
+            return (
+              <div className="bg-ink-900 rounded-sharp p-4 border border-ink-700">
+                <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-3">Fighter Form</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {fighters.map(f => (
+                    <div key={f.key}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-ink-200 font-medium truncate">{f.name}</span>
+                        {f.record && (
+                          <span className="flex-shrink-0 text-[10px] font-mono bg-ink-800 text-ink-200 rounded px-1.5 py-0.5 tabular-nums">{f.record}</span>
+                        )}
+                      </div>
+                      {f.layoffDays != null && (
+                        <div className={`text-[11px] font-mono tabular-nums mb-1.5 ${f.layoffDays >= 365 ? 'text-orange-400' : 'text-ink-400'}`}>
+                          last fought {f.layoffDays} days ago{f.layoffDays >= 365 ? ' · long layoff' : ''}
+                        </div>
+                      )}
+                      {(f.recentLines || []).length > 0 ? (
+                        <div className="space-y-1">
+                          {f.recentLines.map((line, i) => (
+                            <div key={i} className="flex items-start gap-2 text-xs">
+                              <span className={`px-1.5 py-0.5 rounded font-bold flex-shrink-0 ${
+                                line.startsWith('W') ? 'bg-green-900 text-green-300' : 'bg-signal-neg-dim text-signal-neg'
+                              }`}>
+                                {line.startsWith('W') ? 'W' : 'L'}
+                              </span>
+                              <span className="text-ink-300 leading-snug">{line.replace(/^[WL] /, '')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-ink-500 italic">No stored recent fights.</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-ink-700 text-xs text-ink-300">
+                  {(ufc.h2h || []).length > 0 ? (
+                    <span>Head-to-head: <span className="text-ink-100 font-medium">{ufc.h2h[0].winner_name}</span> won the most recent meeting.</span>
+                  ) : (
+                    <span className="text-ink-400">Head-to-head: no prior meeting in stored results.</span>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Tennis player form: rank, 30-day record, workload, recent
               matches, H2H. Sourced from tennis_rankings/tennis_match_results,
               the team-sport sections above are always empty for tennis. */}

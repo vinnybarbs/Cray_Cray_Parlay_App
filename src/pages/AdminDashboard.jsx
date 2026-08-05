@@ -254,27 +254,50 @@ function UpcomingInspectorSection({ analyses }) {
 }
 
 function IntelFeedSection({ intel }) {
+  const [kindFilter, setKindFilter] = React.useState(null)
   const kindCls = {
     injury: 'text-signal-neg bg-signal-neg-dim/30',
     weather: 'text-sky-400 bg-sky-950/50',
     record_mismatch: 'text-signal-pos bg-signal-pos-dim/30',
-    agent_error: 'text-ink-400 bg-ink-850',
+    record_check_summary: 'text-ink-300 bg-ink-850',
+    agent_debug: 'text-ink-400 bg-ink-850',
+    agent_error: 'text-orange-400 bg-orange-950/40',
   }
+  // Each kind's payload has its own shape. The old weather line looked for
+  // wind_mph/precip fields the agent never writes and dropped the `note`,
+  // which is the actual finding, so weather rows rendered nearly blank.
   const summarize = (kind, p) => {
     if (!p) return ''
-    if (kind === 'injury') return `${p.player || '?'} (${p.status || '?'}) ${p.note || ''}`
-    if (kind === 'weather') return `${p.stadium || ''} ${p.temp_f ?? '?'}F wind ${p.wind_mph ?? '?'}mph precip ${p.precip_chance_pct ?? '?'}%`
+    if (kind === 'injury') return [p.player, p.status && `(${p.status})`, p.note || p.summary].filter(Boolean).join(' ') || JSON.stringify(p).slice(0, 140)
+    if (kind === 'weather') return [p.note, p.temp_f != null && `${p.temp_f}F`, p.roof && p.roof !== 'none' && `roof: ${p.roof}`, p.source && `(${p.source})`].filter(Boolean).join(' · ')
     if (kind === 'record_mismatch') return `ours ${p.ours || '?'} vs ${p.source || 'web'} ${p.actual || '?'}`
-    return JSON.stringify(p).slice(0, 120)
+    if (kind === 'record_check_summary') return `${p.checked ?? '?'} checked, ${p.mismatches ?? '?'} mismatches`
+    return JSON.stringify(p).slice(0, 140)
   }
+  const counts = {}
+  for (const r of intel || []) counts[r.kind] = (counts[r.kind] || 0) + 1
+  const rows = kindFilter ? (intel || []).filter(r => r.kind === kindFilter) : (intel || [])
   return (
-    <FeedPanel title="Intel feed" sub={`${intel?.length || 0} findings from the research agent, newest first`}>
-      {(!intel || intel.length === 0) ? (
+    <FeedPanel title="Intel feed" sub={`${intel?.length || 0} findings from the research agent, newest first. Tap a kind to filter`}>
+      <div className="flex flex-wrap gap-1.5 px-4 py-2 border-t border-ink-800/60 bg-ink-950/40">
+        {Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([kind, n]) => (
+          <button
+            key={kind}
+            onClick={() => setKindFilter(kindFilter === kind ? null : kind)}
+            className={`px-2 py-0.5 rounded-full font-mono text-[10px] uppercase tracking-wider transition-colors ${
+              kindFilter === kind ? 'bg-signal-pos-dim/60 text-signal-pos font-bold' : `${kindCls[kind] || 'text-ink-300 bg-ink-850'} opacity-90 hover:opacity-100`
+            }`}
+          >
+            {kind.replace(/_/g, ' ')} {n}
+          </button>
+        ))}
+      </div>
+      {rows.length === 0 ? (
         <p className="px-4 py-8 text-center text-ink-500 text-sm">No intel filed in the current window.</p>
-      ) : intel.map((r, i) => (
+      ) : rows.map((r, i) => (
         <div key={i} className="flex items-start gap-3 px-4 py-2.5 border-t border-ink-800/60">
           <span className={`flex-shrink-0 mt-0.5 px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold uppercase tracking-wider ${kindCls[r.kind] || 'text-ink-300 bg-ink-850'}`}>
-            {(r.kind || '?').replace('_', ' ')}
+            {(r.kind || '?').replace(/_/g, ' ')}
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm text-ink-100 truncate">{r.team || (r.payload?.game || '-')}</p>
@@ -418,7 +441,9 @@ function CronHealthSection({ cronHealth, recentErrors }) {
 }
 
 function DataFreshnessSection({ dataFreshness }) {
-  const tables = ['news_cache', 'news_articles', 'odds_cache', 'game_results', 'game_analysis']
+  // Render whatever the API measured, so new tables (tennis, ufc, intel)
+  // appear here without a client change.
+  const tables = Object.keys(dataFreshness || {})
   return (
     <div className="bg-ink-950 rounded-sharp border border-ink-700 p-5">
       <SectionHeader title="Data Freshness" sub="Key tables with count and most recent record" />
@@ -445,14 +470,90 @@ function DataFreshnessSection({ dataFreshness }) {
   )
 }
 
+// Sortable stats table: click a column header to sort by it, click again
+// to flip direction. Shared by the tier / sport / bet-type breakdowns.
+function SortableStatsTable({ title, groups }) {
+  const [sortKey, setSortKey] = React.useState('settled')
+  const [sortDir, setSortDir] = React.useState(-1)
+  const cols = [
+    { key: 'name', label: title, numeric: false },
+    { key: 'settled', label: 'Settled', numeric: true },
+    { key: 'won', label: 'W', numeric: true },
+    { key: 'lost', label: 'L', numeric: true },
+    { key: 'push', label: 'Push', numeric: true },
+    { key: 'pending', label: 'Open', numeric: true },
+    { key: 'hitRate', label: 'Hit %', numeric: true },
+  ]
+  const rows = Object.entries(groups || {}).map(([name, c]) => {
+    const won = c.won || 0, lost = c.lost || 0
+    return {
+      name,
+      won,
+      lost,
+      push: c.push || 0,
+      pending: c.pending || 0,
+      settled: won + lost + (c.push || 0),
+      hitRate: (won + lost) > 0 ? Math.round((won / (won + lost)) * 1000) / 10 : null,
+    }
+  })
+  rows.sort((a, b) => {
+    const av = a[sortKey], bv = b[sortKey]
+    if (av == null && bv == null) return 0
+    if (av == null) return 1
+    if (bv == null) return -1
+    return (av < bv ? -1 : av > bv ? 1 : 0) * sortDir
+  })
+  const clickCol = (key) => {
+    if (sortKey === key) setSortDir(d => -d)
+    else { setSortKey(key); setSortDir(key === 'name' ? 1 : -1) }
+  }
+  if (rows.length === 0) return null
+  return (
+    <div className="mb-5 overflow-x-auto">
+      <table className="w-full text-sm min-w-[420px]">
+        <thead>
+          <tr className="text-ink-400 text-xs uppercase border-b border-ink-700">
+            {cols.map(c => (
+              <th
+                key={c.key}
+                onClick={() => clickCol(c.key)}
+                className={`pb-2 pr-3 cursor-pointer select-none hover:text-ink-100 ${c.numeric ? 'text-right' : 'text-left'} ${sortKey === c.key ? 'text-signal-pos' : ''}`}
+                title="Click to sort"
+              >
+                {c.label}{sortKey === c.key ? (sortDir === -1 ? ' ▼' : ' ▲') : ''}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(r => (
+            <tr key={r.name} className="border-b border-ink-800 hover:bg-ink-900/50">
+              <td className="py-1.5 pr-3 text-ink-200 text-xs capitalize">{r.name}</td>
+              <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-ink-300">{r.settled}</td>
+              <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-green-400">{r.won}</td>
+              <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-signal-neg">{r.lost}</td>
+              <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-ink-500">{r.push}</td>
+              <td className="py-1.5 pr-3 text-right font-mono text-xs tabular-nums text-ink-500">{r.pending}</td>
+              <td className={`py-1.5 text-right font-mono text-xs font-bold tabular-nums ${
+                r.hitRate == null ? 'text-ink-500' : r.hitRate >= 55 ? 'text-signal-pos' : r.hitRate >= 50 ? 'text-ink-100' : 'text-signal-neg'
+              }`}>{r.hitRate != null ? `${r.hitRate}%` : '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
 function ModelPerformanceSection({ modelAccuracy }) {
-  const { overall, bySport, byBetType } = modelAccuracy || {}
+  const { overall, bySport, byBetType, byTier, period } = modelAccuracy || {}
   const { won = 0, lost = 0, push = 0, pending = 0, total = 0 } = overall || {}
   const wr = winRate(won, lost)
+  const periodLabel = { all: 'all-time', last_30d: 'last 30 days', last_7d: 'last 7 days', last_3d: 'last 3 days' }[period] || period
 
   return (
     <div className="bg-ink-950 rounded-sharp border border-ink-700 p-5">
-      <SectionHeader title="Model Performance" sub="Based on settled ai_suggestions" />
+      <SectionHeader title="Model Performance" sub={`mv_public_record · ${periodLabel} · click any column to sort. Trap and Leg grade on their own lines`} />
 
       {/* Top stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
@@ -470,52 +571,9 @@ function ModelPerformanceSection({ modelAccuracy }) {
         </div>
       )}
 
-      {/* By sport */}
-      {bySport && Object.keys(bySport).length > 0 && (
-        <div className="mb-5">
-          <p className="text-ink-300 text-xs uppercase tracking-wide mb-3">By Sport</p>
-          <div className="space-y-2">
-            {Object.entries(bySport)
-              .sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost))
-              .map(([sport, counts]) => {
-                const wr = winRate(counts.won || 0, counts.lost || 0)
-                return (
-                  <div key={sport} className="flex items-center gap-3">
-                    <span className="text-ink-200 text-xs w-24 flex-shrink-0 capitalize">{sport}</span>
-                    <div className="flex-1">
-                      <WinRateBar won={counts.won || 0} lost={counts.lost || 0} />
-                    </div>
-                    <span className="text-ink-400 text-xs w-20 text-right flex-shrink-0">
-                      {counts.won || 0}W / {counts.lost || 0}L
-                    </span>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
-      )}
-
-      {/* By bet type */}
-      {byBetType && Object.keys(byBetType).length > 0 && (
-        <div>
-          <p className="text-ink-300 text-xs uppercase tracking-wide mb-3">By Bet Type</p>
-          <div className="space-y-2">
-            {Object.entries(byBetType)
-              .sort((a, b) => (b[1].won + b[1].lost) - (a[1].won + a[1].lost))
-              .map(([betType, counts]) => (
-                <div key={betType} className="flex items-center gap-3">
-                  <span className="text-ink-200 text-xs w-24 flex-shrink-0 capitalize">{betType}</span>
-                  <div className="flex-1">
-                    <WinRateBar won={counts.won || 0} lost={counts.lost || 0} />
-                  </div>
-                  <span className="text-ink-400 text-xs w-20 text-right flex-shrink-0">
-                    {counts.won || 0}W / {counts.lost || 0}L
-                  </span>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
+      <SortableStatsTable title="Tier" groups={byTier} />
+      <SortableStatsTable title="Sport" groups={bySport} />
+      <SortableStatsTable title="Bet type" groups={byBetType} />
     </div>
   )
 }
@@ -671,6 +729,7 @@ export default function AdminDashboard({ onBack }) {
               <option value="all">All-time</option>
               <option value="last_30d">Last 30 days</option>
               <option value="last_7d">Last 7 days</option>
+              <option value="last_3d">Last 3 days</option>
             </select>
             <button
               onClick={fetchData}

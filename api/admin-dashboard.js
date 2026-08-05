@@ -90,7 +90,7 @@ async function getAdminDashboard(req, res) {
     });
 
     // --- 3. Model Accuracy: single MV read, slice by dimension ---
-    const period = ['all', 'last_30d', 'last_7d'].includes(req.query.period)
+    const period = ['all', 'last_30d', 'last_7d', 'last_3d'].includes(req.query.period)
       ? req.query.period
       : 'all';
 
@@ -211,7 +211,10 @@ async function getAdminDashboard(req, res) {
     });
 
     // --- 6. Data Freshness: count + max timestamp for key tables ---
-    const tables = ['news_cache', 'news_articles', 'odds_cache', 'game_results', 'game_analysis'];
+    const tables = [
+      'news_cache', 'news_articles', 'odds_cache', 'game_results', 'game_analysis',
+      'tennis_rankings', 'tennis_match_results', 'ufc_fighters', 'ufc_fight_results', 'agent_intel',
+    ];
     const freshnessResults = {};
 
     await Promise.all(tables.map(async (table) => {
