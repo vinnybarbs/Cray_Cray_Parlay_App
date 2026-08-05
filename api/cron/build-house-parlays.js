@@ -108,7 +108,7 @@ async function buildHouseParlays(req, res) {
 
     if (error) throw error;
 
-    // Leg-tier rows are the backfill pool: sides the model grades 70%+ to
+    // Leg-tier rows are the backfill pool: sides the model grades 65%+ to
     // win on games with no betting edge (high hit probability, thin
     // payout). They rank BELOW every positive-edge pick, so they only
     // enter a parlay when the day's pick pool is short.

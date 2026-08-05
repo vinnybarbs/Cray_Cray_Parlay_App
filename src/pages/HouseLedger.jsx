@@ -259,7 +259,7 @@ export default function HouseLedger() {
                   {legReport.hits}-{legReport.misses}{legReport.hitRate != null ? ` (${legReport.hitRate}%)` : ''}
                 </span>
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full">
-                  a leg is a side the model grades 70% or better to win on a game with no betting edge. High chance to hit, bad payout, so it is never a pick. Tracked here because those hits calibrate the model and feed the machine parlays.
+                  a leg is a side the model grades 65% or better to win on a game with no betting edge. High chance to hit, bad payout, so it is never a pick. Tracked here because those hits calibrate the model and feed the machine parlays.
                 </span>
               </div>
             )}

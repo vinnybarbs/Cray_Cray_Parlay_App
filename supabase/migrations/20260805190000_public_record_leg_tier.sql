@@ -1,6 +1,6 @@
 -- mv_public_record v5: Leg joins the tier dimension, outside the pick record.
 --
--- A Leg is a side the model grades very likely to WIN (70 percent or
+-- A Leg is a side the model grades very likely to WIN (65 percent or
 -- more) on a game with no betting edge: high hit probability, thin
 -- payout, only a parlay leg. Legs publish under auto_digest_leg_
 -- sessions (pre-analyze 2026-08-05) so their hits feed calibration and
