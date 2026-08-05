@@ -267,29 +267,6 @@ export default function HouseLedger() {
               </div>
             )}
 
-            {/* Machine-built parlays */}
-            {data.parlays?.length > 0 && (
-              <div>
-                <h2 className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos mb-1">Machine-built parlays</h2>
-                {(() => {
-                  const settled = data.parlays.filter(p => p.status === 'won' || p.status === 'lost')
-                  const won = settled.filter(p => p.status === 'won').length
-                  if (settled.length === 0) return null
-                  return (
-                    <p className="font-mono text-xs text-ink-300 mb-1 tabular-nums">
-                      Parlay record: <span className="font-bold text-ink-100">{won}-{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own, never mixed into the pick record
-                    </p>
-                  )
-                })()}
-                <p className="text-sm text-ink-300 mb-4 max-w-2xl">
-                  Parlays the machine assembles from its own highest-edge legs, cross-game only, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
-                </p>
-                <div className="grid md:grid-cols-2 gap-3">
-                  {data.parlays.map(p => <ParlayCard key={p.id} parlay={p} />)}
-                </div>
-              </div>
-            )}
-
             {/* Open picks, the publish-before-start proof */}
             {data.openPicks?.length > 0 && (
               <div>
@@ -329,6 +306,35 @@ export default function HouseLedger() {
                   })}
                 </div>
               </div>
+            )}
+
+            {/* Machine-built parlays. Below the record and the feeds, and
+                collapsed by default: the performance of the site is what
+                this page proves, and a wall of expanded parlay cards was
+                burying it. The record line stays visible as the summary. */}
+            {data.parlays?.length > 0 && (
+              <details className="group">
+                <summary className="cursor-pointer list-none flex flex-wrap items-center gap-x-3 gap-y-1 bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 select-none">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos">Machine-built parlays</span>
+                  {(() => {
+                    const settled = data.parlays.filter(p => p.status === 'won' || p.status === 'lost')
+                    const won = settled.filter(p => p.status === 'won').length
+                    if (settled.length === 0) return <span className="font-mono text-xs text-ink-400">{data.parlays.length} published</span>
+                    return (
+                      <span className="font-mono text-xs text-ink-300 tabular-nums">
+                        Record: <span className="font-bold text-ink-100">{won}-{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own, never mixed into the pick record
+                      </span>
+                    )
+                  })()}
+                  <span className="ml-auto text-ink-400 text-xs group-open:rotate-180 transition-transform">▼</span>
+                </summary>
+                <p className="text-sm text-ink-300 my-4 max-w-2xl">
+                  Parlays the machine assembles from its own highest-edge legs, cross-game only, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
+                </p>
+                <div className="grid md:grid-cols-2 gap-3">
+                  {data.parlays.map(p => <ParlayCard key={p.id} parlay={p} />)}
+                </div>
+              </details>
             )}
 
             {/* Methodology */}
