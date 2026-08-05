@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { supabase } from '../lib/supabaseClient'
 import { edgeTier, formatPp, edgePpForSide } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -1491,23 +1490,16 @@ export default function DailyDigest({ onBack }) {
     fetchDigest()
   }, [fetchDigest])
 
-  // Fetch tier hit-rate once per mount. Drives the Sharp Take track record
-  // badge on PickOfTheDay. Cheap query (≤6 rows from a materialized view).
+  // Tier hit-rates for the PickOfTheDay track-record badge come from the
+  // digest payload (mv_public_record), the SAME rollup as the hero stat and
+  // the ledger. This used to read mv_model_accuracy directly, a different
+  // population (no graded-era trim, no dedup), so the page showed 62% in
+  // the hero and 60.3% on the pick card for the same 30 days.
   useEffect(() => {
-    if (!supabase) return
-    let cancelled = false
-    ;(async () => {
-      const { data: rows } = await supabase
-        .from('mv_model_accuracy')
-        .select('*')
-        .eq('period_bucket', 'last_30d')
-        .eq('dimension_type', 'tier')
-      if (cancelled || !rows) return
-      const byTier = (name) => rows.find(r => r.dimension_value === name) || null
-      setTierStats({ sharpTake: byTier('Sharp Take'), strongPlay: byTier('Strong Play') })
-    })()
-    return () => { cancelled = true }
-  }, [])
+    const byTier = data?.modelAccuracy?.last_30d?.byTier
+    if (!byTier) return
+    setTierStats({ sharpTake: byTier['Sharp Take'] || null, strongPlay: byTier['Strong Play'] || null })
+  }, [data])
 
   const sportSections = data
     ? Object.entries(data.gamesBySport)
@@ -1580,21 +1572,22 @@ export default function DailyDigest({ onBack }) {
     return best
   }, [data, pickOfTheDay])
 
-  // Hero trust anchor reads Sharp Take, the ticket. Prefer 30d, fall back
-  // to 7d then all-time; fall back to the overall record only if tier data
-  // is absent. The full table lives on the ledger, not here.
+  // Hero trust anchor reads Sharp Take, the ticket, and is CLICKABLE:
+  // tapping cycles 3d, 7d, 30d, all-time so a heater is visible at a
+  // glance. Every number comes from mv_public_record via /api/digest, the
+  // SAME rollup the ledger shows, so the page can never disagree with
+  // itself. Falls back to the overall record only if tier data is absent.
+  const HERO_PERIODS = [['last_3d', '3d'], ['last_7d', '7d'], ['last_30d', '30d'], ['all', 'all-time']]
+  const [heroPeriodIdx, setHeroPeriodIdx] = useState(2) // default 30d
   const heroHitRate = (() => {
-    const periods = [['last_30d', '30d'], ['last_7d', '7d'], ['all', 'all-time']]
-    for (const [period, label] of periods) {
-      const st = data?.modelAccuracy?.[period]?.byTier?.['Sharp Take']
-      if (st?.winRate != null) return { name: 'Sharp Take', rate: st.winRate, label }
-    }
-    for (const [period, label] of periods) {
-      const o = data?.modelAccuracy?.[period]?.overall
-      if (o?.winRate != null) return { name: 'Model', rate: o.winRate, label }
-    }
-    return null
+    const [period, label] = HERO_PERIODS[heroPeriodIdx]
+    const st = data?.modelAccuracy?.[period]?.byTier?.['Sharp Take']
+    if (st?.winRate != null) return { name: 'Sharp Take', rate: st.winRate, won: st.won, lost: st.lost, label }
+    const o = data?.modelAccuracy?.[period]?.overall
+    if (o?.winRate != null) return { name: 'Model', rate: o.winRate, won: o.won, lost: o.lost, label }
+    return { name: 'Sharp Take', rate: null, won: 0, lost: 0, label }
   })()
+  const cycleHeroPeriod = () => setHeroPeriodIdx(i => (i + 1) % HERO_PERIODS.length)
 
   const handleOpenDeepResearch = useCallback((game, gameKey) => {
     setDeepResearchTarget({ game, gameKey })
@@ -1639,9 +1632,22 @@ export default function DailyDigest({ onBack }) {
             <span className="truncate">{data ? formatFullDate(null) : 'Loading...'}</span>
             <div className="flex items-center gap-4 flex-shrink-0">
               {heroHitRate && (
-                <span>
-                  {heroHitRate.name} · <span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span> · {heroHitRate.label}
-                </span>
+                <button
+                  onClick={cycleHeroPeriod}
+                  className="hover:text-ink-200 transition-colors"
+                  title="Tap to switch period: 3d, 7d, 30d, all-time. Same numbers as The House Ledger."
+                >
+                  {heroHitRate.name} ·{' '}
+                  {heroHitRate.rate != null ? (
+                    <>
+                      <span className="tabular-nums text-ink-300">{heroHitRate.won}-{heroHitRate.lost}</span>
+                      {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span>
+                    </>
+                  ) : (
+                    <span className="text-ink-500">no picks</span>
+                  )}
+                  {' '}· <span className="text-signal-pos underline decoration-dotted underline-offset-2">{heroHitRate.label}</span>
+                </button>
               )}
               <button
                 onClick={() => setLegendOpen(true)}

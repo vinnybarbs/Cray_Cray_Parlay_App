@@ -152,7 +152,7 @@ async function getDigest(req, res) {
       const { data, error } = await supabase
         .from('mv_public_record')
         .select('period_bucket, dimension_type, dimension_value, won, lost, push, total')
-        .in('period_bucket', ['last_7d', 'last_30d', 'all']);
+        .in('period_bucket', ['last_3d', 'last_7d', 'last_30d', 'all']);
       if (error) throw error;
 
       const buildBreakdown = (rows) => {
@@ -171,7 +171,7 @@ async function getDigest(req, res) {
         return out;
       };
 
-      const byPeriod = { last_7d: null, last_30d: null, all: null };
+      const byPeriod = { last_3d: null, last_7d: null, last_30d: null, all: null };
       for (const period of Object.keys(byPeriod)) {
         const rows = (data || []).filter(r => r.period_bucket === period);
         if (rows.length === 0) continue;
@@ -356,7 +356,7 @@ async function getDigest(req, res) {
       gamesBySport: gamesBySport || {},
       injuries: injuriesBySport || {},
       yesterdayResults: yesterdayResultsResult || {},
-      modelAccuracy: modelAccuracyResult || { last_7d: null, last_30d: null, all: null },
+      modelAccuracy: modelAccuracyResult || { last_3d: null, last_7d: null, last_30d: null, all: null },
       upcomingCounts: upcomingCountResult || {},
       firstGameTime: firstGameResult || null,
       onDeck: onDeckResult || {},
