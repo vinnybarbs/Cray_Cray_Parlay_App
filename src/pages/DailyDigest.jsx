@@ -731,7 +731,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
             parlay material only. */}
         {(() => {
           const legProb = Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0)
-          const isLegGame = signedPp != null && signedPp < 2 && signedPp > -2 && legProb >= 0.7
+          const isLegGame = signedPp != null && signedPp < 2 && signedPp > -2 && legProb >= 0.65
           if (game.recommended_pick && signedPp != null && signedPp <= -2) return (
             <div className="bg-signal-neg-dim/30 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-signal-neg/40">
               <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">Trap · fade this side</div>

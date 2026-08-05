@@ -1391,7 +1391,13 @@ async function runPreAnalysis(sportSlugs) {
               // edge, that side publishes as tier Leg in its own domain:
               // never in the pick record, graded on its own line, and a
               // backfill pool for machine parlays.
-              const LEG_PROB_FLOOR = 0.70;
+              //
+              // Floor at 65%: books cap MLB favorites around -250 (71%
+              // implied) and a full slate's strongest no-pick favorite
+              // often sits in the mid-60s, so a 70% floor produced zero
+              // legs across entire MLB slates. 65% is about -186, still a
+              // genuinely heavy favorite in any sport.
+              const LEG_PROB_FLOOR = 0.65;
               const publishedPick = mathPick && mathPick.signedEdge * 100 >= 2;
               if (!publishedPick && edgeData && edgeData.homeWinProb != null && edgeData.awayWinProb != null) {
                 try {
