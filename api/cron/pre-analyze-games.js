@@ -5,6 +5,7 @@
 // Schedule: Every 4 hours
 // Endpoint: POST /cron/pre-analyze-games
 
+const crypto = require('crypto');
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
@@ -934,7 +935,7 @@ async function runPreAnalysis(sportSlugs) {
     // 2. Check which games already have analysis (fresh or stale)
     const { data: existingAnalysis } = await supabase
       .from('game_analysis')
-      .select('game_key, generated_at, stale, analysis_snippet, edge_score, analysis_version, recommended_pick')
+      .select('game_key, generated_at, stale, analysis_snippet, edge_score, analysis_version, recommended_pick, context_hash')
       .in('game_key', games.map(g => g.game_key));
 
     const existingKeys = new Set();
@@ -949,7 +950,8 @@ async function runPreAnalysis(sportSlugs) {
           prior_snippet: ea.analysis_snippet,
           prior_edge: ea.edge_score,
           prior_pick: ea.recommended_pick,
-          version: ea.analysis_version || 1
+          version: ea.analysis_version || 1,
+          context_hash: ea.context_hash || null
         };
       }
     }
@@ -980,6 +982,7 @@ async function runPreAnalysis(sportSlugs) {
 
     // 3. Analyze each game
     let analyzed = 0;
+    let skippedUnchanged = 0;
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
     const errors = [];
@@ -1146,6 +1149,43 @@ async function runPreAnalysis(sportSlugs) {
           console.log(`  ⚪ No-edge game, every market < +2pp`);
         }
 
+        // CHANGE GATE (August cost audit): a game past the 3h staleness
+        // window whose inputs are byte-identical to the last narration gets
+        // its expiry extended instead of a fresh Claude call. The hash
+        // covers everything the prompt is built from: odds, records, news
+        // and intel, trends, player stats, the computed edge, the math
+        // pick, and trap calls. Any line move, injury note, or intel row
+        // changes the hash and the game re-analyzes as before. Grading
+        // meta (accuracy) and the playbook are deliberately excluded.
+        const contextHash = crypto.createHash('sha256').update(JSON.stringify({
+          odds: [oddsCtx.spread, oddsCtx.total, oddsCtx.ml_home, oddsCtx.ml_away],
+          rank: rankCtx,
+          news: newsCtx,
+          injuries: injuryCtx,
+          trends: [homeTrend, awayTrend],
+          stats: playerStatsCtx,
+          tennis: tennisCtx,
+          edge: edgeData ? {
+            edge: edgeData.edge, side: edgeData.edgeSide,
+            home: edgeData.homeWinProb, implied: edgeData.impliedHomeProb
+          } : null,
+          pick: mathPick ? [mathPick.recommended_side, mathPick.recommended_pick] : null,
+          traps: trapCalls.map(t => [t.side, t.edge_pp, t.lure_score]),
+        })).digest('hex');
+
+        if (prior && prior.context_hash && prior.context_hash === contextHash && prior.prior_snippet) {
+          await supabase
+            .from('game_analysis')
+            .update({
+              expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
+              stale: false,
+            })
+            .eq('game_key', game.game_key);
+          skippedUnchanged++;
+          console.log(`  ⏩ Inputs unchanged since v${prior.version}, expiry extended, no model call (${game.game_key})`);
+          continue;
+        }
+
         const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx);
 
         // After the prompt is built: expose the tennis 30-day match record
@@ -1202,6 +1242,7 @@ async function runPreAnalysis(sportSlugs) {
             generated_at: new Date().toISOString(),
             expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
             stale: false,
+            context_hash: contextHash,
             // Refinement loop fields
             analysis_version: prior ? prior.version + 1 : 1,
             prior_analysis: prior ? prior.prior_snippet : null,
@@ -1478,6 +1519,7 @@ async function runPreAnalysis(sportSlugs) {
           batch_size: batch.length,
           existing_fresh: existingKeys.size,
           analyzed,
+          skipped_unchanged: skippedUnchanged,
           errors: errors.slice(0, 5),
           duration_ms: duration,
           cost: estimatedCost
