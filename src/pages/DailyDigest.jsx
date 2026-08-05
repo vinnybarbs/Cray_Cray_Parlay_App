@@ -725,22 +725,43 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
         </div>
 
         {/* Recommended read. A trap read (negative edge) must never render
-            in pick-green: the text names the side NOT to bet. */}
-        {game.recommended_pick && signedPp != null && signedPp <= -2 ? (
-          <div className="bg-signal-neg-dim/30 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-signal-neg/40">
-            <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">Trap · fade this side</div>
-            <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
-          </div>
-        ) : game.recommended_pick ? (
-          <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
-            <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick</div>
-            <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
-          </div>
-        ) : (
-          <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
-            <div className="font-mono text-[11px] text-ink-400">No model edge. Every market &lt; 2pp</div>
-          </div>
-        )}
+            in pick-green: the text names the side NOT to bet. The 0-2pp
+            band is a Skip, not a pick, and when the model makes one side
+            70%+ to win it is labeled a Leg: high hit rate, thin payout,
+            parlay material only. */}
+        {(() => {
+          const legProb = Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0)
+          const isLegGame = signedPp != null && signedPp < 2 && signedPp > -2 && legProb >= 0.7
+          if (game.recommended_pick && signedPp != null && signedPp <= -2) return (
+            <div className="bg-signal-neg-dim/30 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-signal-neg/40">
+              <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">Trap · fade this side</div>
+              <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+            </div>
+          )
+          if (game.recommended_pick && signedPp != null && signedPp >= 2) return (
+            <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
+              <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick</div>
+              <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+            </div>
+          )
+          if (game.recommended_pick && isLegGame) return (
+            <div className="bg-ink-850/60 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-ink-500">
+              <div className="font-mono text-[9px] text-ink-300 uppercase tracking-[0.14em] mb-0.5">Leg · {Math.round(legProb * 100)}% to hit, thin payout</div>
+              <div className="text-ink-200 font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+            </div>
+          )
+          if (game.recommended_pick) return (
+            <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
+              <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Skip · best side below the 2pp floor</div>
+              <div className="text-ink-300 font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+            </div>
+          )
+          return (
+            <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
+              <div className="font-mono text-[11px] text-ink-400">No model edge. Every market &lt; 2pp</div>
+            </div>
+          )
+        })()}
 
         {/* Per-market tabs */}
         <div className="mb-3">
@@ -1587,7 +1608,6 @@ export default function DailyDigest({ onBack }) {
     if (o?.winRate != null) return { name: 'Model', rate: o.winRate, won: o.won, lost: o.lost, label }
     return { name: 'Sharp Take', rate: null, won: 0, lost: 0, label }
   })()
-  const cycleHeroPeriod = () => setHeroPeriodIdx(i => (i + 1) % HERO_PERIODS.length)
 
   const handleOpenDeepResearch = useCallback((game, gameKey) => {
     setDeepResearchTarget({ game, gameKey })
@@ -1632,22 +1652,36 @@ export default function DailyDigest({ onBack }) {
             <span className="truncate">{data ? formatFullDate(null) : 'Loading...'}</span>
             <div className="flex items-center gap-4 flex-shrink-0">
               {heroHitRate && (
-                <button
-                  onClick={cycleHeroPeriod}
-                  className="hover:text-ink-200 transition-colors"
-                  title="Tap to switch period: 3d, 7d, 30d, all-time. Same numbers as The House Ledger."
-                >
-                  {heroHitRate.name} ·{' '}
-                  {heroHitRate.rate != null ? (
-                    <>
-                      <span className="tabular-nums text-ink-300">{heroHitRate.won}-{heroHitRate.lost}</span>
-                      {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span>
-                    </>
-                  ) : (
-                    <span className="text-ink-500">no picks</span>
-                  )}
-                  {' '}· <span className="text-signal-pos underline decoration-dotted underline-offset-2">{heroHitRate.label}</span>
-                </button>
+                <span className="flex items-center gap-2" title="Sharp Take record for the selected window. Same numbers as The House Ledger.">
+                  <span>
+                    {heroHitRate.name} ·{' '}
+                    {heroHitRate.rate != null ? (
+                      <>
+                        <span className="tabular-nums text-ink-300">{heroHitRate.won}-{heroHitRate.lost}</span>
+                        {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span>
+                      </>
+                    ) : (
+                      <span className="text-ink-500">no picks</span>
+                    )}
+                  </span>
+                  {/* Period bubbles: each window is its own visible pill so
+                      switching is obvious and a heater is one tap away. */}
+                  <span className="flex items-center gap-1">
+                    {HERO_PERIODS.map(([period, label], i) => (
+                      <button
+                        key={period}
+                        onClick={() => setHeroPeriodIdx(i)}
+                        className={`px-1.5 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-[0.08em] transition-colors ${
+                          i === heroPeriodIdx
+                            ? 'bg-signal-pos-dim/60 text-signal-pos font-semibold'
+                            : 'bg-ink-850 text-ink-400 hover:text-ink-200'
+                        }`}
+                      >
+                        {label === 'all-time' ? 'all' : label}
+                      </button>
+                    ))}
+                  </span>
+                </span>
               )}
               <button
                 onClick={() => setLegendOpen(true)}

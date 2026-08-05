@@ -108,19 +108,39 @@ async function buildHouseParlays(req, res) {
 
     if (error) throw error;
 
+    // Leg-tier rows are the backfill pool: sides the model grades 70%+ to
+    // win on games with no betting edge (high hit probability, thin
+    // payout). They rank BELOW every positive-edge pick, so they only
+    // enter a parlay when the day's pick pool is short.
+    const { data: legRows } = await supabase
+      .from('ai_suggestions')
+      .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob')
+      .eq('session_id', `auto_digest_leg_${today}`)
+      .eq('actual_outcome', 'pending')
+      .not('odds', 'is', null)
+      .gt('game_date', cutoff);
+
     // Correlation exclusion for the MVP is cross game only.
-    // Keep at most one leg per game, the one with the highest edge.
+    // Keep at most one leg per game: a positive-edge pick always beats a
+    // Leg row, otherwise highest edge wins.
     const byGame = new Map();
-    for (const row of candidates || []) {
+    for (const row of [...(candidates || []), ...(legRows || [])]) {
       const key = `${row.home_team}|${row.away_team}|${row.game_date}`;
       const existing = byGame.get(key);
-      if (!existing || Number(row.edge_pp) > Number(existing.edge_pp)) {
-        byGame.set(key, row);
-      }
+      const beats = !existing
+        || (existing.tier === 'Leg' && row.tier !== 'Leg')
+        || (existing.tier === 'Leg') === (row.tier === 'Leg') && Number(row.edge_pp) > Number(existing.edge_pp);
+      if (beats) byGame.set(key, row);
     }
 
     const legsPool = Array.from(byGame.values())
-      .sort((a, b) => Number(b.edge_pp) - Number(a.edge_pp));
+      .sort((a, b) => {
+        const aLeg = a.tier === 'Leg', bLeg = b.tier === 'Leg';
+        if (aLeg !== bLeg) return aLeg ? 1 : -1;
+        return aLeg
+          ? Number(b.model_prob || 0) - Number(a.model_prob || 0)
+          : Number(b.edge_pp) - Number(a.edge_pp);
+      });
 
     // Which sizes are already published today. Published parlays are append only.
     const { data: existingRows, error: existingError } = await supabase
