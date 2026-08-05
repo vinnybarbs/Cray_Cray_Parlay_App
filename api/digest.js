@@ -1,6 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../shared/logger');
 const { getTennisContext } = require('../lib/services/tennis-data');
+const { getUfcContext } = require('../lib/services/ufc-data');
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -466,6 +467,12 @@ async function deepResearch(req, res) {
       ? await safeQuery(() => getTennisContext(supabase, home_team, away_team))
       : null;
 
+    // 4c. UFC: fighter career records, recent fights, layoff, and H2H
+    // from the ufc tables. Same rationale as tennis.
+    const ufcResult = sport === 'UFC'
+      ? await safeQuery(() => getUfcContext(supabase, home_team, away_team))
+      : null;
+
     // 5. Last 5 games for each team from game_results
     const [homeResultsResult, awayResultsResult] = await Promise.all([
       safeQuery(async () => {
@@ -503,6 +510,7 @@ async function deepResearch(req, res) {
       homeTeamResults: homeResultsResult || [],
       awayTeamResults: awayResultsResult || [],
       tennis: tennisResult || null,
+      ufc: ufcResult || null,
     });
   } catch (err) {
     logger.error('Deep research endpoint error', { error: err.message, game_key });

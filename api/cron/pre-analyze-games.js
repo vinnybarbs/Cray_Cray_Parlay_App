@@ -13,6 +13,7 @@ const { getIntelContext } = require('../../lib/services/data-integrity-agent.js'
 const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson } = require('../../lib/services/claude.js');
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
+const { getUfcContext, formatUfcContext } = require('../../lib/services/ufc-data.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
@@ -1000,13 +1001,14 @@ async function runPreAnalysis(sportSlugs) {
         // semifinal preview. News + web-verified intel only.
         const NATIONAL_TEAM_SPORTS = new Set(['World Cup', 'Euros', 'Copa America']);
         const nationalTeams = NATIONAL_TEAM_SPORTS.has(sportDisplay);
-        // Tennis skips every team-sport fetcher: standings, injuries,
-        // game_results, and player_game_stats have no tennis rows, and the
-        // surname-based mascot matching can only produce false positives
-        // ("Fernandez" matching a Nets assistant coach). Tennis context
-        // comes from the tennis tables instead.
+        // Player sports skip every team-sport fetcher: standings, injuries,
+        // game_results, and player_game_stats have no rows for them, and
+        // the surname-based mascot matching can only produce false
+        // positives ("Fernandez" matching a Nets assistant coach). Their
+        // context comes from the tennis/ufc tables instead.
         const isTennis = sportDisplay === 'Tennis';
-        const skipTeamCtx = nationalTeams || isTennis;
+        const isUfc = sportDisplay === 'UFC';
+        const skipTeamCtx = nationalTeams || isTennis || isUfc;
         const emptyRankCtx = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
 
         // Fetch context in parallel: DB queries + news
@@ -1021,10 +1023,14 @@ async function runPreAnalysis(sportSlugs) {
           // Web-verified injuries/weather/record warnings from the data
           // integrity agent (empty string when no fresh intel exists).
           getIntelContext(supabase, game.home_team, game.away_team),
-          isTennis ? getTennisContext(supabase, game.home_team, game.away_team) : null
+          isTennis ? getTennisContext(supabase, game.home_team, game.away_team)
+            : isUfc ? getUfcContext(supabase, game.home_team, game.away_team)
+            : null
         ]);
         const newsCtx = `${newsCtxRaw || ''}${intelCtx || ''}` || null;
-        const tennisCtx = isTennis ? formatTennisContext(tennisData) : null;
+        const tennisCtx = isTennis ? formatTennisContext(tennisData)
+          : isUfc ? formatUfcContext(tennisData)
+          : null;
         if (isTennis) {
           // Surface tour rank and 30-day match record through the standard
           // rank/record storage fields so tiles and the digest show them.
