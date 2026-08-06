@@ -829,6 +829,8 @@ const SPORT_GROUPS = {
   'tennis': ['tennis_%'],
   'soccer': ['soccer_%'],
   'worldcup': ['soccer_fifa_world_cup'],
+  'nfl': ['americanfootball_nfl'],
+  'ncaaf': ['americanfootball_ncaaf'],
   'football': ['americanfootball_nfl', 'americanfootball_ncaaf'],
   'all': ALL_SPORT_SLUGS
 };
