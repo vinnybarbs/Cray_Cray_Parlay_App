@@ -607,7 +607,7 @@ function SnapshotTerminal({ tierStats }) {
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
           {quiet && pick
-            ? 'Fresh picks grade with the morning board. Until today\'s board produces a qualifier, here is yesterday\'s pick of the day with its honest result.'
+            ? 'No Sharp Take on the board today. Here is the next-highest edge graded in full, the same math and research every pick gets. When a real one fires, it lands right here.'
             : quiet
             ? 'Fresh picks grade with the morning board.'
             : 'Same tile, same math as every pick in the paid digest. Refreshes with the morning board.'}
@@ -619,7 +619,7 @@ function SnapshotTerminal({ tierStats }) {
             <div className="flex items-center gap-2.5">
               <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
               <span className="text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
-                {pod?.podType === 'yesterday' ? "★ yesterday's pick of the day" : '★ pick of the day'}
+                {pod?.podType === 'example' ? '★ example grade · no sharp take today' : '★ free pick of the day'}
               </span>
             </div>
             <span className="text-[10px] uppercase tracking-[0.14em] text-ink-400 tabular-nums">
@@ -648,15 +648,6 @@ function SnapshotTerminal({ tierStats }) {
                   <div className="text-[10px] italic lowercase text-ink-400 mt-0.5">
                     {TIER_SUBTITLES[pick.tier] || ''}
                   </div>
-                  {pick.outcome && (
-                    <div className={`mt-1.5 px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-[0.12em] ${
-                      pick.outcome === 'won' ? 'bg-signal-pos/20 text-signal-pos'
-                        : pick.outcome === 'lost' ? 'bg-red-500/20 text-red-400'
-                        : 'bg-ink-800 text-ink-300'
-                    }`}>
-                      {pick.outcome === 'won' ? 'WON' : pick.outcome === 'lost' ? 'LOST' : 'PUSH'}
-                    </div>
-                  )}
                 </div>
               </div>
 

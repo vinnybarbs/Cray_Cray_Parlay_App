@@ -68,48 +68,34 @@ module.exports = async (req, res) => {
     });
 
     res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=600');
-    if (!qualifying) {
-      // Marketing first glance (Vince, 2026-08-06): an empty tile sells
-      // nothing. Until today's board produces a qualifier, serve
-      // yesterday's pick of the day with its honest graded result. Losers
-      // included, that IS the brand.
-      const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
-      const { data: yRows } = await supabase
+
+    let featured = qualifying;
+    let podType = 'today';
+    if (!featured) {
+      // No Sharp Take today. Never show yesterday's pick (it may have
+      // lost, terrible first glance) and never show an empty tile. Show
+      // the PROCESS instead: the next-highest-edge upcoming read graded
+      // in full, labeled as an example. The expandable research is the
+      // conversion moment either way (Vince, 2026-08-06).
+      const { data: exRows } = await supabase
         .from('ai_suggestions')
-        .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob, actual_outcome')
+        .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob, created_at')
         .eq('generate_mode', 'auto_digest')
-        .in('actual_outcome', ['won', 'lost', 'push'])
+        .eq('actual_outcome', 'pending')
         .is('voided_at', null)
-        .gte('game_date', since)
-        .gte('edge_pp', POD_MIN_PP)
+        .gt('game_date', new Date().toISOString())
+        .gte('edge_pp', 2)
         .order('edge_pp', { ascending: false })
-        .limit(20);
-      const yesterday = (yRows || []).find(r => {
+        .limit(40);
+      featured = (exRows || []).find(r => {
         if (r.bet_type !== 'Moneyline') return true;
         const n = Number(String(r.odds || '').replace('+', ''));
         return Number.isNaN(n) || n <= POD_MAX_ML_ODDS;
-      });
-      if (yesterday) {
-        res.status(200).json({
-          quiet: true,
-          podType: 'yesterday',
-          pick: {
-            sport: yesterday.sport,
-            homeTeam: yesterday.home_team,
-            awayTeam: yesterday.away_team,
-            gameDate: yesterday.game_date,
-            betType: yesterday.bet_type,
-            pick: yesterday.pick,
-            edgePp: yesterday.edge_pp != null ? Number(yesterday.edge_pp) : null,
-            tier: yesterday.tier,
-            modelProb: yesterday.model_prob != null ? Number(yesterday.model_prob) : null,
-            impliedProb: yesterday.implied_prob != null ? Number(yesterday.implied_prob) : null,
-            outcome: yesterday.actual_outcome,
-          },
-          work: null,
-        });
-        return;
-      }
+      }) || null;
+      podType = 'example';
+    }
+
+    if (!featured) {
       res.status(200).json({ quiet: true, pick: null });
       return;
     }
@@ -122,9 +108,9 @@ module.exports = async (req, res) => {
       const { data: ga } = await supabase
         .from('game_analysis')
         .select('edge_factors')
-        .eq('sport', qualifying.sport)
-        .eq('home_team', qualifying.home_team)
-        .eq('away_team', qualifying.away_team)
+        .eq('sport', featured.sport)
+        .eq('home_team', featured.home_team)
+        .eq('away_team', featured.away_team)
         .not('edges', 'is', null)
         .order('generated_at', { ascending: false })
         .limit(1);
@@ -147,7 +133,7 @@ module.exports = async (req, res) => {
               .slice(0, 6)
               .map(a => ({
                 factor: a.factor,
-                favors: a.impact > 0 ? qualifying.home_team : qualifying.away_team,
+                favors: a.impact > 0 ? featured.home_team : featured.away_team,
               }))
           : [];
         work = { home: teamInputs('home'), away: teamInputs('away'), signals };
@@ -155,18 +141,19 @@ module.exports = async (req, res) => {
     } catch { /* work section is best-effort */ }
 
     res.status(200).json({
-      quiet: false,
+      quiet: podType === 'example',
+      podType,
       pick: {
-        sport: qualifying.sport,
-        homeTeam: qualifying.home_team,
-        awayTeam: qualifying.away_team,
-        gameDate: qualifying.game_date,
-        betType: qualifying.bet_type,
-        pick: qualifying.pick,
-        edgePp: qualifying.edge_pp != null ? Number(qualifying.edge_pp) : null,
-        tier: qualifying.tier,
-        modelProb: qualifying.model_prob != null ? Number(qualifying.model_prob) : null,
-        impliedProb: qualifying.implied_prob != null ? Number(qualifying.implied_prob) : null,
+        sport: featured.sport,
+        homeTeam: featured.home_team,
+        awayTeam: featured.away_team,
+        gameDate: featured.game_date,
+        betType: featured.bet_type,
+        pick: featured.pick,
+        edgePp: featured.edge_pp != null ? Number(featured.edge_pp) : null,
+        tier: featured.tier,
+        modelProb: featured.model_prob != null ? Number(featured.model_prob) : null,
+        impliedProb: featured.implied_prob != null ? Number(featured.implied_prob) : null,
       },
       work,
     });
