@@ -6,7 +6,6 @@ import Auth from './components/Auth'
 import DailyDigest from './pages/DailyDigest'
 import GeneratorPage from './pages/GeneratorPage'
 import ChatPicks from './pages/ChatPicks'
-import ResultsPage from './pages/ResultsPage'
 import AdminDashboard from './pages/AdminDashboard'
 import HouseLedger from './pages/HouseLedger'
 
@@ -65,11 +64,6 @@ function ChatRoute() {
   )
 }
 
-function ResultsRoute() {
-  const navigate = useNavigate()
-  return <ResultsPage onBack={() => navigate('/digest')} />
-}
-
 function AdminRoute() {
   const navigate = useNavigate()
   return <AdminDashboard onBack={() => navigate('/digest')} />
@@ -113,7 +107,9 @@ function AppRoutes() {
       <Route path="/digest" element={<DigestRoute />} />
       <Route path="/generator" element={<GeneratorPage />} />
       <Route path="/chat" element={<ChatRoute />} />
-      <Route path="/results" element={<ResultsRoute />} />
+      {/* The old Results page is gone. The House Ledger IS the results
+          surface now, so stale bookmarks land there. */}
+      <Route path="/results" element={<Navigate to="/ledger" replace />} />
       {/* The House Ledger is deliberately public. It IS the marketing. */}
       <Route path="/ledger" element={<HouseLedger />} />
       <Route path="/admin" element={<AdminRoute />} />
