@@ -1858,13 +1858,13 @@ export default function DailyDigest({ onBack }) {
                 </p>
               </div>
             ) : (
-              sportSections.map(([sport, games], i) => (
+              sportSections.map(([sport, games]) => (
                 <SportSection
                   key={sport}
                   sport={sport}
                   games={games}
                   injuries={data.injuries}
-                  isDefaultExpanded={i === 0}
+                  isDefaultExpanded={sport === 'UFC'}
                   onDeepResearch={handleOpenDeepResearch}
                   upcomingCount={data.upcomingCounts?.[sport] || 0}
                 />

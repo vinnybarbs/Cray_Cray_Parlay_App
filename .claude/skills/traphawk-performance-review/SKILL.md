@@ -34,6 +34,7 @@ select case when edge_pp >= 10 then '10+' when edge_pp >= 7 then '7-10'
        count(*) filter (where actual_outcome = 'lost') as lost
 from ai_suggestions
 where session_id like 'auto_digest_2%' and tier not in ('Trap','Skip','Leg')
+  and voided_at is null
   and actual_outcome in ('won','lost')
   and game_date >= now() - interval '30 days'
 group by 1 order by 1;
@@ -57,6 +58,12 @@ group by 1;
 
 (Soccer family counts live in their model docs flow.) State progress plainly: "Tennis 140 of 150, promotion decision next week." For CLV, if closing line data exists for the period, report average CLV in pp and percent beating close. Under 50% beating close is not marketing material, say so honestly.
 
-## 6. Output
+## 6. Historical context that prevents false findings
+
+- `record_mismatch` rows in agent_intel for Tennis or UFC dated before 2026-08-05 are FALSE POSITIVES. The verifier was comparing 30-day form (stored by design in the record columns) against season records. Fixed 2026-08-05, and the tennis model prices off market consensus and never reads those columns, so they never contaminated reads.
+- The Leg tier shipped 2026-08-05 and requires a 65 percent model-probability side with no edge. Zero or few Leg rows shortly after that date is the feature being honest, not broken.
+- Rows with `voided_at` set are retroactively voided picks (first use: MLB spreads published under the 0.60 seed multiplier, voided 2026-08-06). mv_public_record excludes them. When counting from raw ai_suggestions, always filter `voided_at is null` to match the public record.
+
+## 7. Output
 
 End with at most three recommendations, each one sentence, each tied to a number above. If the data says do nothing, say the model is behaving and skip invented action items. Plain punctuation, no em dashes, en dashes, semicolons, or arrows. Do not change code or data during a review.

@@ -31,7 +31,7 @@ Rows are namespaced by `session_id` prefix, one row per game per domain per day:
 - `auto_digest_trap_YYYY-MM-DD` = trap calls. Graded as the FADE: a won trap row means the named trap side lost
 - `auto_digest_leg_YYYY-MM-DD` = legs (65%+ sides), outcomes read straight
 
-A partial unique index (`uq_ai_suggestions_auto_digest_game`) dedupes on (session_id, home, away, game_date). Key columns: sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, actual_outcome, reasoning, fact_check fields, and for traps lure_score plus trap_signals, for legs model_prob plus implied_prob.
+A partial unique index (`uq_ai_suggestions_auto_digest_game`) dedupes on (session_id, home, away, game_date). Rows with `voided_at` set are retroactively voided (published under a later-discovered defect) and excluded from mv_public_record; filter `voided_at is null` in any raw query that should match the public record. Key columns: sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, actual_outcome, reasoning, fact_check fields, and for traps lure_score plus trap_signals, for legs model_prob plus implied_prob.
 
 ## mv_public_record is the ONLY source for public percentages
 
