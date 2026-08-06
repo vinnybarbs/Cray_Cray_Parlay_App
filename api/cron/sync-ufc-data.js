@@ -46,17 +46,24 @@ async function fetchJson(url) {
 /**
  * All fights for one event via the core API, with athlete json attached.
  * athleteCache dedupes athlete fetches across events within a run.
+ *
+ * A fight whose OTHER athlete fails to resolve used to be dropped
+ * entirely, which is how Darren Elkins got a record row while his
+ * late-booked opponent never got one (2026-08-06). Now every resolved
+ * athlete is returned in `athletes` for upserting, and only the results
+ * path still requires a complete pair.
  */
 async function getEventFights(eventId, athleteCache) {
   const data = await fetchJson(`${CORE_BASE}/mma/leagues/ufc/events/${eventId}/competitions?limit=50`);
   const fights = [];
+  const athletes = [];
   for (const comp of (data.items || [])) {
     const competitors = comp.competitors || [];
     if (competitors.length !== 2) continue;
     const pair = [];
     for (const c of competitors) {
       const refUrl = c.athlete?.$ref;
-      if (!refUrl) { pair.length = 0; break; }
+      if (!refUrl) continue;
       let athlete = athleteCache.get(refUrl);
       if (!athlete) {
         try {
@@ -64,18 +71,34 @@ async function getEventFights(eventId, athleteCache) {
           athleteCache.set(refUrl, athlete);
         } catch { athlete = null; }
       }
-      if (!athlete?.displayName) { pair.length = 0; break; }
+      if (!athlete?.displayName) continue;
+      athletes.push(athlete);
       pair.push({ athlete, winner: c.winner === true });
     }
     if (pair.length === 2) fights.push(pair);
   }
-  return fights;
+  return { fights, athletes };
 }
 
-async function upsertFighter(athlete, summary) {
-  const name = athlete.displayName;
+async function upsertFighter({ name, record, espnId }, summary) {
   const key = playerKey(name);
   if (!key) return;
+  // Never overwrite a stored record with null: a flaky records fetch on a
+  // later run must not blank a fighter we already know. Omitted columns
+  // are left untouched on conflict.
+  const row = {
+    fighter_key: key,
+    fighter_name: name,
+    updated_at: new Date().toISOString(),
+  };
+  if (record) row.record = record;
+  if (espnId != null) row.espn_id = String(espnId);
+  const { error } = await supabase.from('ufc_fighters').upsert(row, { onConflict: 'fighter_key' });
+  if (error) summary.errors.push(`fighter ${name}: ${error.message}`);
+  else summary.fighters++;
+}
+
+async function upsertCoreAthlete(athlete, summary) {
   let record = null;
   const recordsRef = athlete.records?.$ref;
   if (recordsRef) {
@@ -83,20 +106,35 @@ async function upsertFighter(athlete, summary) {
       record = recordFromRecordsPayload(await fetchJson(recordsRef));
     } catch { /* record stays null, name row still lands */ }
   }
-  const { error } = await supabase.from('ufc_fighters').upsert({
-    fighter_key: key,
-    fighter_name: name,
-    record,
-    espn_id: athlete.id != null ? String(athlete.id) : null,
-    updated_at: new Date().toISOString(),
-  }, { onConflict: 'fighter_key' });
-  if (error) summary.errors.push(`fighter ${name}: ${error.message}`);
-  else summary.fighters++;
+  if (!record) summary.records_missing.push(athlete.displayName);
+  await upsertFighter({ name: athlete.displayName, record, espnId: athlete.id }, summary);
+}
+
+/**
+ * The site scoreboard already carries competitor names and records inline
+ * (competitors[].records[].summary), no core-API refs needed. Harvest them
+ * first so a card whose core event lookup fails, or whose athletes are
+ * brand-new prospects with flaky refs (Contender Series debuts), still
+ * gets record rows before analysis runs.
+ */
+async function harvestScoreboardFighters(event, syncedAthletes, summary) {
+  for (const comp of (event.competitions || [])) {
+    for (const c of (comp.competitors || [])) {
+      const name = c.athlete?.displayName || c.athlete?.fullName || null;
+      if (!name) continue;
+      const dedupe = `sb:${name}`;
+      if (syncedAthletes.has(dedupe)) continue;
+      syncedAthletes.add(dedupe);
+      const record = (Array.isArray(c.records) && c.records[0]?.summary)
+        || c.displayRecord || c.athlete?.record || null;
+      await upsertFighter({ name, record, espnId: c.athlete?.id }, summary);
+    }
+  }
 }
 
 async function runSync(days) {
   const startTime = Date.now();
-  const summary = { fighters: 0, fights: 0, events: 0, errors: [] };
+  const summary = { fighters: 0, fights: 0, events: 0, errors: [], records_missing: [] };
   const athleteCache = new Map();
   const syncedAthletes = new Set();
 
@@ -126,21 +164,33 @@ async function runSync(days) {
       for (const event of events) {
         if (!event?.id) continue;
         summary.events++;
+
+        // Inline scoreboard data first: works even when the core event
+        // lookup below fails, and covers late replacements.
+        try {
+          await harvestScoreboardFighters(event, syncedAthletes, summary);
+        } catch (err) {
+          summary.errors.push(`scoreboard harvest ${event.id}: ${err.message}`);
+        }
+
         let fights;
         try {
-          fights = await getEventFights(event.id, athleteCache);
+          ({ fights } = await (async () => {
+            const r = await getEventFights(event.id, athleteCache);
+            for (const athlete of r.athletes) {
+              const dedupe = athlete.$ref || athlete.id || athlete.displayName;
+              if (syncedAthletes.has(dedupe)) continue;
+              syncedAthletes.add(dedupe);
+              await upsertCoreAthlete(athlete, summary);
+            }
+            return r;
+          })());
         } catch (err) {
           summary.errors.push(`event ${event.id}: ${err.message}`);
           continue;
         }
 
         for (const pair of fights) {
-          for (const { athlete } of pair) {
-            const dedupe = athlete.$ref || athlete.id || athlete.displayName;
-            if (syncedAthletes.has(dedupe)) continue;
-            syncedAthletes.add(dedupe);
-            await upsertFighter(athlete, summary);
-          }
 
           // Store the result only for completed past fights.
           const winner = pair.find(p => p.winner);
@@ -176,6 +226,7 @@ async function runSync(days) {
         events: summary.events,
         fighters_upserted: summary.fighters,
         fights_upserted: summary.fights,
+        records_missing: summary.records_missing.slice(0, 10),
         errors: summary.errors.slice(0, 5),
         duration_ms: Date.now() - startTime,
       }),
