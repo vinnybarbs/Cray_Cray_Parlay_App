@@ -606,8 +606,10 @@ function SnapshotTerminal({ tierStats }) {
           straight off the <span className="text-signal-pos">live board.</span>
         </h2>
         <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          {quiet
-            ? 'The board is quiet today. When no game clears our Play threshold, we say so. We refuse to force a pick.'
+          {quiet && pick
+            ? 'Fresh picks grade with the morning board. Until today\'s board produces a qualifier, here is yesterday\'s pick of the day with its honest result.'
+            : quiet
+            ? 'Fresh picks grade with the morning board.'
             : 'Same tile, same math as every pick in the paid digest. Refreshes with the morning board.'}
         </p>
 
@@ -617,7 +619,7 @@ function SnapshotTerminal({ tierStats }) {
             <div className="flex items-center gap-2.5">
               <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
               <span className="text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
-                ★ pick of the day
+                {pod?.podType === 'yesterday' ? "★ yesterday's pick of the day" : '★ pick of the day'}
               </span>
             </div>
             <span className="text-[10px] uppercase tracking-[0.14em] text-ink-400 tabular-nums">
@@ -646,6 +648,15 @@ function SnapshotTerminal({ tierStats }) {
                   <div className="text-[10px] italic lowercase text-ink-400 mt-0.5">
                     {TIER_SUBTITLES[pick.tier] || ''}
                   </div>
+                  {pick.outcome && (
+                    <div className={`mt-1.5 px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-[0.12em] ${
+                      pick.outcome === 'won' ? 'bg-signal-pos/20 text-signal-pos'
+                        : pick.outcome === 'lost' ? 'bg-red-500/20 text-red-400'
+                        : 'bg-ink-800 text-ink-300'
+                    }`}>
+                      {pick.outcome === 'won' ? 'WON' : pick.outcome === 'lost' ? 'LOST' : 'PUSH'}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -732,14 +743,9 @@ function SnapshotTerminal({ tierStats }) {
             <div className="px-5 md:px-7 py-10 text-center">
               <p className="text-ink-300 text-sm">
                 {quiet
-                  ? 'Quiet day. Math says skip. No game on the board clears +4pp right now.'
+                  ? 'Fresh picks grade with the morning board.'
                   : 'Pulling today\'s board…'}
               </p>
-              {quiet && (
-                <p className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mt-3">
-                  // A pick you shouldn't make is not a pick. Check back after the morning refresh.
-                </p>
-              )}
             </div>
           )}
 
