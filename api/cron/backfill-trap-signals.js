@@ -52,13 +52,18 @@ async function runBackfill() {
 
   for (const t of traps || []) {
     try {
+      // A trap row stores a calendar date while game_analysis stores a
+      // timestamp, and a 7pm MT first pitch lands past midnight UTC. The
+      // window reaches 12h each side of the calendar day so the same game
+      // matches from either side of the boundary.
+      const day = new Date(`${String(t.game_date).slice(0, 10)}T00:00:00Z`).getTime();
       const { data: gaRows } = await supabase
         .from('game_analysis')
         .select('edges, edge_factors, moneyline_home, moneyline_away, spread, total')
         .eq('home_team', t.home_team)
         .eq('away_team', t.away_team)
-        .gte('game_date', `${String(t.game_date).slice(0, 10)}T00:00:00Z`)
-        .lte('game_date', `${String(t.game_date).slice(0, 10)}T23:59:59Z`)
+        .gte('game_date', new Date(day - 12 * 3600 * 1000).toISOString())
+        .lte('game_date', new Date(day + 36 * 3600 * 1000).toISOString())
         .limit(1);
       const ga = gaRows?.[0];
       if (!ga || !ga.edges) { summary.no_analysis++; continue; }
