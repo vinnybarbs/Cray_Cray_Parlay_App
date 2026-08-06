@@ -1736,6 +1736,31 @@ function EdgeLegendModal({ open, onClose }) {
             </div>
           </div>
 
+          <div>
+            <div className="font-mono text-[10px] text-signal-pos uppercase tracking-[0.18em] mb-2">
+              What feeds the number
+            </div>
+            <p className="text-ink-300 text-xs leading-relaxed mb-2.5">
+              Every edge is built from the same stack of inputs, each carrying its own weight in the blend:
+            </p>
+            <ul className="text-ink-300 text-xs leading-relaxed space-y-1.5 list-none">
+              <li><span className="text-ink-100">Market prices</span> · every book's line, devigged to a fair consensus probability</li>
+              <li><span className="text-ink-100">Season records</span> · verified standings, not vibes</li>
+              <li><span className="text-ink-100">Recent form</span> · last-10 results and active win or loss streaks</li>
+              <li><span className="text-ink-100">Scoring margin</span> · run and point differential over the recent window</li>
+              <li><span className="text-ink-100">Home and road splits</span> · including the home-field baseline</li>
+              <li><span className="text-ink-100">Strength of schedule</span> · who those wins actually came against</li>
+              <li><span className="text-ink-100">Injuries</span> · web-verified reports swept twice daily, returns included</li>
+              <li><span className="text-ink-100">Weather</span> · game-time wind, temperature, and precipitation at the stadium for outdoor games</li>
+              <li><span className="text-ink-100">Head-to-head</span> · prior meetings where the sport keeps them meaningful</li>
+              <li><span className="text-ink-100">Player-sport form</span> · tour rankings, 30-day match records, fight records and layoffs</li>
+              <li><span className="text-ink-100">Line value</span> · the best available price measured against that fair consensus</li>
+            </ul>
+            <p className="text-ink-400 text-xs leading-relaxed mt-2.5">
+              The weights are re-measured against settled results every week, so a signal that stops predicting loses its vote. The exact weights and the blend are the house recipe.
+            </p>
+          </div>
+
           <div className="pt-3 border-t border-ink-700">
             <p className="text-ink-300 text-xs leading-relaxed font-mono">
               Math picks the side. De-Genny narrates. A <span className="text-signal-neg">Trap</span> is a side the casual bettor wants, priced 2pp or more below fair. We name the bait so you don't take it.
