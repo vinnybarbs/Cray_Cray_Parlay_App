@@ -159,12 +159,14 @@ async function runSync(days) {
     console.log(`\n🥊 CRON: Syncing UFC data (${days} days back, ${UPCOMING_DAYS} ahead)...`);
 
     // One pass over past (results + fighters) and future (fighters only)
-    // scoreboard dates. Non-event days return empty and cost one fetch.
+    // scoreboard dates, per promotion. Non-event days return empty and
+    // cost one fetch per league.
     for (let offset = -days; offset <= UPCOMING_DAYS; offset++) {
       const date = new Date(Date.now() + offset * 24 * 60 * 60 * 1000);
+      for (const league of MMA_LEAGUES) {
       let events;
       try {
-        const sb = await fetchJson(`${SITE_BASE}/mma/ufc/scoreboard?dates=${yyyymmdd(date)}`);
+        const sb = await fetchJson(`${SITE_BASE}/mma/${league}/scoreboard?dates=${yyyymmdd(date)}`);
         events = sb.events || [];
       } catch { continue; }
       if (events.length === 0) continue;
@@ -184,7 +186,7 @@ async function runSync(days) {
         let fights;
         try {
           ({ fights } = await (async () => {
-            const r = await getEventFights(event.id, athleteCache);
+            const r = await getEventFights(event.id, athleteCache, league);
             for (const athlete of r.athletes) {
               const dedupe = athlete.$ref || athlete.id || athlete.displayName;
               if (syncedAthletes.has(dedupe)) continue;
@@ -222,6 +224,7 @@ async function runSync(days) {
             }
           }
         }
+      }
       }
       await new Promise(r => setTimeout(r, 250));
     }
