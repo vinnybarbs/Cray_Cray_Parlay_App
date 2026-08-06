@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import BrandMark, { SignOutButton } from '../components/BrandMark'
 
 import { API_BASE_URL as API_BASE } from '../config'
 
@@ -705,6 +706,7 @@ export default function AdminDashboard({ onBack }) {
       <div className="sticky top-0 z-40 bg-ink-950 border-b border-ink-800 px-4 py-3">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <BrandMark />
             {onBack && (
               <button
                 onClick={onBack}
@@ -721,6 +723,7 @@ export default function AdminDashboard({ onBack }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <SignOutButton />
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import BrandMark, { SignOutButton } from '../components/BrandMark'
 import { edgeTier, tierRange, TIERS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -122,7 +123,8 @@ export default function HouseLedger() {
     <div className="min-h-screen bg-ink-950 text-white font-sans">
       {/* Top bar */}
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
-        <span className="text-sm font-semibold text-ink-200">The House Ledger</span>
+        <BrandMark />
+        <span className="text-sm font-semibold text-ink-200 hidden sm:inline">The House Ledger</span>
         <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">append-only · losers included</span>
         <button
           onClick={() => navigate('/')}
@@ -130,6 +132,7 @@ export default function HouseLedger() {
         >
           Home
         </button>
+        <SignOutButton />
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
