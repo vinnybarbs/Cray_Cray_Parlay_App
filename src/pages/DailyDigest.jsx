@@ -1028,7 +1028,13 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 
       {/* Collapsed preview, top 3 actionable picks as compact rows */}
       {!expanded && topGames.length > 0 && (
-        <div className="px-6 py-3 space-y-2">
+        <div
+          onClick={() => setExpanded(true)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(true) } }}
+          className="px-6 py-3 space-y-2 cursor-pointer hover:bg-ink-850/50 transition-colors"
+        >
           {topGames.map((game, i) => {
             const pp = ppFor(game)
             const tier = edgeTier(pp)
