@@ -29,6 +29,14 @@ const DEFAULT_DAYS = 3;
 const MAX_DAYS = 30;
 const UPCOMING_DAYS = 10;
 
+// The odds feed (mma_mixed_martial_arts) prices every promotion, but this
+// sync originally scanned only ESPN's ufc league, which left PFL cards
+// (Goltsov, 8/5) and prospect cards (8/6) with no fighter data. ESPN
+// serves each promotion under its own league slug, so sweep them all. An
+// unknown or eventless league returns an error or empty scoreboard and
+// costs one cheap fetch per day slot.
+const MMA_LEAGUES = ['ufc', 'pfl', 'bellator', 'lfa'];
+
 function yyyymmdd(date) {
   return date.toISOString().split('T')[0].replace(/-/g, '');
 }
@@ -53,8 +61,8 @@ async function fetchJson(url) {
  * athlete is returned in `athletes` for upserting, and only the results
  * path still requires a complete pair.
  */
-async function getEventFights(eventId, athleteCache) {
-  const data = await fetchJson(`${CORE_BASE}/mma/leagues/ufc/events/${eventId}/competitions?limit=50`);
+async function getEventFights(eventId, athleteCache, league = 'ufc') {
+  const data = await fetchJson(`${CORE_BASE}/mma/leagues/${league}/events/${eventId}/competitions?limit=50`);
   const fights = [];
   const athletes = [];
   for (const comp of (data.items || [])) {
