@@ -1,0 +1,62 @@
+---
+name: traphawk-performance-review
+description: The weekly TrapHawk model performance and calibration review. Use whenever the user asks how the model is doing, whether the site is on a heater, tier win rates, trap detector accuracy, edge calibration, CLV, shadow sport promotion progress, or wants "the latest performance" or a business status update. Also the template for a scheduled Monday review. Prevents the classic mistakes: mixing record sources and misreading trap grades.
+---
+
+# TrapHawk performance review
+
+Read-only against production (Supabase project `pcjhulzyqmhrhsrgvwvx`, `execute_sql` tool). Two rules prevent every historical reporting error: all public numbers come from `mv_public_record` only (never raw ai_suggestions math, never mv_model_accuracy), and trap rows grade the fade (a won trap means the named side lost, report it as "fading them went W-L"). Full schema context is in the traphawk-data-model skill.
+
+## 1. Headline records, all four windows
+
+```sql
+select period_bucket, dimension_value as tier, won, lost, push, pending,
+       round(100.0 * won / nullif(won + lost, 0), 1) as win_pct
+from mv_public_record
+where dimension_type = 'tier'
+order by period_bucket, tier;
+```
+
+Also pull the `overall` rows. Present Sharp Take first (it is the flagship), then the ladder. The interesting story is always the spread between last_3d and last_7d versus last_30d and all: call heaters and cold streaks plainly with the sample size right next to the claim. A 9-2 three-day run is a heater, a 5-4 one is noise, say which.
+
+## 2. Tier monotonicity
+
+Higher tiers should win more often over meaningful samples. Sharp Take under Strong Play over 30 days or more is a calibration finding, not a fluke to smooth over.
+
+## 3. Edge calibration
+
+For settled picks in the last 30 days, bucket by stated edge and compare implied versus actual:
+
+```sql
+select case when edge_pp >= 10 then '10+' when edge_pp >= 7 then '7-10'
+            when edge_pp >= 4 then '4-7' else '2-4' end as bucket,
+       count(*) filter (where actual_outcome = 'won') as won,
+       count(*) filter (where actual_outcome = 'lost') as lost
+from ai_suggestions
+where session_id like 'auto_digest_2%' and tier not in ('Trap','Skip','Leg')
+  and actual_outcome in ('won','lost')
+  and game_date >= now() - interval '30 days'
+group by 1 order by 1;
+```
+
+An edge bucket winning more than about 5 points under what its edge implies is drift. Note it and check whether one sport drives it (add sport to the group by).
+
+## 4. Traps and legs
+
+Trap record from the mv tier row (fade framing). If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Legs: hit rate versus the 65% floor. Legs hitting well below 65% over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
+
+## 5. Shadow sports and CLV
+
+Shadow read counts toward the 150-read promotion gate:
+
+```sql
+select sport, count(*) from game_analysis
+where sport in ('Tennis','UFC') and recommended_pick is not null
+group by 1;
+```
+
+(Soccer family counts live in their model docs flow.) State progress plainly: "Tennis 140 of 150, promotion decision next week." For CLV, if closing line data exists for the period, report average CLV in pp and percent beating close. Under 50% beating close is not marketing material, say so honestly.
+
+## 6. Output
+
+End with at most three recommendations, each one sentence, each tied to a number above. If the data says do nothing, say the model is behaving and skip invented action items. Plain punctuation, no em dashes, en dashes, semicolons, or arrows. Do not change code or data during a review.
