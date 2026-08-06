@@ -1096,11 +1096,9 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                 </>
               )}
             </>
-          ) : (
-            <div className="rounded-sharp bg-ink-950/40 border border-dashed border-ink-700 px-4 py-6 text-center text-sm text-ink-400">
-              No actionable picks for {meta.label} today. The model considered every game and didn't find an edge ≥ 2pp.
-            </div>
-          )}
+          ) : null}
+          {/* No-picks banner removed (Vince, 2026-08-06): the graded game
+              tiles below already tell the story, the banner was noise. */}
 
           {/* Traps: detector calls rendered as their own highlighted tiles,
               independent of the pick grid. Knowing what NOT to bet is half
