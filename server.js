@@ -448,6 +448,10 @@ app.post('/cron/sync-tennis-data', syncTennisData);
 const syncUfcData = require('./api/cron/sync-ufc-data');
 app.post('/cron/sync-ufc-data', syncUfcData);
 
+// One-shot, idempotent, manually triggered (not in pg_cron).
+const backfillTrapSignals = require('./api/cron/backfill-trap-signals');
+app.post('/cron/backfill-trap-signals', backfillTrapSignals);
+
 // Add cron endpoint to pre-analyze upcoming games with GPT-4o-mini
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);

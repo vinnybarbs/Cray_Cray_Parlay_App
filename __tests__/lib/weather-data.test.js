@@ -28,6 +28,13 @@ describe('venueKey and lookupVenue', () => {
     expect(lookupVenue('Milwaukee Brewers').roof).toBe('retractable');
     expect(lookupVenue('Boston Red Sox').roof).toBe('none');
   });
+
+  test('covers NFL venues for the 2026 season', () => {
+    expect(lookupVenue('Green Bay Packers').stadium).toBe('Lambeau Field');
+    expect(lookupVenue('Minnesota Vikings').roof).toBe('dome');
+    expect(lookupVenue('Dallas Cowboys').roof).toBe('retractable');
+    expect(lookupVenue('New York Jets').stadium).toBe('MetLife Stadium');
+  });
 });
 
 describe('compassFromDegrees', () => {
