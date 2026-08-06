@@ -1054,7 +1054,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             )
           })}
           {pickGames.length > 3 && (
-            <p className="font-mono text-[10px] text-ink-500 text-center pt-1 uppercase tracking-[0.14em]">Tap to see all {pickGames.length} picks</p>
+            <p className="font-mono text-[10px] text-ink-500 text-center pt-1 uppercase tracking-[0.14em]">Tap to see all grades</p>
           )}
         </div>
       )}
@@ -1158,160 +1158,6 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
           <InjurySection content={injuryEntry?.content} />
         </div>
       )}
-    </div>
-  )
-}
-
-// ─── PickOfTheDay ────────────────────────────────────────────────────────────
-// The single highest-edge tile across all sports today, featured prominently
-// above the sport sections. This IS the "first Sharp Take seen" aha moment for
-// new users. Without it, they'd have to expand sport accordions to find the
-// best play. With it, the value prop lands on first scroll.
-
-function PickOfTheDay({ pick, tierCounts, totalGames, tierStats }) {
-  const [expanded, setExpanded] = useState(false)
-  if (!pick) return null
-  const { game, sport, signedPp } = pick
-  const tier = edgeTier(signedPp)
-  const sportMeta = getSportMeta(sport)
-  const arrow = signedPp > 0 ? '▲' : '▼'
-  const pp = formatPp(signedPp)
-
-  // Surface the model's view in human terms when the data is on the row.
-  // pre-analyze writes calc_*_prob and implied_*_prob alongside edges, but
-  // they may be absent on older rows, so fall back gracefully.
-  const side = game.recommended_side
-  const isHomeSide = side === 'home_ml' || side === 'home_spread'
-  const isAwaySide = side === 'away_ml' || side === 'away_spread'
-  const modelProb = isHomeSide ? game.calc_home_prob : isAwaySide ? game.calc_away_prob : null
-  const impliedProb = isHomeSide ? game.implied_home_prob : isAwaySide ? game.implied_away_prob : null
-  const showProbCompare = modelProb != null && impliedProb != null && (side === 'home_ml' || side === 'away_ml')
-
-  // Rank context, "highest of N graded today", gives the headline its bite.
-  const totalSignalPicks = (tierCounts?.sharpTakes || 0) + (tierCounts?.strongPlays || 0) + (tierCounts?.plays || 0) + (tierCounts?.leans || 0)
-
-  // Track record across same-tier picks (last 30 days). Combines Sharp Take +
-  // Strong Play when both are present so a low-volume sport still has signal.
-  // Hidden until ≥10 settled. Small samples mislead more than they help.
-  const trackRecord = (() => {
-    const ts = tierStats?.sharpTake
-    if (!ts) return null
-    const w = ts.won || 0
-    const l = ts.lost || 0
-    if (w + l < 10) return null
-    return { w, l, rate: ((w / (w + l)) * 100).toFixed(1) }
-  })()
-
-  return (
-    <div className="bg-ink-900 rounded-sharp overflow-hidden shadow-hairline-pos">
-      {/* Top bar, featured label + sport context */}
-      <div className="flex items-center justify-between px-5 py-2 bg-signal-pos-dim/25 border-b border-signal-pos-dim/60">
-        <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
-          ★ Pick of the Day
-        </span>
-        <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-300">
-          {sportMeta.emoji} {sportMeta.label}
-        </span>
-      </div>
-
-      <div className="p-5 md:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="font-mono text-sm text-ink-300 tracking-tight tabular-nums">
-              {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
-              {game.game_date && <span className="text-ink-500"> · {fmtGameDateTime(game.game_date)}</span>}
-            </div>
-            <div className="mt-2 font-mono text-2xl md:text-3xl font-bold text-signal-pos tabular-nums tracking-tight leading-tight">
-              {game.recommended_pick}
-            </div>
-          </div>
-
-          {/* Edge stat block, sized larger than a regular EdgeChip */}
-          <div className={`flex flex-col items-end leading-tight flex-shrink-0 rounded-sharp ${tier.bg} px-3 py-2`}>
-            <div className={`font-mono text-2xl font-bold ${tier.color} tabular-nums tracking-tight`}>
-              <span className="mr-1">{arrow}</span>{pp}
-            </div>
-            <div className={`font-mono text-[10px] uppercase tracking-[0.14em] ${tier.color} mt-0.5`}>{tier.label}</div>
-            {tier.subtitle && (
-              <div className="text-[10px] text-ink-400 lowercase italic leading-none">{tier.subtitle}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Sharp Take track record. Last 30d hit rate for same-tier picks.
-            Hidden until ≥10 settled (see trackRecord derivation above). The
-            point isn't to celebrate the model. It's to show the receipt. */}
-        {trackRecord && (
-          <div className="mt-3 flex items-center justify-between bg-ink-850 shadow-hairline rounded-sharp px-3 py-2 gap-3">
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300">
-              Sharp Take · last 30 days
-            </span>
-            <span className="font-mono text-sm tabular-nums flex-shrink-0">
-              <span className="text-signal-pos font-semibold">{trackRecord.w}W</span>
-              <span className="text-ink-500 mx-1">·</span>
-              <span className="text-ink-400">{trackRecord.l}L</span>
-              <span className="text-ink-500 mx-1">·</span>
-              <span className={parseFloat(trackRecord.rate) >= 55 ? 'text-signal-pos font-semibold' : 'text-ink-200'}>
-                {trackRecord.rate}%
-              </span>
-            </span>
-          </div>
-        )}
-
-        {/* Why this pick, rank context + model-vs-market in human terms */}
-        <div className="mt-4 bg-ink-850 shadow-hairline rounded-sharp px-3 py-2.5">
-          <div className="font-mono text-[9px] text-signal-pos uppercase tracking-[0.18em] mb-1.5">Why this pick</div>
-          <div className="space-y-1 font-mono text-xs">
-            <div className="flex items-start gap-2">
-              <span className="text-signal-pos flex-shrink-0">▸</span>
-              <span className="text-ink-200 tabular-nums">
-                Highest edge across <span className="text-ink-100 font-semibold">{totalGames}</span> game{totalGames !== 1 ? 's' : ''} graded today
-                {totalSignalPicks > 0 && (
-                  <span className="text-ink-400"> · ahead of {totalSignalPicks - 1} other actionable pick{totalSignalPicks !== 2 ? 's' : ''}</span>
-                )}
-              </span>
-            </div>
-            {showProbCompare && (
-              <div className="flex items-start gap-2">
-                <span className="text-signal-pos flex-shrink-0">▸</span>
-                <span className="text-ink-200 tabular-nums">
-                  Model gives this side <span className="text-signal-pos font-semibold">{(modelProb * 100).toFixed(1)}%</span>
-                  <span className="text-ink-400"> · book implies </span>
-                  <span className="text-ink-100">{(impliedProb * 100).toFixed(1)}%</span>
-                  <span className="text-ink-400"> · {pp} gap</span>
-                </span>
-              </div>
-            )}
-            {!showProbCompare && (
-              <div className="flex items-start gap-2">
-                <span className="text-signal-pos flex-shrink-0">▸</span>
-                <span className="text-ink-200 tabular-nums">
-                  Model disagrees with the book by <span className="text-signal-pos font-semibold">{pp}</span> on this side
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Analysis snippet. Surfaces De-Genny's voice on the featured pick.
-            Expandable with the same +read more / −show less pattern as regular tiles. */}
-        {game.analysis_snippet && (
-          <div className="mt-3">
-            <p className={`text-sm text-ink-300 leading-relaxed ${!expanded ? 'line-clamp-3' : ''}`}>
-              {game.analysis_snippet}
-            </p>
-            {game.analysis_snippet.length > 220 && (
-              <button
-                onClick={() => setExpanded(e => !e)}
-                className="font-mono text-[10px] uppercase tracking-[0.14em] text-signal-pos/80 hover:text-signal-pos mt-1.5"
-              >
-                {expanded ? '− show less' : '+ read more'}
-              </button>
-            )}
-          </div>
-        )}
-
-      </div>
     </div>
   )
 }
@@ -1488,58 +1334,6 @@ function GolfLeaderboard({ golf }) {
   )
 }
 
-// ─── QuietDayCard, the fallback hero when nothing clears the feature bar ────────
-// The bar stays at 7pp; on a quiet slate the honest move is to say so and
-// hand the user a next step, not to leave a hole where the hero was.
-
-function QuietDayCard({ best, trapCount }) {
-  const tier = best ? edgeTier(best.signedPp) : null
-  return (
-    <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
-      <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
-        Pick of the day · 7pp feature bar
-      </div>
-      <h2 className="text-xl md:text-2xl font-bold text-ink-100 leading-tight">
-        No featured pick today.
-      </h2>
-      <p className="text-sm text-ink-300 mt-2 leading-relaxed max-w-2xl">
-        Nothing on the board cleared the 7-point feature bar, and we don't
-        lower the bar on quiet days. That discipline is what the record is
-        built on. Here's what's still worth your time:
-      </p>
-      <div className="mt-5 space-y-3">
-        {best && (
-          <div className="flex items-start gap-3 bg-ink-850 rounded-sharp p-4 shadow-hairline">
-            <span className={`px-2 py-0.5 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${tier.color} ${tier.bg}`}>
-              {tier.label}
-            </span>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold text-ink-100">
-                {best.game.recommended_pick}
-                <span className="text-signal-pos/80 ml-2 font-mono text-xs">{formatPp(best.signedPp)}</span>
-              </div>
-              <div className="text-xs text-ink-400 mt-0.5">
-                {best.sport} · {best.game.away_team} @ {best.game.home_team} · best edge on a quiet board, below our feature bar, so size it accordingly
-              </div>
-            </div>
-          </div>
-        )}
-        {trapCount > 0 && (
-          <p className="text-sm text-ink-300">
-            <span className="text-signal-neg font-bold font-mono">{trapCount}</span> Trap{trapCount !== 1 ? 's' : ''} on the board below. Knowing what <span className="text-ink-100">not</span> to bet is half the product.
-          </p>
-        )}
-        <button
-          onClick={() => { window.location.hash = '#/chat' }}
-          className="px-5 py-2.5 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-mono font-medium uppercase tracking-[0.12em] text-xs text-ink-200 transition-all active:scale-[0.98]"
-        >
-          Ask De-Genny what's worth a look →
-        </button>
-      </div>
-    </div>
-  )
-}
-
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function DailyDigest({ onBack }) {
@@ -1548,10 +1342,6 @@ export default function DailyDigest({ onBack }) {
   const [error, setError] = useState(null)
   const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
   const [legendOpen, setLegendOpen] = useState(false)
-  // Sharp Take / Strong Play hit-rate over last 30d. Surfaces below the
-  // featured pick to anchor the picks-actually-win narrative ("don't trust
-  // me, trust the receipt").
-  const [tierStats, setTierStats] = useState(null)
 
   const fetchDigest = useCallback(async () => {
     setLoading(true)
@@ -1571,17 +1361,6 @@ export default function DailyDigest({ onBack }) {
   useEffect(() => {
     fetchDigest()
   }, [fetchDigest])
-
-  // Tier hit-rates for the PickOfTheDay track-record badge come from the
-  // digest payload (mv_public_record), the SAME rollup as the hero stat and
-  // the ledger. This used to read mv_model_accuracy directly, a different
-  // population (no graded-era trim, no dedup), so the page showed 62% in
-  // the hero and 60.3% on the pick card for the same 30 days.
-  useEffect(() => {
-    const byTier = data?.modelAccuracy?.last_30d?.byTier
-    if (!byTier) return
-    setTierStats({ sharpTake: byTier['Sharp Take'] || null, strongPlay: byTier['Strong Play'] || null })
-  }, [data])
 
   const sportSections = data
     ? Object.entries(data.gamesBySport)
@@ -1613,54 +1392,10 @@ export default function DailyDigest({ onBack }) {
     return c
   }, [data])
 
-  // Pick of the Day, the single highest-edge tile across all sports today.
-  // Featured only when it clears the Strong Play tier (>= 7pp) AND has a real
-  // recommended_pick string. Settled results showed sub-7pp picks running
-  // 46-51%, which is not headline material. Otherwise the callout hides,
-  // which is the honest move on a quiet board.
-  const POD_MIN_PP = 7
-  // Shadow sports store edges but publish nothing to the record, so their
-  // reads can never headline. Before this filter a 7pp tennis read became
-  // the digest's Pick of the Day while the landing (which reads published
-  // picks only) said the board was quiet, two surfaces telling different
-  // stories (Vince, 2026-08-06).
-  const POD_SHADOW_SPORTS = new Set(['Tennis', 'UFC', 'MLS', 'EPL', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
-  const pickOfTheDay = useMemo(() => {
-    if (!data?.gamesBySport) return null
-    let best = null
-    for (const [sport, games] of Object.entries(data.gamesBySport)) {
-      if (POD_SHADOW_SPORTS.has(sport)) continue
-      for (const g of games) {
-        const pp = edgePpForSide(g.edges, g.recommended_side)
-        if (pp == null || pp < POD_MIN_PP) continue
-        if (!g.recommended_pick) continue
-        if (!best || pp > best.signedPp) {
-          best = { game: g, sport, signedPp: pp }
-        }
-      }
-    }
-    return best
-  }, [data])
-
-  // Quiet-day fallback: the best sub-feature-bar edge, so a first session on
-  // a quiet board still has a next step instead of a missing hero (audit 40,
-  // funnel leak 5). Never dressed up as a Pick of the Day. Labeled honestly.
-  const quietBest = useMemo(() => {
-    if (!data?.gamesBySport || pickOfTheDay) return null
-    let best = null
-    for (const [sport, games] of Object.entries(data.gamesBySport)) {
-      if (POD_SHADOW_SPORTS.has(sport)) continue
-      for (const g of games) {
-        const pp = edgePpForSide(g.edges, g.recommended_side)
-        if (pp == null || pp < 2) continue
-        if (!g.recommended_pick) continue
-        if (!best || pp > best.signedPp) {
-          best = { game: g, sport, signedPp: pp }
-        }
-      }
-    }
-    return best
-  }, [data, pickOfTheDay])
+  // Pick of the Day left the digest on 2026-08-06 (Vince): the free
+  // landing tile owns the single-pick tease, the digest IS the full
+  // board. Removing it also killed a class of digest-vs-landing
+  // disagreements about which pick headlines.
 
   // Hero trust anchor reads Sharp Take, the ticket, and is CLICKABLE:
   // tapping cycles 3d, 7d, 30d, all-time so a heater is visible at a
@@ -1837,13 +1572,6 @@ export default function DailyDigest({ onBack }) {
             {sportSections.length > 0 && (
               <div className="-mt-2"><YesterdayBoard /></div>
             )}
-
-            {/* Pick of the Day, the single best edge across all sports, featured
-                above the accordions so new users see the aha moment on first scroll. */}
-            {pickOfTheDay && <PickOfTheDay pick={pickOfTheDay} tierCounts={tierCounts} totalGames={totalGames} tierStats={tierStats} />}
-            {/* Dark slate (no games at all) gets the calendar card below instead, since
-                the 7pp-bar copy makes no sense when there is nothing to grade. */}
-            {!pickOfTheDay && totalGames > 0 && <QuietDayCard best={quietBest} trapCount={tierCounts.traps} />}
 
             {/* Sport sections. All start collapsed, show 3 game preview */}
             {sportSections.length === 0 ? (
