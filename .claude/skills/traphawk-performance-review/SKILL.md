@@ -1,6 +1,6 @@
 ---
 name: traphawk-performance-review
-description: The weekly TrapHawk model performance and calibration review. Use whenever the user asks how the model is doing, whether the site is on a heater, tier win rates, trap detector accuracy, edge calibration, CLV, shadow sport promotion progress, or wants "the latest performance" or a business status update. Also the template for a scheduled Monday review. Prevents the classic mistakes: mixing record sources and misreading trap grades.
+description: The weekly TrapHawk model performance and calibration review. Use whenever the user asks how the model is doing, whether the site is on a heater, tier win rates, trap detector accuracy, edge calibration, CLV, shadow sport promotion progress, or wants "the latest performance" or a business status update. Also the template for a scheduled Monday review. Prevents the two classic reporting mistakes, mixing record sources and misreading trap grades.
 ---
 
 # TrapHawk performance review
