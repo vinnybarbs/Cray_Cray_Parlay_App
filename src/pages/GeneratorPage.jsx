@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import BrandMark from '../components/BrandMark'
 import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -231,12 +232,12 @@ export default function GeneratorPage() {
     <div className="min-h-screen bg-ink-950 text-white font-sans">
       {/* Top bar */}
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
-        <span className="text-sm font-semibold text-ink-200">The Board</span>
+        <BrandMark />
+        <span className="text-sm font-semibold text-ink-200 hidden sm:inline">The Board</span>
         <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">every graded pick · filter it your way</span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => navigate('/digest')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Digest</button>
           <button onClick={() => navigate('/chat')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">De-Genny</button>
-          <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
           <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
           <button onClick={signOut} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Sign out</button>
         </div>

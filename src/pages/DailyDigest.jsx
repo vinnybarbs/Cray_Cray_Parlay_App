@@ -3,6 +3,7 @@ import { edgeTier, formatPp, edgePpForSide } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
+import BrandMark, { SignOutButton } from '../components/BrandMark'
 
 const SPORT_META = {
   NBA:   { emoji: '🏀', label: 'NBA' },
@@ -1618,10 +1619,17 @@ export default function DailyDigest({ onBack }) {
   // 46-51%, which is not headline material. Otherwise the callout hides,
   // which is the honest move on a quiet board.
   const POD_MIN_PP = 7
+  // Shadow sports store edges but publish nothing to the record, so their
+  // reads can never headline. Before this filter a 7pp tennis read became
+  // the digest's Pick of the Day while the landing (which reads published
+  // picks only) said the board was quiet, two surfaces telling different
+  // stories (Vince, 2026-08-06).
+  const POD_SHADOW_SPORTS = new Set(['Tennis', 'UFC', 'MLS', 'EPL', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
   const pickOfTheDay = useMemo(() => {
     if (!data?.gamesBySport) return null
     let best = null
     for (const [sport, games] of Object.entries(data.gamesBySport)) {
+      if (POD_SHADOW_SPORTS.has(sport)) continue
       for (const g of games) {
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp == null || pp < POD_MIN_PP) continue
@@ -1641,6 +1649,7 @@ export default function DailyDigest({ onBack }) {
     if (!data?.gamesBySport || pickOfTheDay) return null
     let best = null
     for (const [sport, games] of Object.entries(data.gamesBySport)) {
+      if (POD_SHADOW_SPORTS.has(sport)) continue
       for (const g of games) {
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp == null || pp < 2) continue
@@ -1682,7 +1691,8 @@ export default function DailyDigest({ onBack }) {
       {/* Top nav bar. The digest is the authenticated home, so there is no
           "Back". Other surfaces are forward navigation. */}
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
-        <span className="text-sm font-semibold text-ink-200">Daily Digest</span>
+        <BrandMark />
+        <span className="text-sm font-semibold text-ink-200 hidden sm:inline">Daily Digest</span>
         <button
           onClick={() => { window.location.hash = '#/ledger' }}
           className="ml-auto px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
@@ -1701,6 +1711,7 @@ export default function DailyDigest({ onBack }) {
         >
           {loading ? '...' : '↻ Refresh'}
         </button>
+        <SignOutButton />
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -1868,7 +1879,7 @@ export default function DailyDigest({ onBack }) {
                   sport={sport}
                   games={games}
                   injuries={data.injuries}
-                  isDefaultExpanded={sport === 'UFC'}
+                  isDefaultExpanded={false}
                   onDeepResearch={handleOpenDeepResearch}
                   upcomingCount={data.upcomingCounts?.[sport] || 0}
                 />

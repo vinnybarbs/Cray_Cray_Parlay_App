@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Routes, Route, Navigate, useNavigate, Link, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Landing from './pages/Landing'
 import Auth from './components/Auth'
@@ -74,32 +74,12 @@ export default function App() {
 
   if (authLoading) return <Splash />
 
-  return (
-    <>
-      <SiteBanner />
-      <AppRoutes />
-    </>
-  )
+  return <AppRoutes />
 }
 
-// Persistent brand banner on every app page. The marketing landing ("/")
-// keeps its own full-size branded header, so the banner skips it to avoid
-// stacking two logos.
-function SiteBanner() {
-  const location = useLocation()
-  if (location.pathname === '/') return null
-  return (
-    <header className="sticky top-0 z-40 bg-ink-950/90 backdrop-blur-md border-b border-ink-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5">
-        <Link to="/digest" className="inline-flex items-center gap-2.5">
-          <img src="/traphawk-mark.png" alt="TrapHawk" className="h-7 w-7 object-contain" />
-          <span className="font-mono text-sm font-semibold uppercase tracking-[0.18em] text-ink-100">TrapHawk</span>
-        </Link>
-      </div>
-    </header>
-  )
-}
-
+// The brand mark lives inside each page's own sticky header
+// (components/BrandMark.jsx), not a second app-level banner. Vince:
+// one banner, not two.
 function AppRoutes() {
   return (
     <Routes>

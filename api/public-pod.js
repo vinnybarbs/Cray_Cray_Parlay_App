@@ -42,6 +42,7 @@ module.exports = async (req, res) => {
       .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob, created_at')
       .eq('generate_mode', 'auto_digest')
       .eq('actual_outcome', 'pending')
+      .is('voided_at', null)
       .gt('game_date', new Date().toISOString())
       .gte('edge_pp', POD_MIN_PP)
       .order('created_at', { ascending: false })
@@ -68,6 +69,47 @@ module.exports = async (req, res) => {
 
     res.setHeader('Cache-Control', 'public, max-age=600, s-maxage=600');
     if (!qualifying) {
+      // Marketing first glance (Vince, 2026-08-06): an empty tile sells
+      // nothing. Until today's board produces a qualifier, serve
+      // yesterday's pick of the day with its honest graded result. Losers
+      // included, that IS the brand.
+      const since = new Date(Date.now() - 48 * 3600 * 1000).toISOString();
+      const { data: yRows } = await supabase
+        .from('ai_suggestions')
+        .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob, actual_outcome')
+        .eq('generate_mode', 'auto_digest')
+        .in('actual_outcome', ['won', 'lost', 'push'])
+        .is('voided_at', null)
+        .gte('game_date', since)
+        .gte('edge_pp', POD_MIN_PP)
+        .order('edge_pp', { ascending: false })
+        .limit(20);
+      const yesterday = (yRows || []).find(r => {
+        if (r.bet_type !== 'Moneyline') return true;
+        const n = Number(String(r.odds || '').replace('+', ''));
+        return Number.isNaN(n) || n <= POD_MAX_ML_ODDS;
+      });
+      if (yesterday) {
+        res.status(200).json({
+          quiet: true,
+          podType: 'yesterday',
+          pick: {
+            sport: yesterday.sport,
+            homeTeam: yesterday.home_team,
+            awayTeam: yesterday.away_team,
+            gameDate: yesterday.game_date,
+            betType: yesterday.bet_type,
+            pick: yesterday.pick,
+            edgePp: yesterday.edge_pp != null ? Number(yesterday.edge_pp) : null,
+            tier: yesterday.tier,
+            modelProb: yesterday.model_prob != null ? Number(yesterday.model_prob) : null,
+            impliedProb: yesterday.implied_prob != null ? Number(yesterday.implied_prob) : null,
+            outcome: yesterday.actual_outcome,
+          },
+          work: null,
+        });
+        return;
+      }
       res.status(200).json({ quiet: true, pick: null });
       return;
     }
