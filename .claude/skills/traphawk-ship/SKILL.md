@@ -34,6 +34,10 @@ Work on the session's designated claude/ branch. After a squash merge, the branc
 - ESPN APIs (site.api.espn.com, sports.core.api.espn.com) are blocked by the dev proxy. Code against recorded payload shapes, verify in prod.
 - External APIs generally: test through mocked fetch, then verify live after deploy.
 
+## File a build report
+
+A session that ships anything substantive (new feature, data correction, calibration change, cost change) ends by writing one row to `agent_reports` with `agent = 'build-session'`: two or three sentences on what shipped and anything a scheduled review should know (for example "MLB spread picks voided retroactively, record moved, expect the spread bucket to look different this week"). This is how the scheduled workers stay on the same page without Vince ferrying context between chats.
+
 ## Post-deploy verification pattern
 
 Do not declare a change live until you have production evidence. The standard loop:

@@ -5,7 +5,19 @@ description: Daily operational health check for TrapHawk production. Run this wh
 
 # TrapHawk daily ops check
 
-Read-only sweep of production (Supabase project `pcjhulzyqmhrhsrgvwvx`, use the `execute_sql` tool). Do not change code or data during the check, report findings and propose fixes separately. Lead the report with ALL CLEAR or the problems in severity order. The tier definitions and table shapes are in the traphawk-data-model skill.
+Read-only sweep of production (Supabase project `pcjhulzyqmhrhsrgvwvx`, use the `execute_sql` tool). Do not change code or data during the check, report findings and propose fixes separately (the one exception is filing your own report at the end). Lead the report with ALL CLEAR or the problems in severity order. The tier definitions and table shapes are in the traphawk-data-model skill.
+
+## 0. Read the blackboard first
+
+`agent_reports` is the shared memory of every digital worker (reviews, audits, build sessions, prior ops checks). Read it before anything else so you do not rediscover settled findings or miss context that changes what a number means:
+
+```sql
+select created_at, agent, summary from agent_reports
+where created_at >= now() - interval '7 days'
+order by created_at desc limit 20;
+```
+
+Fold anything relevant into your brief under a short "From the other workers" note, especially findings from the last 24 hours that Vince has not acted on yet.
 
 ## 1. Cron completions, last 24h
 
@@ -73,3 +85,13 @@ An in-season sport with games in the window but analyses older than 6 hours (and
 ## Reporting
 
 Keep it terse. ALL CLEAR plus the two or three numbers that prove it, or findings ranked by user impact (public stats wrong beats a noisy log). Plain punctuation, no em dashes, en dashes, semicolons, or arrows.
+
+## File your report
+
+Always end by writing to the blackboard, even on an ALL CLEAR, so tomorrow's workers know the last known-good state:
+
+```sql
+insert into agent_reports (agent, summary, findings)
+values ('ops-check', '<two or three sentences: verdict plus anything another worker should know>',
+        '<compact json of key numbers, or null>');
+```
