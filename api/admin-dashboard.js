@@ -165,6 +165,17 @@ async function getAdminDashboard(req, res) {
       return data || [];
     });
 
+    // --- 4b2. Worker blackboard: what every digital worker filed ---
+    const agentReportsResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('agent_reports')
+        .select('agent, summary, findings, created_at')
+        .order('created_at', { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data || [];
+    });
+
     // --- 4c. Pipeline runs: raw scrollable cron log ---
     const recentRunsResult = await safeQuery(async () => {
       const { data, error } = await supabase
@@ -267,6 +278,7 @@ async function getAdminDashboard(req, res) {
       },
       recentPicks: recentPicksResult || [],
       intel: intelResult || [],
+      agentReports: agentReportsResult || [],
       recentRuns: recentRunsResult || [],
       recentAnalyses: recentAnalysesResult || [],
       houseParlays: houseParlaysResult || [],

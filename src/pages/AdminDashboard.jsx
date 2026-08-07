@@ -254,6 +254,59 @@ function UpcomingInspectorSection({ analyses }) {
   )
 }
 
+// The digital workers' blackboard (agent_reports): every scheduled review,
+// audit, ops check, and build session files a row, and each reads recent
+// rows before starting. This feed is the same shared memory the workers see.
+function AgentReportsSection({ reports }) {
+  const [openId, setOpenId] = React.useState(null)
+  const agentCls = {
+    'ops-check': 'text-signal-pos bg-signal-pos-dim/30',
+    'calibration-review': 'text-sky-400 bg-sky-950/50',
+    'cost-audit': 'text-amber-400 bg-amber-950/40',
+    'build-session': 'text-ink-200 bg-ink-850',
+  }
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+      <h2 className="text-white font-semibold mb-1">Worker Reports</h2>
+      <p className="text-ink-500 text-xs mb-3">
+        The shared blackboard. Reviews, audits, ops checks, and build sessions file here and read each other before starting.
+      </p>
+      {(!reports || reports.length === 0) ? (
+        <p className="text-ink-500 text-sm">No reports filed yet.</p>
+      ) : (
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {reports.map((r, i) => (
+            <div key={i} className="bg-ink-950/60 rounded-sharp px-3 py-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold ${agentCls[r.agent] || 'text-ink-300 bg-ink-850'}`}>
+                  {r.agent}
+                </span>
+                <span className="font-mono text-[10px] text-ink-500 tabular-nums">
+                  {new Date(r.created_at).toLocaleString()}
+                </span>
+                {r.findings && (
+                  <button
+                    onClick={() => setOpenId(openId === i ? null : i)}
+                    className="ml-auto font-mono text-[10px] text-ink-400 hover:text-ink-100 transition-colors"
+                  >
+                    {openId === i ? 'hide detail' : 'detail'}
+                  </button>
+                )}
+              </div>
+              <p className="text-ink-200 text-sm mt-1 leading-snug">{r.summary}</p>
+              {openId === i && r.findings && (
+                <pre className="mt-2 text-[10px] text-ink-300 whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-ink-950 rounded-sharp p-2">
+                  {JSON.stringify(r.findings, null, 2)}
+                </pre>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function IntelFeedSection({ intel }) {
   const [kindFilter, setKindFilter] = React.useState(null)
   const kindCls = {
@@ -797,6 +850,7 @@ export default function AdminDashboard({ onBack }) {
             {/* System Health row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="lg:col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <AgentReportsSection reports={data.agentReports} />
                 <IntelFeedSection intel={data.intel} />
                 <PipelineRunsSection runs={data.recentRuns} />
               </div>

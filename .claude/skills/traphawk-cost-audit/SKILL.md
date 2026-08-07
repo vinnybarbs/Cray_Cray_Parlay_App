@@ -7,6 +7,8 @@ description: Audit TrapHawk's Anthropic API spend from production records and re
 
 All spend evidence lives in production (Supabase project `pcjhulzyqmhrhsrgvwvx`, `execute_sql` tool). The August 2026 baseline: $7.60/day before fixes, target under $3/day after caching, change-gating, and Open-Meteo weather.
 
+Start by reading `agent_reports` for the last month (other workers may have already flagged a cost anomaly or shipped a change that moves the bill), and end by filing your own report with `agent = 'cost-audit'`, summary plus a findings json of the per-call-site table. The exact read and insert patterns are in the traphawk-ops-check skill.
+
 ## Where every dollar comes from
 
 | Call site | Model | Logged where |

@@ -61,6 +61,7 @@ Skipping this silently zeroes every public stat on the site.
 - `house_parlays`: machine parlays with honest math (model_win_prob, fair_win_prob, ev_pct).
 - `tennis_rankings`, `tennis_match_results`, `ufc_fighters`, `ufc_fight_results`: player-sport context synced from ESPN. Player keys are normalized: NFD strip accents, lowercase, strip punctuation ("Fábián Marozsán" becomes "fabian marozsan").
 - `golf_field`: tournament fields with prices and research notes.
+- `agent_reports`: the digital workers' shared blackboard. Every scheduled review, audit, ops check, and significant build session files a summary row here and reads recent rows before starting. When investigating anything, check it early: another worker may have already diagnosed it.
 
 ## Player sports are different on purpose
 
