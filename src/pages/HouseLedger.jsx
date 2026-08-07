@@ -235,17 +235,26 @@ export default function HouseLedger() {
               <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-l-2 border-signal-neg">
                 <span className="font-mono text-xs font-bold uppercase tracking-wider text-signal-neg">The Trap Record</span>
                 <span className="font-mono text-sm tabular-nums text-ink-100">{trapReport.called} called</span>
-                <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">fading them went</span>
-                <span className={`font-mono text-sm font-bold tabular-nums ${trapReport.fadeRate >= 55 ? 'text-signal-pos' : 'text-ink-100'}`}>
-                  {trapReport.fadeWins}-{trapReport.fadeLosses}{trapReport.fadeRate != null ? ` (${trapReport.fadeRate}%)` : ''}
-                </span>
+                {/* The money line, not the win rate: bait sides are chalk,
+                    so even a near-even bait record bleeds units at the
+                    price. A fade percentage near 50 undersold the
+                    detector (Vince, 2026-08-07). */}
+                {trapReport.betRoiUnits != null && trapReport.betRoiUnits < 0 && (
+                  <>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">betting them cost</span>
+                    <span className="font-mono text-sm font-bold tabular-nums text-signal-neg">
+                      {trapReport.betRoiUnits}u
+                    </span>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">at 1u stakes</span>
+                  </>
+                )}
                 {trapReport.lastGraded && (
                   <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
                     last graded {fmtDate(trapReport.lastGraded)}
                   </span>
                 )}
                 <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-600 basis-full">
-                  a trap names a side priced 2pp or more below fair. When that side loses, the call was right. Graded on its own record because the win condition is inverted, never mixed into the pick record above.
+                  a trap names the side the crowd wants at a price 2pp or more below fair. The bait went {trapReport.fadeLosses}-{trapReport.fadeWins} outright, and it still lost money, because the price is the trap. Graded on its own record, never mixed into the pick record above.
                 </span>
               </div>
             )}
