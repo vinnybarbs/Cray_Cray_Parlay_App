@@ -170,16 +170,24 @@ async function getPublicLedger(req, res) {
     // record above because its win condition is inverted. (Publication was
     // paused 2026-07-10 to 2026-07-23 while this presentation was
     // reworked; lastGraded makes any future gap visible.)
-    const trapReport = { called: trapPicks.length, fadeWins: 0, fadeLosses: 0, pushes: 0 };
+    const trapReport = { called: trapPicks.length, fadeWins: 0, fadeLosses: 0, pushes: 0, betRoiUnits: 0 };
     let lastTrapSettled = null;
     for (const t of trapPicks) {
       if (t.actual_outcome === 'lost') trapReport.fadeWins++;
       else if (t.actual_outcome === 'won') trapReport.fadeLosses++;
       else trapReport.pushes++;
+      // The headline stat (Vince, 2026-08-07): what betting the bait
+      // sides at their stored prices would have cost. Fade win rate near
+      // 50 percent undersells the detector, because the bait is chalk
+      // and even a winning bait record loses money at those prices. The
+      // stored outcome IS the bait side's own result, so unitProfit on
+      // it is the bait bettor's P and L directly.
+      trapReport.betRoiUnits += unitProfit(t.odds, t.actual_outcome);
       if (t.resolved_at && (!lastTrapSettled || t.resolved_at > lastTrapSettled)) {
         lastTrapSettled = t.resolved_at;
       }
     }
+    trapReport.betRoiUnits = Math.round(trapReport.betRoiUnits * 100) / 100;
     const fadeDecided = trapReport.fadeWins + trapReport.fadeLosses;
     trapReport.fadeRate = fadeDecided > 0
       ? Math.round((trapReport.fadeWins / fadeDecided) * 1000) / 10 : null;
@@ -262,6 +270,12 @@ async function getPublicLedger(req, res) {
         const decided = trapReport.fadeWins + trapReport.fadeLosses;
         trapReport.fadeRate = decided > 0
           ? Math.round((trapReport.fadeWins / decided) * 1000) / 10 : null;
+        // MV roi_units on the Trap row is computed from the bait side's
+        // own outcomes at the stored prices, exactly the bait bettor's
+        // P and L.
+        if (trapRow.roi_units != null) {
+          trapReport.betRoiUnits = Math.round(Number(trapRow.roi_units) * 100) / 100;
+        }
       }
       // Leg outcomes read straight: won means the leg hit.
       const legRow = mvDim('tier').find(r => r.dimension_value === 'Leg');
