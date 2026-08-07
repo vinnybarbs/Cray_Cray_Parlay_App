@@ -673,12 +673,25 @@ function MarketRow({ sides, recommendedSide }) {
                   {s.text}
                 </span>
               </div>
-              <span
-                className={`flex-shrink-0 font-mono text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}
-                title={s.signedPp != null ? `${formatPp(s.signedPp)} · ${tier.label}` : 'No model edge for this side'}
-              >
-                {hasAnyEdge ? (formatPp(s.signedPp) ?? '-') : '-'}
-              </span>
+              {s.calMuted ? (
+                // The model graded this side, but weekly calibration measured
+                // this market's edge at zero predictive value for this sport,
+                // so it carries no weight. A flat +0.0pp read as a bug
+                // (Vince, 2026-08-06); the word reads as intent.
+                <span
+                  className="flex-shrink-0 font-mono text-[10px] uppercase tracking-[0.08em] text-ink-500 italic"
+                  title="Edge computed, but this market currently carries zero calibration weight for this sport. It re-earns its vote through the weekly review. See How edges work."
+                >
+                  muted
+                </span>
+              ) : (
+                <span
+                  className={`flex-shrink-0 font-mono text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}
+                  title={s.signedPp != null ? `${formatPp(s.signedPp)} · ${tier.label}` : 'No model edge for this side'}
+                >
+                  {hasAnyEdge ? (formatPp(s.signedPp) ?? '-') : '-'}
+                </span>
+              )}
             </div>
           )
         })}
@@ -688,7 +701,21 @@ function MarketRow({ sides, recommendedSide }) {
 }
 
 function MarketTabs({ game }) {
-  const { edges, recommended_side } = game
+  const { edges, edges_raw: edgesRaw, recommended_side } = game
+  // Calibration-muted: the raw model computed a real edge but the
+  // calibrated value is exactly zero, meaning the market's multiplier is
+  // zeroed for this sport (for example MLB spreads and totals, Aug 2026).
+  const calMutedFor = (side) => {
+    const cal = edgePpForSide(edges, side)
+    const raw = edgePpForSide(edgesRaw, side)
+    return cal === 0 && raw != null && raw !== 0
+  }
+  const sideEntry = (side) => ({
+    side,
+    text: sidePickText(game, side),
+    signedPp: edgePpForSide(edges, side),
+    calMuted: calMutedFor(side),
+  })
   const defaultTab = recommended_side?.startsWith('over') || recommended_side?.startsWith('under')
     ? 'total'
     : recommended_side?.endsWith('_spread')
@@ -709,18 +736,9 @@ function MarketTabs({ game }) {
   if (!tabs.length) return null
 
   const sidesByTab = {
-    ml: [
-      { side: 'home_ml', text: sidePickText(game, 'home_ml'), signedPp: edgePpForSide(edges, 'home_ml') },
-      { side: 'away_ml', text: sidePickText(game, 'away_ml'), signedPp: edgePpForSide(edges, 'away_ml') },
-    ],
-    spread: [
-      { side: 'home_spread', text: sidePickText(game, 'home_spread'), signedPp: edgePpForSide(edges, 'home_spread') },
-      { side: 'away_spread', text: sidePickText(game, 'away_spread'), signedPp: edgePpForSide(edges, 'away_spread') },
-    ],
-    total: [
-      { side: 'over',  text: sidePickText(game, 'over'),  signedPp: edgePpForSide(edges, 'over') },
-      { side: 'under', text: sidePickText(game, 'under'), signedPp: edgePpForSide(edges, 'under') },
-    ],
+    ml: [sideEntry('home_ml'), sideEntry('away_ml')],
+    spread: [sideEntry('home_spread'), sideEntry('away_spread')],
+    total: [sideEntry('over'), sideEntry('under')],
   }
 
   return (
@@ -1758,6 +1776,9 @@ function EdgeLegendModal({ open, onClose }) {
             </ul>
             <p className="text-ink-400 text-xs leading-relaxed mt-2.5">
               The weights are re-measured against settled results every week, so a signal that stops predicting loses its vote. The exact weights and the blend are the house recipe.
+            </p>
+            <p className="text-ink-400 text-xs leading-relaxed mt-2.5">
+              <span className="text-ink-200 italic">muted</span> on a market means exactly that: the model still computes an edge there every run, but the weekly calibration measured that market's edge against settled results and found it predicting nothing for that sport, so it carries zero weight until it re-earns its vote. We would rather show you nothing than a number that does not win.
             </p>
           </div>
 
