@@ -764,39 +764,53 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
     const claude = getClaude();
     if (!claude) throw new Error('Server missing ANTHROPIC_API_KEY');
 
-    const data = await claude.messages.create({
-      model: MODELS.NARRATION,
-      // Sonnet narrations run 500-600 output tokens where gpt-4o-mini used
-      // ~150-200. The old 600 cap truncated most responses mid-JSON, so
-      // nearly every analysis parsed as null (broke the whole board 7/11).
-      max_tokens: 1500,
-      // Narration only. The math already picked the side. Thinking stays
-      // off to keep the per-game cost/latency profile of the old setup.
-      thinking: { type: 'disabled' },
-      messages: [{ role: 'user', content: prompt }],
-    });
+    // One retry on a malformed generation. On 2026-08-08 a single
+    // unparseable response failed the Diamondbacks refresh, the old
+    // analysis expired a minute later, and a +15pp Sharp Take fell off
+    // the board with the next cron scheduled after first pitch. These
+    // failures are transient, one more attempt is cheap insurance.
+    let lastErr = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const data = await claude.messages.create({
+          model: MODELS.NARRATION,
+          // Sonnet narrations run 500-600 output tokens where gpt-4o-mini used
+          // ~150-200. The old 600 cap truncated most responses mid-JSON, so
+          // nearly every analysis parsed as null (broke the whole board 7/11).
+          max_tokens: 1500,
+          // Narration only. The math already picked the side. Thinking stays
+          // off to keep the per-game cost/latency profile of the old setup.
+          thinking: { type: 'disabled' },
+          messages: [{ role: 'user', content: prompt }],
+        });
 
-    const content = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
-    const usage = data.usage;
+        const content = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+        const usage = data.usage;
 
-    if (!content) throw new Error('Empty response from Claude');
-    if (data.stop_reason === 'max_tokens') throw new Error(`Response truncated at max_tokens (${usage?.output_tokens} tokens)`);
+        if (!content) throw new Error('Empty response from Claude');
+        if (data.stop_reason === 'max_tokens') throw new Error(`Response truncated at max_tokens (${usage?.output_tokens} tokens)`);
 
-    const parsed = extractJson(content);
-    if (!parsed || !parsed.analysis) throw new Error(`Unparseable model response: ${content.slice(0, 120)}`);
+        const parsed = extractJson(content);
+        if (!parsed || !parsed.analysis) throw new Error(`Unparseable model response: ${content.slice(0, 120)}`);
 
-    // Pick is now math-derived. Return it alongside the LLM's analysis text.
-    // LLM is no longer allowed to change recommended_pick / recommended_side.
-    return {
-      analysis_snippet: parsed.analysis,
-      edge_score_llm_fallback: null,
-      recommended_pick: mathPick ? mathPick.recommended_pick : null,
-      recommended_side: mathPick ? mathPick.recommended_side : null,
-      key_factors: parsed.key_factors,
-      what_changed: parsed.what_changed || null,
-      prompt_tokens: usage?.input_tokens,
-      completion_tokens: usage?.output_tokens
-    };
+        // Pick is now math-derived. Return it alongside the LLM's analysis text.
+        // LLM is no longer allowed to change recommended_pick / recommended_side.
+        return {
+          analysis_snippet: parsed.analysis,
+          edge_score_llm_fallback: null,
+          recommended_pick: mathPick ? mathPick.recommended_pick : null,
+          recommended_side: mathPick ? mathPick.recommended_side : null,
+          key_factors: parsed.key_factors,
+          what_changed: parsed.what_changed || null,
+          prompt_tokens: usage?.input_tokens,
+          completion_tokens: usage?.output_tokens
+        };
+      } catch (err) {
+        lastErr = err;
+        if (attempt === 1) console.warn(`Narration attempt 1 failed for ${game.game_key}, retrying once: ${err.message}`);
+      }
+    }
+    throw lastErr;
   } catch (err) {
     console.error(`AI analysis failed for ${game.game_key}:`, err.message);
     // Surface the real reason to the caller. cron_job_logs used to record
@@ -1203,6 +1217,20 @@ async function runPreAnalysis(sportSlugs) {
           const reason = result?.error || 'AI returned null';
           console.warn(`  ⚠️ analyzeGame failed for ${game.game_key}: ${reason}`);
           errors.push(`${game.game_key}: ${reason}`);
+          // A failed refresh must never take a live game off the board.
+          // Keep the last good analysis visible for another 3 hours and
+          // mark it stale so every later run keeps trying to replace it.
+          // Without this, the Aug 8 Diamondbacks Sharp Take vanished 25
+          // minutes after one flaky generation.
+          if (prior) {
+            await supabase
+              .from('game_analysis')
+              .update({
+                expires_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
+                stale: true,
+              })
+              .eq('game_key', game.game_key);
+          }
         }
 
         if (result && !result.error) {
