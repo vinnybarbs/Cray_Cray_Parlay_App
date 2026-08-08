@@ -69,7 +69,7 @@ Shadow promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded p
 select public.shadow_model_readiness();
 ```
 
-Report each model's publishable record against implied ("Tennis 30-7 on 37 publishable, 81.1 actual vs 78.2 implied, needs 75"). Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record (the Aug 2026 lesson: the aggregate made Tennis look below-market while its publishable bucket was beating its own claims). For CLV, if closing line data exists for the period, report average CLV in pp and percent beating close. Under 50% beating close is not marketing material, say so honestly.
+Report each model's publishable record against implied AND its units ("Tennis 30-7 on 37 publishable, 81.1 actual vs 78.2 implied, -0.28u, needs 75 and positive units"). Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record (the Aug 2026 lesson: the aggregate made Tennis look below-market while its publishable bucket was beating its own claims). And never judge on win rate alone: the same Tennis bucket won 81 percent and still lost units, because at heavy chalk the vig eats a 3 point edge. When a model calibrates well but cannot beat the vig, weigh the leg alternative in the promotion decision: it may belong in the Leg Pool feeding parlays, not the pick record. For CLV, if closing line data exists for the period, report average CLV in pp and percent beating close. Under 50% beating close is not marketing material, say so honestly.
 
 ## 6. Historical context that prevents false findings
 
