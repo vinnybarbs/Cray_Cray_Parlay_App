@@ -63,15 +63,13 @@ Trap record from the mv tier row (fade framing). If trap_signals is populated, g
 
 ## 5. Shadow sports and CLV
 
-Shadow read counts toward the 150-read promotion gate:
+Shadow promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded publishable picks (claimed edge 2pp or more) whose actual win rate meets or beats fair implied. One call returns everything:
 
 ```sql
-select sport, count(*) from game_analysis
-where sport in ('Tennis','UFC') and recommended_pick is not null
-group by 1;
+select public.shadow_model_readiness();
 ```
 
-(Soccer family counts live in their model docs flow.) State progress plainly: "Tennis 140 of 150, promotion decision next week." For CLV, if closing line data exists for the period, report average CLV in pp and percent beating close. Under 50% beating close is not marketing material, say so honestly.
+Report each model's publishable record against implied ("Tennis 30-7 on 37 publishable, 81.1 actual vs 78.2 implied, needs 75"). Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record (the Aug 2026 lesson: the aggregate made Tennis look below-market while its publishable bucket was beating its own claims). For CLV, if closing line data exists for the period, report average CLV in pp and percent beating close. Under 50% beating close is not marketing material, say so honestly.
 
 ## 6. Historical context that prevents false findings
 
