@@ -38,6 +38,10 @@ Also pull the `overall` rows. Present Sharp Take first (it is the flagship), the
 
 Higher tiers should win more often over meaningful samples. Sharp Take under Strong Play over 30 days or more is a calibration finding, not a fluke to smooth over.
 
+## 2b. Muted markets and market shadow performance
+
+`select * from market_shadow_calibration();` grades every sport's RAW spread, total, and moneyline edges against finals, no publication needed. This is how a muted market earns its way back and how NFL and NCAAF markets get measured from week one. Report each muted market's shadow record and units at -110, and recommend re-enabling ONLY when the shadow record clears the juice break-even (52.4 percent at -110) over a real sample. Baseline for context, Aug 2026 MLB over 317 games: spreads 50.5 percent and -11.6u, totals 47.9 percent and -26.2u, both correctly muted; ml 53 percent, live.
+
 ## 3. Edge calibration
 
 For settled picks in the last 30 days, bucket by stated edge and compare implied versus actual:
