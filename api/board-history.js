@@ -28,7 +28,7 @@ module.exports = async function boardHistory(req, res) {
       // day with picks (was 8 serial count queries, slow enough that the
       // button felt dead).
       const candidates = Array.from({ length: 8 }, (_, i) =>
-        `auto_digest_${new Date(Date.now() - i * 24 * 3600e3).toISOString().split('T')[0]}`);
+        `auto_digest_${siteDayOffset(-i)}`);
       const { data: latest } = await supabase
         .from('ai_suggestions')
         .select('session_id')
@@ -36,7 +36,7 @@ module.exports = async function boardHistory(req, res) {
         .order('session_id', { ascending: false })
         .limit(1);
       date = latest?.[0]?.session_id?.replace('auto_digest_', '')
-        || new Date(Date.now() - 24 * 3600e3).toISOString().split('T')[0];
+        || siteDayOffset(-1);
     }
 
     const { data, error } = await supabase

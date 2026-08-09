@@ -450,7 +450,12 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                   </span>
                   {r.date && (
                     <span className="text-ink-700 flex-shrink-0 ml-auto">
-                      {new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {/* Date-only strings parse as UTC midnight and render as
+                          the PREVIOUS day in US zones. Anchor at noon UTC so
+                          the calendar date survives (same fix as
+                          YesterdayBoard). */}
+                      {new Date(String(r.date).includes('T') ? r.date : `${r.date}T12:00:00Z`)
+                        .toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   )}
                 </div>
