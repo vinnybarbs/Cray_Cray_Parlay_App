@@ -314,7 +314,7 @@ export default function HouseLedger() {
                       <span className="min-w-0">
                         <span className="text-ink-100 font-medium truncate block">{p.pick}</span>
                         {p.away_team && p.home_team && (
-                          <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}</span>
+                          <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</span>
                         )}
                       </span>
                       <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
@@ -341,7 +341,7 @@ export default function HouseLedger() {
                         <span className="min-w-0">
                           <span className="text-ink-100 font-medium truncate block">{p.pick}</span>
                           {p.away_team && p.home_team && (
-                            <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}</span>
+                            <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</span>
                           )}
                         </span>
                         <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
