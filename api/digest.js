@@ -119,6 +119,10 @@ async function getDigest(req, res) {
         .from('ai_suggestions')
         .select('sport, actual_outcome, pick, home_team, away_team, bet_type, resolved_at')
         .gt('resolved_at', cutoff)
+        // resolved_at alone lets a maintenance pass that restamps old rows
+        // (like the 2026-08-09 frozen-cohort restore) flood "recent results"
+        // with months-old picks. The game itself must also be recent.
+        .gt('game_date', cutoff)
         .in('actual_outcome', ['won', 'lost'])
         // Traps grade inverted (named side losing is a correct call) and
         // Legs are tracked material, not bets. Counting either here would

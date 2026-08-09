@@ -100,7 +100,12 @@ async function getPublicLedger(req, res) {
           .select('id, sport, home_team, away_team, bet_type, pick, odds, edge_pp, tier, game_date, created_at, last_revised_at, resolved_at, actual_outcome')
           .like('session_id', 'auto_digest%')
           .in('actual_outcome', ['won', 'lost', 'push'])
-          .order('resolved_at', { ascending: false })
+          // Recency on the ledger means when the GAME happened, not when the
+          // row was stamped. Sorting by resolved_at surfaced months-old picks
+          // as "today" whenever a maintenance pass touched their timestamps
+          // (2026-08-09: the frozen-cohort restore put April runline picks at
+          // the top of the ledger).
+          .order('game_date', { ascending: false })
           .range(page * PAGE, page * PAGE + PAGE - 1);
         if (error) throw error;
         all.push(...(data || []));
