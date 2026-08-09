@@ -8,6 +8,7 @@
 // coverage: games with odds vs games with fresh analyses, per sport.
 
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
+const { siteDay } = require('../shared/site-day.js');
 
 // odds_cache stores provider slugs, game_analysis stores display names.
 function slugToSport(slug) {
@@ -42,7 +43,9 @@ module.exports = async function pipelineHealth(req, res) {
     const ago24h = new Date(now - 24 * 3600e3).toISOString();
     const ago48h = new Date(now - 48 * 3600e3).toISOString();
     const ago12h = new Date(now - 12 * 3600e3).toISOString();
-    const todayUtc = nowIso.split('T')[0];
+    // Digest sessions and parlay_date are keyed by the site day (America/Denver),
+    // so health checks must query the same day or every evening reads as zero.
+    const todaySite = siteDay();
 
     const [cronRows, oddsRows, analysisRows, oddsFresh, picksToday, parlaysToday, stalePending, errorRows] = await Promise.all([
       // Latest runs across all app-level cron jobs
@@ -70,11 +73,11 @@ module.exports = async function pipelineHealth(req, res) {
       // Graded picks published today by the digest pipeline
       supabase.from('ai_suggestions')
         .select('sport', { count: 'exact', head: true })
-        .eq('session_id', `auto_digest_${todayUtc}`),
+        .eq('session_id', `auto_digest_${todaySite}`),
       // Machine parlays built today
       supabase.from('house_parlays')
         .select('legs_count, status, combined_edge_pp, created_at')
-        .eq('parlay_date', todayUtc),
+        .eq('parlay_date', todaySite),
       // Picks that should have settled by now but haven't
       supabase.from('ai_suggestions')
         .select('sport', { count: 'exact', head: true })

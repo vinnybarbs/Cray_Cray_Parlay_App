@@ -98,7 +98,7 @@ async function getUpcomingGames(sports) {
 
   const { data, error } = await supabase
     .from('odds_cache')
-    .select('sport, home_team, away_team, commence_time, market_type, outcomes, bookmaker')
+    .select('sport, home_team, away_team, commence_time, market_type, outcomes, bookmaker, external_game_id')
     .or(orParts.join(','))
     .gte('commence_time', now)
     .lte('commence_time', twoDaysOut)
@@ -121,9 +121,13 @@ async function getUpcomingGames(sports) {
         home_team: row.home_team,
         away_team: row.away_team,
         game_date: row.commence_time,
+        odds_event_id: row.external_game_id || null,
         markets: {},
         h2hRows: []
       };
+    }
+    if (!games[key].odds_event_id && row.external_game_id) {
+      games[key].odds_event_id = row.external_game_id;
     }
 
     // Prefer DraftKings, fall back to FanDuel
@@ -259,7 +263,11 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
   if (existing) {
     const { error } = await supabase
       .from('ai_suggestions')
-      .update({ ...payload, last_revised_at: new Date().toISOString() })
+      .update({
+        ...payload,
+        odds_event_id: game.odds_event_id || null,
+        last_revised_at: new Date().toISOString(),
+      })
       .eq('id', existing.id);
     return { status: error ? 'error' : 'revised', error };
   }
@@ -270,6 +278,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
       home_team: game.home_team,
       away_team: game.away_team,
       game_date: game.game_date,
+      odds_event_id: game.odds_event_id || null,
       actual_outcome: 'pending',
       ...payload,
     });
