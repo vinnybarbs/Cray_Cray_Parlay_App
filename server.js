@@ -452,6 +452,12 @@ app.post('/cron/sync-ufc-data', syncUfcData);
 const backfillTrapSignals = require('./api/cron/backfill-trap-signals');
 app.post('/cron/backfill-trap-signals', backfillTrapSignals);
 
+// Football props data collection (shadow-first, publishes nothing).
+const syncNflProps = require('./api/cron/sync-nfl-props');
+app.post('/cron/sync-nfl-props', syncNflProps);
+const syncNflPlayerStats = require('./api/cron/sync-nfl-player-stats');
+app.post('/cron/sync-nfl-player-stats', syncNflPlayerStats);
+
 // Add cron endpoint to pre-analyze upcoming games with GPT-4o-mini
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');
 app.post('/cron/pre-analyze-games', preAnalyzeGames);
