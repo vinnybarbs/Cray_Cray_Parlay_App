@@ -7,6 +7,7 @@
 
 const crypto = require('crypto');
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
+const { siteDay } = require('../../shared/site-day.js');
 const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
@@ -108,7 +109,9 @@ async function getUpcomingGames(sports) {
   // Group by game
   const games = {};
   for (const row of (data || [])) {
-    const dateStr = new Date(row.commence_time).toISOString().split('T')[0];
+    // Site-local day, not UTC: an evening game after 6 PM Denver landed
+    // on tomorrow's key, which mislabeled every board day (2026-08-08).
+    const dateStr = siteDay(row.commence_time);
     const key = makeGameKey(row.home_team, row.away_team, dateStr);
 
     if (!games[key]) {
@@ -1356,7 +1359,7 @@ async function runPreAnalysis(sportSlugs) {
                 const isHomeMl = side === 'home_ml';
                 const isAwayMl = side === 'away_ml';
 
-                const sessionId = `auto_digest_${new Date().toISOString().split('T')[0]}`;
+                const sessionId = `auto_digest_${siteDay()}`;
                 const pickPayload = {
                   sport: sportDisplay,
                   bet_type: betType,
@@ -1445,7 +1448,7 @@ async function runPreAnalysis(sportSlugs) {
                       lure_score: t.lure_score,
                       trap_signals: t.signals || null,
                     };
-                    const trapSessionId = `auto_digest_trap_${new Date().toISOString().split('T')[0]}`;
+                    const trapSessionId = `auto_digest_trap_${siteDay()}`;
                     const saved = await upsertDailySuggestion(game, trapPayload, trapSessionId, { domain: 'trap' });
                     if (saved.status === 'settled') {
                       console.log(`  Trap already settled for ${game.game_key}, not revising`);
@@ -1506,7 +1509,7 @@ async function runPreAnalysis(sportSlugs) {
                         lure_score: null,
                         trap_signals: null,
                       };
-                      const legSessionId = `auto_digest_leg_${new Date().toISOString().split('T')[0]}`;
+                      const legSessionId = `auto_digest_leg_${siteDay()}`;
                       const saved = await upsertDailySuggestion(game, legPayload, legSessionId, { domain: 'leg' });
                       if (saved.status === 'settled') {
                         console.log(`  Leg already settled for ${game.game_key}, not revising`);
