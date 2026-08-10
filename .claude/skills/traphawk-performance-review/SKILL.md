@@ -40,7 +40,9 @@ Higher tiers should win more often over meaningful samples. Sharp Take under Str
 
 ## 2b. Muted markets and market shadow performance
 
-`select * from market_shadow_calibration();` grades every sport's RAW spread, total, and moneyline edges against finals, no publication needed. This is how a muted market earns its way back and how NFL and NCAAF markets get measured from week one. Report each muted market's shadow record and units at -110, and recommend re-enabling ONLY when the shadow record clears the juice break-even (52.4 percent at -110) over a real sample. Baseline for context, Aug 2026 MLB over 317 games: spreads 50.5 percent and -11.6u, totals 47.9 percent and -26.2u, both correctly muted; ml 53 percent, live.
+`select * from market_shadow_calibration();` grades every sport's RAW spread, total, and moneyline edges against finals, no publication needed. This is how a muted market earns its way back and how NFL and NCAAF markets get measured from week one. Report each muted market's shadow record and units at -110, and recommend re-enabling ONLY when the shadow record clears the juice break-even (52.4 percent at -110) over a real sample. Baseline for context, Aug 2026 MLB over 317 games: spreads 50.5 percent and -11.6u, totals 47.9 percent and -26.2u; ml 53 percent, live.
+
+Owner decision 2026-08-10: MLB spreads re-entered production at multiplier 0.21 (the shadow-fitted k) and MLB totals on probation at 0.10 even though the shadow measured a negative k. Tennis left the shadow list the same day and publishes through the ladder at 0.50. Every weekly review must report how these three re-entries are performing against their published record AND their shadow record, and recommend re-muting any of them that runs below break-even on a real published sample. Do not silently accept the multipliers as settled.
 
 ## 3. Edge calibration
 
@@ -73,7 +75,17 @@ Shadow promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded p
 select public.shadow_model_readiness();
 ```
 
-Report each model's publishable record against implied AND its units ("Tennis 30-7 on 37 publishable, 81.1 actual vs 78.2 implied, -0.28u, needs 75 and positive units"). Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record (the Aug 2026 lesson: the aggregate made Tennis look below-market while its publishable bucket was beating its own claims). And never judge on win rate alone: the same Tennis bucket won 81 percent and still lost units, because at heavy chalk the vig eats a 3 point edge. When a model calibrates well but cannot beat the vig, weigh the leg alternative in the promotion decision: it may belong in the Leg Pool feeding parlays, not the pick record. For CLV, if closing line data exists for the period, report average CLV in pp and percent beating close. Under 50% beating close is not marketing material, say so honestly.
+Report each model's publishable record against implied AND its units ("Tennis 30-7 on 37 publishable, 81.1 actual vs 78.2 implied, -0.28u, needs 75 and positive units"). Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record (the Aug 2026 lesson: the aggregate made Tennis look below-market while its publishable bucket was beating its own claims). And never judge on win rate alone: the same Tennis bucket won 81 percent and still lost units, because at heavy chalk the vig eats a 3 point edge. When a model calibrates well but cannot beat the vig, weigh the leg alternative in the promotion decision: it may belong in the Leg Pool feeding parlays, not the pick record. For CLV, the `pick_clv` view (shipped 2026-08-10) computes closing line value for every moneyline pick since 2026-07-11, joined by event id or kickoff instant. Canonical query:
+
+```sql
+select tier, count(*) as n, round(avg(clv_pp), 2) as avg_clv_pp,
+       round(100.0 * count(*) filter (where clv_pp > 0) / count(*), 1) as pct_beat_close
+from pick_clv
+where actual_outcome in ('won','lost','push')
+group by tier order by tier;
+```
+
+Report average CLV in pp and percent beating close per tier. First baseline, 2026-08-10 over 229 picks: overall +0.19pp and 53.3 percent beating close, Sharp Take +1.81pp. CLV is the earliest honest signal of edge drift, a tier whose CLV goes negative is losing its edge before the win rate shows it. Under 50 percent beating close is not marketing material, say so honestly.
 
 ## 6. Historical context that prevents false findings
 
