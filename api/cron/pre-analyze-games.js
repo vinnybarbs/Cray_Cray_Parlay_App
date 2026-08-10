@@ -51,7 +51,10 @@ const SLUG_TO_SPORT = {
 // model calibrates on settled shadow reads. Soccer uses the three-way 1X2
 // module, tennis and UFC use market-consensus player models. Designs and
 // un-shadow criteria live in docs/models/.
-const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'Tennis', 'UFC']);
+// Tennis promoted to production 2026-08-10 at owner direction. It publishes
+// through the normal ladder under its 0.50 calibration multiplier. UFC and
+// soccer stay shadowed until they clear the readiness bar.
+const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'UFC']);
 
 // ATP slams are best of five. Everything else, including all WTA events,
 // is best of three. The tennis model prices the reliability gap between
