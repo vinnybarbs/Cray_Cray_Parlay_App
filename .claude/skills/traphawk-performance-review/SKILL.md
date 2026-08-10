@@ -44,6 +44,8 @@ Higher tiers should win more often over meaningful samples. Sharp Take under Str
 
 Owner decision 2026-08-10: MLB spreads re-entered production at multiplier 0.21 (the shadow-fitted k) and MLB totals on probation at 0.10 even though the shadow measured a negative k. Tennis left the shadow list the same day and publishes through the ladder at 0.50. Every weekly review must report how these three re-entries are performing against their published record AND their shadow record, and recommend re-muting any of them that runs below break-even on a real published sample. Do not silently accept the multipliers as settled.
 
+Football plan, same owner decision: NFL and NCAAF are in SHADOW_SPORTS through preseason. Every preseason game gets full analysis and its raw edges get shadow graded, nothing publishes. Weekly reviews during preseason must report the football shadow record per market. Go-live is a deliberate flip at the openers, NCAAF 2026-08-29 and NFL 2026-09-10: remove the sport from SHADOW_SPORTS and seed its multipliers from the preseason measured_k. Do not promote early on a hot preseason sample, and do not let the flip date slip silently.
+
 ## 3. Edge calibration
 
 For settled picks in the last 30 days, bucket by stated edge and compare implied versus actual:

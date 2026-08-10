@@ -54,7 +54,15 @@ const SLUG_TO_SPORT = {
 // Tennis promoted to production 2026-08-10 at owner direction. It publishes
 // through the normal ladder under its 0.50 calibration multiplier. UFC and
 // soccer stay shadowed until they clear the readiness bar.
-const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'UFC']);
+//
+// NFL and NCAAF are shadowed for PRESEASON ONLY (owner decision
+// 2026-08-10): full analysis and nightly shadow grading of every raw
+// edge, zero publication, so the preseason slate trains the calibration
+// before a single pick goes public. Go-live is a deliberate flip at the
+// season openers (NCAAF 2026-08-29, NFL 2026-09-10): remove the sport
+// from this set and seed its edge_calibration multipliers from the
+// preseason market_shadow_calibration() measured_k.
+const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'UFC', 'NFL', 'NCAAF']);
 
 // ATP slams are best of five. Everything else, including all WTA events,
 // is best of three. The tennis model prices the reliability gap between
