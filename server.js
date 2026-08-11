@@ -457,6 +457,8 @@ const syncNflProps = require('./api/cron/sync-nfl-props');
 app.post('/cron/sync-nfl-props', syncNflProps);
 const syncNflPlayerStats = require('./api/cron/sync-nfl-player-stats');
 app.post('/cron/sync-nfl-player-stats', syncNflPlayerStats);
+const repricePendingPicks = require('./api/cron/reprice-pending-picks');
+app.post('/cron/reprice-pending-picks', repricePendingPicks);
 
 // Add cron endpoint to pre-analyze upcoming games with GPT-4o-mini
 const preAnalyzeGames = require('./api/cron/pre-analyze-games');

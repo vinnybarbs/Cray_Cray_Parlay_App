@@ -36,7 +36,9 @@ Also pull the `overall` rows. Present Sharp Take first (it is the flagship), the
 
 ## 2. Tier monotonicity
 
-Higher tiers should win more often over meaningful samples. Sharp Take under Strong Play over 30 days or more is a calibration finding, not a fluke to smooth over.
+Higher tiers should win more often over meaningful samples. A higher tier under a lower one over 30 days or more is a calibration finding, not a fluke to smooth over.
+
+Ladder change 2026-08-10: Strong Play merged into Play, the live ladder is Sharp Take 10pp+, Play 4-10pp, Lean 2-4pp. The old 4-7 and 7-10 bands were indistinguishable over every window and both carried negative CLV. Historical rows keep their stored Strong Play tier, so tier queries over windows that cross the merge date will show both labels, treat Strong Play rows as Play when judging the ladder. A lock-time reprice cron (reprice-pending-picks, every 30 min) demotes pending Play moneyline picks to Lean when the market fades their side by 1pp of implied probability inside 90 minutes of first pitch, check its cron_job_logs demote counts when reviewing Play performance. Per-band calibration multipliers are planned for football go-live, revisit tier boundaries only at 500+ settled picks per band.
 
 ## 2b. Muted markets and market shadow performance
 

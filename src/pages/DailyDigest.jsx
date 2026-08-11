@@ -1397,7 +1397,7 @@ export default function DailyDigest({ onBack }) {
   // Count tiles by tier so we can render a count-first hero ("12 Sharp Takes today").
   // Cheaper than rendering every tile twice, derived once per data refresh.
   const tierCounts = useMemo(() => {
-    const c = { sharpTakes: 0, strongPlays: 0, plays: 0, leans: 0, traps: 0 }
+    const c = { sharpTakes: 0, plays: 0, leans: 0, traps: 0 }
     if (!data?.gamesBySport) return c
     for (const games of Object.values(data.gamesBySport)) {
       for (const g of games) {
@@ -1406,8 +1406,9 @@ export default function DailyDigest({ onBack }) {
         c.traps += Array.isArray(g.trap_calls) ? g.trap_calls.length : 0
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp == null) continue
+        // Strong Play merged into Play 2026-08-10, the ladder is three
+        // actionable tiers: Sharp Take 10+, Play 4-10, Lean 2-4.
         if (pp >= 10) c.sharpTakes++
-        else if (pp >= 7) c.strongPlays++
         else if (pp >= 4) c.plays++
         else if (pp >= 2) c.leans++
       }
@@ -1528,20 +1529,14 @@ export default function DailyDigest({ onBack }) {
                 tierCounts.sharpTakes > 0 ? (
                   <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
                     <span className="text-signal-pos">{tierCounts.sharpTakes}</span> Sharp Take{tierCounts.sharpTakes !== 1 ? 's' : ''}
-                    {tierCounts.strongPlays > 0 && (
-                      <span className="text-ink-400"> · </span>
-                    )}
-                    {tierCounts.strongPlays > 0 && (
-                      <span><span className="text-signal-pos">{tierCounts.strongPlays}</span> <span className="text-ink-200">Strong</span></span>
-                    )}
                   </h1>
-                ) : tierCounts.strongPlays > 0 ? (
+                ) : tierCounts.plays > 0 ? (
                   <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
-                    <span className="text-signal-pos">{tierCounts.strongPlays}</span> Strong Play{tierCounts.strongPlays !== 1 ? 's' : ''}
+                    <span className="text-signal-pos">{tierCounts.plays}</span> Play{tierCounts.plays !== 1 ? 's' : ''}
                   </h1>
                 ) : (
                   <h1 className="font-mono text-2xl md:text-3xl font-bold tracking-tight text-ink-100 leading-tight">
-                    Quiet board. No tiles cleared 7pp today
+                    Quiet board. No tiles cleared 4pp today
                   </h1>
                 )
               ) : (
@@ -1703,8 +1698,7 @@ function EdgeLegendModal({ open, onClose }) {
 
   const tiers = [
     { range: '≥ 10pp', label: 'Sharp Take',  sub: 'sharp take',  cls: 'text-signal-pos font-semibold' },
-    { range: '7-10pp', label: 'Strong Play', sub: 'hammer it',   cls: 'text-signal-pos font-semibold' },
-    { range: '4-7pp',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
+    { range: '4-10pp', label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
     { range: '2-4pp',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
     { range: '-2-2pp', label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
     { range: 'baited', label: 'Trap',        sub: 'fade it',     cls: 'text-signal-neg font-semibold' },
