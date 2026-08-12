@@ -82,6 +82,33 @@ group by 1;
 
 An in-season sport with games in the window but analyses older than 6 hours (and not gate-skipped) means pre-analyze is not covering the board.
 
+## 6. Odds cache starvation
+
+pg_cron records success when the HTTP post succeeds, even if the edge function times out, so refresh-odds failures are invisible in job status. The 2026-08-12 incident: football markets opening blew the function's time limit after its global delete, MLB and tennis vanished from odds_cache for a whole day, and every fire read as success. Check the cache directly:
+
+```sql
+select sport, count(*) as future_rows,
+       round(extract(epoch from (min(commence_time) - now())) / 3600, 1) as first_game_hrs
+from odds_cache where commence_time > now()
+group by sport order by min(commence_time);
+```
+
+An in-season sport with zero future rows, or a first game hundreds of hours out, means the refresher is failing regardless of what cron says. Cross-check edge gateway status codes in the Supabase function logs if it looks wrong. pre-analyze games_found 0 with no error on an in-season sport is the same failure seen from downstream.
+
+## 7. Silent-witness outputs
+
+Some jobs write no cron_job_logs at all; their output table is the only witness. Check each has produced rows on its expected cadence:
+
+```sql
+select 'house_parlays' as job, max(created_at) as newest from house_parlays
+union all
+select 'closing_lines', max(captured_at) from closing_lines
+union all
+select 'player_props', max(last_updated) from player_props;
+```
+
+house_parlays builds twice daily in season. closing_lines captures every 15 minutes. A stale newest here is a finding even when every logged job reads green.
+
 ## Reporting
 
 Keep it terse. ALL CLEAR plus the two or three numbers that prove it, or findings ranked by user impact (public stats wrong beats a noisy log). Plain punctuation, no em dashes, en dashes, semicolons, or arrows.

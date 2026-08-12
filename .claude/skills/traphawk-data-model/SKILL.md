@@ -9,19 +9,20 @@ Supabase project id: `pcjhulzyqmhrhsrgvwvx`. Query it with the Supabase `execute
 
 ## The pipeline in one paragraph
 
-Math picks the side, Claude narrates. `api/cron/pre-analyze-games.js` computes per-side edges (edge calculator for team sports, dedicated models in `docs/models/` for tennis, UFC, soccer), then calls Sonnet only to write the analysis. The LLM never chooses the side. Shadow sports (Tennis, UFC, soccer family in `SHADOW_SPORTS`) store edges and analyses but never publish picks to the record; they graduate after 150 graded shadow reads.
+Math picks the side, Claude narrates. `api/cron/pre-analyze-games.js` computes per-side edges (edge calculator for team sports, dedicated models in `docs/models/` for tennis, UFC, soccer), then calls Sonnet only to write the analysis. The LLM never chooses the side. Shadow sports (`SHADOW_SPORTS`: UFC, the soccer family, and NFL plus NCAAF through preseason) store edges and analyses but never publish picks. Tennis left the shadow list 2026-08-10 and publishes through the ladder at a 0.50 multiplier. Football go-live is a deliberate flip at the openers, NCAAF 2026-08-29 and NFL 2026-09-10, seeded from preseason `market_shadow_calibration()` measured_k. Shadow promotion for player sports is judged by `shadow_model_readiness()`: 75 graded publishable reads, actual at or above fair implied, AND positive publishable units. Never a raw read count.
 
-## Tier system (edge in percentage points vs implied probability)
+## Tier system (CALIBRATED edge in percentage points vs implied probability)
 
 | Tier | Rule |
 |---|---|
-| Sharp Take | edge >= 10pp |
-| Strong Play | edge >= 7pp |
-| Play | edge >= 4pp |
+| Sharp Take | edge >= 10pp AND price lighter than -150 (the chalk fence, 2026-08-10: heavier chalk publishes as Play, break-even at -150 is 60 percent and heavy-chalk claimed edges measured as mostly vig) |
+| Play | edge 4-10pp, or a 10pp+ edge fenced for price. Strong Play (7-10pp) merged into Play 2026-08-10; historical rows keep the stored label, treat them as Play |
 | Lean | edge >= 2pp (2pp is the floor for a published pick) |
 | Skip | edge between -2pp and 2pp |
 | Trap | lure-based, side priced <= -2pp that casual bettors are drawn to (`lib/services/trap-detector.js`). NOT simply the inverse of a pick |
 | Leg | model probability >= 65% to win but no 2pp edge (payout too thin). Tracked for parlay building |
+
+Edges are calibrated by `edge_calibration` multipliers (keys `<Sport>:<market>`, `<Sport>`, `__global__`) before tiering. Current posture: MLB ml about 0.92, MLB spread 0.21 (re-entered 2026-08-10 at shadow-fitted k), MLB total 0.10 (probation, shadow measured NEGATIVE k), Tennis 0.50. A `reprice-pending-picks` cron demotes pending Play moneyline picks to Lean when the market fades their side by 1pp of implied probability inside 90 minutes of first pitch.
 
 ## Record domains in ai_suggestions
 
@@ -31,7 +32,13 @@ Rows are namespaced by `session_id` prefix, one row per game per domain per day:
 - `auto_digest_trap_YYYY-MM-DD` = trap calls. Graded as the FADE: a won trap row means the named trap side lost
 - `auto_digest_leg_YYYY-MM-DD` = legs (65%+ sides), outcomes read straight
 
-A partial unique index (`uq_ai_suggestions_auto_digest_game`) dedupes on (session_id, home, away, game_date). Rows with `voided_at` set are retroactively voided (published under a later-discovered defect) and excluded from mv_public_record; filter `voided_at is null` in any raw query that should match the public record. Key columns: sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, actual_outcome, reasoning, fact_check fields, and for traps lure_score plus trap_signals, for legs model_prob plus implied_prob.
+A partial unique index (`uq_ai_suggestions_auto_digest_game`) dedupes on (session_id, home, away, game_date), and since 2026-08-12 the upsert matches on `odds_event_id` per domain FIRST, so a start-time re-emit revises the existing row instead of duplicating it (three tennis duplicates double counted the record before this). Rows with `voided_at` set are retroactively voided (published under a later-discovered defect, or duplicates) and excluded from mv_public_record; filter `voided_at is null` in any raw query that should match the public record. Key columns: sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, actual_outcome, reasoning, `odds_event_id` (the Odds API event the pick was priced from, on every row since 2026-08-09), and for traps lure_score plus trap_signals, for legs model_prob plus implied_prob.
+
+THE FROZEN COHORT: 529 rows share `resolved_at = '2026-08-09 12:13:08.323644-06'`. They were regraded, then restored at owner direction the same day after six forensic audits returned a mixed verdict. NEVER re-flip them in any sweep. Details and row lists live in agent_reports (2026-08-09).
+
+## Settlement and the one clock
+
+Same-game identity resolves in strict order: `odds_event_id` (primary-key hit against `odds_api_scores`), then kickoff instant within 3 hours, then exact Denver calendar day. America/Denver is the ONLY timezone that may produce a calendar day anywhere in the pipeline, via `shared/site-day.js` (lib/services/sport-day.js delegates to it). A tripwire test fails the build on any new UTC day derivation. `game_results.date` rows stamped before 2026-07-25 were UTC-derived and can be one day late for evening games; do not treat them as ground truth for which night a game was played.
 
 ## mv_public_record is the ONLY source for public percentages
 
@@ -62,6 +69,11 @@ Skipping this silently zeroes every public stat on the site.
 - `tennis_rankings`, `tennis_match_results`, `ufc_fighters`, `ufc_fight_results`: player-sport context synced from ESPN. Player keys are normalized: NFD strip accents, lowercase, strip punctuation ("Fábián Marozsán" becomes "fabian marozsan").
 - `golf_field`: tournament fields with prices and research notes.
 - `agent_reports`: the digital workers' shared blackboard. Every scheduled review, audit, ops check, and significant build session files a summary row here and reads recent rows before starting. When investigating anything, check it early: another worker may have already diagnosed it.
+- `closing_lines`: closing prices captured every 15 minutes since 2026-07-11 (h2h, spreads, totals, per book, with `external_game_id` and real commence instants).
+- `pick_clv` (view): closing line value per moneyline pick, joined by event id or kickoff instant. `clv_pp` positive means the pick beat the close. The earliest honest signal of edge drift.
+- `odds_api_scores`: finals from The Odds API keyed by `event_id` with real commence instants. The settlement grader's first stop and the independent cross-check source against ESPN-backed `game_results`.
+- `player_props`: raw props market rows (event, market, player_key, line, over/under/yes prices, per book), NFL preseason collection first. `player_game_stats`: ESPN box-score stats, football-shaped columns only.
+- `edge_calibration` plus `market_shadow_calibration(since date)`: multipliers and the shadow grader that lets muted markets earn their way back (re-enable bar 52.4 percent at -110 on a real sample).
 
 ## Player sports are different on purpose
 
