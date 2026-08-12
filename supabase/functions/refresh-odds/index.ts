@@ -240,11 +240,34 @@ async function refreshOdds(req: Request): Promise<Response> {
     //   - Fetch core markets, clear old rows for those sports, insert fresh data
     //   - Then fetch per-event player props and insert those as well.
 
-    const SPORTS_TO_REFRESH = SPORTS;
-    const allSportGames: Array<{ sport: string; games: any[] }> = [];
+    // Per-sport atomic replace (2026-08-12). The old flow fetched every
+    // sport into memory, deleted ALL sports' rows in one statement, then
+    // upserted one row per market per book per game sequentially, then
+    // walked a per-event props loop with a 1.5s delay per event. When
+    // football markets opened (~2,000 events) the function blew the edge
+    // time limit mid-insert on every run: the global delete had already
+    // fired, so MLB and tennis vanished from the cache while the gateway
+    // returned 504 and pg_cron recorded success. Now each sport is
+    // fetched, horizon-filtered, and swapped in batched writes, so a slow
+    // or failed sport can never destroy another sport's rows, and a hard
+    // time budget stops starting new sports before the platform kills the
+    // function.
 
-    // 1) Fetch core odds for NFL & NBA
-    for (const sport of SPORTS_TO_REFRESH) {
+    const HORIZON_DAYS = 21;          // ignore events further out than this
+    const TIME_BUDGET_MS = 100_000;   // stop starting new sports after this
+    const INSERT_CHUNK = 500;
+    const horizonMs = Date.now() + HORIZON_DAYS * 24 * 3600 * 1000;
+
+    const coreGames: Record<string, any[]> = {};
+    let totalGames = 0;
+    let totalOddsInserted = 0;
+    const skippedForTime: string[] = [];
+
+    for (const sport of SPORTS) {
+      if (Date.now() - startTime > TIME_BUDGET_MS) {
+        skippedForTime.push(sport);
+        continue;
+      }
       try {
         const params = new URLSearchParams({
           apiKey: oddsApiKey,
@@ -262,68 +285,74 @@ async function refreshOdds(req: Request): Promise<Response> {
           console.log(`⚠️ Core odds request failed for ${sport}: ${response.status}`);
           continue;
         }
+        await logRateLimit(response);
 
-        const games = await response.json() as any[];
-        console.log(`✅ Fetched ${games.length} games for ${sport}`);
-        allSportGames.push({ sport, games });
-      } catch (err) {
-        console.error(`❌ Error fetching core odds for ${sport}:`, err);
-      }
-    }
+        const games = (await response.json() as any[])
+          .filter(g => g?.commence_time && new Date(g.commence_time).getTime() < horizonMs);
+        console.log(`✅ Fetched ${games.length} games for ${sport} inside ${HORIZON_DAYS}d horizon`);
+        coreGames[sport] = games;
 
-    // 2) Clear old odds data only for NFL & NBA, then insert fresh data
-    console.log("🗑️ Clearing old NFL & NBA odds data...");
-    const { error: deleteError } = await supabase
-      .from("odds_cache")
-      .delete()
-      .in("sport", SPORTS_TO_REFRESH);
-
-    if (deleteError) {
-      console.error("⚠️ Error clearing old odds:", deleteError);
-    }
-
-    console.log("💾 Inserting fresh core odds data...");
-    let totalGames = 0;
-    let totalOddsInserted = 0;
-
-    for (const { sport, games } of allSportGames) {
-      totalGames += games.length;
-
-      for (const game of games) {
-        for (const bookmaker of (game.bookmakers || [])) {
-          for (const market of (bookmaker.markets || [])) {
-            const record = {
-              sport,
-              external_game_id: game.id,
-              commence_time: game.commence_time,
-              home_team: game.home_team,
-              away_team: game.away_team,
-              bookmaker: bookmaker.key,
-              market_type: market.key,
-              outcomes: market.outcomes,
-              last_updated: new Date().toISOString()
-            };
-
-            const { error } = await supabase
-              .from("odds_cache")
-              .upsert(record, {
-                onConflict: "external_game_id,bookmaker,market_type"
+        const now = new Date().toISOString();
+        const rows: any[] = [];
+        for (const game of games) {
+          for (const bookmaker of (game.bookmakers || [])) {
+            for (const market of (bookmaker.markets || [])) {
+              rows.push({
+                sport,
+                external_game_id: game.id,
+                commence_time: game.commence_time,
+                home_team: game.home_team,
+                away_team: game.away_team,
+                bookmaker: bookmaker.key,
+                market_type: market.key,
+                outcomes: market.outcomes,
+                last_updated: now
               });
-
-            if (error) {
-              console.log("⚠️ Error upserting core odds:", error.message || error);
-            } else {
-              totalOddsInserted++;
             }
           }
         }
+
+        // Swap this sport's rows only now that fresh data is in hand. A
+        // fetch failure above leaves yesterday's rows serving the board.
+        const { error: deleteError } = await supabase
+          .from("odds_cache")
+          .delete()
+          .eq("sport", sport);
+        if (deleteError) {
+          console.error(`⚠️ Error clearing ${sport}, keeping old rows:`, deleteError);
+          continue;
+        }
+        for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+          const chunk = rows.slice(i, i + INSERT_CHUNK);
+          const { error } = await supabase
+            .from("odds_cache")
+            .upsert(chunk, { onConflict: "external_game_id,bookmaker,market_type" });
+          if (error) console.log(`⚠️ Error inserting ${sport} chunk:`, error.message || error);
+          else totalOddsInserted += chunk.length;
+        }
+        totalGames += games.length;
+      } catch (err) {
+        console.error(`❌ Error refreshing ${sport}:`, err);
       }
+      await delay(250);
+    }
+    if (skippedForTime.length > 0) {
+      console.log(`⏱️ Time budget hit, sports carried to next run: ${skippedForTime.join(", ")}`);
     }
 
-    // 3) Fetch and insert player props via per-event endpoint for NFL & NBA
-    console.log("🎯 Fetching player props for NFL & NBA games...");
+    // Player props: hard-capped inline walk. The dedicated sync crons own
+    // props at scale; this pass only freshens events inside 48 hours, at
+    // most 15 per sport, so 991 preseason NFL events can never eat the
+    // run the way the uncapped loop did.
+    console.log("🎯 Fetching capped player props...");
+    const PROPS_WINDOW_MS = 48 * 3600 * 1000;
+    const PROPS_MAX_EVENTS = 15;
 
-    for (const { sport, games } of allSportGames) {
+    for (const sport of PROP_SPORTS) {
+      if (Date.now() - startTime > TIME_BUDGET_MS) break;
+      const games = (coreGames[sport] || [])
+        .filter(g => new Date(g.commence_time).getTime() - Date.now() < PROPS_WINDOW_MS)
+        .slice(0, PROPS_MAX_EVENTS);
       const propList = PROP_MARKETS[sport as keyof typeof PROP_MARKETS];
       if (!propList || propList.length === 0) continue;
 
@@ -396,20 +425,20 @@ async function refreshOdds(req: Request): Promise<Response> {
         }
 
         // Small delay between prop requests to avoid hitting rate limits too fast
-        await delay(DELAYS.betweenProps);
+        await delay(250);
       }
     }
 
     const duration = Date.now() - startTime;
-    const totalGamesProcessed = allSportGames.reduce((sum, sg) => sum + sg.games.length, 0);
 
-    console.log("✅ Quick refresh complete!");
-    console.log(`📊 Processed ${totalGamesProcessed} games across NFL & NBA`);
+    console.log("✅ Refresh complete!");
+    console.log(`📊 Processed ${totalGames} games, ${totalOddsInserted} rows, ${duration}ms`);
 
     return new Response(JSON.stringify({
       status: "success",
-      totalGames: totalGamesProcessed,
+      totalGames,
       totalOddsInserted,
+      skippedForTime,
       duration
     }), {
       status: 200,
