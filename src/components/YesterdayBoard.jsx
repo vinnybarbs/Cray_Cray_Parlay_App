@@ -116,7 +116,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
             <p className="px-4 py-6 text-sm text-ink-400 text-center">Nothing was published yesterday either. The slate was dark.</p>
           ) : (
             data.picks.map((p, i) => {
-              const tier = edgeTier(p.edge_pp)
+              const tier = edgeTier(p.edge_pp, p.odds)
               const isOpen = openRow === i
               return (
                 <div key={i}>

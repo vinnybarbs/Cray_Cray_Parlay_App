@@ -946,7 +946,7 @@ Return ONLY valid JSON array with this format:
             edgePp = Math.round(signed * 1000) / 10;
             const raw = ga?.[0]?.edges_raw?.[side];
             edgePpRaw = raw != null ? Math.round(raw * 1000) / 10 : edgePp;
-            tier = edgeTier(edgePp);
+            tier = edgeTier(edgePp, pick.odds);
           }
         }
       } catch { /* snapshot is best-effort, never block saving the pick */ }

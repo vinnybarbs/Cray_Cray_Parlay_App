@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { edgeTier, formatPp, edgePpForSide } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, breakEvenPct } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
@@ -266,7 +266,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                   legacy 0-10 edge_score. Showing both on one screen confused
                   users: "is it 12.3pp or 10/10?" The pp number is the truth;
                   edge_score is a saturated derivative of the same data. */}
-              <EdgeChip signedPp={edgePpForSide(analysis.edges, analysis.recommended_side)} />
+              <EdgeChip signedPp={edgePpForSide(analysis.edges, analysis.recommended_side)} odds={lockOddsFor(analysis)} />
               {analysis.edge_movement && (
                 <span className="text-sm flex items-center gap-1 text-ink-300">
                   Movement: {edgeMovementIcon(analysis.edge_movement)}
@@ -629,8 +629,8 @@ function DeepResearchModal({ gameKey, game, onClose }) {
 // Take" reads as a model take with documented hit-rate range, not as 10/10
 // confidence in a coin flip.
 
-function EdgeChip({ signedPp, size = 'md' }) {
-  const tier = edgeTier(signedPp)
+function EdgeChip({ signedPp, odds = null, size = 'md' }) {
+  const tier = edgeTier(signedPp, odds)
   const pp = formatPp(signedPp)
   const isNeg = signedPp != null && signedPp < 0
   const isPos = signedPp != null && signedPp > 0
@@ -801,7 +801,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               <div className="font-mono text-[11px] text-ink-500 mt-0.5 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
             )}
           </div>
-          <EdgeChip signedPp={signedPp} />
+          <EdgeChip signedPp={signedPp} odds={lockOddsFor(game)} />
         </div>
 
         {/* Recommended read. A trap read (negative edge) must never render
@@ -822,6 +822,17 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
             <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
               <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick</div>
               <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+              {(() => {
+                {/* Break-even = risk / (risk + win). Teaches the price: a
+                    -180 pick must win 64.3% just to tread water, +122 only
+                    45%. The number that explains why chalk is fenced. */}
+                const be = breakEvenPct(lockOddsFor(game))
+                return be != null ? (
+                  <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">
+                    break-even {be.toFixed(1)}% at this price
+                  </div>
+                ) : null
+              })()}
             </div>
           )
           if (game.recommended_pick && isLegGame) return (
@@ -1008,7 +1019,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   const injuryCode = ANALYSIS_SPORT_TO_CODE[sport] || sport
   const injuryEntry = injuries[injuryCode]
   const topSignedPp = pickGames[0] ? ppFor(pickGames[0]) : null
-  const topTier = edgeTier(topSignedPp)
+  const topTier = edgeTier(topSignedPp, pickGames[0] ? lockOddsFor(pickGames[0]) : null)
 
   // Use game_key from the DB directly (returned by /api/digest)
   function getGameKey(game) {
@@ -1061,7 +1072,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         >
           {topGames.map((game, i) => {
             const pp = ppFor(game)
-            const tier = edgeTier(pp)
+            const tier = edgeTier(pp, lockOddsFor(game))
             return (
               <div key={i} className="flex items-center justify-between gap-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
@@ -1407,10 +1418,12 @@ export default function DailyDigest({ onBack }) {
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp == null) continue
         // Strong Play merged into Play 2026-08-10, the ladder is three
-        // actionable tiers: Sharp Take 10+, Play 4-10, Lean 2-4.
-        if (pp >= 10) c.sharpTakes++
-        else if (pp >= 4) c.plays++
-        else if (pp >= 2) c.leans++
+        // actionable tiers: Sharp Take 10+, Play 4-10, Lean 2-4. The
+        // count applies the same chalk fence as the tier chips.
+        const label = edgeTier(pp, lockOddsFor(g))?.label
+        if (label === 'Sharp Take') c.sharpTakes++
+        else if (label === 'Play') c.plays++
+        else if (label === 'Lean') c.leans++
       }
     }
     return c
