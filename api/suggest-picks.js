@@ -51,7 +51,7 @@ async function storeAISuggestions(suggestions, options = {}) {
         pipeline_version: 6,
         edge_pp: edgePp,
         edge_pp_raw: suggestion.edgePpRaw ?? edgePp,
-        tier: edgeTier(edgePp)
+        tier: edgeTier(edgePp, suggestion.odds)
       };
     });
 

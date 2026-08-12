@@ -1396,7 +1396,7 @@ async function runPreAnalysis(sportSlugs) {
                   pipeline_version: 6,
                   edge_pp: edgePp,
                   edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
-                  tier: pickGrader.edgeTier(edgePp),
+                  tier: pickGrader.edgeTier(edgePp, pickOdds),
                   model_prob: isHomeMl ? edgeData?.homeWinProb ?? null
                             : isAwayMl ? edgeData?.awayWinProb ?? null : null,
                   implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null

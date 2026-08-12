@@ -24,9 +24,24 @@ export function tierRange(label) {
   return t ? t.range : null
 }
 
-// 6-tier label scheme from signed edge in percentage points.
+// Sharp Take chalk fence: no Sharp Take heavier than -150. Break-even at
+// -150 is 60 percent, and heavy-chalk claimed edges measured as mostly
+// vig (45d: chalk Sharp Takes +2.8u vs dog Sharp Takes +25.3u). Must
+// stay in lockstep with lib/services/pick-grader.js.
+const SHARP_TAKE_PRICE_FENCE = -150
+
+// Break-even win percentage for an American price: risk / (risk + win).
+// -150 needs 60.0, -180 needs 64.3, +122 needs only 45.0.
+export function breakEvenPct(americanOdds) {
+  const o = Number(String(americanOdds ?? '').replace(/[^0-9-]/g, ''))
+  if (!Number.isFinite(o) || o === 0) return null
+  return o > 0 ? 100 * 100 / (o + 100) : 100 * -o / (-o + 100)
+}
+
+// Tier label scheme from signed edge in percentage points, plus the price
+// fence when the pick's American odds are known.
 // Sharp-Quant aesthetic: graphite frame + amber/crimson signal accent.
-export function edgeTier(signedPp) {
+export function edgeTier(signedPp, americanOdds = null) {
   if (signedPp == null || Number.isNaN(signedPp)) {
     return { label: '-', subtitle: '', color: 'text-ink-400', bg: 'bg-ink-850 shadow-hairline' }
   }
@@ -43,6 +58,10 @@ export function edgeTier(signedPp) {
     return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
   }
   if (signedPp < 10) {
+    return { label: 'Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
+  }
+  const o = americanOdds != null ? Number(String(americanOdds).replace(/[^0-9-]/g, '')) : null
+  if (o != null && Number.isFinite(o) && o < 0 && o <= SHARP_TAKE_PRICE_FENCE) {
     return { label: 'Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
   }
   return { label: 'Sharp Take', subtitle: 'sharp take', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/40 shadow-hairline-pos-bright' }
