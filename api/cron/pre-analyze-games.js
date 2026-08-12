@@ -253,6 +253,43 @@ function deriveBetTypeAndPoint(side, oddsCtx) {
  * auto_digest_leg_).
  */
 async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick' } = {}) {
+  // Match by event id FIRST. Tennis re-emits matches with shifted start
+  // times, and the team+game_date match below treats the re-emit as a new
+  // game, publishing the same match twice (2026-08-12 ops finding: three
+  // duplicate rows double counted the live record). The event id is
+  // stable across reschedules, so an existing row for the same event in
+  // the same domain gets revised, and its game_date follows the
+  // reschedule so settlement matches the real instant.
+  if (game.odds_event_id) {
+    let evQuery = supabase
+      .from('ai_suggestions')
+      .select('id, actual_outcome')
+      .like('session_id', 'auto_digest%')
+      .eq('odds_event_id', game.odds_event_id);
+    evQuery = domain === 'trap' ? evQuery.eq('tier', 'Trap')
+            : domain === 'leg' ? evQuery.eq('tier', 'Leg')
+            : evQuery.or('tier.not.in.("Trap","Leg"),tier.is.null');
+    const { data: evRows } = await evQuery
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const evExisting = evRows?.[0] || null;
+    if (evExisting && evExisting.actual_outcome !== 'pending') {
+      return { status: 'settled' };
+    }
+    if (evExisting) {
+      const { error } = await supabase
+        .from('ai_suggestions')
+        .update({
+          ...payload,
+          game_date: game.game_date,
+          odds_event_id: game.odds_event_id,
+          last_revised_at: new Date().toISOString(),
+        })
+        .eq('id', evExisting.id);
+      return { status: error ? 'error' : 'revised', error };
+    }
+  }
+
   let query = supabase
     .from('ai_suggestions')
     .select('id, actual_outcome')
