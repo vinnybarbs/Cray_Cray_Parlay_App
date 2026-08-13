@@ -1444,9 +1444,17 @@ export default function DailyDigest({ onBack }) {
   const heroHitRate = (() => {
     const [period, label] = HERO_PERIODS[heroPeriodIdx]
     const st = data?.modelAccuracy?.[period]?.byTier?.['Sharp Take']
-    if (st?.winRate != null) return { name: 'Sharp Take', rate: st.winRate, won: st.won, lost: st.lost, label }
+    // Lead with the flagship only when it has a real sample in this
+    // window. Sharp Take issuance dropped after the mutes and the chalk
+    // fence, and a truthful "1-1" headline on an 18-11 heater day reads
+    // as a broken record (2026-08-12). Under 5 graded, show the model.
+    const stGraded = (st?.won ?? 0) + (st?.lost ?? 0)
+    if (st?.winRate != null && stGraded >= 5) {
+      return { name: 'Sharp Take', rate: st.winRate, won: st.won, lost: st.lost, label }
+    }
     const o = data?.modelAccuracy?.[period]?.overall
     if (o?.winRate != null) return { name: 'Model', rate: o.winRate, won: o.won, lost: o.lost, label }
+    if (st?.winRate != null) return { name: 'Sharp Take', rate: st.winRate, won: st.won, lost: st.lost, label }
     return { name: 'Sharp Take', rate: null, won: 0, lost: 0, label }
   })()
 
