@@ -629,8 +629,14 @@ function DeepResearchModal({ gameKey, game, onClose }) {
 // Take" reads as a model take with documented hit-rate range, not as 10/10
 // confidence in a coin flip.
 
-function EdgeChip({ signedPp, odds = null, size = 'md' }) {
-  const tier = edgeTier(signedPp, odds)
+function EdgeChip({ signedPp, odds = null, leg = false, size = 'md' }) {
+  let tier = edgeTier(signedPp, odds)
+  // A 65%+ side below the 2pp floor is a Leg, not a Skip. The tile body
+  // already said so, but the corner chip contradicted it (2026-08-12:
+  // "can't find any leg labels").
+  if (leg && tier?.label === 'Skip') {
+    tier = { label: 'Leg', subtitle: 'parlay material', color: 'text-ink-200', bg: 'bg-ink-850 shadow-hairline' }
+  }
   const pp = formatPp(signedPp)
   const isNeg = signedPp != null && signedPp < 0
   const isPos = signedPp != null && signedPp > 0
@@ -801,7 +807,12 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               <div className="font-mono text-[11px] text-ink-500 mt-0.5 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
             )}
           </div>
-          <EdgeChip signedPp={signedPp} odds={lockOddsFor(game)} />
+          <EdgeChip
+            signedPp={signedPp}
+            odds={lockOddsFor(game)}
+            leg={signedPp != null && signedPp < 2 && signedPp > -2
+              && Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0) >= 0.65}
+          />
         </div>
 
         {/* Recommended read. A trap read (negative edge) must never render
@@ -1007,7 +1018,19 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   // 2026-08-02). Traps are detector calls rendered as their OWN tiles,
   // independent of the pick, since one game can carry both.
   const ppFor = (g) => edgePpForSide(g.edges, g.recommended_side)
-  const pickGames = games.filter(g => g.recommended_pick && (ppFor(g) ?? 0) >= 2)
+  // Best edge first, everywhere. Unsorted, the collapsed preview showed
+  // the first three games by schedule and the section's headline chip
+  // came from whichever game the API returned first (2026-08-12: a Lean
+  // fronted a section that held a Sharp Take).
+  const pickGames = games
+    .filter(g => g.recommended_pick && (ppFor(g) ?? 0) >= 2)
+    .sort((a, b) => (ppFor(b) ?? 0) - (ppFor(a) ?? 0))
+  const legOf = (g) => {
+    const prob = Math.max(g.calc_home_prob ?? 0, g.calc_away_prob ?? 0)
+    const pp = ppFor(g)
+    return pp != null && pp < 2 && pp > -2 && prob >= 0.65 ? prob : null
+  }
+  const legGames = games.filter(g => g.recommended_pick && legOf(g) != null)
   const bubbleGames = games.filter(g => !pickGames.includes(g))
   const trapEntries = games.flatMap(g =>
     (Array.isArray(g.trap_calls) ? g.trap_calls : []).map(trap => ({ game: g, trap }))
@@ -1087,7 +1110,17 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               </div>
             )
           })}
-          {pickGames.length > 3 && (
+          {legGames.length > 0 && (
+            <div className="flex items-center gap-2 text-xs pt-0.5">
+              <span className="px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold flex-shrink-0 bg-ink-850 shadow-hairline text-ink-200">
+                Leg
+              </span>
+              <span className="text-ink-400 font-mono text-[11px]">
+                {legGames.length} parlay {legGames.length === 1 ? 'leg' : 'legs'} · 65%+ to hit, thin payout
+              </span>
+            </div>
+          )}
+          {(pickGames.length > 3 || legGames.length > 0) && (
             <p className="font-mono text-[10px] text-ink-500 text-center pt-1 uppercase tracking-[0.14em]">Tap to see all grades</p>
           )}
         </div>
