@@ -171,7 +171,7 @@ async function getDigest(req, res) {
             won,
             lost,
             total: decided,
-            winRate: decided > 0 ? Math.round((won / decided) * 100) : null,
+            winRate: decided > 0 ? Math.round((won / decided) * 1000) / 10 : null,
           };
         }
         return out;
@@ -190,7 +190,7 @@ async function getDigest(req, res) {
             won,
             lost,
             total: decided,
-            winRate: decided > 0 ? Math.round((won / decided) * 100) : null,
+            winRate: decided > 0 ? Math.round((won / decided) * 1000) / 10 : null,
           },
           bySport:   buildBreakdown(rows.filter(r => r.dimension_type === 'sport')),
           byBetType: buildBreakdown(rows.filter(r => r.dimension_type === 'bet_type')),
