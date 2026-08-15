@@ -563,37 +563,40 @@ async function executeTool(name, args) {
       }
 
       case 'get_model_performance': {
+        // Read the same rollup every public surface reads. The old raw
+        // query counted trap rows at face value, voided rows, soccer v1,
+        // Skips, Legs, and duplicate revisions, so De-Genny could quote
+        // a record matching nothing on the site (win-pct audit,
+        // 2026-08-12). mv_public_record is the one source of truth.
         const days = args.days || 7;
-        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+        const bucket = days <= 3 ? 'last_3d' : days <= 7 ? 'last_7d' : days <= 30 ? 'last_30d' : 'all';
 
-        let query = supabase
-          .from('ai_suggestions')
-          .select('sport, bet_type, actual_outcome, generate_mode')
-          .neq('actual_outcome', 'pending')
-          .gte('created_at', since);
-
-        if (args.sport) query = query.eq('sport', args.sport);
-
-        const { data } = await query;
+        const { data } = await supabase
+          .from('mv_public_record')
+          .select('dimension_type, dimension_value, won, lost, push, pending')
+          .eq('period_bucket', bucket)
+          .in('dimension_type', ['overall', 'tier', 'sport']);
 
         if (!data?.length) return { message: 'No resolved predictions in this period' };
 
-        const total = data.length;
-        const wins = data.filter(d => d.actual_outcome === 'won').length;
-        const losses = data.filter(d => d.actual_outcome === 'lost').length;
-
-        // Group by sport
+        const pct = (r) => (r.won + r.lost > 0 ? ((r.won / (r.won + r.lost)) * 100).toFixed(1) + '%' : 'N/A');
+        const overallRow = data.find(r => r.dimension_type === 'overall');
+        const byTier = {};
         const bySport = {};
-        data.forEach(d => {
-          if (!bySport[d.sport]) bySport[d.sport] = { wins: 0, losses: 0, total: 0 };
-          bySport[d.sport].total++;
-          if (d.actual_outcome === 'won') bySport[d.sport].wins++;
-          if (d.actual_outcome === 'lost') bySport[d.sport].losses++;
-        });
+        for (const r of data) {
+          const entry = { won: r.won, lost: r.lost, push: r.push, winRate: pct(r) };
+          if (r.dimension_type === 'tier') byTier[r.dimension_value] = entry;
+          if (r.dimension_type === 'sport') bySport[r.dimension_value] = entry;
+        }
+        if (byTier['Trap']) byTier['Trap'].note = 'graded as the fade: won means the named bait side lost';
 
+        const requested = args.sport && bySport[args.sport] ? { [args.sport]: bySport[args.sport] } : bySport;
         return {
-          overall: { total, wins, losses, winRate: total > 0 ? ((wins / (wins + losses)) * 100).toFixed(1) + '%' : 'N/A' },
-          bySport
+          window: bucket,
+          overall: overallRow ? { won: overallRow.won, lost: overallRow.lost, push: overallRow.push, winRate: pct(overallRow) } : null,
+          byTier,
+          bySport: requested,
+          source: 'mv_public_record, the same rollup the ledger and digest show',
         };
       }
 

@@ -1536,7 +1536,12 @@ export default function DailyDigest({ onBack }) {
             <span className="truncate">{data ? formatFullDate(null) : 'Loading...'}</span>
             <div className="flex items-center gap-4 flex-shrink-0">
               {heroHitRate && (
-                <span className="flex items-center gap-2" title="Sharp Take record for the selected window. Same numbers as The House Ledger.">
+                <span
+                  className="flex items-center gap-2"
+                  title={heroHitRate.name === 'Model'
+                    ? 'All actionable tiers combined for the selected window (Sharp Take shown instead once it has 5+ graded picks). Same numbers as The House Ledger.'
+                    : 'Sharp Take record for the selected window. Same numbers as The House Ledger.'}
+                >
                   <span>
                     {heroHitRate.name} ·{' '}
                     {heroHitRate.rate != null ? (

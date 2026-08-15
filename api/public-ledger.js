@@ -99,6 +99,7 @@ async function getPublicLedger(req, res) {
           .from('ai_suggestions')
           .select('id, sport, home_team, away_team, bet_type, pick, odds, edge_pp, tier, game_date, created_at, last_revised_at, resolved_at, actual_outcome')
           .like('session_id', 'auto_digest%')
+          .is('voided_at', null)
           .in('actual_outcome', ['won', 'lost', 'push'])
           // Recency on the ledger means when the GAME happened, not when the
           // row was stamped. Sorting by resolved_at surfaced months-old picks
@@ -121,6 +122,7 @@ async function getPublicLedger(req, res) {
         .from('ai_suggestions')
         .select('id, sport, home_team, away_team, bet_type, pick, odds, edge_pp, tier, game_date, created_at, last_revised_at, actual_outcome')
         .like('session_id', 'auto_digest%')
+        .is('voided_at', null)
         .eq('actual_outcome', 'pending')
         .not('sport', 'in', '("EPL","MLS","Soccer","World Cup","Champions League","Copa America","Euros")')
         .gt('game_date', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())

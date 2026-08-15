@@ -4,6 +4,10 @@
 // published yesterday and how it actually went, instead of a blank page.
 
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
+// Missing since PR 44 rekeyed the sessions to site days: the handler
+// referenced siteDayOffset without importing it, so every request threw
+// and Yesterday's Board rendered its error state from Aug 8 to Aug 12.
+const { siteDayOffset } = require('../shared/site-day.js');
 
 // Same 1u math as the House Ledger. The two surfaces must never disagree.
 function unitProfit(oddsStr, outcome) {

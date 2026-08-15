@@ -117,7 +117,11 @@ export default function HouseLedger() {
   const legReport = data?.summary?.legReport
   const bySport = data?.summary?.bySport || {}
   const byBetType = data?.summary?.byBetType || {}
-  const tierOrder = TIERS.map(t => t.label).filter(l => byTier[l])
+  // TIERS lost its Strong Play entry in the 08-10 merge, but 188 settled
+  // historical rows keep that label and the MV still emits the tier row.
+  // Without this append the tier table silently dropped 90-96 while the
+  // page's own headline still counted it (win-pct audit, 2026-08-12).
+  const tierOrder = [...TIERS.map(t => t.label), 'Strong Play'].filter(l => byTier[l])
 
   return (
     <div className="min-h-screen bg-ink-950 text-white font-sans">
