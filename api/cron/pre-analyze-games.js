@@ -16,6 +16,7 @@ const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson } = require('..
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
 const { getUfcContext, formatUfcContext } = require('../../lib/services/ufc-data.js');
+const { getProbablePitchersText } = require('../../lib/services/probable-pitchers.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
@@ -628,7 +629,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
  * Generate AI analysis for a single game. Returns the analysis fields on
  * success, or { error } on failure so the caller can log the real reason.
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null, tennisCtx = null) {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null, tennisCtx = null, pitcherCtx = null) {
   const sportDisplay = slugToSport(game.sport) || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -669,6 +670,10 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
   // all read tables with no tennis rows, so without this block a tennis
   // prompt carried only odds and every card said "records not available".
   if (tennisCtx) contextParts.push(tennisCtx);
+
+  // MLB: the probable starters are the single most game-specific fact on
+  // the card. Without this line the narration fell back to team streaks.
+  if (pitcherCtx) contextParts.push(`Probable starting pitchers: ${pitcherCtx}`);
 
   if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
@@ -1091,7 +1096,7 @@ async function runPreAnalysis(sportSlugs) {
         const emptyRankCtx = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
 
         // Fetch context in parallel: DB queries + news
-        const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx, tennisData] = await Promise.all([
+        const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx, tennisData, pitcherCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
           skipTeamCtx ? null : getInjuryContext(game.home_team, game.away_team),
           skipTeamCtx ? Promise.resolve(emptyRankCtx) : getRankingsContext(game.home_team, game.away_team),
@@ -1104,7 +1109,10 @@ async function runPreAnalysis(sportSlugs) {
           getIntelContext(supabase, game.home_team, game.away_team),
           isTennis ? getTennisContext(supabase, game.home_team, game.away_team)
             : isUfc ? getUfcContext(supabase, game.home_team, game.away_team)
-            : null
+            : null,
+          // MLB only: probable starters from ESPN's scoreboard. Fail-soft,
+          // one cached fetch covers the whole slate.
+          sportDisplay === 'MLB' ? getProbablePitchersText(game.home_team, game.away_team) : null
         ]);
         const newsCtx = `${newsCtxRaw || ''}${intelCtx || ''}` || null;
         const tennisCtx = isTennis ? formatTennisContext(tennisData)
@@ -1241,6 +1249,9 @@ async function runPreAnalysis(sportSlugs) {
           trends: [homeTrend, awayTrend],
           stats: playerStatsCtx,
           tennis: tennisCtx,
+          // A probables change (late scratch, announcement) must force a
+          // fresh narration even when the line has not moved.
+          pitchers: pitcherCtx,
           edge: edgeData ? {
             edge: edgeData.edge, side: edgeData.edgeSide,
             home: edgeData.homeWinProb, implied: edgeData.impliedHomeProb
@@ -1262,7 +1273,7 @@ async function runPreAnalysis(sportSlugs) {
           continue;
         }
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx);
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx, pitcherCtx);
 
         // After the prompt is built: expose the tennis 30-day match record
         // through the stored record fields (tiles/digest), without letting
