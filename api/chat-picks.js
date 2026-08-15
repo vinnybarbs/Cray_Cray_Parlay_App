@@ -9,6 +9,7 @@ const { supabase } = require('../lib/middleware/supabaseAuth');
 const aiInstructions = require('../lib/services/ai-instructions');
 const pickGrader = require('../lib/services/pick-grader');
 const { getClient: getClaude, complete, MODELS, WRITING_STYLE } = require('../lib/services/claude');
+const { siteDay } = require('../shared/site-day.js');
 
 // Tool definitions the model can call to query our database (legacy
 // chat-completions shape; converted to Anthropic tool shape below).
@@ -86,6 +87,19 @@ const TOOLS = [
           away_team: { type: 'string', description: 'Away team name' }
         },
         required: ['home_team', 'away_team']
+      }
+    }
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_todays_picks',
+      description: "TrapHawk's OFFICIAL published board for today: every pick, trap call, and parlay leg with tier, odds, edge, and the full written reasoning. This is the source of truth for what the site actually published. ALWAYS call this when the user asks about today's picks, the board, sharp takes, traps, or legs, and never contradict the published tier.",
+      parameters: {
+        type: 'object',
+        properties: {
+          sport: { type: 'string', description: 'Optional sport filter, e.g. MLB or Tennis' }
+        }
       }
     }
   },
@@ -476,7 +490,12 @@ async function executeTool(name, args) {
           .select('home_team, away_team, game_date, sport, analysis_snippet, edge_score, recommended_pick, recommended_side, key_factors, spread, total, moneyline_home, moneyline_away, home_record, away_record, home_ranking, away_ranking, news_context, injury_context, calc_home_prob, calc_away_prob, implied_home_prob, implied_away_prob, calc_edge, calc_edge_side, edge_factors, generated_at')
           .or(`home_team.ilike.%${args.home_team}%,home_team.ilike.%${args.away_team}%`)
           .or(`away_team.ilike.%${args.home_team}%,away_team.ilike.%${args.away_team}%`)
-          .eq('stale', false)
+          // No stale filter: intel updates and the keep-alive path mark
+          // most live rows stale, and a slightly-aged analysis beats no
+          // analysis (2026-08-15: this filter starved De-Genny's richest
+          // tool, so it answered from generic odds instead). Prefer the
+          // upcoming game over an old completed matchup.
+          .gte('game_date', new Date(Date.now() - 6 * 3600 * 1000).toISOString())
           .order('generated_at', { ascending: false })
           .limit(1);
 
@@ -514,6 +533,37 @@ async function executeTool(name, args) {
           };
         }
         return { message: 'No pre-computed analysis found for this matchup' };
+      }
+
+      case 'get_todays_picks': {
+        const day = siteDay();
+        let boardQuery = supabase
+          .from('ai_suggestions')
+          .select('sport, home_team, away_team, tier, bet_type, pick, odds, edge_pp, actual_outcome, reasoning, session_id, game_date')
+          .in('session_id', [`auto_digest_${day}`, `auto_digest_trap_${day}`, `auto_digest_leg_${day}`])
+          .is('voided_at', null)
+          .order('edge_pp', { ascending: false });
+        if (args.sport) boardQuery = boardQuery.eq('sport', args.sport);
+        const { data: board } = await boardQuery;
+        if (!board?.length) return { message: `No published picks yet for ${day}. The board fills as the analysis crons run.` };
+        return {
+          site_day: day,
+          picks: board.filter(r => !r.session_id.includes('trap') && !r.session_id.includes('leg')).map(r => ({
+            sport: r.sport, matchup: `${r.away_team} @ ${r.home_team}`, tier: r.tier,
+            pick: r.pick, odds: r.odds, edge_pp: r.edge_pp, status: r.actual_outcome,
+            reasoning: (r.reasoning || '').slice(0, 500),
+          })),
+          traps: board.filter(r => r.session_id.includes('trap')).map(r => ({
+            sport: r.sport, matchup: `${r.away_team} @ ${r.home_team}`,
+            bait_side: r.pick, odds: r.odds, status: r.actual_outcome,
+            note: 'trap means FADE this side, it is the bait',
+          })),
+          legs: board.filter(r => r.session_id.includes('leg')).map(r => ({
+            sport: r.sport, matchup: `${r.away_team} @ ${r.home_team}`,
+            leg: r.pick, odds: r.odds, status: r.actual_outcome,
+            note: 'high hit probability, thin payout, parlay material not a straight pick',
+          })),
+        };
       }
 
       case 'get_injuries': {
@@ -699,6 +749,7 @@ YOUR TOOLS (use them aggressively):
 - get_standings → records and conference rankings
 - get_news → articles with analysis, insider takes
 - get_upcoming_games → what's on the schedule
+- get_todays_picks → TrapHawk's OFFICIAL published board today: picks with tiers and full reasoning, traps (fade advice), and parlay legs. THE source of truth for "what are today's picks". Never contradict a published tier.
 - get_game_analysis → pre-computed AI breakdown
 - get_team_stats → team records from our database
 - get_golf_leaderboard → live tournament leaderboard + outright winner odds (for golf questions)

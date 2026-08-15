@@ -846,12 +846,24 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               })()}
             </div>
           )
-          if (game.recommended_pick && isLegGame) return (
-            <div className="bg-ink-850/60 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-ink-500">
-              <div className="font-mono text-[9px] text-ink-300 uppercase tracking-[0.14em] mb-0.5">Leg · {Math.round(legProb * 100)}% to hit, thin payout</div>
-              <div className="text-ink-200 font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
-            </div>
-          )
+          if (game.recommended_pick && isLegGame) {
+            // The leg is the HIGH-PROBABILITY side, which is not always the
+            // recommended-pick side (2026-08-15: a UFC tile said "83% to
+            // hit" above Barboza ML +500, the 83% belonged to Ribovics).
+            // Name the side the probability belongs to, never the other one.
+            const legIsHome = (game.calc_home_prob ?? 0) >= (game.calc_away_prob ?? 0)
+            const legTeam = legIsHome ? game.home_team : game.away_team
+            const legMl = legIsHome ? game.moneyline_home : game.moneyline_away
+            const legText = legTeam
+              ? `${legTeam} ML${legMl != null ? ` ${legMl > 0 ? '+' : ''}${legMl}` : ''}`
+              : game.recommended_pick
+            return (
+              <div className="bg-ink-850/60 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-ink-500">
+                <div className="font-mono text-[9px] text-ink-300 uppercase tracking-[0.14em] mb-0.5">Leg · {Math.round(legProb * 100)}% to hit, thin payout</div>
+                <div className="text-ink-200 font-mono font-medium text-sm tabular-nums">{legText}</div>
+              </div>
+            )
+          }
           if (game.recommended_pick) return (
             <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
               <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Skip · best side below the 2pp floor</div>
