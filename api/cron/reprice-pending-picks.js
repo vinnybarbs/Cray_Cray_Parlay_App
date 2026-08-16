@@ -86,11 +86,14 @@ async function runReprice() {
 
         // Market moved away from our side: its implied probability of our
         // pick DROPPED since we priced it. That predicts negative CLV.
+        // Demote one rung (Strong Play to Play, Play to Lean) now that the
+        // 7-10 band is its own tier again (2026-08-16 restore).
         const drift = storedImplied - market.avgImplied;
         if (drift >= DEMOTE_DRIFT_PP) {
+          const demotedTier = row.tier === 'Strong Play' ? 'Play' : 'Lean';
           const { error: upErr } = await supabase
             .from('ai_suggestions')
-            .update({ tier: 'Lean', last_revised_at: new Date().toISOString() })
+            .update({ tier: demotedTier, last_revised_at: new Date().toISOString() })
             .eq('id', row.id)
             .eq('actual_outcome', 'pending');
           if (upErr) summary.errors.push(`id ${row.id}: ${upErr.message}`);
