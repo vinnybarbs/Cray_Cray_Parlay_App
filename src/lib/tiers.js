@@ -6,17 +6,17 @@
 // model the old 10/10 edge_score caused. Negative edges get their own tier
 // so we never silently dress them up.
 
-// Strong Play merged into Play 2026-08-10: the 4-7 and 7-10 bands were
-// statistically indistinguishable and both carried negative CLV, so the
-// split labeled noise as signal. Historical rows keep their stored
-// 'Strong Play' tier (the record is append only), which is why renderers
-// must still map that label, see legacyTier below.
+// Strong Play restored 2026-08-16 at 7-10pp (owner decision: 7pp is the
+// betting floor, so that band earns its own label). It was merged into
+// Play from 2026-08-10 to 2026-08-16, rows stamped in that window may
+// carry 7-10pp edges under the 'Play' label, the record is append only.
 export const TIERS = [
-  { label: 'Sharp Take',  subtitle: 'sharp take', range: '10pp+',   min: 10,        max: Infinity },
-  { label: 'Play',        subtitle: 'play it',    range: '4-10pp',  min: 4,         max: 10 },
-  { label: 'Lean',        subtitle: 'lean it',    range: '2-4pp',   min: 2,         max: 4 },
-  { label: 'Skip',        subtitle: 'pass on it', range: '-2-2pp',  min: -2,        max: 2 },
-  { label: 'Trap',        subtitle: 'fade it',    range: '-2pp or worse', min: -Infinity, max: -2 },
+  { label: 'Sharp Take',  subtitle: 'sharp take',  range: '10pp+',   min: 10,        max: Infinity },
+  { label: 'Strong Play', subtitle: 'strong play', range: '7-10pp',  min: 7,         max: 10 },
+  { label: 'Play',        subtitle: 'play it',     range: '4-7pp',   min: 4,         max: 7 },
+  { label: 'Lean',        subtitle: 'lean it',     range: '2-4pp',   min: 2,         max: 4 },
+  { label: 'Skip',        subtitle: 'pass on it',  range: '-2-2pp',  min: -2,        max: 2 },
+  { label: 'Trap',        subtitle: 'fade it',     range: '-2pp or worse', min: -Infinity, max: -2 },
 ]
 
 export function tierRange(label) {
@@ -57,21 +57,26 @@ export function edgeTier(signedPp, americanOdds = null) {
   if (signedPp < 4) {
     return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
   }
-  if (signedPp < 10) {
+  if (signedPp < 7) {
     return { label: 'Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
   }
+  if (signedPp < 10) {
+    return { label: 'Strong Play', subtitle: 'strong play', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/25 shadow-hairline-pos' }
+  }
   const o = americanOdds != null ? Number(String(americanOdds).replace(/[^0-9-]/g, '')) : null
+  // Fenced 10pp+ chalk drops one rung to Strong Play, mirror of pick-grader.
   if (o != null && Number.isFinite(o) && o < 0 && o <= SHARP_TAKE_PRICE_FENCE) {
-    return { label: 'Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
+    return { label: 'Strong Play', subtitle: 'strong play', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/25 shadow-hairline-pos' }
   }
   return { label: 'Sharp Take', subtitle: 'sharp take', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/40 shadow-hairline-pos-bright' }
 }
 
-// Historical rows persisted before 2026-08-10 carry 'Strong Play'. Render
-// them with the Play styling so old ledger rows never show an unstyled tier.
+// Strong Play is a live tier again (2026-08-16), so no legacy remap is
+// needed. Kept as a no-op passthrough because renderers still call it for
+// rows whose stored tier is not in TIERS.
 export function legacyTier(label) {
   if (label === 'Strong Play') {
-    return { label: 'Strong Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
+    return { label: 'Strong Play', subtitle: 'strong play', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/25 shadow-hairline-pos' }
   }
   return null
 }
