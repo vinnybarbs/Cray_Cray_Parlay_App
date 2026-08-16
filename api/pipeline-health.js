@@ -15,7 +15,8 @@ function slugToSport(slug) {
   if (!slug) return 'Unknown';
   if (slug.startsWith('tennis_')) return 'Tennis';
   const map = {
-    americanfootball_nfl: 'NFL', americanfootball_ncaaf: 'NCAAF',
+    americanfootball_nfl: 'NFL', americanfootball_nfl_preseason: 'NFL',
+    americanfootball_ncaaf: 'NCAAF',
     basketball_nba: 'NBA', basketball_ncaab: 'NCAAB',
     icehockey_nhl: 'NHL', baseball_mlb: 'MLB',
     soccer_epl: 'EPL', soccer_usa_mls: 'MLS',

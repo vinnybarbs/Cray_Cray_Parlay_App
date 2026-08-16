@@ -27,6 +27,11 @@ const trapDetector = require('../../lib/services/trap-detector.js');
 // tournaments here (the old static list went dark the Monday after Wimbledon).
 const SLUG_TO_SPORT = {
   americanfootball_nfl: 'NFL',
+  // The Odds API serves preseason NFL under its own sport key. Without this
+  // mapping every August probe of americanfootball_nfl found zero events and
+  // preseason looked missing from the plan tier. Same display sport, so
+  // preseason games flow through the normal NFL shadow pipeline.
+  americanfootball_nfl_preseason: 'NFL',
   americanfootball_ncaaf: 'NCAAF',
   basketball_nba: 'NBA',
   basketball_ncaab: 'NCAAB',
@@ -360,6 +365,11 @@ async function getNewsContext(homeTeam, awayTeam, sport) {
       .gte('published_at', threeDaysAgo)
       .or(`title.ilike.%${homeQuery}%,title.ilike.%${awayQuery}%,summary.ilike.%${homeQuery}%,summary.ilike.%${awayQuery}%`)
       .order('published_at', { ascending: false })
+      // Deterministic tiebreaker. 37 percent of articles share a published_at
+      // with another article, and without a secondary key Postgres returns
+      // ties in planner-dependent order, so the top-5 set shuffled between
+      // runs, churned the context hash, and re-narrated MLB for nothing.
+      .order('id', { ascending: false })
       .limit(5);
 
     if (!data || data.length === 0) return null;
@@ -890,7 +900,8 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
 // don't fit the h2h edge model. Golf odds land in odds_cache for display,
 // not for pre-analysis.
 const ALL_SPORT_SLUGS = [
-  'americanfootball_nfl', 'basketball_nba', 'basketball_ncaab',
+  'americanfootball_nfl', 'americanfootball_nfl_preseason',
+  'basketball_nba', 'basketball_ncaab',
   'icehockey_nhl', 'americanfootball_ncaaf', 'baseball_mlb',
   'soccer_%', 'mma_mixed_martial_arts',
   'tennis_%'
@@ -908,9 +919,9 @@ const SPORT_GROUPS = {
   'tennis': ['tennis_%'],
   'soccer': ['soccer_%'],
   'worldcup': ['soccer_fifa_world_cup'],
-  'nfl': ['americanfootball_nfl'],
+  'nfl': ['americanfootball_nfl', 'americanfootball_nfl_preseason'],
   'ncaaf': ['americanfootball_ncaaf'],
-  'football': ['americanfootball_nfl', 'americanfootball_ncaaf'],
+  'football': ['americanfootball_nfl', 'americanfootball_nfl_preseason', 'americanfootball_ncaaf'],
   'all': ALL_SPORT_SLUGS
 };
 
