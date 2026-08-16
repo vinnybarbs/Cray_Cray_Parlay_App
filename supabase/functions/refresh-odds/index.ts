@@ -6,6 +6,11 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 const SPORTS = [
   // Team sports
   "americanfootball_nfl",
+  // Preseason NFL is a SEPARATE sport key on The Odds API. Without it the
+  // whole August slate is invisible (americanfootball_nfl carries only
+  // regular-season events, which start 2026-09-10). Out of season the key
+  // just returns no events at the cost of one list call.
+  "americanfootball_nfl_preseason",
   "americanfootball_ncaaf",
   "basketball_nba",
   "basketball_ncaab",
@@ -46,20 +51,23 @@ const SPORTS = [
   "tennis_wta_china_open"
 ];
 
-const PROP_SPORTS = ["americanfootball_nfl", "basketball_nba", "basketball_ncaab"];
+const PROP_SPORTS = ["americanfootball_nfl", "americanfootball_nfl_preseason", "basketball_nba", "basketball_ncaab"];
 
 const CORE_MARKETS = "h2h,spreads,totals";
 
+const NFL_PROP_MARKETS = [
+  "player_pass_tds",
+  "player_pass_yds",
+  "player_pass_completions",
+  "player_rush_yds",
+  "player_receptions",
+  "player_reception_yds",
+  "player_anytime_td"
+];
+
 const PROP_MARKETS = {
-  americanfootball_nfl: [
-    "player_pass_tds",
-    "player_pass_yds",
-    "player_pass_completions",
-    "player_rush_yds",
-    "player_receptions",
-    "player_reception_yds",
-    "player_anytime_td"
-  ],
+  americanfootball_nfl: NFL_PROP_MARKETS,
+  americanfootball_nfl_preseason: NFL_PROP_MARKETS,
   basketball_nba: [
     "player_points",
     "player_rebounds",

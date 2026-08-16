@@ -47,6 +47,11 @@ function sportLabel(sportKey) {
   return sportKey === 'americanfootball_ncaaf' ? 'NCAAF' : 'NFL';
 }
 
+// Preseason NFL lives under its own Odds API sport key, so the default run
+// sweeps both. Out of season the extra key costs one events list call that
+// returns empty. Explicit ?sport= still targets a single key.
+const DEFAULT_SPORT_KEYS = ['americanfootball_nfl', 'americanfootball_nfl_preseason'];
+
 async function runSync({ days, sportKey }) {
   const startTime = Date.now();
   const apiKey = process.env.ODDS_API_KEY;
@@ -147,10 +152,12 @@ async function syncNflProps(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   const days = Math.min(MAX_DAYS, Math.max(1, parseInt(req.query.days, 10) || DEFAULT_DAYS));
-  const sportKey = req.query.sport === 'americanfootball_ncaaf'
-    ? 'americanfootball_ncaaf' : 'americanfootball_nfl';
-  res.status(202).json({ status: 'accepted', message: `Props sync started (${sportKey}, ${days} days)` });
-  runSync({ days, sportKey }).catch(err => console.error('Props sync error:', err.message));
+  const sportKeys = ['americanfootball_ncaaf', 'americanfootball_nfl', 'americanfootball_nfl_preseason']
+    .includes(req.query.sport) ? [req.query.sport] : DEFAULT_SPORT_KEYS;
+  res.status(202).json({ status: 'accepted', message: `Props sync started (${sportKeys.join(', ')}, ${days} days)` });
+  (async () => {
+    for (const sportKey of sportKeys) await runSync({ days, sportKey });
+  })().catch(err => console.error('Props sync error:', err.message));
 }
 
 module.exports = syncNflProps;
