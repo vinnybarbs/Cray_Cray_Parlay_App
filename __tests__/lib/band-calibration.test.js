@@ -67,6 +67,15 @@ describe('applyToEdgeData', () => {
     expect(out.edge * 100).toBeCloseTo(5.8, 2);
   });
 
+  test('stashes pre-band edges for the publish gate', async () => {
+    _setPoints(SEED);
+    const edgeData = { edge: 0.0829, edges: { home_ml: 0.0829, away_ml: -0.0829 } };
+    const out = await applyToEdgeData(edgeData);
+    expect(out.edgesPreBand.home_ml).toBeCloseTo(0.0829, 6);
+    expect(out.edgesPreBand.away_ml).toBeCloseTo(-0.0829, 6);
+    expect(out.edges.home_ml).not.toBeCloseTo(0.0829, 4);
+  });
+
   test('identity when no points are loaded', async () => {
     _resetCache();
     _setPoints(null);

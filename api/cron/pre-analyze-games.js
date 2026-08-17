@@ -1423,6 +1423,13 @@ async function runPreAnalysis(sportSlugs) {
             // display-only: it carries no read in either direction.
             const displayEdgePp = edgeData?.edges?.[result.recommended_side] != null
               ? edgeData.edges[result.recommended_side] * 100 : null;
+            // The publish gate binds on the PRE-band-calibration edge so the
+            // calibration layer relabels picks without shrinking publication
+            // (owner 2026-08-16: everything graded keeps publishing, it
+            // costs nothing and users get the research). Tier still comes
+            // from the calibrated pp below.
+            const gateEdgePp = edgeData?.edgesPreBand?.[result.recommended_side] != null
+              ? edgeData.edgesPreBand[result.recommended_side] * 100 : displayEdgePp;
             if (SHADOW_SPORTS.has(sportDisplay)) {
               // Shadow mode: the board shows the read and game_analysis
               // stores the edges for calibration measurement, but nothing
@@ -1431,7 +1438,7 @@ async function runPreAnalysis(sportSlugs) {
                 console.log(`  👻 Shadow (${sportDisplay}): ${displayEdgePp.toFixed(1)}pp stored, no pick published`);
               }
             } else {
-              if (result.recommended_pick && displayEdgePp != null && displayEdgePp >= 2) {
+              if (result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2) {
               try {
                 const side = result.recommended_side;
                 const { betType, point } = deriveBetTypeAndPoint(side, oddsCtx);
@@ -1463,7 +1470,13 @@ async function runPreAnalysis(sportSlugs) {
                   pipeline_version: 6,
                   edge_pp: edgePp,
                   edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
-                  tier: pickGrader.edgeTier(edgePp, pickOdds),
+                  // Calibrated pp under 2 would grade Skip, but this row
+                  // cleared the pre-band gate, so it publishes at the
+                  // ladder floor instead of wearing a non-published label.
+                  tier: (() => {
+                    const t = pickGrader.edgeTier(edgePp, pickOdds);
+                    return t === 'Skip' ? 'Lean' : t;
+                  })(),
                   model_prob: isHomeMl ? edgeData?.homeWinProb ?? null
                             : isAwayMl ? edgeData?.awayWinProb ?? null : null,
                   implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null
@@ -1565,7 +1578,11 @@ async function runPreAnalysis(sportSlugs) {
               // legs across entire MLB slates. 65% is about -186, still a
               // genuinely heavy favorite in any sport.
               const LEG_PROB_FLOOR = 0.65;
-              const publishedPick = mathPick && mathPick.signedEdge * 100 >= 2;
+              // Same pre-band gate as publication, so the pick-vs-leg split
+              // is unchanged by the calibration layer.
+              const publishedPick = mathPick && (
+                (edgeData?.edgesPreBand?.[mathPick.side] ?? mathPick.signedEdge) * 100 >= 2
+              );
               if (!publishedPick && edgeData && edgeData.homeWinProb != null && edgeData.awayWinProb != null) {
                 try {
                   const legSide = edgeData.homeWinProb >= edgeData.awayWinProb ? 'home_ml' : 'away_ml';
