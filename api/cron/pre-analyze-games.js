@@ -17,6 +17,7 @@ const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
 const { getUfcContext, formatUfcContext } = require('../../lib/services/ufc-data.js');
 const { getProbablePitchersText } = require('../../lib/services/probable-pitchers.js');
+const bandCalibration = require('../../lib/services/band-calibration.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
@@ -1178,6 +1179,13 @@ async function runPreAnalysis(sportSlugs) {
             edgeData = await edgeCalc.calculateEdge(game);
           }
           if (edgeData) {
+            // Second calibration layer: per-band mapping fit on PUBLISHED
+            // outcomes (edge_band_calibration, refit weekly). Positive
+            // edges shrink toward what their band actually delivers,
+            // negative edges (trap reads) pass through raw. Applied here,
+            // before side selection and tiering, so board tiles, math
+            // picks, and the published record all speak calibrated pp.
+            edgeData = await bandCalibration.applyToEdgeData(edgeData);
             const edgeSign = edgeData.edge !== null ? (edgeData.edge >= 0 ? '+' : '') + (edgeData.edge * 100).toFixed(1) + '%' : 'N/A';
             console.log(`  📐 Edge: ${edgeSign} on ${edgeData.edgeSide || '?'} (${edgeData.confidence}), home ${(edgeData.homeWinProb * 100).toFixed(1)}% vs implied ${edgeData.impliedHomeProb !== null ? (edgeData.impliedHomeProb * 100).toFixed(1) + '%' : 'N/A'}`);
           }
