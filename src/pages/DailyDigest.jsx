@@ -1490,18 +1490,19 @@ export default function DailyDigest({ onBack }) {
   const heroHitRate = (() => {
     const [period, label] = HERO_PERIODS[heroPeriodIdx]
     const st = data?.modelAccuracy?.[period]?.byTier?.['Sharp Take']
-    // Lead with the flagship only when it has a real sample in this
-    // window. Sharp Take issuance dropped after the mutes and the chalk
-    // fence, and a truthful "1-1" headline on an 18-11 heater day reads
-    // as a broken record (2026-08-12). Under 5 graded, show the model.
-    const stGraded = (st?.won ?? 0) + (st?.lost ?? 0)
-    if (st?.winRate != null && stGraded >= 5) {
-      return { name: 'Sharp Take', rate: st.winRate, won: st.won, lost: st.lost, label }
-    }
     const o = data?.modelAccuracy?.[period]?.overall
-    if (o?.winRate != null) return { name: 'Model', rate: o.winRate, won: o.won, lost: o.lost, label }
-    if (st?.winRate != null) return { name: 'Sharp Take', rate: st.winRate, won: st.won, lost: st.lost, label }
-    return { name: 'Sharp Take', rate: null, won: 0, lost: 0, label }
+    // Both populations, fixed, side by side. The old design swapped a
+    // single slot between Sharp Take and Model depending on the window's
+    // ST sample, so cycling 3d to 7d could show a 30-pick record next to
+    // an 8-pick record under the same tile and read as corrupt counts
+    // (owner report 2026-08-18: "the 3 day record has 3x the count of
+    // the 7 day"). Populations never swap now, each series is monotone
+    // across windows on its own.
+    return {
+      label,
+      st: st?.winRate != null ? { rate: st.winRate, won: st.won, lost: st.lost } : null,
+      overall: o?.winRate != null ? { rate: o.winRate, won: o.won, lost: o.lost } : null,
+    }
   })()
 
   const handleOpenDeepResearch = useCallback((game, gameKey) => {
@@ -1551,19 +1552,27 @@ export default function DailyDigest({ onBack }) {
               {heroHitRate && (
                 <span
                   className="flex items-center gap-2"
-                  title={heroHitRate.name === 'Model'
-                    ? 'All actionable tiers combined for the selected window (Sharp Take shown instead once it has 5+ graded picks). Same numbers as The House Ledger.'
-                    : 'Sharp Take record for the selected window. Same numbers as The House Ledger.'}
+                  title="Sharp Take record and the all-tiers Model record for the selected window. Same numbers as The House Ledger."
                 >
                   <span>
-                    {heroHitRate.name} ·{' '}
-                    {heroHitRate.rate != null ? (
+                    {'Sharp '}
+                    {heroHitRate.st ? (
                       <>
-                        <span className="tabular-nums text-ink-300">{heroHitRate.won}-{heroHitRate.lost}</span>
-                        {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.rate)}`}>{heroHitRate.rate}%</span>
+                        <span className="tabular-nums text-ink-300">{heroHitRate.st.won}-{heroHitRate.st.lost}</span>
+                        {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.st.rate)}`}>{heroHitRate.st.rate}%</span>
                       </>
                     ) : (
-                      <span className="text-ink-500">no picks</span>
+                      <span className="text-ink-500">none</span>
+                    )}
+                    <span className="text-ink-600">{' · '}</span>
+                    {'All '}
+                    {heroHitRate.overall ? (
+                      <>
+                        <span className="tabular-nums text-ink-300">{heroHitRate.overall.won}-{heroHitRate.overall.lost}</span>
+                        {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.overall.rate)}`}>{heroHitRate.overall.rate}%</span>
+                      </>
+                    ) : (
+                      <span className="text-ink-500">none</span>
                     )}
                   </span>
                   {/* Period bubbles: each window is its own visible pill so
