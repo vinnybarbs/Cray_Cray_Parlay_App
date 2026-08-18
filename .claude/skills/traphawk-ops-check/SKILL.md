@@ -44,7 +44,7 @@ where job_name like 'pre-analyze%' and status in ('completed','partial')
 group by 1 order by 1;
 ```
 
-Two thresholds: daily narration_cost above 2.50 dollars is a cost regression, and skipped = 0 across a full day means the change gate is not firing (likely a churning input in the context hash, prime suspect is news ordering). Healthy state after August 2026: a meaningful share of stale games skip.
+Two thresholds: daily narration_cost above 6.00 dollars is a cost regression (raised from 2.50 on 2026-08-18 by owner decision, the full tennis draw narrates by design and lands the normal day near 5), and skipped = 0 across a full day means the change gate is not firing (a churning input in the context hash; news ordering and tennis result ordering were both fixed with deterministic tiebreakers, so a new collapse means a new churning input). Healthy state after August 2026: a meaningful share of stale games skip in every sport.
 
 ## 3. Integrity sweep findings
 
@@ -107,7 +107,7 @@ union all
 select 'player_props', max(last_updated) from player_props;
 ```
 
-house_parlays builds twice daily in season. closing_lines captures every 15 minutes. A stale newest here is a finding even when every logged job reads green.
+closing_lines captures every 15 minutes; a stale newest is a finding even when every logged job reads green. house_parlays is NO LONGER a silent witness: since 2026-08-18 build-house-parlays files a cron_job_logs row per run with per-size outcomes (built, already_published, pool_short with the pool count). Read those rows instead of inferring from row timestamps, and know the design: the 09:45 run builds the day's 2-leg and 3-leg, the 13:45 run is a catch-up that only builds a size the morning missed. A 13:45 run that writes no new parlay while both sizes exist is HEALTHY (the Aug 14-16 "afternoon build failures" were this misread). The real alert conditions: a day that never gets both sizes, or pool_short repeating across both runs.
 
 ## Reporting
 

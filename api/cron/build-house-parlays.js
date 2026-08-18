@@ -15,8 +15,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Minimum edge in percentage points for a leg to qualify. Play tier or better.
-const MIN_EDGE_PP = 4;
+// Minimum CALIBRATED edge in percentage points for a pick to qualify.
+// Was 4 ("Play tier or better") on the old claimed scale, but edge_pp
+// stores band-calibrated values since 2026-08-16 and calibrated 4 is a
+// genuinely strong claim now: the bar left the pool at roughly one pick
+// a day and starved the 3-leg build (Aug 17 never built one). Every
+// published pick (calibrated 2+, Lean floor) qualifies, the sort still
+// puts the strongest first, and Legs backfill below picks as before.
+const MIN_EDGE_PP = 2;
 
 // Never publish a leg whose game starts within this window.
 const MIN_MINUTES_TO_START = 30;
@@ -112,13 +118,17 @@ async function buildHouseParlays(req, res) {
     // win on games with no betting edge (high hit probability, thin
     // payout). They rank BELOW every positive-edge pick, so they only
     // enter a parlay when the day's pick pool is short.
-    const { data: legRows } = await supabase
+    const { data: legRows, error: legError } = await supabase
       .from('ai_suggestions')
       .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob')
       .eq('session_id', `auto_digest_leg_${today}`)
       .eq('actual_outcome', 'pending')
       .not('odds', 'is', null)
       .gt('game_date', cutoff);
+    // A failed leg query used to be discarded silently, shrinking the
+    // pool with no witness. It is not fatal (picks can still build), but
+    // it must be visible in the run log.
+    if (legError) logger.error('House parlay leg pool query failed:', legError);
 
     // Correlation exclusion for the MVP is cross game only.
     // Keep at most one leg per game: a positive-edge pick always beats a
@@ -153,11 +163,19 @@ async function buildHouseParlays(req, res) {
 
     // Build the 2 leg and 3 leg products from the top of the pool.
     // The two parlays may share legs. They are separate published products.
+    const sizeOutcomes = {};
     for (const size of [2, 3]) {
-      if (legsPool.length < size) continue;
+      if (legsPool.length < size) {
+        // The old code fell through here in silence, which is how the
+        // Aug 17 three-leg build vanished without a trace.
+        sizeOutcomes[size] = `pool_short (${legsPool.length} eligible)`;
+        logger.info(`House parlay ${size}-leg for ${today}: pool too short (${legsPool.length})`);
+        continue;
+      }
 
       if (existingSizes.has(size)) {
         logger.info(`House parlay ${size}-leg for ${today} already published, skipping`);
+        sizeOutcomes[size] = 'already_published';
         skipped++;
         continue;
       }
@@ -200,10 +218,29 @@ async function buildHouseParlays(req, res) {
 
       built++;
       parlays.push(record);
+      sizeOutcomes[size] = 'built';
       logger.info(`Built ${size}-leg house parlay for ${today} at ${combinedOdds} (model ${Math.round(modelProb * 1000) / 10}% vs fair ${Math.round(fairProb * 1000) / 10}%, +${combinedEdgePp}pp, EV ${evPct}%)`);
     }
 
     const duration = Date.now() - startTime;
+
+    // The run log is the witness. pg_cron records the HTTP post as
+    // succeeded no matter what happens in here, which is how four days
+    // of quiet non-builds read as healthy (Aug 14-17 ops checks). Every
+    // run now files its outcome where the ops sweep already looks.
+    await supabase.from('cron_job_logs').insert({
+      job_name: 'build-house-parlays',
+      status: 'completed',
+      details: JSON.stringify({
+        built, skipped, sizes: sizeOutcomes,
+        pool: legsPool.length,
+        pick_candidates: (candidates || []).length,
+        leg_candidates: (legRows || []).length,
+        leg_query_error: legError ? String(legError.message || legError) : null,
+        duration_ms: duration,
+      }),
+    });
+
     res.json({
       success: true,
       built,
@@ -215,6 +252,13 @@ async function buildHouseParlays(req, res) {
 
   } catch (error) {
     logger.error('Build house parlays error:', error);
+    try {
+      await supabase.from('cron_job_logs').insert({
+        job_name: 'build-house-parlays',
+        status: 'failed',
+        details: JSON.stringify({ error: error.message }),
+      });
+    } catch { /* best-effort */ }
     res.status(500).json({ success: false, error: error.message });
   }
 }
