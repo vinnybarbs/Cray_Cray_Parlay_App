@@ -1019,8 +1019,13 @@ function InjurySection({ content }) {
 
 // ─── SportSection ────────────────────────────────────────────────────────────
 
-function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch, upcomingCount }) {
+function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearch, upcomingCount, filter = 'All' }) {
   const [expanded, setExpanded] = useState(isDefaultExpanded)
+  // A narrowed board auto-expands: the user asked to SEE that read type,
+  // a row of collapsed headers is not an answer.
+  useEffect(() => {
+    if (filter !== 'All') setExpanded(true)
+  }, [filter])
   const meta = getSportMeta(sport)
 
   // Split games by whether the math returned an actionable pick. "On the
@@ -1034,19 +1039,43 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   // the first three games by schedule and the section's headline chip
   // came from whichever game the API returned first (2026-08-12: a Lean
   // fronted a section that held a Sharp Take).
-  const pickGames = games
+  const allPickGames = games
     .filter(g => g.recommended_pick && (ppFor(g) ?? 0) >= 2)
     .sort((a, b) => (ppFor(b) ?? 0) - (ppFor(a) ?? 0))
+  // Tier-narrowed view when a tier chip is active.
+  const pickGames = (filter === 'All' || filter === 'Legs' || filter === 'Traps')
+    ? allPickGames
+    : allPickGames.filter(g => edgeTier(ppFor(g), lockOddsFor(g))?.label === filter)
   const legOf = (g) => {
     const prob = Math.max(g.calc_home_prob ?? 0, g.calc_away_prob ?? 0)
     const pp = ppFor(g)
     return pp != null && pp < 2 && pp > -2 && prob >= 0.65 ? prob : null
   }
-  const legGames = games.filter(g => g.recommended_pick && legOf(g) != null)
-  const bubbleGames = games.filter(g => !pickGames.includes(g))
+  // Legs get their own SECTION now, ranked by hit probability. They used
+  // to render only as a count line in the collapsed preview while the
+  // tiles drowned unsorted in the bubble pile (owner, 2026-08-18: "I
+  // want legs on there, I can't find them anywhere").
+  const legGames = games
+    .filter(g => g.recommended_pick && legOf(g) != null)
+    .sort((a, b) => legOf(b) - legOf(a))
+  const bubbleGames = games
+    .filter(g => !allPickGames.includes(g) && !legGames.includes(g))
+    .sort((a, b) => (ppFor(b) ?? -99) - (ppFor(a) ?? -99))
   const trapEntries = games.flatMap(g =>
     (Array.isArray(g.trap_calls) ? g.trap_calls : []).map(trap => ({ game: g, trap }))
   )
+
+  // What this section contributes under the active filter. An empty
+  // section hides entirely instead of rendering a dead header.
+  const showPicks = filter === 'All' || !['Legs', 'Traps'].includes(filter)
+  const showLegs = filter === 'All' || filter === 'Legs'
+  const showTraps = filter === 'All' || filter === 'Traps'
+  const showBubble = filter === 'All'
+  const visibleCount = (showPicks ? pickGames.length : 0)
+    + (showLegs ? legGames.length : 0)
+    + (showTraps ? trapEntries.length : 0)
+    + (showBubble ? bubbleGames.length : 0)
+  if (visibleCount === 0) return null
 
   // Top 3 actionable picks for the collapsed preview / top tile grid.
   const topGames = pickGames.slice(0, 3)
@@ -1141,7 +1170,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
       {/* Expanded body, full tiles */}
       {expanded && (
         <div className="p-6">
-          {pickGames.length > 0 ? (
+          {showPicks && pickGames.length > 0 ? (
             <>
               <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 mb-3 font-medium">
                 Picks · ranked by model edge
@@ -1186,10 +1215,33 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
           {/* No-picks banner removed (Vince, 2026-08-06): the graded game
               tiles below already tell the story, the banner was noise. */}
 
+          {/* Parlay legs: the 65%+ hit-probability sides on no-edge games.
+              Their record runs hot precisely because they are chalk, so
+              they earn their own section instead of drowning in the
+              bubble pile. */}
+          {showLegs && legGames.length > 0 && (
+            <div className={showPicks && pickGames.length > 0 ? 'mt-6' : ''}>
+              <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-300 mb-3 font-medium">
+                Parlay legs · 65%+ to hit, thin payout
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {legGames.map((game, i) => (
+                  <GameCard
+                    key={`${game.home_team}-${game.away_team}-leg-${i}`}
+                    game={game}
+                    gameKey={getGameKey(game)}
+                    sport={sport}
+                    onDeepResearch={onDeepResearch}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Traps: detector calls rendered as their own highlighted tiles,
               independent of the pick grid. Knowing what NOT to bet is half
               the product, so these never hide behind a collapsed section. */}
-          {trapEntries.length > 0 && (
+          {showTraps && trapEntries.length > 0 && (
             <div className="mt-6">
               <h3 className="font-mono text-[10px] uppercase tracking-[0.18em] text-signal-neg mb-3 font-medium">
                 Traps · the bait the public wants
@@ -1210,7 +1262,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
 
           {/* Every other graded game, open by default: the research exists
               for all of them, so all of them show. */}
-          {bubbleGames.length > 0 && (
+          {showBubble && bubbleGames.length > 0 && (
             <details className="mt-6 group" open>
               <summary className="cursor-pointer list-none flex items-center gap-2 select-none">
                 <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-400 font-medium">
@@ -1441,19 +1493,33 @@ export default function DailyDigest({ onBack }) {
     fetchDigest()
   }, [fetchDigest])
 
+  // Sections rank by their STRONGEST pick, not by volume. Count ordering
+  // put a 56-match tennis wall above the day's only Sharp Take (owner,
+  // 2026-08-18: "board sort is still buggy"). Volume breaks ties.
+  const bestPickPp = (games) => games.reduce((best, g) => {
+    if (!g.recommended_pick) return best
+    const pp = edgePpForSide(g.edges, g.recommended_side)
+    return pp != null && pp > best ? pp : best
+  }, -Infinity)
   const sportSections = data
     ? Object.entries(data.gamesBySport)
         .filter(([, games]) => games.length > 0)
-        .sort((a, b) => b[1].length - a[1].length)
+        .sort((a, b) => (bestPickPp(b[1]) - bestPickPp(a[1])) || (b[1].length - a[1].length))
     : []
 
   const totalGames = sportSections.reduce((sum, [, games]) => sum + games.length, 0)
   const totalSports = sportSections.length
 
+  // Board filter: one chip row narrows every section to a single read
+  // type. Legs got their own chip because they were invisible on the
+  // board despite hitting 78 percent (owner, 2026-08-18).
+  const BOARD_FILTERS = ['All', 'Sharp Take', 'Strong Play', 'Play', 'Lean', 'Legs', 'Traps']
+  const [boardFilter, setBoardFilter] = useState('All')
+
   // Count tiles by tier so we can render a count-first hero ("12 Sharp Takes today").
   // Cheaper than rendering every tile twice, derived once per data refresh.
   const tierCounts = useMemo(() => {
-    const c = { sharpTakes: 0, strongPlays: 0, plays: 0, leans: 0, traps: 0 }
+    const c = { sharpTakes: 0, strongPlays: 0, plays: 0, leans: 0, legs: 0, traps: 0 }
     if (!data?.gamesBySport) return c
     for (const games of Object.values(data.gamesBySport)) {
       for (const g of games) {
@@ -1464,12 +1530,15 @@ export default function DailyDigest({ onBack }) {
         if (pp == null) continue
         // Four actionable tiers since the 2026-08-16 Strong Play restore:
         // Sharp Take 10+, Strong Play 7-10, Play 4-7, Lean 2-4. The count
-        // applies the same chalk fence as the tier chips.
+        // applies the same chalk fence as the tier chips. Legs mirror the
+        // SportSection legOf rule: no-edge games with a 65%+ side.
         const label = edgeTier(pp, lockOddsFor(g))?.label
         if (label === 'Sharp Take') c.sharpTakes++
         else if (label === 'Strong Play') c.strongPlays++
         else if (label === 'Play') c.plays++
         else if (label === 'Lean') c.leans++
+        else if (g.recommended_pick && pp < 2 && pp > -2
+          && Math.max(g.calc_home_prob ?? 0, g.calc_away_prob ?? 0) >= 0.65) c.legs++
       }
     }
     return c
@@ -1636,7 +1705,9 @@ export default function DailyDigest({ onBack }) {
                   {tierCounts.plays > 0 && <span><span className="text-signal-pos">{tierCounts.plays}</span> Play{tierCounts.plays !== 1 ? 's' : ''}</span>}
                   {(tierCounts.strongPlays > 0 || tierCounts.plays > 0) && tierCounts.leans > 0 && <span className="text-ink-600"> · </span>}
                   {tierCounts.leans > 0 && <span><span className="text-signal-pos/70">{tierCounts.leans}</span> Lean{tierCounts.leans !== 1 ? 's' : ''}</span>}
-                  {(tierCounts.strongPlays > 0 || tierCounts.plays > 0 || tierCounts.leans > 0) && tierCounts.traps > 0 && <span className="text-ink-600"> · </span>}
+                  {(tierCounts.strongPlays > 0 || tierCounts.plays > 0 || tierCounts.leans > 0) && tierCounts.legs > 0 && <span className="text-ink-600"> · </span>}
+                  {tierCounts.legs > 0 && <span><span className="text-ink-200">{tierCounts.legs}</span> Leg{tierCounts.legs !== 1 ? 's' : ''}</span>}
+                  {(tierCounts.strongPlays > 0 || tierCounts.plays > 0 || tierCounts.leans > 0 || tierCounts.legs > 0) && tierCounts.traps > 0 && <span className="text-ink-600"> · </span>}
                   {tierCounts.traps > 0 && <span><span className="text-signal-neg">{tierCounts.traps}</span> Trap{tierCounts.traps !== 1 ? 's' : ''} to fade</span>}
                 </p>
               )}
@@ -1706,17 +1777,37 @@ export default function DailyDigest({ onBack }) {
                 </p>
               </div>
             ) : (
-              sportSections.map(([sport, games]) => (
-                <SportSection
-                  key={sport}
-                  sport={sport}
-                  games={games}
-                  injuries={data.injuries}
-                  isDefaultExpanded={false}
-                  onDeepResearch={handleOpenDeepResearch}
-                  upcomingCount={data.upcomingCounts?.[sport] || 0}
-                />
-              ))
+              <>
+                {/* Board filter chips */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500 mr-1">Show</span>
+                  {BOARD_FILTERS.map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setBoardFilter(f)}
+                      className={`px-2.5 py-1 rounded-full font-mono text-[11px] uppercase tracking-[0.06em] transition-colors ${
+                        boardFilter === f
+                          ? 'bg-signal-pos-dim/60 text-signal-pos font-semibold'
+                          : 'bg-ink-900 text-ink-400 hover:text-ink-200 shadow-hairline'
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                {sportSections.map(([sport, games]) => (
+                  <SportSection
+                    key={sport}
+                    sport={sport}
+                    games={games}
+                    injuries={data.injuries}
+                    isDefaultExpanded={boardFilter !== 'All'}
+                    onDeepResearch={handleOpenDeepResearch}
+                    upcomingCount={data.upcomingCounts?.[sport] || 0}
+                    filter={boardFilter}
+                  />
+                ))}
+              </>
             )}
 
             {/* Golf is a side dish, not the main course. One collapsed line at
