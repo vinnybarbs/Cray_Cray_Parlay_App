@@ -1185,7 +1185,7 @@ async function runPreAnalysis(sportSlugs) {
             // negative edges (trap reads) pass through raw. Applied here,
             // before side selection and tiering, so board tiles, math
             // picks, and the published record all speak calibrated pp.
-            edgeData = await bandCalibration.applyToEdgeData(edgeData);
+            edgeData = await bandCalibration.applyToEdgeData(edgeData, sportDisplay);
             const edgeSign = edgeData.edge !== null ? (edgeData.edge >= 0 ? '+' : '') + (edgeData.edge * 100).toFixed(1) + '%' : 'N/A';
             console.log(`  📐 Edge: ${edgeSign} on ${edgeData.edgeSide || '?'} (${edgeData.confidence}), home ${(edgeData.homeWinProb * 100).toFixed(1)}% vs implied ${edgeData.impliedHomeProb !== null ? (edgeData.impliedHomeProb * 100).toFixed(1) + '%' : 'N/A'}`);
           }
