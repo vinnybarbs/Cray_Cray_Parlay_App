@@ -1268,9 +1268,14 @@ async function runPreAnalysis(sportSlugs) {
           trends: [homeTrend, awayTrend],
           stats: playerStatsCtx,
           tennis: tennisCtx,
-          // A probables change (late scratch, announcement) must force a
-          // fresh narration even when the line has not moved.
-          pitchers: pitcherCtx,
+          // A probables CHANGE (late scratch, new announcement) must force
+          // a fresh narration, so the hash carries the pitcher NAMES. It
+          // must NOT carry the (W-L, ERA) stat notes: ESPN updates those
+          // continuously, including live during games, and hashing them
+          // kept the MLB change gate at zero skips for a week (the ops
+          // checks' tenth-report finding, prime suspect confirmed). The
+          // prompt still gets the full text with stats.
+          pitchers: pitcherCtx ? pitcherCtx.replace(/\s*\([^)]*\)/g, '') : null,
           edge: edgeData ? {
             edge: edgeData.edge, side: edgeData.edgeSide,
             home: edgeData.homeWinProb, implied: edgeData.impliedHomeProb
