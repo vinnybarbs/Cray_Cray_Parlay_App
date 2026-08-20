@@ -640,7 +640,7 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
  * Generate AI analysis for a single game. Returns the analysis fields on
  * success, or { error } on failure so the caller can log the real reason.
  */
-async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null, tennisCtx = null, pitcherCtx = null) {
+async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook = '', priorAnalysis = null, edgeData = null, mathPick = null, tennisCtx = null, pitcherCtx = null, narrationModel = null) {
   const sportDisplay = slugToSport(game.sport) || game.sport.toUpperCase();
 
   let contextParts = [];
@@ -845,20 +845,26 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
     // analysis expired a minute later, and a +15pp Sharp Take fell off
     // the board with the next cron scheduled after first pitch. These
     // failures are transient, one more attempt is cheap insurance.
+    // Cost tiering (owner decision 2026-08-19): audience-worthy tiles
+    // (publishable picks, traps, possible legs) narrate on Sonnet, the
+    // Skip and bubble tiles narrate on Haiku at a third of the price.
+    const model = narrationModel || MODELS.NARRATION;
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const data = await claude.messages.create({
-          model: MODELS.NARRATION,
+        const params = {
+          model,
           // Sonnet narrations run 500-600 output tokens where gpt-4o-mini used
           // ~150-200. The old 600 cap truncated most responses mid-JSON, so
           // nearly every analysis parsed as null (broke the whole board 7/11).
           max_tokens: 1500,
-          // Narration only. The math already picked the side. Thinking stays
-          // off to keep the per-game cost/latency profile of the old setup.
-          thinking: { type: 'disabled' },
           messages: [{ role: 'user', content: prompt }],
-        });
+        };
+        // Narration only. The math already picked the side. Thinking stays
+        // off to keep the per-game cost/latency profile of the old setup.
+        // Haiku runs without a thinking param at all.
+        if (model !== MODELS.UTILITY) params.thinking = { type: 'disabled' };
+        const data = await claude.messages.create(params);
 
         const content = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
         const usage = data.usage;
@@ -878,6 +884,7 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
           recommended_side: mathPick ? mathPick.recommended_side : null,
           key_factors: parsed.key_factors,
           what_changed: parsed.what_changed || null,
+          model_used: model,
           prompt_tokens: usage?.input_tokens,
           completion_tokens: usage?.output_tokens
         };
@@ -1297,7 +1304,18 @@ async function runPreAnalysis(sportSlugs) {
           continue;
         }
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx, pitcherCtx);
+        // Model tiering by audience (owner decision 2026-08-19, cost).
+        // Sonnet narrates anything a bettor acts on: a publishable pick
+        // (pre-band 2pp+), a trap call, or a possible leg (65%+ side).
+        // Skip and bubble tiles, most of a full tennis draw, narrate on
+        // Haiku at roughly a third of the price.
+        const audienceWorthy =
+          (mathPick && ((edgeData?.edgesPreBand?.[mathPick.recommended_side] ?? mathPick.signedEdge) || 0) * 100 >= 2)
+          || trapCalls.length > 0
+          || (edgeData?.homeWinProb >= 0.65 || edgeData?.awayWinProb >= 0.65);
+        const narrationModel = audienceWorthy ? MODELS.NARRATION : MODELS.UTILITY;
+
+        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx, pitcherCtx, narrationModel);
 
         // After the prompt is built: expose the tennis 30-day match record
         // through the stored record fields (tiles/digest), without letting
@@ -1361,7 +1379,7 @@ async function runPreAnalysis(sportSlugs) {
             key_factors: result.key_factors,
             news_context: newsCtx,
             injury_context: injuryCtx,
-            model_used: MODELS.NARRATION,
+            model_used: result.model_used || MODELS.NARRATION,
             prompt_tokens: result.prompt_tokens,
             completion_tokens: result.completion_tokens,
             generated_at: new Date().toISOString(),
@@ -1584,9 +1602,11 @@ async function runPreAnalysis(sportSlugs) {
               // genuinely heavy favorite in any sport.
               const LEG_PROB_FLOOR = 0.65;
               // Same pre-band gate as publication, so the pick-vs-leg split
-              // is unchanged by the calibration layer.
+              // is unchanged by the calibration layer. (mathPick carries
+              // recommended_side; an earlier version read a nonexistent
+              // .side key and silently fell back to the calibrated edge.)
               const publishedPick = mathPick && (
-                (edgeData?.edgesPreBand?.[mathPick.side] ?? mathPick.signedEdge) * 100 >= 2
+                (edgeData?.edgesPreBand?.[mathPick.recommended_side] ?? mathPick.signedEdge) * 100 >= 2
               );
               if (!publishedPick && edgeData && edgeData.homeWinProb != null && edgeData.awayWinProb != null) {
                 try {
