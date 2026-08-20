@@ -89,13 +89,12 @@ describe('applyToEdgeData', () => {
     expect(await applyToEdgeData(null)).toBeNull();
   });
 
-  test('a sport with its own map uses it over the pooled prior', async () => {
-    _setPoints(SEED);
-    // NFL map: identity-ish, no haircut earned or owed.
-    _setPoints([{ claimed: 10, calibrated: 10 }], 'NFL');
-    const nfl = await applyToEdgeData({ edge: 0.0829, edges: { home_ml: 0.0829 } }, 'NFL');
-    expect(nfl.edges.home_ml * 100).toBeCloseTo(8.29, 2);
+  test('a sport uses its own map, an unfitted sport gets identity', async () => {
+    _setPoints(SEED, 'MLB');
     const mlb = await applyToEdgeData({ edge: 0.0829, edges: { home_ml: 0.0829 } }, 'MLB');
     expect(mlb.edges.home_ml * 100).toBeCloseTo(5.8, 2);
+    // NFL has no fitted rows: identity, never the pooled or MLB haircut.
+    const nfl = await applyToEdgeData({ edge: 0.0829, edges: { home_ml: 0.0829 } }, 'NFL');
+    expect(nfl.edges.home_ml * 100).toBeCloseTo(8.29, 5);
   });
 });
