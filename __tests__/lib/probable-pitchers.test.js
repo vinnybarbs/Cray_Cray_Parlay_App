@@ -1,4 +1,4 @@
-const { getProbablePitchersText, _resetCache } = require('../../lib/services/probable-pitchers');
+const { getProbablePitchersText, getProbablePitcherStats, starterEraAdjustment, _resetCache } = require('../../lib/services/probable-pitchers');
 
 function espnPayload() {
   return {
@@ -110,5 +110,36 @@ describe('getProbablePitchersText', () => {
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 502 });
     const text = await getProbablePitchersText('Colorado Rockies', 'San Francisco Giants');
     expect(text).toBeNull();
+  });
+
+  test('structured stats parse ERA from statistics and record strings', async () => {
+    const stats = await getProbablePitcherStats('Colorado Rockies', 'San Francisco Giants');
+    expect(stats.home.name).toBe('Kyle Freeland');
+    expect(stats.home.era).toBeCloseTo(5.24, 2);
+    // Webb's ERA comes from the "12-7, 3.01 ERA" record-string fallback.
+    expect(stats.away.name).toBe('Logan Webb');
+    expect(stats.away.era).toBeCloseTo(3.01, 2);
+  });
+
+  test('one-sided announcement yields a null side', async () => {
+    const stats = await getProbablePitcherStats('New York Yankees', 'Boston Red Sox');
+    expect(stats.home.name).toBe('Max Fried');
+    expect(stats.home.era).toBeNull();
+    expect(stats.away).toBeNull();
+  });
+});
+
+describe('starterEraAdjustment', () => {
+  test('better home starter moves probability home, capped at 6pp', () => {
+    expect(starterEraAdjustment(3.01, 5.24)).toBeCloseTo(0.06, 5);
+    expect(starterEraAdjustment(3.5, 4.5)).toBeCloseTo(0.04, 5);
+    expect(starterEraAdjustment(4.5, 3.5)).toBeCloseTo(-0.04, 5);
+  });
+
+  test('returns zero unless both ERAs are known and sane', () => {
+    expect(starterEraAdjustment(null, 4.5)).toBe(0);
+    expect(starterEraAdjustment(3.5, null)).toBe(0);
+    expect(starterEraAdjustment(0, 4.5)).toBe(0);
+    expect(starterEraAdjustment(3.5, 27)).toBe(0);
   });
 });
