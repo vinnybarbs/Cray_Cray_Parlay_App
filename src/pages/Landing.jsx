@@ -357,10 +357,14 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
 function StatRow({ label, value, tone = 'neutral', big = false, small = false }) {
   const valueColor = tone === 'pos' ? 'text-signal-pos' : tone === 'neg' ? 'text-signal-neg' : 'text-ink-100'
   const valueSize = big ? 'text-3xl md:text-4xl' : small ? 'text-sm' : 'text-xl'
+  // The LABEL wraps and the VALUE holds one line, not the reverse: with
+  // flex-shrink-0 on the label, "Sharp Take only · all-time (647 graded)"
+  // refused to shrink on phones and pushed "63.5% · +16.2% ROI" off the
+  // right edge as a four-line tower (2026-08-22 owner screenshot).
   return (
     <div className="flex items-center justify-between px-4 py-3 gap-3">
-      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400 flex-shrink-0">{label}</dt>
-      <dd className={`font-bold tabular-nums ${valueColor} ${valueSize} tracking-tight text-right`}>{value}</dd>
+      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400 min-w-0">{label}</dt>
+      <dd className={`font-bold tabular-nums ${valueColor} ${valueSize} tracking-tight text-right flex-shrink-0 whitespace-nowrap`}>{value}</dd>
     </div>
   )
 }
