@@ -816,41 +816,45 @@ function TrackRecord({ sportStats, tierStats }) {
             <div className="px-5 pt-2.5 bg-ink-950 text-[10px] uppercase tracking-[0.18em] text-signal-pos">
               Last 30 days only
             </div>
-            <div className="grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-2.5 bg-ink-950 border-b border-ink-800 text-[10px] uppercase tracking-[0.18em] text-ink-400">
+            {/* minmax(0,1fr) on the label column: a bare 1fr floors at
+                min-content, and on phones that pushed the table 16px past
+                the viewport (2026-08-22 mobile audit). Fixed columns also
+                shrink below sm so the label keeps a readable share. */}
+            <div className="grid grid-cols-[minmax(0,1fr)_52px_56px_52px] sm:grid-cols-[minmax(0,1fr)_80px_100px_80px] gap-2 sm:gap-3 px-4 sm:px-5 py-2.5 bg-ink-950 border-b border-ink-800 text-[10px] uppercase tracking-[0.18em] text-ink-400">
               <span>{dimensionLabel}</span>
-              <span className="text-right">Settled · 30d</span>
-              <span>Hit rate</span>
+              <span className="text-right">Settled<span className="hidden sm:inline"> · 30d</span></span>
+              <span>Hit<span className="hidden sm:inline"> rate</span></span>
               <span className="text-right">%</span>
             </div>
             {rows.map((row, i) => {
               const settled = row.wins + row.losses
               const rate = parseFloat(row.hitRate)
               const label = row[dimensionKey]
-              // Trap is graded on the pick it warns AGAINST, so a low hit rate
-              // there is the model working, not failing. Styling it in the
-              // same red as a losing tier undercut the pitch (audit 40,
-              // high 3): invert the coloring and say so.
+              // Trap is scored in FADE framing since the trap-domain
+              // restructure: the rollup's wins are fades that landed, so a
+              // HIGH number is the detector working. Same coloring as every
+              // other tier. (The old inverted styling dated from the era
+              // when the row showed the trap pick's own win rate.)
               const isTrap = label === 'Trap'
-              const isPos = isTrap ? rate < 50 : rate >= 55
-              const isNeg = isTrap ? rate >= 50 : rate < 50
+              const isPos = rate >= 55
+              const isNeg = rate < 50
               const color = isPos ? 'text-signal-pos' : isNeg ? 'text-signal-neg' : 'text-ink-100'
               const barColor = isPos ? 'bg-signal-pos' : isNeg ? 'bg-signal-neg' : 'bg-ink-400'
               return (
-                <div key={label} className={`grid grid-cols-[1fr_80px_100px_80px] gap-3 px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
-                  <span className="text-ink-100 font-medium">
+                <div key={label} className={`grid grid-cols-[minmax(0,1fr)_52px_56px_52px] sm:grid-cols-[minmax(0,1fr)_80px_100px_80px] gap-2 sm:gap-3 px-4 sm:px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
+                  <span className="text-ink-100 font-medium min-w-0">
                     {label}
                     {useTiers && tierRange(label) && (
-                      <span className="ml-2 font-mono text-[10px] text-ink-500 tabular-nums">
+                      <span className="ml-2 font-mono text-[10px] text-ink-500 tabular-nums whitespace-nowrap">
                         {tierRange(label) === '-2pp or worse' ? 'edge -2pp or worse' : `edge ${tierRange(label)}`}
                       </span>
                     )}
+                    {/* Hidden on phones: as a nowrap chip it overflowed the
+                        shrunken label cell into the settled column, and the
+                        full-width explainer row below already says the
+                        window. From sm: up there is room for the chip. */}
                     {row.window === 'all-time' && (
-                      <span className="ml-2 font-mono text-[10px] uppercase text-signal-pos">all-time</span>
-                    )}
-                    {isTrap && (
-                      <span className="block text-[10px] font-normal text-ink-400 mt-0.5">
-                        picks we said to fade, full record since May 10. Low is the model working
-                      </span>
+                      <span className="ml-2 font-mono text-[10px] uppercase text-signal-pos whitespace-nowrap hidden sm:inline">all-time</span>
                     )}
                   </span>
                   <span className="text-right text-ink-400 tabular-nums text-sm">{settled.toLocaleString()}</span>
@@ -868,6 +872,13 @@ function TrackRecord({ sportStats, tierStats }) {
                   <span className={`text-right text-base tabular-nums font-bold ${color}`}>
                     {row.hitRate}%
                   </span>
+                  {/* Full-width explainer row: inside the label cell this
+                      wrapped into a one-word-per-line tower on phones. */}
+                  {isTrap && (
+                    <span className="col-span-full text-[10px] font-normal text-ink-400 -mt-2">
+                      the record of fading the picks we flagged, full history since May 10. High means the warnings landed
+                    </span>
+                  )}
                 </div>
               )
             })}
@@ -902,8 +913,8 @@ function TrackRecord({ sportStats, tierStats }) {
             tiers carry small edges by definition and hover near break-even, and
             that's the honest shape of the market, not a bug. The money tier
             is <span className="text-signal-pos">Sharp Take</span>, and Trap
-            is scored on the picks it told you to avoid, where a low number
-            means the warning was right.
+            is scored as the record of fading the picks it flagged, so a high
+            number means the warnings were right.
           </p>
         )}
 
