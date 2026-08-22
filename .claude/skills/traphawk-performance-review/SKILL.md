@@ -69,6 +69,32 @@ group by 1 order by 1;
 
 An edge bucket winning more than about 5 points under what its edge implies is drift. Note it and check whether one sport drives it (add sport to the group by).
 
+## 3b. Price buckets: where does the claimed edge actually pay
+
+The pp bands say how much edge the model claims. The price of the pick says where that claim has historically paid, and the two disagree. The 2026-08-21 forensic over the season to date: nearly all MLB moneyline profit lived in slight dogs (+100 to +150, delivered about +11pp over implied since Jul 1), slight favorites (-101 to -149) underdelivered the entire season and were August's biggest bleeder, and the underdog side as a whole beat implied every single month while the margin decayed (roughly +22pp in May to +4pp in August). Do not assume dogs are the problem because books shade longshots; in this model's record the dogs carried it. Run this weekly per sport:
+
+```sql
+select case when odds::numeric <= -150 then '1 chalk -150 and heavier'
+            when odds::numeric < 0 then '2 slight fav -101 to -149'
+            when odds::numeric <= 150 then '3 slight dog +100 to +150'
+            else '4 long dog +151 and up' end as bucket,
+       count(*) as n,
+       count(*) filter (where actual_outcome = 'won') as won,
+       round(100.0 * avg(implied_prob::numeric), 1) as implied,
+       round(100.0 * count(*) filter (where actual_outcome = 'won') / count(*)
+             - 100.0 * avg(implied_prob::numeric), 1) as delivered_pp,
+       round(sum(case when actual_outcome = 'won'
+                 then (case when odds::numeric > 0 then odds::numeric / 100.0
+                       else 100.0 / abs(odds::numeric) end) else -1 end), 1) as units
+from ai_suggestions
+where bet_type = 'Moneyline' and actual_outcome in ('won','lost') and voided_at is null
+  and tier in ('Sharp Take','Strong Play','Play')
+  and game_date >= now() - interval '30 days'
+group by 1 order by 1;
+```
+
+Report delivered_pp and units per bucket next to the pp bands. A price bucket that has never delivered its claim (slight favorites, historically) staying negative for another 30-day window is evidence for a price-aware haircut; raise it as a recommendation, do not auto-apply one.
+
 ## 4. Traps and legs
 
 Trap record from the mv tier row (fade framing). If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Legs: hit rate versus the 65% floor. Legs hitting well below 65% over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
