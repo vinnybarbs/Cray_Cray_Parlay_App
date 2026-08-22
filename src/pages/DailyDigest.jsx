@@ -779,6 +779,28 @@ function MarketTabs({ game }) {
 
 // ─── GameCard ───────────────────────────────────────────────────────────────
 
+// Tiers revise all day as prices and data move, promotions included
+// (owner call 2026-08-22: a bet climbing to Sharp Take is a feature).
+// What must never happen again is the 2026-08-21 silent swap, where the
+// Rays left Sharp Take at 12:45 and the Padres entered at 15:45 with no
+// trace for a morning reader. When a published pick's tier has changed,
+// the card says so.
+function TierPathNote({ published }) {
+  const hist = published?.tier_history
+  if (!Array.isArray(hist) || hist.length < 2) return null
+  const prev = hist[hist.length - 2]
+  const curr = hist[hist.length - 1]
+  if (!prev?.tier || !curr?.tier || !curr.at) return null
+  const order = ['Lean', 'Play', 'Strong Play', 'Sharp Take']
+  const up = order.indexOf(curr.tier) > order.indexOf(prev.tier)
+  const when = new Date(curr.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return (
+    <div className={`font-mono text-[10px] mt-0.5 ${up ? 'text-signal-pos' : 'text-ink-400'}`}>
+      {up ? 'Promoted' : 'Demoted'} from {prev.tier} at {when}
+    </div>
+  )
+}
+
 function GameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -844,6 +866,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
                   </div>
                 ) : null
               })()}
+              <TierPathNote published={game.published_pick} />
             </div>
           )
           if (game.recommended_pick && isLegGame) {
@@ -1716,6 +1739,7 @@ export default function DailyDigest({ onBack }) {
               {data && (
                 <p className="text-ink-400 text-xs mt-3 font-mono leading-relaxed">
                   {totalGames} game{totalGames !== 1 ? 's' : ''} graded across {totalSports} sport{totalSports !== 1 ? 's' : ''}. Math picks the side. De-Genny narrates.
+                  {' '}Tiers revise with prices until lock. A pick that moved says so on its card.
                 </p>
               )}
 

@@ -74,6 +74,33 @@ async function getDigest(req, res) {
       }
     }));
 
+    // Attach the published pick row so tiles can show the tier PATH.
+    // Tiers legally revise all day (promotions included, owner call
+    // 2026-08-22), so the card says "promoted from Strong Play at 3:45 PM"
+    // instead of the board silently differing from a reader's last visit.
+    const pendingPicksResult = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('ai_suggestions')
+        .select('home_team, away_team, game_date, pick, tier, tier_history, last_revised_at')
+        .like('session_id', 'auto_digest_2%')
+        .eq('actual_outcome', 'pending')
+        .is('voided_at', null)
+        .not('tier', 'in', '("Trap","Leg")')
+        .gt('game_date', new Date().toISOString());
+      if (error) throw error;
+      return data || [];
+    });
+    const pickByMatchup = new Map();
+    for (const p of pendingPicksResult || []) {
+      pickByMatchup.set(`${p.home_team}|${p.away_team}`, p);
+    }
+    for (const game of games) {
+      const p = pickByMatchup.get(`${game.home_team}|${game.away_team}`);
+      game.published_pick = p
+        ? { pick: p.pick, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at }
+        : null;
+    }
+
     // Group games by sport
     const gamesBySport = {};
     for (const game of games) {

@@ -95,6 +95,22 @@ group by 1 order by 1;
 
 Report delivered_pp and units per bucket next to the pp bands. A price bucket that has never delivered its claim (slight favorites, historically) staying negative for another 30-day window is evidence for a price-aware haircut; raise it as a recommendation, do not auto-apply one.
 
+## 3c. Tier churn: morning board versus lock
+
+Tiers legally revise all day, promotions included (owner call 2026-08-22). Since then every published pick carries `tier_history` (array of {tier, odds, edge_pp, at}). Weekly, report how often the tier at lock differed from the first published tier, and whether crossers of the bet-signal line (into or out of Sharp Take and Strong Play) won or lost:
+
+```sql
+select count(*) filter (where jsonb_array_length(tier_history) > 1) as changed,
+       count(*) as published,
+       count(*) filter (where jsonb_array_length(tier_history) > 1 and actual_outcome = 'won') as changed_won,
+       count(*) filter (where jsonb_array_length(tier_history) > 1 and actual_outcome = 'lost') as changed_lost
+from ai_suggestions
+where tier_history is not null and actual_outcome in ('won','lost') and voided_at is null
+  and game_date >= now() - interval '7 days';
+```
+
+If picks that were promoted late underperform the ones published at their tier from the start, late promotions are chasing moved prices and that is evidence to bring the asymmetric-revision idea back to the owner. Until the data says that, promotions stay.
+
 ## 4. Traps and legs
 
 Trap record from the mv tier row (fade framing). If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Legs: hit rate versus the 65% floor. Legs hitting well below 65% over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
