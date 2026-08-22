@@ -22,6 +22,7 @@ const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
+const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 
 // Map odds_cache sport slugs to display sport names. Tennis (and golf)
 // tournament keys ROTATE weekly and are discovered dynamically by the
@@ -271,7 +272,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
   if (game.odds_event_id) {
     let evQuery = supabase
       .from('ai_suggestions')
-      .select('id, actual_outcome')
+      .select('id, actual_outcome, tier, tier_history')
       .like('session_id', 'auto_digest%')
       .eq('odds_event_id', game.odds_event_id);
     evQuery = domain === 'trap' ? evQuery.eq('tier', 'Trap')
@@ -285,10 +286,13 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
       return { status: 'settled' };
     }
     if (evExisting) {
+      const evHist = withTierHistory(evExisting.tier, evExisting.tier_history,
+        historyEntry(payload.tier, payload.odds, payload.edge_pp));
       const { error } = await supabase
         .from('ai_suggestions')
         .update({
           ...payload,
+          ...(evHist ? { tier_history: evHist } : {}),
           game_date: game.game_date,
           odds_event_id: game.odds_event_id,
           last_revised_at: new Date().toISOString(),
@@ -300,7 +304,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
 
   let query = supabase
     .from('ai_suggestions')
-    .select('id, actual_outcome')
+    .select('id, actual_outcome, tier, tier_history')
     .like('session_id', 'auto_digest%')
     .eq('home_team', game.home_team)
     .eq('away_team', game.away_team)
@@ -317,10 +321,13 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
     return { status: 'settled' };
   }
   if (existing) {
+    const hist = withTierHistory(existing.tier, existing.tier_history,
+      historyEntry(payload.tier, payload.odds, payload.edge_pp));
     const { error } = await supabase
       .from('ai_suggestions')
       .update({
         ...payload,
+        ...(hist ? { tier_history: hist } : {}),
         odds_event_id: game.odds_event_id || null,
         last_revised_at: new Date().toISOString(),
       })
@@ -337,6 +344,9 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
       odds_event_id: game.odds_event_id || null,
       actual_outcome: 'pending',
       ...payload,
+      tier_history: payload.tier
+        ? [historyEntry(payload.tier, payload.odds, payload.edge_pp)]
+        : null,
     });
   return { status: error ? 'error' : 'published', error };
 }

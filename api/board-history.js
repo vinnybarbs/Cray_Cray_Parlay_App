@@ -45,7 +45,7 @@ module.exports = async function boardHistory(req, res) {
 
     const { data, error } = await supabase
       .from('ai_suggestions')
-      .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, actual_outcome, reasoning, created_at')
+      .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, tier_history, actual_outcome, reasoning, created_at')
       .eq('session_id', `auto_digest_${date}`)
       .order('edge_pp', { ascending: false, nullsFirst: false });
 

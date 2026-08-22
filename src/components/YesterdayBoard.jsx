@@ -147,6 +147,17 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                       <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
                         {tier.label}{tier.subtitle && tier.subtitle.toLowerCase() !== tier.label.toLowerCase() ? ` · ${tier.subtitle}` : ''} · published {fmtPublished(p.created_at)}, before the game started
                       </p>
+                      {/* Tiers revise until lock. When this pick's tier moved
+                          during the day, show the full path so the graded
+                          label never silently differs from a reader's earlier
+                          visit (the 2026-08-21 Rays/Padres swap). */}
+                      {Array.isArray(p.tier_history) && p.tier_history.length > 1 && (
+                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+                          tier path: {p.tier_history.map((h) => h.at
+                            ? `${h.tier} ${new Date(h.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+                            : h.tier).join(', then ')}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
