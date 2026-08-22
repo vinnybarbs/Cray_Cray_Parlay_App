@@ -431,6 +431,9 @@ app.post('/cron/sync-ncaab-data', syncNCAABData);
 const backfillGameResults = require('./api/cron/backfill-game-results');
 app.post('/cron/backfill-game-results', backfillGameResults);
 
+const discordMorningBoard = require('./api/cron/discord-morning-board');
+app.post('/cron/discord-morning-board', discordMorningBoard);
+
 // Probe every upstream data source so we get a loud alert when ESPN (or any
 // other vendor) silently changes JSON shape. Writes to data_source_health.
 const probeDataSources = require('./api/cron/probe-data-sources');
