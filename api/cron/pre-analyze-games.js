@@ -23,6 +23,29 @@ const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
+const { shouldAlertSharpTake, sendSharpTakeAlert } = require('../../lib/services/discord-alerts.js');
+
+// Fires the Discord alert on a pick's FIRST entry into Sharp Take, fresh
+// publish or promotion (owner spec 2026-08-22: promotions matter,
+// demotions do not, and never alert the same pick twice). No-op until
+// DISCORD_WEBHOOK_URL is set. Never throws into the publish path.
+async function alertIfNewSharpTake(game, payload, existing) {
+  try {
+    if (!shouldAlertSharpTake(payload.tier, existing?.tier ?? null, existing?.tier_history ?? null)) return;
+    const result = await sendSharpTakeAlert({
+      pick: payload.pick,
+      sport: payload.sport,
+      homeTeam: game.home_team,
+      awayTeam: game.away_team,
+      gameDate: game.game_date,
+      edgePp: payload.edge_pp,
+      previousTier: existing?.tier && existing.tier !== payload.tier ? existing.tier : null,
+    });
+    if (result.sent) console.log(`  🔔 Sharp Take alert sent: ${payload.pick}`);
+  } catch (e) {
+    console.warn(`  Sharp Take alert failed: ${e.message}`);
+  }
+}
 
 // Map odds_cache sport slugs to display sport names. Tennis (and golf)
 // tournament keys ROTATE weekly and are discovered dynamically by the
@@ -298,6 +321,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
           last_revised_at: new Date().toISOString(),
         })
         .eq('id', evExisting.id);
+      if (!error) await alertIfNewSharpTake(game, payload, evExisting);
       return { status: error ? 'error' : 'revised', error };
     }
   }
@@ -332,6 +356,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
         last_revised_at: new Date().toISOString(),
       })
       .eq('id', existing.id);
+    if (!error) await alertIfNewSharpTake(game, payload, existing);
     return { status: error ? 'error' : 'revised', error };
   }
   const { error } = await supabase
@@ -348,6 +373,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
         ? [historyEntry(payload.tier, payload.odds, payload.edge_pp)]
         : null,
     });
+  if (!error) await alertIfNewSharpTake(game, payload, null);
   return { status: error ? 'error' : 'published', error };
 }
 
