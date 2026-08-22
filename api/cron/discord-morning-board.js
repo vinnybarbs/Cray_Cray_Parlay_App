@@ -22,7 +22,7 @@ const { siteDay } = require('../../shared/site-day.js');
 
 const SITE_URL = 'https://traphawk.io';
 const TIER_ORDER = ['Sharp Take', 'Strong Play', 'Play', 'Lean'];
-const FOOTER = `Tiers revise with prices until lock, and Sharp Take promotions ping here when they happen. All the research and full grades: ${SITE_URL}`;
+const FOOTER = `Tiers revise with prices until lock, and promotions into Strong Play or Sharp Take ping here as they happen. All the research and full grades: ${SITE_URL}`;
 
 function gameTimeMt(iso) {
   if (!iso) return null;
@@ -76,7 +76,7 @@ function formatMorningBoard(rows, dateLabel) {
     for (const r of traps.sort((a, b) => (a.edge_pp ?? 0) - (b.edge_pp ?? 0))) lines.push(pickLine(r));
   }
   if (!anything) {
-    lines.push('', 'Quiet board so far. Sweeps run all day and promotions ping here when a Sharp Take lands.');
+    lines.push('', 'Quiet board so far. Sweeps run all day and promotions ping here when a Strong Play or Sharp Take lands.');
   }
   lines.push('', FOOTER);
   return lines.join('\n');

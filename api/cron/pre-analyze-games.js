@@ -23,16 +23,18 @@ const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
-const { shouldAlertSharpTake, sendSharpTakeAlert } = require('../../lib/services/discord-alerts.js');
+const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 
-// Fires the Discord alert on a pick's FIRST entry into Sharp Take, fresh
-// publish or promotion (owner spec 2026-08-22: promotions matter,
-// demotions do not, and never alert the same pick twice). No-op until
-// DISCORD_WEBHOOK_URL is set. Never throws into the publish path.
+// Fires the Discord alert on a pick's FIRST entry into Strong Play or
+// Sharp Take, fresh publish or upward promotion (owner spec 2026-08-22:
+// promotions matter, demotions do not, and never alert the same pick
+// at the same tier twice). No-op until DISCORD_WEBHOOK_URL is set.
+// Never throws into the publish path.
 async function alertIfNewSharpTake(game, payload, existing) {
   try {
-    if (!shouldAlertSharpTake(payload.tier, existing?.tier ?? null, existing?.tier_history ?? null)) return;
-    const result = await sendSharpTakeAlert({
+    if (!shouldAlertTierEntry(payload.tier, existing?.tier ?? null, existing?.tier_history ?? null)) return;
+    const result = await sendTierAlert({
+      tier: payload.tier,
       pick: payload.pick,
       sport: payload.sport,
       homeTeam: game.home_team,
@@ -41,7 +43,7 @@ async function alertIfNewSharpTake(game, payload, existing) {
       edgePp: payload.edge_pp,
       previousTier: existing?.tier && existing.tier !== payload.tier ? existing.tier : null,
     });
-    if (result.sent) console.log(`  🔔 Sharp Take alert sent: ${payload.pick}`);
+    if (result.sent) console.log(`  🔔 ${payload.tier} alert sent: ${payload.pick}`);
   } catch (e) {
     console.warn(`  Sharp Take alert failed: ${e.message}`);
   }
