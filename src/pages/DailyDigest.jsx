@@ -1161,14 +1161,18 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             const pp = ppFor(game)
             const tier = edgeTier(pp, lockOddsFor(game))
             return (
-              <div key={i} className="flex items-center justify-between gap-3 text-sm">
+              /* Phones: matchup and pick stack on two lines instead of
+                 fighting for one row, where both ended up double-truncated
+                 ("New York M... Chicago White Sox ...", 2026-08-22 mobile
+                 audit). From sm: up the original single row returns. */
+              <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-0.5 gap-x-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
                     {formatPp(pp) ?? '-'}
                   </span>
                   <span className="text-ink-200 truncate">{game.away_team} @ {game.home_team}</span>
                 </div>
-                <span className="font-mono text-signal-pos text-xs font-medium flex-shrink-0 truncate max-w-[140px] tabular-nums">
+                <span className="font-mono text-signal-pos text-xs font-medium flex-shrink-0 truncate sm:max-w-[140px] tabular-nums pl-9 sm:pl-0">
                   {game.recommended_pick || '-'}
                 </span>
               </div>
@@ -1441,9 +1445,12 @@ function GolfLeaderboard({ golf }) {
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-ink-850 transition-colors text-left"
       >
         <span className="text-lg">⛳</span>
-        <div className="min-w-0 flex-1">
-          <span className="text-sm font-semibold text-ink-100">Golf</span>
-          <span className="ml-2 text-xs text-ink-400 truncate">
+        {/* Baseline flex so truncate actually clips: an inline span never
+            truncates, and this line was 598px wide on phones, one of the
+            elements that forced the page into horizontal overflow. */}
+        <div className="min-w-0 flex-1 flex items-baseline gap-2">
+          <span className="text-sm font-semibold text-ink-100 flex-shrink-0">Golf</span>
+          <span className="text-xs text-ink-400 truncate min-w-0">
             {golf.tournament} · {golf.status}{fieldSummary ? ` · odds boards: ${fieldSummary}` : ''}
           </span>
         </div>
@@ -1612,23 +1619,29 @@ export default function DailyDigest({ onBack }) {
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
         <BrandMark />
         <span className="text-sm font-semibold text-ink-200 hidden sm:inline">Daily Digest</span>
+        {/* px-2 below 640px: at px-3 the four nav controls need ~590px and
+            push the page into horizontal overflow on phones (2026-08-22
+            mobile audit: the whole digest rendered 591px wide on a 390px
+            screen, the "congested" report). Same fix for the Refresh label:
+            icon only on phones. */}
         <button
           onClick={() => { window.location.hash = '#/ledger' }}
-          className="ml-auto px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="ml-auto px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           Ledger
         </button>
         <button
           onClick={onBack}
-          className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           The Board
         </button>
         <button
           onClick={fetchDigest}
-          className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          aria-label="Refresh"
         >
-          {loading ? '...' : '↻ Refresh'}
+          {loading ? '...' : <><span aria-hidden="true">↻</span><span className="hidden sm:inline"> Refresh</span></>}
         </button>
         <SignOutButton />
       </div>
@@ -1638,12 +1651,16 @@ export default function DailyDigest({ onBack }) {
         {/* Hero header */}
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
           {/* Top meta row: today's date + 30d model hit-rate (trust anchor) + edge legend trigger */}
-          <div className="flex items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3 gap-3">
+          {/* flex-wrap + no flex-shrink-0: this row (records, period pills,
+              legend trigger) is ~540px wide and was the main driver of the
+              phone horizontal overflow. On small screens it wraps under the
+              date instead of widening the page. */}
+          <div className="flex flex-wrap items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3 gap-x-3 gap-y-1.5">
             <span className="truncate">{data ? formatFullDate(null) : 'Loading...'}</span>
-            <div className="flex items-center gap-4 flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 min-w-0">
               {heroHitRate && (
                 <span
-                  className="flex items-center gap-2"
+                  className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0"
                   title="Sharp Take record and the all-tiers Model record for the selected window. Same numbers as The House Ledger."
                 >
                   <span>
