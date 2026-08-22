@@ -21,6 +21,7 @@ const bandCalibration = require('../../lib/services/band-calibration.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
+const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 
 // Map odds_cache sport slugs to display sport names. Tennis (and golf)
 // tournament keys ROTATE weekly and are discovered dynamically by the
@@ -1476,6 +1477,30 @@ async function runPreAnalysis(sportSlugs) {
                 const isHomeMl = side === 'home_ml';
                 const isAwayMl = side === 'away_ml';
 
+                // Calibrated pp under 2 would grade Skip, but this row
+                // cleared the pre-band gate, so it publishes at the
+                // ladder floor instead of wearing a non-published label.
+                let pickTier = (() => {
+                  const t = pickGrader.edgeTier(edgePp, pickOdds);
+                  return t === 'Skip' ? 'Lean' : t;
+                })();
+                let pickReasoning = result.analysis_snippet;
+                // Same-team moneyline claims are the same opinion resampled,
+                // so a team on a graded losing streak this week costs the
+                // claim one rung until it cashes (exposure-guard.js).
+                if (betType === 'Moneyline' && (isHomeMl || isAwayMl)) {
+                  const guard = await applyExposureGuard(supabase, {
+                    sport: sportDisplay,
+                    team: isHomeMl ? game.home_team : game.away_team,
+                    tier: pickTier,
+                  });
+                  if (guard.demoted) {
+                    console.log(`  🛑 ${guard.reason}`);
+                    pickTier = guard.tier;
+                    pickReasoning = pickReasoning ? `${pickReasoning} ${guard.reason}` : guard.reason;
+                  }
+                }
+
                 const sessionId = `auto_digest_${siteDay()}`;
                 const pickPayload = {
                   sport: sportDisplay,
@@ -1484,7 +1509,7 @@ async function runPreAnalysis(sportSlugs) {
                   point: point,
                   odds: pickOdds,
                   confidence: Math.round(result.edge_score),
-                  reasoning: result.analysis_snippet,
+                  reasoning: pickReasoning,
                   risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
                   generate_mode: 'auto_digest',
                   // 6 = calibrated devig regime (edge_calibration multipliers
@@ -1493,13 +1518,7 @@ async function runPreAnalysis(sportSlugs) {
                   pipeline_version: 6,
                   edge_pp: edgePp,
                   edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
-                  // Calibrated pp under 2 would grade Skip, but this row
-                  // cleared the pre-band gate, so it publishes at the
-                  // ladder floor instead of wearing a non-published label.
-                  tier: (() => {
-                    const t = pickGrader.edgeTier(edgePp, pickOdds);
-                    return t === 'Skip' ? 'Lean' : t;
-                  })(),
+                  tier: pickTier,
                   model_prob: isHomeMl ? edgeData?.homeWinProb ?? null
                             : isAwayMl ? edgeData?.awayWinProb ?? null : null,
                   implied_prob: isHomeMl ? edgeData?.impliedHomeProb ?? null
