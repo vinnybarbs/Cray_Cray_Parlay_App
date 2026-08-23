@@ -346,8 +346,12 @@ export default function HouseLedger() {
                             <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</span>
                           )}
                         </span>
-                        <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
-                        <span className="ml-auto font-mono text-[10px] text-ink-500 flex-shrink-0">{fmtDate(p.resolved_at)}</span>
+                        {/* Settlement date dropped from the row (owner call
+                            2026-08-22): grading follows the final within the
+                            hour, so game date and settled date only differ on
+                            midnight-crossing games and the second date read
+                            as clutter. resolved_at still orders the feed. */}
+                        <span className="ml-auto font-mono text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
                       </div>
                     )
                   })}
