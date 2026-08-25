@@ -69,7 +69,9 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
     : null
 
   return (
-    <div className="mt-5">
+    // w-full so the panel takes its own row when the button strip sits in
+    // a flex-wrap next to the house parlays button.
+    <div className="mt-5 w-full">
       {loading && <div className="h-20 bg-ink-850 rounded-sharp animate-pulse" />}
       {error && <p className="text-signal-neg text-sm">Couldn't load yesterday's board: {error}</p>}
       {data && (
