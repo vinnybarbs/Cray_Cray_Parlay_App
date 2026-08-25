@@ -1748,17 +1748,14 @@ async function runPreAnalysis(sportSlugs) {
               // legs across entire MLB slates. 65% is about -186, still a
               // genuinely heavy favorite in any sport.
               const LEG_PROB_FLOOR = 0.65;
-              // Market-anchored second path (owner 2026-08-25). The 65%
-              // floor reads the CALIBRATED probability, which rides the
-              // weekly multiplier: in a cold-streak rebuild (k at the 0.25
-              // floor) calibrated probability hugs implied, a whole slate
-              // produces zero legs, and the board's high-percent lane goes
-              // dark exactly when the tier lane is also muted. A leg's hit
-              // claim is really the market's, so the second path anchors on
-              // the market: implied probability 60% or better with the raw
-              // model read at or above the price. The market vouches for
-              // the percent, the model only has to not disagree.
-              const LEG_IMPLIED_FLOOR = 0.60;
+              // Owner clarification 2026-08-25: a Leg means a GIMME, the
+              // model's own 65%-plus read, and the label does not loosen
+              // in rebuild weeks. The quiet-day content problem is solved
+              // in the Discord morning board instead, which lists heavy
+              // market favorites the model agrees with as presentation
+              // only (never published, never graded). A briefly-live
+              // market-anchored second path (implied 60% + raw agreement)
+              // was reverted the same day at owner direction.
               // Same pre-band gate as publication, so the pick-vs-leg split
               // is unchanged by the calibration layer. (mathPick carries
               // recommended_side; an earlier version read a nonexistent
@@ -1771,19 +1768,12 @@ async function runPreAnalysis(sportSlugs) {
                   const legSide = edgeData.homeWinProb >= edgeData.awayWinProb ? 'home_ml' : 'away_ml';
                   const legProb = Math.max(edgeData.homeWinProb, edgeData.awayWinProb);
                   const legEdge = edgeData?.edges?.[legSide] ?? null;
-                  const legImplied = legSide === 'home_ml'
-                    ? edgeData.impliedHomeProb ?? null : edgeData.impliedAwayProb ?? null;
-                  const legRawEdge = edgeData?.edgesRaw?.[legSide] ?? legEdge;
                   const legIsTrapSide = trapCalls.some(t => t.side === legSide);
-                  const legQualifies =
-                    legProb >= LEG_PROB_FLOOR ||
-                    (legImplied != null && legImplied >= LEG_IMPLIED_FLOOR
-                      && legRawEdge != null && legRawEdge >= 0);
-                  if (legQualifies && !legIsTrapSide && legEdge != null && legEdge * 100 > -2) {
+                  if (legProb >= LEG_PROB_FLOOR && !legIsTrapSide && legEdge != null && legEdge * 100 > -2) {
                     const legText = buildPickText(legSide, oddsCtx, game);
                     const legOdds = resolveOddsForPick(oddsCtx, legSide);
                     if (legText && legOdds != null) {
-                      const legEdgeRaw = legRawEdge;
+                      const legEdgeRaw = edgeData?.edgesRaw?.[legSide] ?? legEdge;
                       const legPayload = {
                         sport: sportDisplay,
                         bet_type: 'Moneyline',
@@ -1791,19 +1781,7 @@ async function runPreAnalysis(sportSlugs) {
                         point: null,
                         odds: formatAmericanOdds(legOdds),
                         confidence: Math.min(10, Math.round(legProb * 10)),
-                        reasoning: (() => {
-                          // Owner framing 2026-08-25: anchor the percent on
-                          // the market, report the model as the delta.
-                          const impliedPct = legImplied != null ? (legImplied * 100).toFixed(0) : null;
-                          const deltaPp = legEdgeRaw != null ? Math.round(legEdgeRaw * 1000) / 10 : null;
-                          const deltaPhrase = deltaPp == null ? 'in line with the market'
-                            : deltaPp >= 0.5 ? `${deltaPp}pp better than the price`
-                            : deltaPp >= 0 ? 'right at the market'
-                            : 'close to the market';
-                          return impliedPct != null
-                            ? `Leg: ${legText} is ${impliedPct}% implied at the price and the model reads it ${deltaPhrase}. No Sharp Take edge here, high percent to hit, parlay material.`
-                            : `Leg: ${legText} grades ${(legProb * 100).toFixed(0)}% to hit but carries no betting value at the price. High hit probability, thin payout. Tracked as a parlay leg, never a pick.`;
-                        })(),
+                        reasoning: `Leg: ${legText} grades ${(legProb * 100).toFixed(0)}% to hit but carries no betting value at the price. High hit probability, thin payout. Tracked as a parlay leg, never a pick.`,
                         risk_level: 'Low',
                         generate_mode: 'auto_digest',
                         pipeline_version: 6,
