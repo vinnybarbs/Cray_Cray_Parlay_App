@@ -43,10 +43,16 @@ module.exports = async function boardHistory(req, res) {
         || siteDayOffset(-1);
     }
 
+    // Spotlight (alt-market) rows live in their own session domains but
+    // belong on the same day's board and in its record.
     const { data, error } = await supabase
       .from('ai_suggestions')
       .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, tier_history, actual_outcome, reasoning, created_at')
-      .eq('session_id', `auto_digest_${date}`)
+      .in('session_id', [
+        `auto_digest_${date}`,
+        `auto_digest_alt_spread_${date}`,
+        `auto_digest_alt_total_${date}`,
+      ])
       .order('edge_pp', { ascending: false, nullsFirst: false });
 
     if (error) throw error;
