@@ -63,9 +63,25 @@ function formatMorningBoard(rows, dateLabel) {
   const legs = byTier.get('Leg') || [];
   if (legs.length) {
     anything = true;
+    // Owner call 2026-08-25: on a day with no bet-signal tier, the board
+    // says so plainly instead of looking broken, and hands the channel
+    // the high percenters with the market's number leading.
+    const hasBetSignal = (byTier.get('Sharp Take')?.length || 0) > 0
+      || (byTier.get('Strong Play')?.length || 0) > 0;
+    if (!hasBetSignal) {
+      lines.push('', 'No Sharp Take edge on the board right now. The legs below are the high percenters: heavy favorites the model agrees with, sized for parlays rather than singles.');
+    }
     lines.push('', '**Legs · high hit rate, thin payout, parlay material**');
-    for (const r of legs.sort((a, b) => (b.model_prob ?? 0) - (a.model_prob ?? 0))) {
-      const prob = r.model_prob != null ? `${Math.round(r.model_prob * 100)}% to hit` : null;
+    for (const r of legs.sort((a, b) => (b.implied_prob ?? b.model_prob ?? 0) - (a.implied_prob ?? a.model_prob ?? 0))) {
+      // The market vouches for the percent, the model is the delta. Rows
+      // from before implied_prob was stored fall back to the model read.
+      let prob = null;
+      if (r.implied_prob != null) {
+        const delta = r.edge_pp_raw != null && r.edge_pp_raw >= 0.5 ? `, model +${r.edge_pp_raw}pp` : '';
+        prob = `${Math.round(r.implied_prob * 100)}% implied${delta}`;
+      } else if (r.model_prob != null) {
+        prob = `${Math.round(r.model_prob * 100)}% to hit`;
+      }
       lines.push(`• ${[r.pick, r.sport, prob, gameTimeMt(r.game_date)].filter(Boolean).join(' · ')}`);
     }
   }
@@ -92,7 +108,7 @@ async function runMorningBoard() {
   const windowEnd = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
   const { data: fetched, error } = await supabase
     .from('ai_suggestions')
-    .select('sport, pick, edge_pp, tier, game_date, model_prob')
+    .select('sport, pick, edge_pp, edge_pp_raw, tier, game_date, model_prob, implied_prob')
     .like('session_id', 'auto_digest%')
     .eq('actual_outcome', 'pending')
     .is('voided_at', null)

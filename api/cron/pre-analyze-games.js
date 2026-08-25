@@ -26,6 +26,7 @@ const { withTierHistory, historyEntry } = require('../../lib/services/tier-histo
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
+const { getCalibrationMultiplier } = require('../../lib/services/calibration-multiplier.js');
 
 // One provider per process; the Elo table load is cached inside it, so a
 // 40-match tennis slate costs one pair of table reads, not 40.
@@ -91,9 +92,15 @@ const SLUG_TO_SPORT = {
 // model calibrates on settled shadow reads. Soccer uses the three-way 1X2
 // module, tennis and UFC use market-consensus player models. Designs and
 // un-shadow criteria live in docs/models/.
-// Tennis promoted to production 2026-08-10 at owner direction. It publishes
-// through the normal ladder under its 0.50 calibration multiplier. UFC and
-// soccer stay shadowed until they clear the readiness bar.
+// Tennis promoted to production 2026-08-10 at owner direction, and runs
+// both model signals (market consensus + Elo) since 2026-08-25.
+// UFC promoted to production 2026-08-25 at owner direction: 81 graded
+// shadow reads, recommended side 48-33 (59.3 pct), measured k 4.43, so
+// the direction is proven while the claims stay tiny (0.35pp average,
+// market-consensus only). In practice UFC feeds the board, legs, and
+// traps; picks require the same 2pp pre-band gate as everyone and will
+// stay rare until the model gets a fighter-strength signal. Soccer stays
+// shadowed until a real three-way model clears the readiness bar.
 //
 // NFL and NCAAF are shadowed for PRESEASON ONLY (owner decision
 // 2026-08-10): full analysis and nightly shadow grading of every raw
@@ -102,7 +109,7 @@ const SLUG_TO_SPORT = {
 // season openers (NCAAF 2026-08-29, NFL 2026-09-10): remove the sport
 // from this set and seed its edge_calibration multipliers from the
 // preseason market_shadow_calibration() measured_k.
-const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'UFC', 'NFL', 'NCAAF']);
+const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'NFL', 'NCAAF']);
 
 // ATP slams are best of five. Everything else, including all WTA events,
 // is best of three. The tennis model prices the reliability gap between
@@ -1238,6 +1245,8 @@ async function runPreAnalysis(sportSlugs) {
               away_team: game.away_team,
               books: game.h2hRows || [],
               markets: game.markets
+            }, {
+              calibrationMultiplier: await getCalibrationMultiplier(supabase, ['UFC:ml', 'UFC'])
             });
           } else if (SHADOW_SPORTS.has(sportDisplay)) {
             // The remaining shadow sports are the soccer family: three-way
@@ -1739,6 +1748,17 @@ async function runPreAnalysis(sportSlugs) {
               // legs across entire MLB slates. 65% is about -186, still a
               // genuinely heavy favorite in any sport.
               const LEG_PROB_FLOOR = 0.65;
+              // Market-anchored second path (owner 2026-08-25). The 65%
+              // floor reads the CALIBRATED probability, which rides the
+              // weekly multiplier: in a cold-streak rebuild (k at the 0.25
+              // floor) calibrated probability hugs implied, a whole slate
+              // produces zero legs, and the board's high-percent lane goes
+              // dark exactly when the tier lane is also muted. A leg's hit
+              // claim is really the market's, so the second path anchors on
+              // the market: implied probability 60% or better with the raw
+              // model read at or above the price. The market vouches for
+              // the percent, the model only has to not disagree.
+              const LEG_IMPLIED_FLOOR = 0.60;
               // Same pre-band gate as publication, so the pick-vs-leg split
               // is unchanged by the calibration layer. (mathPick carries
               // recommended_side; an earlier version read a nonexistent
@@ -1751,12 +1771,19 @@ async function runPreAnalysis(sportSlugs) {
                   const legSide = edgeData.homeWinProb >= edgeData.awayWinProb ? 'home_ml' : 'away_ml';
                   const legProb = Math.max(edgeData.homeWinProb, edgeData.awayWinProb);
                   const legEdge = edgeData?.edges?.[legSide] ?? null;
+                  const legImplied = legSide === 'home_ml'
+                    ? edgeData.impliedHomeProb ?? null : edgeData.impliedAwayProb ?? null;
+                  const legRawEdge = edgeData?.edgesRaw?.[legSide] ?? legEdge;
                   const legIsTrapSide = trapCalls.some(t => t.side === legSide);
-                  if (legProb >= LEG_PROB_FLOOR && !legIsTrapSide && legEdge != null && legEdge * 100 > -2) {
+                  const legQualifies =
+                    legProb >= LEG_PROB_FLOOR ||
+                    (legImplied != null && legImplied >= LEG_IMPLIED_FLOOR
+                      && legRawEdge != null && legRawEdge >= 0);
+                  if (legQualifies && !legIsTrapSide && legEdge != null && legEdge * 100 > -2) {
                     const legText = buildPickText(legSide, oddsCtx, game);
                     const legOdds = resolveOddsForPick(oddsCtx, legSide);
                     if (legText && legOdds != null) {
-                      const legEdgeRaw = edgeData?.edgesRaw?.[legSide] ?? legEdge;
+                      const legEdgeRaw = legRawEdge;
                       const legPayload = {
                         sport: sportDisplay,
                         bet_type: 'Moneyline',
@@ -1764,7 +1791,19 @@ async function runPreAnalysis(sportSlugs) {
                         point: null,
                         odds: formatAmericanOdds(legOdds),
                         confidence: Math.min(10, Math.round(legProb * 10)),
-                        reasoning: `Leg: ${legText} grades ${(legProb * 100).toFixed(0)}% to hit but carries no betting value at the price. High hit probability, thin payout. Tracked as a parlay leg, never a pick.`,
+                        reasoning: (() => {
+                          // Owner framing 2026-08-25: anchor the percent on
+                          // the market, report the model as the delta.
+                          const impliedPct = legImplied != null ? (legImplied * 100).toFixed(0) : null;
+                          const deltaPp = legEdgeRaw != null ? Math.round(legEdgeRaw * 1000) / 10 : null;
+                          const deltaPhrase = deltaPp == null ? 'in line with the market'
+                            : deltaPp >= 0.5 ? `${deltaPp}pp better than the price`
+                            : deltaPp >= 0 ? 'right at the market'
+                            : 'close to the market';
+                          return impliedPct != null
+                            ? `Leg: ${legText} is ${impliedPct}% implied at the price and the model reads it ${deltaPhrase}. No Sharp Take edge here, high percent to hit, parlay material.`
+                            : `Leg: ${legText} grades ${(legProb * 100).toFixed(0)}% to hit but carries no betting value at the price. High hit probability, thin payout. Tracked as a parlay leg, never a pick.`;
+                        })(),
                         risk_level: 'Low',
                         generate_mode: 'auto_digest',
                         pipeline_version: 6,
