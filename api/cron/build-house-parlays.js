@@ -16,14 +16,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Minimum CALIBRATED edge in percentage points for a pick to qualify.
-// Was 4 ("Play tier or better") on the old claimed scale, but edge_pp
-// stores band-calibrated values since 2026-08-16 and calibrated 4 is a
-// genuinely strong claim now: the bar left the pool at roughly one pick
-// a day and starved the 3-leg build (Aug 17 never built one). Every
-// published pick (calibrated 2+, Lean floor) qualifies, the sort still
-// puts the strongest first, and Legs backfill below picks as before.
-const MIN_EDGE_PP = 2;
+// Every published pick qualifies for the pool, no edge floor. The old
+// floor of calibrated 2 was written when the Lean floor sat at 2, but
+// picks publish on the PRE-band gate and their calibrated edge_pp can
+// legally sit near 1 in a rebuild week (k at the 0.25 floor), which
+// left the pool at zero picks on exactly the days that needed a
+// product. Passing the publish gate is the qualification. The composer
+// ranks safety from there.
 
 // Never publish a leg whose game starts within this window.
 const MIN_MINUTES_TO_START = 30;
@@ -103,13 +102,15 @@ async function buildHouseParlays(req, res) {
     // Cutoff so we never publish a leg whose game has started or is about to.
     const cutoff = new Date(Date.now() + MIN_MINUTES_TO_START * 60 * 1000).toISOString();
 
-    // Candidate legs come from the house's own digest picks for today.
+    // Candidate legs come from the house's own digest picks for today,
+    // spotlight (alt-market) rows included: they are published graded
+    // picks like any other and a -175 spread favorite is exactly the
+    // kind of component a hit-first parlay wants.
     const { data: candidates, error } = await supabase
       .from('ai_suggestions')
       .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob')
-      .eq('session_id', sessionId)
+      .in('session_id', [sessionId, `auto_digest_alt_spread_${today}`, `auto_digest_alt_total_${today}`])
       .eq('actual_outcome', 'pending')
-      .gte('edge_pp', MIN_EDGE_PP)
       .not('odds', 'is', null)
       .gt('game_date', cutoff);
 
