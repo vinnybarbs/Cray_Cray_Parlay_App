@@ -110,6 +110,9 @@ const SLUG_TO_SPORT = {
 // from this set and seed its edge_calibration multipliers from the
 // preseason market_shadow_calibration() measured_k.
 const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'NFL', 'NCAAF']);
+// Model routing for the three-way soccer family only. SHADOW_SPORTS
+// answers "does it publish"; this set answers "which model prices it".
+const SOCCER_1X2_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
 
 // ATP slams are best of five. Everything else, including all WTA events,
 // is best of three. The tennis model prices the reliability gap between
@@ -1248,9 +1251,15 @@ async function runPreAnalysis(sportSlugs) {
             }, {
               calibrationMultiplier: await getCalibrationMultiplier(supabase, ['UFC:ml', 'UFC'])
             });
-          } else if (SHADOW_SPORTS.has(sportDisplay)) {
-            // The remaining shadow sports are the soccer family: three-way
-            // 1X2 with the draw as its own side.
+          } else if (SOCCER_1X2_SPORTS.has(sportDisplay)) {
+            // The soccer family prices three-way 1X2 with the draw as its
+            // own side. This branch used to test SHADOW_SPORTS, which
+            // silently routed NFL and NCAAF preseason (added to the shadow
+            // set 2026-08-10) through the soccer model: no raw edges
+            // stored, so market_shadow_calibration had zero football rows
+            // to seed go-live k from. Model routing and publication
+            // shadowing are different questions; football belongs to the
+            // core team calculator below, shadow or not.
             edgeData = soccer1x2.calculateSoccer1x2Edges({
               homeTeam: game.home_team,
               awayTeam: game.away_team,

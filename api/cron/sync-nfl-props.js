@@ -48,9 +48,13 @@ function sportLabel(sportKey) {
 }
 
 // Preseason NFL lives under its own Odds API sport key, so the default run
-// sweeps both. Out of season the extra key costs one events list call that
-// returns empty. Explicit ?sport= still targets a single key.
-const DEFAULT_SPORT_KEYS = ['americanfootball_nfl', 'americanfootball_nfl_preseason'];
+// sweeps both. NCAAF joined the default sweep 2026-08-25 with the opener
+// days out; college props post for the marquee games and the preseason
+// weeks proved books post nothing for exhibition NFL (every 200 came back
+// with zero markets and zero billed credits). Out of season an extra key
+// costs one events list call that returns empty. Explicit ?sport= still
+// targets a single key. MAX_EVENTS_PER_RUN bounds the credit spend.
+const DEFAULT_SPORT_KEYS = ['americanfootball_nfl', 'americanfootball_nfl_preseason', 'americanfootball_ncaaf'];
 
 async function runSync({ days, sportKey }) {
   const startTime = Date.now();
