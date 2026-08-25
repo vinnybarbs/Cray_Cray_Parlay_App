@@ -25,6 +25,11 @@ const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
+const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
+
+// One provider per process; the Elo table load is cached inside it, so a
+// 40-match tennis slate costs one pair of table reads, not 40.
+const tennisRatingsProvider = createRatingsProvider(supabase);
 
 // Fires the Discord alert on a pick's FIRST entry into Strong Play or
 // Sharp Take, fresh publish or upward promotion (owner spec 2026-08-22:
@@ -1211,12 +1216,21 @@ async function runPreAnalysis(sportSlugs) {
         let edgeData = null;
         try {
           if (sportDisplay === 'Tennis') {
+            // Both halves of the model's design are wired as of 2026-08-25:
+            // the Elo ratings provider (seeded from official points, replayed
+            // over stored results) and the Tennis:ml calibration multiplier.
+            // Before this, production ran market-consensus only, which
+            // structurally capped tennis edges near 4pp and made Sharp Takes
+            // impossible.
             edgeData = await tennisModel.calculateTennisEdge({
               home_team: game.home_team,
               away_team: game.away_team,
               books: tennisModel.booksFromOddsRows(game.h2hRows || [], game.home_team, game.away_team),
               best_of: BO5_TENNIS_KEYS.has(game.sport) ? 5 : 3,
               tour: String(game.sport || '').startsWith('tennis_wta') ? 'wta' : 'atp'
+            }, {
+              ratings: tennisRatingsProvider,
+              calibrationMultiplier: await getTennisCalibrationMultiplier(supabase)
             });
           } else if (sportDisplay === 'UFC') {
             edgeData = await ufcModel.computeUfcEdge({

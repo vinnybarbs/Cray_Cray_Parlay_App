@@ -22,7 +22,7 @@ Math picks the side, Claude narrates. `api/cron/pre-analyze-games.js` computes p
 | Trap | lure-based, side priced <= -2pp that casual bettors are drawn to (`lib/services/trap-detector.js`). NOT simply the inverse of a pick |
 | Leg | model probability >= 65% to win but no 2pp edge (payout too thin). Tracked for parlay building |
 
-Edges are calibrated by `edge_calibration` multipliers (keys `<Sport>:<market>`, `<Sport>`, `__global__`) before tiering. Current posture: MLB ml about 0.92, MLB spread 0.21 (re-entered 2026-08-10 at shadow-fitted k), MLB total 0.10 (probation, shadow measured NEGATIVE k), Tennis 0.50. A `reprice-pending-picks` cron demotes pending Play moneyline picks to Lean when the market fades their side by 1pp of implied probability inside 90 minutes of first pitch.
+Edges are calibrated by `edge_calibration` multipliers (keys `<Sport>:<market>`, `<Sport>`, `__global__`) before tiering, with a 0.25 floor on the weekly refit since 2026-08-24. Current posture: MLB ml 0.25 (at the floor, measured k went negative 2026-08-24), MLB spread 0.21 (re-entered 2026-08-10 at shadow-fitted k), MLB total 0 (muted, shadow still measures NEGATIVE k), Tennis:ml 1.00 (shadow-fit 2026-08-25, applied together with the Elo ratings provider in lib/services/tennis-ratings.js). A `reprice-pending-picks` cron demotes pending Play moneyline picks to Lean when the market fades their side by 1pp of implied probability inside 90 minutes of first pitch.
 
 ## Record domains in ai_suggestions
 

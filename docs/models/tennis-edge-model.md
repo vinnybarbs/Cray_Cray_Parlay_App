@@ -143,6 +143,29 @@ Phase 2, publish.
 - If measured k is meaningfully positive (k of 0.5 or better on 150 plus matches), seed `Tennis:ml` at `min(k, 0.75)`, remove Tennis from `SHADOW_SPORTS`, and let the normal 2pp gate and tier ladder take over. Trap reads (negative edge) publish under the same rules as other sports.
 - The weekly refresh takes ownership of the multiplier from there.
 
+## Status 2026-08-25: both signals live
+
+Tennis left `SHADOW_SPORTS` on 2026-08-10, but production ran market-consensus
+only for the first two weeks: the call site passed no options, so the ratings
+interface and the calibration multiplier below were dead code and every
+published edge was pure inter-book disagreement, capped near 4pp in practice.
+
+Wired 2026-08-25:
+
+- `lib/services/tennis-ratings.js` implements the ratings provider from
+  `tennis_rankings` and `tennis_match_results`: Elo seeded log-linearly from
+  official ranking points, replayed over stored results (K 32, walkovers
+  skipped), `matchesLast14` feeding the fatigue term. No surface data exists
+  in the tables, so `surfaceElo` stays null and the surface blend degrades to
+  overall Elo by design. Unranked players need 3 replayed matches before the
+  provider vouches for them; otherwise the model stays market-only for that
+  match.
+- `calibrationMultiplier` now reads `edge_calibration` key `Tennis:ml`
+  (fallback `Tennis`, then 1; deliberately never `__global__`, which is fit
+  on team sports). The row was set to 1.00 on the shadow evidence (58 graded
+  2pp reads, 79.3 actual vs 76.9 implied, k near 1), which also matches the
+  effective multiplier production had been running by accident.
+
 ## Integration notes (changes NOT made here, for the coordinator)
 
 `api/cron/pre-analyze-games.js`
