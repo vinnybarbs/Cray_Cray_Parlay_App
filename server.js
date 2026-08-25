@@ -532,6 +532,11 @@ app.post('/cron/settle-house-parlays', settleHouseParlays);
 const { getAdminDashboard } = require('./api/admin-dashboard');
 app.get('/api/admin/dashboard', getAdminDashboard);
 
+// Admin: calibration state behind every grade (multipliers, bands,
+// factor attribution, tier ladder). Same admin JWT allowlist.
+const adminCalibration = require('./api/admin-calibration');
+app.get('/api/admin/calibration', adminCalibration);
+
 // Daily Digest - public endpoint, no auth required
 const { getDigest, deepResearch } = require('./api/digest');
 app.get('/api/digest', getDigest);

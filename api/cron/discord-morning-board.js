@@ -44,7 +44,7 @@ function pickLine(row) {
 }
 
 /** Pure formatter so the message shape is testable. */
-function formatMorningBoard(rows, dateLabel) {
+function formatMorningBoard(rows, dateLabel, gimmes = []) {
   const lines = [`🦅 **TrapHawk board · ${dateLabel}**`];
   const byTier = new Map();
   for (const r of rows || []) {
@@ -63,26 +63,24 @@ function formatMorningBoard(rows, dateLabel) {
   const legs = byTier.get('Leg') || [];
   if (legs.length) {
     anything = true;
-    // Owner call 2026-08-25: on a day with no bet-signal tier, the board
-    // says so plainly instead of looking broken, and hands the channel
-    // the high percenters with the market's number leading.
-    const hasBetSignal = (byTier.get('Sharp Take')?.length || 0) > 0
-      || (byTier.get('Strong Play')?.length || 0) > 0;
-    if (!hasBetSignal) {
-      lines.push('', 'No Sharp Take edge on the board right now. The legs below are the high percenters: heavy favorites the model agrees with, sized for parlays rather than singles.');
-    }
-    lines.push('', '**Legs · high hit rate, thin payout, parlay material**');
-    for (const r of legs.sort((a, b) => (b.implied_prob ?? b.model_prob ?? 0) - (a.implied_prob ?? a.model_prob ?? 0))) {
-      // The market vouches for the percent, the model is the delta. Rows
-      // from before implied_prob was stored fall back to the model read.
-      let prob = null;
-      if (r.implied_prob != null) {
-        const delta = r.edge_pp_raw != null && r.edge_pp_raw >= 0.5 ? `, model +${r.edge_pp_raw}pp` : '';
-        prob = `${Math.round(r.implied_prob * 100)}% implied${delta}`;
-      } else if (r.model_prob != null) {
-        prob = `${Math.round(r.model_prob * 100)}% to hit`;
-      }
+    lines.push('', '**Legs · the gimmes, 65% or better to hit, parlay material**');
+    for (const r of legs.sort((a, b) => (b.model_prob ?? 0) - (a.model_prob ?? 0))) {
+      const prob = r.model_prob != null ? `${Math.round(r.model_prob * 100)}% to hit` : null;
       lines.push(`• ${[r.pick, r.sport, prob, gameTimeMt(r.game_date)].filter(Boolean).join(' · ')}`);
+    }
+  }
+  // Owner call 2026-08-25: on a day with no bet-signal tier, say so
+  // plainly and hand the channel the day's high percenters. These are
+  // PRESENTATION ONLY: board reads where a heavy market favorite has the
+  // model's agreement. They are not picks, never published, never graded.
+  const hasBetSignal = (byTier.get('Sharp Take')?.length || 0) > 0
+    || (byTier.get('Strong Play')?.length || 0) > 0;
+  if (!hasBetSignal && (gimmes || []).length) {
+    anything = true;
+    lines.push('', 'No Sharp Take edge on the board today. These are not plays, but the market prices them as the day’s highest percenters and the model agrees with the price:');
+    for (const g of gimmes) {
+      const pct = `${Math.round(g.implied * 100)}% implied`;
+      lines.push(`• ${[g.pick, g.sport, pct, gameTimeMt(g.game_date)].filter(Boolean).join(' · ')}`);
     }
   }
   const traps = byTier.get('Trap') || [];
@@ -98,6 +96,61 @@ function formatMorningBoard(rows, dateLabel) {
   return lines.join('\n');
 }
 
+// Shadow sports never reach the record, so they never reach this list.
+const NON_PUBLISHED_SPORTS = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+
+function fairImplied(ml) {
+  const n = Number(ml);
+  if (!Number.isFinite(n) || n === 0) return null;
+  const raw = n < 0 ? -n / (-n + 100) : 100 / (n + 100);
+  // Same flat two-way devig approximation the shadow grader uses.
+  return raw / 1.04;
+}
+
+/**
+ * The day's high percenters for the no-edge message: board reads where a
+ * heavy market favorite (60% or better fair implied) has the model at or
+ * above the price. Presentation only, never published, never graded.
+ * Games already carrying any published row are excluded so this never
+ * duplicates a pick, leg, or trap the message already shows.
+ */
+async function fetchGimmes(publishedRows, today, windowStart, windowEnd) {
+  try {
+    const { data, error } = await supabase
+      .from('game_analysis')
+      .select('sport, home_team, away_team, game_date, calc_home_prob, calc_away_prob, moneyline_home, moneyline_away')
+      .gte('game_date', windowStart)
+      .lt('game_date', windowEnd);
+    if (error || !Array.isArray(data)) return [];
+
+    const covered = new Set((publishedRows || []).map(r => `${r.home_team}|${r.away_team}`));
+    const gimmes = [];
+    for (const g of data) {
+      if (siteDay(g.game_date) !== today) continue;
+      if (NON_PUBLISHED_SPORTS.has(g.sport)) continue;
+      if (covered.has(`${g.home_team}|${g.away_team}`)) continue;
+      if (new Date(g.game_date) <= new Date()) continue;
+      const homeImp = fairImplied(g.moneyline_home);
+      const awayImp = fairImplied(g.moneyline_away);
+      if (homeImp == null || awayImp == null) continue;
+      const homeSide = homeImp >= awayImp;
+      const implied = homeSide ? homeImp : awayImp;
+      const model = homeSide ? Number(g.calc_home_prob) : Number(g.calc_away_prob);
+      const ml = homeSide ? g.moneyline_home : g.moneyline_away;
+      if (implied < 0.60 || !Number.isFinite(model) || model < implied) continue;
+      gimmes.push({
+        pick: `${homeSide ? g.home_team : g.away_team} ML ${ml > 0 ? `+${ml}` : ml}`,
+        sport: g.sport,
+        implied,
+        game_date: g.game_date,
+      });
+    }
+    return gimmes.sort((a, b) => b.implied - a.implied).slice(0, 5);
+  } catch {
+    return [];
+  }
+}
+
 async function runMorningBoard() {
   const startTime = Date.now();
   const today = siteDay();
@@ -108,7 +161,7 @@ async function runMorningBoard() {
   const windowEnd = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
   const { data: fetched, error } = await supabase
     .from('ai_suggestions')
-    .select('sport, pick, edge_pp, edge_pp_raw, tier, game_date, model_prob, implied_prob')
+    .select('sport, home_team, away_team, pick, edge_pp, tier, game_date, model_prob')
     .like('session_id', 'auto_digest%')
     .eq('actual_outcome', 'pending')
     .is('voided_at', null)
@@ -121,7 +174,8 @@ async function runMorningBoard() {
   const dateLabel = new Date(`${today}T12:00:00Z`).toLocaleDateString('en-US', {
     weekday: 'long', month: 'short', day: 'numeric',
   });
-  const result = await sendDiscordMessage(formatMorningBoard(rows || [], dateLabel));
+  const gimmes = await fetchGimmes(rows, today, windowStart, windowEnd);
+  const result = await sendDiscordMessage(formatMorningBoard(rows || [], dateLabel, gimmes));
 
   await supabase.from('cron_job_logs').insert({
     job_name: 'discord-morning-board',

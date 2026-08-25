@@ -292,4 +292,4 @@ async function getAdminDashboard(req, res) {
   }
 }
 
-module.exports = { getAdminDashboard };
+module.exports = { getAdminDashboard, requireAdmin, getSupabase };

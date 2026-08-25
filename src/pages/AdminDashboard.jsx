@@ -712,6 +712,139 @@ function RecentPicksSection({ recentPicks }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// Inside the grade: the live calibration state behind every published
+// tier (owner request 2026-08-25). Self-contained fetch against the
+// admin calibration endpoint so the main dashboard payload stays lean.
+function CalibrationSection() {
+  const [cal, setCal] = useState(null)
+  const [err, setErr] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data: sessionData } = supabase
+          ? await supabase.auth.getSession()
+          : { data: { session: null } }
+        const token = sessionData?.session?.access_token
+        if (!token) throw new Error('sign in required')
+        const res = await fetch(`${API_BASE}/api/admin/calibration`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        if (!cancelled) setCal(json)
+      } catch (e) {
+        if (!cancelled) setErr(e.message)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  const th = 'text-left text-ink-400 font-mono text-[10px] uppercase tracking-wider px-2 py-1.5'
+  const td = 'px-2 py-1.5 text-ink-200 whitespace-nowrap'
+
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+      <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-1">
+        Inside the grade · current calibration
+      </div>
+      <p className="text-xs text-ink-500 mb-3 leading-relaxed">
+        Every tier is: the sport model's raw edge, times the weekly flat-k
+        multiplier (clamped 0.25 to 1.2), mapped through per-band calibration,
+        then labeled by the ladder. Publication gates on the pre-band edge at
+        2pp, so calibration relabels claims without shrinking what publishes.
+      </p>
+      {err && <p className="text-signal-neg text-sm">Couldn't load calibration: {err}</p>}
+      {!cal && !err && <div className="h-16 bg-ink-850 rounded-sharp animate-pulse" />}
+      {cal && (
+        <div className="space-y-4">
+          <div>
+            <div className="text-[11px] text-ink-300 font-semibold mb-1">Flat-k multipliers, by sport and market</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr>
+                  <th className={th}>key</th><th className={th}>multiplier</th>
+                  <th className={th}>measured k</th><th className={th}>n</th><th className={th}>updated</th>
+                </tr></thead>
+                <tbody>
+                  {(cal.multipliers || []).map((m) => (
+                    <tr key={m.key} className="border-t border-ink-850" title={m.source || ''}>
+                      <td className={`${td} font-mono`}>{m.key}</td>
+                      <td className={`${td} font-mono ${Number(m.multiplier) === 0 ? 'text-signal-neg' : ''}`}>{Number(m.multiplier).toFixed(2)}</td>
+                      <td className={`${td} font-mono`}>{m.measured_k != null ? Number(m.measured_k).toFixed(2) : '-'}</td>
+                      <td className={`${td} font-mono`}>{m.sample_n ?? '-'}</td>
+                      <td className={td}>{m.updated_at ? new Date(m.updated_at).toLocaleDateString() : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-ink-600 mt-1">Hover a row for the source note. Multiplier 0 means the market is muted.</p>
+          </div>
+
+          <div>
+            <div className="text-[11px] text-ink-300 font-semibold mb-1">Band calibration, claimed pp to delivered pp</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr>
+                  <th className={th}>sport</th><th className={th}>band</th>
+                  <th className={th}>claimed center</th><th className={th}>calibrated center</th><th className={th}>n</th>
+                </tr></thead>
+                <tbody>
+                  {(cal.bands || []).map((b, i) => (
+                    <tr key={i} className="border-t border-ink-850">
+                      <td className={td}>{b.sport}</td>
+                      <td className={`${td} font-mono`}>{b.band}</td>
+                      <td className={`${td} font-mono`}>{b.claimed_center != null ? Number(b.claimed_center).toFixed(1) : '-'}</td>
+                      <td className={`${td} font-mono`}>{b.calibrated_center != null ? Number(b.calibrated_center).toFixed(1) : '-'}</td>
+                      <td className={`${td} font-mono`}>{b.sample_n ?? '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div className="text-[11px] text-ink-300 font-semibold mb-1">Factor attribution, MLB since the process break (read only)</div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead><tr>
+                  <th className={th}>factor</th><th className={th}>games</th>
+                  <th className={th}>avg impact pp</th><th className={th}>slope</th><th className={th}>read</th>
+                </tr></thead>
+                <tbody>
+                  {(cal.factors || []).map((f) => (
+                    <tr key={f.factor} className="border-t border-ink-850">
+                      <td className={`${td} font-mono`}>{f.factor}</td>
+                      <td className={`${td} font-mono`}>{f.games}</td>
+                      <td className={`${td} font-mono`}>{f.avg_abs_impact_pp}</td>
+                      <td className={`${td} font-mono`}>{f.slope}</td>
+                      <td className="px-2 py-1.5 text-ink-400">{f.note}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[10px] text-ink-600 mt-1">Slope near 1 is sized right, above 1 underweighted, near 0 priced in, negative anti-signal. Auto-nudge stage two targets 2026-09-07 within owner-approved bounds.</p>
+          </div>
+
+          <div>
+            <div className="text-[11px] text-ink-300 font-semibold mb-1">The ladder</div>
+            {(cal.ladder || []).map((l) => (
+              <p key={l.tier} className="text-xs text-ink-300 py-0.5">
+                <span className="font-mono text-ink-100">{l.tier}</span>
+                <span className="text-ink-500"> · {l.rule}</span>
+              </p>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminDashboard({ onBack }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -869,6 +1002,9 @@ export default function AdminDashboard({ onBack }) {
 
             {/* Model Performance. Graded era only, same population as the ledger */}
             <ModelPerformanceSection modelAccuracy={data.modelAccuracy} />
+
+            {/* Inside the grade: multipliers, bands, factor attribution, ladder */}
+            <CalibrationSection />
 
             {/* Recent Picks, the graded digest stream */}
             <RecentPicksSection recentPicks={data.recentPicks} />
