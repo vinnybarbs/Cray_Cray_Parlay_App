@@ -9,6 +9,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../../shared/logger');
+const { composeParlay } = require('../../lib/services/parlay-composer');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -180,7 +181,16 @@ async function buildHouseParlays(req, res) {
         continue;
       }
 
-      const legs = legsPool.slice(0, size).map(row => ({
+      // Hit-first composition (owner spec 2026-08-25): Legs plus the
+      // safest Play-or-better anchor, see lib/services/parlay-composer.js.
+      const composed = composeParlay(legsPool, size);
+      if (!composed) {
+        sizeOutcomes[size] = `pool_short (${legsPool.length} eligible)`;
+        logger.info(`House parlay ${size}-leg for ${today}: composer found no fill`);
+        continue;
+      }
+
+      const legs = composed.rows.map(row => ({
         suggestion_id: row.id,
         sport: row.sport,
         home_team: row.home_team,
@@ -193,7 +203,7 @@ async function buildHouseParlays(req, res) {
         tier: row.tier
       }));
 
-      const { combinedDecimal, combinedOdds, combinedEdgePp, modelProb, fairProb, evPct } = combineLegs(legsPool.slice(0, size));
+      const { combinedDecimal, combinedOdds, combinedEdgePp, modelProb, fairProb, evPct } = combineLegs(composed.rows);
 
       const record = {
         parlay_date: today,
@@ -218,7 +228,7 @@ async function buildHouseParlays(req, res) {
 
       built++;
       parlays.push(record);
-      sizeOutcomes[size] = 'built';
+      sizeOutcomes[size] = `built (${composed.composition})`;
       logger.info(`Built ${size}-leg house parlay for ${today} at ${combinedOdds} (model ${Math.round(modelProb * 1000) / 10}% vs fair ${Math.round(fairProb * 1000) / 10}%, +${combinedEdgePp}pp, EV ${evPct}%)`);
     }
 

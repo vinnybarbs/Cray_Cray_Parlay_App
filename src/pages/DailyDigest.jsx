@@ -3,6 +3,7 @@ import { edgeTier, formatPp, edgePpForSide, lockOddsFor, breakEvenPct } from '..
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
+import HouseParlays from '../components/HouseParlays'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 
 const SPORT_META = {
@@ -1801,10 +1802,14 @@ export default function DailyDigest({ onBack }) {
         {/* Sport sections */}
         {!loading && !error && data && (
           <>
-            {/* Yesterday's board, the same settled receipts the dark-slate
-                card offers, one button away on normal days too. */}
+            {/* House parlays left, yesterday's board right (owner order
+                2026-08-25). Expanded panels take the full row via w-full
+                so the flex wrap drops them under the button strip. */}
             {sportSections.length > 0 && (
-              <div className="-mt-2"><YesterdayBoard /></div>
+              <div className="-mt-2 flex flex-wrap items-start gap-x-3">
+                <HouseParlays />
+                <YesterdayBoard />
+              </div>
             )}
 
             {/* Sport sections. All start collapsed, show 3 game preview */}
@@ -1829,7 +1834,10 @@ export default function DailyDigest({ onBack }) {
                     On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
                   </p>
                 )}
-                <YesterdayBoard />
+                <div className="flex flex-wrap items-start gap-x-3">
+                  <HouseParlays />
+                  <YesterdayBoard />
+                </div>
                 <p className="text-xs text-ink-500 mt-4">
                   Meanwhile, every settled pick is on <button onClick={() => { window.location.hash = '#/ledger' }} className="text-signal-pos hover:underline">The House Ledger</button>.
                 </p>

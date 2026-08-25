@@ -127,6 +127,11 @@ app.get('/api/pipeline-health', pipelineHealth);
 const boardHistory = require('./api/board-history');
 app.get('/api/board-history', boardHistory);
 
+// House parlays for the digest's parlay view: today's machine-built
+// parlays plus the running hit-rate record.
+const houseParlaysApi = require('./api/house-parlays');
+app.get('/api/house-parlays', houseParlaysApi);
+
 // Golf field analysis: devig outrights + research notes into golf_field.
 const analyzeGolf = require('./api/cron/analyze-golf');
 app.post('/cron/analyze-golf', analyzeGolf);
