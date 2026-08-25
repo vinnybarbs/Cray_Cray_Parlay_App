@@ -441,9 +441,10 @@ app.post('/cron/discord-morning-board', discordMorningBoard);
 
 // Per-player per-game NFL stat lines from nflverse: props settlement
 // truth and prop model history. Backfills a season on demand, keeps the
-// current season fresh weekly in-season.
-const syncNflPlayerStats = require('./api/cron/sync-nfl-player-stats');
-app.post('/cron/sync-nfl-player-stats', syncNflPlayerStats);
+// current season fresh weekly in-season. Distinct from
+// /cron/sync-nfl-player-stats below, the ESPN box-score cacher.
+const syncNflverseStats = require('./api/cron/sync-nflverse-player-stats');
+app.post('/cron/sync-nflverse-player-stats', syncNflverseStats);
 
 // Probe every upstream data source so we get a loud alert when ESPN (or any
 // other vendor) silently changes JSON shape. Writes to data_source_health.

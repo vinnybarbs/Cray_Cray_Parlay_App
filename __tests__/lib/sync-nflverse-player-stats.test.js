@@ -1,7 +1,7 @@
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy';
 
-const { parseCsv, mapStatRow, defaultSeason } = require('../../api/cron/sync-nfl-player-stats');
+const { parseCsv, mapStatRow, defaultSeason } = require('../../api/cron/sync-nflverse-player-stats');
 
 describe('parseCsv', () => {
   test('quoted fields keep commas and escaped quotes', () => {
