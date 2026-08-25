@@ -24,6 +24,7 @@ const trapDetector = require('../../lib/services/trap-detector.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
+const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 
 // Fires the Discord alert on a pick's FIRST entry into Strong Play or
 // Sharp Take, fresh publish or upward promotion (owner spec 2026-08-22:
@@ -300,6 +301,14 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
       .select('id, actual_outcome, tier, tier_history')
       .like('session_id', 'auto_digest%')
       .eq('odds_event_id', game.odds_event_id);
+    // Alt (spotlight) rows carry normal pick tiers, so the pick domain
+    // must exclude their sessions or a spread spotlight would be revised
+    // as if it were the headline pick. The alt domain matches only its
+    // own sessions and its own bet type: a game can carry one spread AND
+    // one total spotlight.
+    evQuery = domain === 'alt'
+      ? evQuery.like('session_id', 'auto_digest_alt_%').eq('bet_type', payload.bet_type)
+      : evQuery.not('session_id', 'like', 'auto_digest_alt_%');
     evQuery = domain === 'trap' ? evQuery.eq('tier', 'Trap')
             : domain === 'leg' ? evQuery.eq('tier', 'Leg')
             : evQuery.or('tier.not.in.("Trap","Leg"),tier.is.null');
@@ -335,6 +344,9 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
     .eq('home_team', game.home_team)
     .eq('away_team', game.away_team)
     .eq('game_date', game.game_date);
+  query = domain === 'alt'
+    ? query.like('session_id', 'auto_digest_alt_%').eq('bet_type', payload.bet_type)
+    : query.not('session_id', 'like', 'auto_digest_alt_%');
   query = domain === 'trap' ? query.eq('tier', 'Trap')
         : domain === 'leg' ? query.eq('tier', 'Leg')
         : query.or('tier.not.in.("Trap","Leg"),tier.is.null');
@@ -1641,6 +1653,61 @@ async function runPreAnalysis(sportSlugs) {
                 } catch (e) {
                   console.error(`  ❌ Trap-save exception: ${e.message}`);
                 }
+              }
+
+              // Spotlight lane (owner approved 2026-08-24): a spread or
+              // total whose PRE-band edge clears the same 2pp gate as the
+              // headline publishes as its own graded row in its own
+              // session domain, instead of living unseen in the market
+              // tabs whenever the moneyline edge is bigger. Grades under
+              // its bet type, seeds spread and total calibration with
+              // real published samples, and rides the tier-entry alerts.
+              try {
+                const altSides = chooseAltMarkets(edgeData?.edgesPreBand, result.recommended_side);
+                for (const alt of altSides) {
+                  const altText = buildPickText(alt.side, oddsCtx, game);
+                  const altOddsRaw = resolveOddsForPick(oddsCtx, alt.side);
+                  const altEdge = edgeData?.edges?.[alt.side];
+                  if (!altText || altOddsRaw == null || altEdge == null) continue;
+                  const altEdgeRaw = edgeData?.edgesRaw?.[alt.side] ?? altEdge;
+                  const altPp = Math.round(altEdge * 1000) / 10;
+                  const { betType, point } = deriveBetTypeAndPoint(alt.side, oddsCtx);
+                  const altOdds = formatAmericanOdds(altOddsRaw);
+                  const altTier = (() => {
+                    const t = pickGrader.edgeTier(altPp, altOdds);
+                    return t === 'Skip' ? 'Lean' : t;
+                  })();
+                  const altPayload = {
+                    sport: sportDisplay,
+                    bet_type: betType,
+                    pick: altText,
+                    point,
+                    odds: altOdds,
+                    confidence: Math.min(10, Math.max(1, Math.round(altPp))),
+                    reasoning: `${betType} spotlight: this market cleared the publish gate on its own, independent of the headline read. ${result.analysis_snippet || ''}`.trim(),
+                    risk_level: altPp >= 8 ? 'Low' : 'Medium',
+                    generate_mode: 'auto_digest',
+                    pipeline_version: 6,
+                    edge_pp: altPp,
+                    edge_pp_raw: altEdgeRaw != null ? Math.round(altEdgeRaw * 1000) / 10 : null,
+                    tier: altTier,
+                    model_prob: null,
+                    implied_prob: null,
+                    lure_score: null,
+                    trap_signals: null,
+                  };
+                  const altSid = altSessionId(betType, siteDay());
+                  const savedAlt = await upsertDailySuggestion(game, altPayload, altSid, { domain: 'alt' });
+                  if (savedAlt.status === 'settled') {
+                    console.log(`  ${betType} spotlight already settled for ${game.game_key}, not revising`);
+                  } else if (savedAlt.error) {
+                    console.warn(`  ${betType} spotlight save result: ${savedAlt.error.message}`);
+                  } else {
+                    console.log(`  ${savedAlt.status === 'revised' ? '✏️ Revised' : '🎯 Published'} ${betType.toLowerCase()} spotlight: ${altText} (${sportDisplay}, ${altPp}pp)`);
+                  }
+                }
+              } catch (e) {
+                console.error(`  ❌ Spotlight-save exception: ${e.message}`);
               }
 
               // Leg tracking: high percent to hit, bad payout, only a leg.

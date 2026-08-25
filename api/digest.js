@@ -81,8 +81,8 @@ async function getDigest(req, res) {
     const pendingPicksResult = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('ai_suggestions')
-        .select('home_team, away_team, game_date, pick, tier, tier_history, last_revised_at')
-        .like('session_id', 'auto_digest_2%')
+        .select('home_team, away_team, game_date, pick, bet_type, odds, edge_pp, tier, tier_history, last_revised_at, session_id')
+        .like('session_id', 'auto_digest%')
         .eq('actual_outcome', 'pending')
         .is('voided_at', null)
         .not('tier', 'in', '("Trap","Leg")')
@@ -90,15 +90,28 @@ async function getDigest(req, res) {
       if (error) throw error;
       return data || [];
     });
+    // Headline rows and spotlight (alt-market) rows attach separately:
+    // the spotlight lane publishes a spread or total that cleared the
+    // gate on its own, and the tile renders it under the headline
+    // instead of leaving it buried in the market tabs.
     const pickByMatchup = new Map();
+    const altsByMatchup = new Map();
     for (const p of pendingPicksResult || []) {
-      pickByMatchup.set(`${p.home_team}|${p.away_team}`, p);
+      const key = `${p.home_team}|${p.away_team}`;
+      if (String(p.session_id).startsWith('auto_digest_alt_')) {
+        if (!altsByMatchup.has(key)) altsByMatchup.set(key, []);
+        altsByMatchup.get(key).push({ pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history });
+      } else {
+        pickByMatchup.set(key, p);
+      }
     }
     for (const game of games) {
-      const p = pickByMatchup.get(`${game.home_team}|${game.away_team}`);
+      const key = `${game.home_team}|${game.away_team}`;
+      const p = pickByMatchup.get(key);
       game.published_pick = p
         ? { pick: p.pick, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at }
         : null;
+      game.published_alts = altsByMatchup.get(key) || null;
     }
 
     // Group games by sport

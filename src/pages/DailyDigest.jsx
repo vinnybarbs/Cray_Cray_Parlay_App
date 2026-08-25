@@ -900,6 +900,23 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           )
         })()}
 
+        {/* Spotlight picks from the other markets: a spread or total that
+            cleared the publish gate on its own gets its own banner under
+            the headline instead of hiding in the market tabs (owner
+            approved 2026-08-24). */}
+        {Array.isArray(game.published_alts) && game.published_alts.map((alt) => (
+          <div key={alt.pick} className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3 border-l-2 border-signal-pos/50">
+            <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">
+              {alt.bet_type} spotlight{alt.tier ? ` · ${alt.tier}` : ''}
+            </div>
+            <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{alt.pick}</div>
+            {alt.edge_pp != null && (
+              <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">{formatPp(Number(alt.edge_pp))} on this market alone</div>
+            )}
+            <TierPathNote published={alt} />
+          </div>
+        ))}
+
         {/* Per-market tabs */}
         <div className="mb-3">
           <MarketTabs game={game} />
