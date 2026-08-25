@@ -111,6 +111,19 @@ where tier_history is not null and actual_outcome in ('won','lost') and voided_a
 
 If picks that were promoted late underperform the ones published at their tier from the start, late promotions are chasing moved prices and that is evidence to bring the asymmetric-revision idea back to the owner. Until the data says that, promotions stay.
 
+## 3d. Factor attribution (staged learning loop, READ-ONLY)
+
+The factor learning loop's first stage (owner approved 2026-08-24): per factor, regress the outcome residual versus the market against the factor's stored contribution, the same slope estimator as the flat k but per factor. One call:
+
+```sql
+select * from factor_attribution();          -- MLB, clean era (since 2026-08-17)
+select * from factor_attribution('2026-08-17', 'NFL');  -- once football grades
+```
+
+Reading it: slope near 1 means sized right and not priced away, well above 1 suggests underweighted, near 0 means priced in, negative means anti-signal. Three traps to name in every report: the slopes are UNIVARIATE and the factors are correlated with each other and with the base blend, so a hot streak-slope may be borrowing venue's credit; small avg impacts make slopes explosively noisy (a 12x slope on a 0.7pp factor is a shrug, not a finding); and one week of games is one regime.
+
+THE STAGING RULE, non-negotiable: this table changes no coefficients. A nudge proposal requires the same direction on n of at least 50 across two consecutive Monday reviews, moves one factor at a time by at most 25 percent of its current weight, and ships only with the owner's explicit approval on the specific number. Track proposals and their outcomes here in the review so the loop's own record is auditable. First baseline (2026-08-24, clean era, MLB): every active factor positive (venue 7.4 on 129, home_adv 3.2 on 93, seed 1.3 on 92, pitcher 3.8 on 41), injury dead at -0.03, consistent with the replay's finding that the adjustments help while the base blend is what disagrees with the market wrongly.
+
 ## 4. Traps and legs
 
 Trap record from the mv tier row (fade framing). If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Legs: hit rate versus the 65% floor. Legs hitting well below 65% over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
