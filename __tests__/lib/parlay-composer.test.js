@@ -1,45 +1,52 @@
-const { composeParlay } = require('../../lib/services/parlay-composer');
+const { composeParlay, isHeavy, impliedOf, HEAVY_IMPLIED } = require('../../lib/services/parlay-composer');
 
-const leg = (id, prob) => ({ id, tier: 'Leg', model_prob: prob, edge_pp: 0.5 });
-const play = (id, prob, edge, tier = 'Play') => ({ id, tier, model_prob: prob, edge_pp: edge });
-const lean = (id, prob) => ({ id, tier: 'Lean', model_prob: prob, edge_pp: 2.1 });
+const leg = (id, prob) => ({ id, tier: 'Leg', model_prob: prob, odds: '-180', edge_pp: 0.5 });
+const heavyFave = (id, odds, tier = 'Lean') => ({ id, tier, odds, model_prob: null, implied_prob: null, edge_pp: 1.5 });
+const lean = (id, odds = '-136') => ({ id, tier: 'Lean', odds, model_prob: 0.55, edge_pp: 2.1 });
+
+describe('isHeavy', () => {
+  test('a Leg label always qualifies', () => {
+    expect(isHeavy(leg('l1', 0.7))).toBe(true);
+  });
+  test('-186 or heavier qualifies whatever the tier', () => {
+    expect(isHeavy(heavyFave('h1', '-186'))).toBe(true);
+    expect(isHeavy(heavyFave('h2', '-250', 'Play'))).toBe(true);
+    expect(isHeavy(heavyFave('h3', '-160'))).toBe(false);
+  });
+  test('a -136 Lean never qualifies', () => {
+    expect(isHeavy(lean('x1'))).toBe(false);
+  });
+});
+
+describe('impliedOf', () => {
+  test('prefers stored implied, falls back to the price', () => {
+    expect(impliedOf({ implied_prob: '0.68', odds: '-136' })).toBeCloseTo(0.68, 6);
+    expect(impliedOf({ odds: '-200' })).toBeCloseTo(0.6667, 3);
+    expect(impliedOf({ odds: '+150' })).toBeCloseTo(0.4, 6);
+  });
+  test('the heavy bar sits at about -186', () => {
+    expect(impliedOf({ odds: '-186' })).toBeGreaterThanOrEqual(HEAVY_IMPLIED);
+    expect(impliedOf({ odds: '-185' })).toBeLessThan(HEAVY_IMPLIED);
+  });
+});
 
 describe('composeParlay', () => {
-  test('2 leg is one Leg plus the anchor, anchor last', () => {
-    const pool = [leg('l1', 0.72), leg('l2', 0.66), play('p1', 0.58, 4.2)];
+  test('builds only from heavy favorites, highest hit probability first', () => {
+    const pool = [lean('x1'), leg('l1', 0.72), heavyFave('h1', '-250'), leg('l2', 0.66)];
     const { rows, composition } = composeParlay(pool, 2);
-    expect(rows.map(r => r.id)).toEqual(['l1', 'p1']);
-    expect(composition).toBe('1_legs_plus_anchor');
+    expect(rows.map(r => r.id)).toEqual(['l1', 'h1']);
+    expect(composition).toBe('heavy_only');
   });
 
-  test('3 leg is two Legs plus the anchor', () => {
-    const pool = [leg('l1', 0.72), leg('l2', 0.66), leg('l3', 0.65), play('p1', 0.58, 4.2)];
+  test('a board without enough heavy favorites builds NOTHING, never a Lean backfill', () => {
+    expect(composeParlay([lean('x1'), lean('x2'), lean('x3')], 2)).toBeNull();
+    expect(composeParlay([leg('l1', 0.7), lean('x1')], 2)).toBeNull();
+  });
+
+  test('3 leg needs three heavies', () => {
+    const pool = [leg('l1', 0.72), leg('l2', 0.66), heavyFave('h1', '-200')];
     const { rows } = composeParlay(pool, 3);
-    expect(rows.map(r => r.id)).toEqual(['l1', 'l2', 'p1']);
-  });
-
-  test('the anchor is the SAFEST Play or better, not the biggest edge', () => {
-    const pool = [leg('l1', 0.72), play('spicy', 0.52, 9.9, 'Sharp Take'), play('safe', 0.61, 4.0)];
-    const { rows } = composeParlay(pool, 2);
-    expect(rows.map(r => r.id)).toEqual(['l1', 'safe']);
-  });
-
-  test('no Play or better falls back to all Legs, never a Lean', () => {
-    const pool = [leg('l1', 0.72), leg('l2', 0.66), lean('x1', 0.53)];
-    const { rows, composition } = composeParlay(pool, 2);
-    expect(rows.map(r => r.id)).toEqual(['l1', 'l2']);
-    expect(composition).toBe('all_legs');
-  });
-
-  test('a short leg pool backfills with the safest remainder', () => {
-    const pool = [leg('l1', 0.72), play('p1', 0.60, 4.0), lean('x1', 0.53)];
-    const { rows, composition } = composeParlay(pool, 3);
-    expect(rows.map(r => r.id).sort()).toEqual(['l1', 'p1', 'x1']);
-    expect(composition).toBe('backfilled');
-  });
-
-  test('an unfillable size returns null', () => {
-    expect(composeParlay([leg('l1', 0.7)], 2)).toBeNull();
-    expect(composeParlay([], 2)).toBeNull();
+    expect(rows).toHaveLength(3);
+    expect(composeParlay(pool.slice(0, 2), 3)).toBeNull();
   });
 });
