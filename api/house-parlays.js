@@ -5,6 +5,7 @@
 
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
 const { siteDay, siteDayOffset } = require('../shared/site-day.js');
+const { enrichParlayLegOutcomes } = require('../lib/services/parlay-leg-outcomes.js');
 
 module.exports = async function houseParlays(req, res) {
   try {
@@ -21,7 +22,8 @@ module.exports = async function houseParlays(req, res) {
     const day = rows.some(r => r.parlay_date === today)
       ? today
       : (rows[0]?.parlay_date || today);
-    const parlays = rows.filter(r => r.parlay_date === day);
+    const parlays = await enrichParlayLegOutcomes(
+      supabase, rows.filter(r => r.parlay_date === day));
 
     const { data: settledRows, error: recErr } = await supabase
       .from('house_parlays')

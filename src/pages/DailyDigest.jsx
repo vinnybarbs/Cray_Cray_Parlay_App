@@ -1569,7 +1569,14 @@ export default function DailyDigest({ onBack }) {
   const tierCounts = useMemo(() => {
     const c = { sharpTakes: 0, strongPlays: 0, plays: 0, leans: 0, legs: 0, traps: 0 }
     if (!data?.gamesBySport) return c
-    for (const games of Object.values(data.gamesBySport)) {
+    // Shadow sports show their reads on tiles but never publish a pick,
+    // and preseason football reads run extreme off two-game records.
+    // They stay OUT of the hero counts: on 2026-08-26 five NFL preseason
+    // shadow tiles headlined as "5 Sharp Takes" while the actual
+    // published board was seven MLB Leans nobody could find.
+    const SHADOW = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
+    for (const [sportKey, games] of Object.entries(data.gamesBySport)) {
+      if (SHADOW.has(sportKey)) continue
       for (const g of games) {
         // Traps are detector calls (lure + negative edge), not any tile
         // whose recommended side happens to be negative.
