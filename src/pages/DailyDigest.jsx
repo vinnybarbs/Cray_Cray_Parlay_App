@@ -6,6 +6,13 @@ import YesterdayBoard from '../components/YesterdayBoard'
 import HouseParlays from '../components/HouseParlays'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 
+// Shadow sports: the board shows the model's read, but nothing publishes
+// until go-live, so no tile may wear bet-tier language. The hero counts
+// already exclude these; the chips and section headers must agree with
+// the hero ("says quiet board but there are a bunch of NFL sharps",
+// owner 2026-08-26).
+const SHADOW_DISPLAY = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
+
 const SPORT_META = {
   NBA:   { emoji: '🏀', label: 'NBA' },
   NFL:   { emoji: '🏈', label: 'NFL' },
@@ -267,7 +274,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                   legacy 0-10 edge_score. Showing both on one screen confused
                   users: "is it 12.3pp or 10/10?" The pp number is the truth;
                   edge_score is a saturated derivative of the same data. */}
-              <EdgeChip signedPp={edgePpForSide(analysis.edges, analysis.recommended_side)} odds={lockOddsFor(analysis)} />
+              <EdgeChip signedPp={edgePpForSide(analysis.edges, analysis.recommended_side)} odds={lockOddsFor(analysis)} shadow={SHADOW_DISPLAY.has(analysis.sport)} />
               {analysis.edge_movement && (
                 <span className="text-sm flex items-center gap-1 text-ink-300">
                   Movement: {edgeMovementIcon(analysis.edge_movement)}
@@ -630,7 +637,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
 // Take" reads as a model take with documented hit-rate range, not as 10/10
 // confidence in a coin flip.
 
-function EdgeChip({ signedPp, odds = null, leg = false, size = 'md' }) {
+function EdgeChip({ signedPp, odds = null, leg = false, size = 'md', shadow = false }) {
   let tier = edgeTier(signedPp, odds)
   // A 65%+ side below the 2pp floor is a Leg, not a Skip. The tile body
   // already said so, but the corner chip contradicted it (2026-08-12:
@@ -638,15 +645,23 @@ function EdgeChip({ signedPp, odds = null, leg = false, size = 'md' }) {
   if (leg && tier?.label === 'Skip') {
     tier = { label: 'Leg', subtitle: 'parlay material', color: 'text-ink-200', bg: 'bg-ink-850 shadow-hairline' }
   }
+  // A shadow sport's read never wears bet-tier language: a preseason
+  // "Sharp Take" chip on a game that will never publish contradicts the
+  // hero and misleads the reader about what is bettable.
+  if (shadow) {
+    tier = { label: 'Shadow', subtitle: 'publishes at go-live', color: 'text-ink-300', bg: 'bg-ink-850 shadow-hairline' }
+  }
   const pp = formatPp(signedPp)
   const isNeg = signedPp != null && signedPp < 0
   const isPos = signedPp != null && signedPp > 0
   const arrow = isPos ? '▲' : isNeg ? '▼' : '·'
   const padding = size === 'sm' ? 'px-2 py-1' : 'px-2.5 py-1.5'
   const ppSize = size === 'sm' ? 'text-[11px]' : 'text-sm'
-  const ppTooltip = pp != null
-    ? `${pp} · ${tier.label}. The gap between the model's win-probability and the book's implied probability, in percentage points`
-    : 'No model edge available for this side'
+  const ppTooltip = pp == null
+    ? 'No model edge available for this side'
+    : shadow
+      ? `${pp} · Shadow read. This sport is in shadow mode: the model's edge shows for transparency, but nothing publishes or grades until go-live`
+      : `${pp} · ${tier.label}. The gap between the model's win-probability and the book's implied probability, in percentage points`
   return (
     <div
       className={`rounded-sharp ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}
@@ -833,6 +848,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           <EdgeChip
             signedPp={signedPp}
             odds={lockOddsFor(game)}
+            shadow={SHADOW_DISPLAY.has(sport)}
             leg={signedPp != null && signedPp < 2 && signedPp > -2
               && Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0) >= 0.65}
           />
@@ -1145,13 +1161,16 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               <h2 className="font-mono text-base font-semibold text-ink-100 uppercase tracking-[0.06em]">{meta.label}</h2>
               <p className="font-mono text-[11px] text-ink-400 tabular-nums">
                 {games.length} graded
+                {SHADOW_DISPLAY.has(sport) && <span className="text-ink-500"> · shadow, publishes at go-live</span>}
                 <span className="text-ink-500"> · {pickGames.length} pick{pickGames.length !== 1 ? 's' : ''}</span>
                 {trapEntries.length > 0 && <span className="text-signal-neg"> · {trapEntries.length} trap{trapEntries.length !== 1 ? 's' : ''}</span>}
                 {bubbleGames.length > 0 && <span className="text-ink-500"> · {bubbleGames.length} on the bubble</span>}
                 {upcomingCount > 0 && <span className="text-ink-500"> · {upcomingCount} next 24h</span>}
                 {!expanded && topSignedPp != null && (
                   <span className="ml-2 text-ink-500">
-                    · Top: <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>
+                    · Top: {SHADOW_DISPLAY.has(sport)
+                      ? <span className="font-semibold text-ink-300">{formatPp(topSignedPp)} shadow read</span>
+                      : <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>}
                   </span>
                 )}
               </p>
@@ -1177,7 +1196,10 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         >
           {topGames.map((game, i) => {
             const pp = ppFor(game)
-            const tier = edgeTier(pp, lockOddsFor(game))
+            const rawTier = edgeTier(pp, lockOddsFor(game))
+            const tier = SHADOW_DISPLAY.has(sport)
+              ? { ...rawTier, bg: 'bg-ink-850 shadow-hairline', color: 'text-ink-300' }
+              : rawTier
             return (
               /* Phones: matchup and pick stack on two lines instead of
                  fighting for one row, where both ended up double-truncated
@@ -1569,14 +1591,11 @@ export default function DailyDigest({ onBack }) {
   const tierCounts = useMemo(() => {
     const c = { sharpTakes: 0, strongPlays: 0, plays: 0, leans: 0, legs: 0, traps: 0 }
     if (!data?.gamesBySport) return c
-    // Shadow sports show their reads on tiles but never publish a pick,
-    // and preseason football reads run extreme off two-game records.
-    // They stay OUT of the hero counts: on 2026-08-26 five NFL preseason
-    // shadow tiles headlined as "5 Sharp Takes" while the actual
-    // published board was seven MLB Leans nobody could find.
-    const SHADOW = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
+    // Shadow sports stay OUT of the hero counts: on 2026-08-26 five NFL
+    // preseason shadow tiles headlined as "5 Sharp Takes" while the
+    // actual published board was seven MLB Leans nobody could find.
     for (const [sportKey, games] of Object.entries(data.gamesBySport)) {
-      if (SHADOW.has(sportKey)) continue
+      if (SHADOW_DISPLAY.has(sportKey)) continue
       for (const g of games) {
         // Traps are detector calls (lure + negative edge), not any tile
         // whose recommended side happens to be negative.
