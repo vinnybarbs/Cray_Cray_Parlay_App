@@ -72,6 +72,17 @@ function ParlayCard({ parlay }) {
             <span className="font-mono text-ink-400 flex-shrink-0">{fmtOdds(leg.odds)}</span>
             <span className="font-mono text-signal-pos/80 flex-shrink-0 tabular-nums">{Number(leg.edge_pp) >= 0 ? '+' : ''}{Number(leg.edge_pp).toFixed(1)}pp</span>
             <span className="ml-auto text-ink-500 flex-shrink-0">{leg.sport}</span>
+            {/* Live per-leg outcome: the ticket settles one leg at a
+                time, and a pending parlay with a dead leg says so. */}
+            <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[9px] font-bold tracking-wider flex-shrink-0 ${
+              leg.outcome === 'won' ? 'bg-signal-pos-dim/40 text-signal-pos'
+              : leg.outcome === 'lost' ? 'bg-signal-neg-dim/40 text-signal-neg'
+              : leg.outcome === 'push' || leg.outcome === 'void' ? 'bg-ink-850 text-ink-400'
+              : 'bg-ink-850 text-ink-300'
+            }`}>
+              {leg.outcome === 'won' ? 'W' : leg.outcome === 'lost' ? 'L'
+                : leg.outcome === 'push' ? 'P' : leg.outcome === 'void' ? 'V' : 'OPEN'}
+            </span>
           </div>
         ))}
       </div>

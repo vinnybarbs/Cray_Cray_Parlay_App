@@ -326,7 +326,9 @@ async function getPublicLedger(req, res) {
         .order('legs_count', { ascending: true })
         .limit(80);
       if (error) throw error;
-      return data || [];
+      // Legs carry their live outcomes so the card shows the ticket
+      // settling one leg at a time (owner request 2026-08-26).
+      return enrichParlayLegOutcomes(supabase, data || []);
     }) || [];
 
     res.json({
