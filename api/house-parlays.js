@@ -1,29 +1,27 @@
-// House parlays for the digest's parlay view. Public and read-only,
-// same receipts philosophy as Yesterday's Board: today's machine-built
-// parlays when they exist, else the most recent built day inside a week,
-// plus the running settled record the 70 percent hit goal is judged on.
+// House parlays for the digest's parlay view. Public and read-only.
+// TODAY'S OPEN TICKETS ONLY (owner call 2026-08-26): the digest is the
+// live board, so it never re-shows a settled ticket. The full parlay
+// history, wins and losses alike, lives on the House Ledger. The
+// running record line stays here because the 70 percent hit goal is
+// judged in public.
 
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
-const { siteDay, siteDayOffset } = require('../shared/site-day.js');
+const { siteDay } = require('../shared/site-day.js');
 const { enrichParlayLegOutcomes } = require('../lib/services/parlay-leg-outcomes.js');
 
 module.exports = async function houseParlays(req, res) {
   try {
     const today = siteDay();
-    const { data: recent, error } = await supabase
+    const { data: rows, error } = await supabase
       .from('house_parlays')
       .select('id, parlay_date, legs_count, legs, combined_odds, model_win_prob, fair_win_prob, status, settled_at')
-      .gte('parlay_date', siteDayOffset(-7))
-      .order('parlay_date', { ascending: false })
+      .eq('parlay_date', today)
+      .eq('status', 'pending')
       .order('legs_count', { ascending: true });
     if (error) throw error;
 
-    const rows = recent || [];
-    const day = rows.some(r => r.parlay_date === today)
-      ? today
-      : (rows[0]?.parlay_date || today);
-    const parlays = await enrichParlayLegOutcomes(
-      supabase, rows.filter(r => r.parlay_date === day));
+    const day = today;
+    const parlays = await enrichParlayLegOutcomes(supabase, rows || []);
 
     const { data: settledRows, error: recErr } = await supabase
       .from('house_parlays')

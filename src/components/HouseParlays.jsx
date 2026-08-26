@@ -69,7 +69,6 @@ export default function HouseParlays() {
         <div className="bg-ink-950/60 rounded-sharp shadow-hairline overflow-hidden">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">
             <span className="text-ink-200">House parlays · {dateLabel}</span>
-            {!data.isToday && <span>most recent build</span>}
             {rec && rec.hitRate != null && (
               <span className="ml-auto">
                 to date <span className="text-ink-200">{rec.won}-{rec.lost}</span>
@@ -81,9 +80,10 @@ export default function HouseParlays() {
 
           {data.parlays.length === 0 ? (
             <p className="px-4 py-4 text-sm text-ink-300">
-              No parlay today. The builder only ships tickets made of heavy
-              favorites, a Leg grade or -186 and heavier, and this board does
-              not have enough of them. No ticket beats a coin-flip ticket.
+              No open parlay today. The builder only ships tickets made of
+              heavy favorites, a Leg grade or -186 and heavier, and this board
+              does not have enough of them. No ticket beats a coin-flip
+              ticket. Settled parlays live on the House Ledger.
             </p>
           ) : (
             <div className="divide-y divide-ink-850">
