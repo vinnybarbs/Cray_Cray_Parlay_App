@@ -391,7 +391,7 @@ export default function HouseLedger() {
                   <span className="ml-auto text-ink-400 text-xs group-open:rotate-180 transition-transform">▼</span>
                 </summary>
                 <p className="text-sm text-ink-300 my-4 max-w-2xl">
-                  Parlays the machine assembles from its own highest-edge legs, cross-game only, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
+                  Parlays the machine assembles from heavy favorites only, a Leg grade or a -186 and heavier price, cross-game, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
                 </p>
                 <div className="grid md:grid-cols-2 gap-3">
                   {data.parlays.map(p => <ParlayCard key={p.id} parlay={p} />)}

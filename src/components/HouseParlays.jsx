@@ -81,8 +81,9 @@ export default function HouseParlays() {
 
           {data.parlays.length === 0 ? (
             <p className="px-4 py-4 text-sm text-ink-300">
-              No parlay built in the last week. The builder runs after the morning
-              sweep and needs at least two live entries on the board.
+              No parlay today. The builder only ships tickets made of heavy
+              favorites, a Leg grade or -186 and heavier, and this board does
+              not have enough of them. No ticket beats a coin-flip ticket.
             </p>
           ) : (
             <div className="divide-y divide-ink-850">
@@ -126,9 +127,9 @@ export default function HouseParlays() {
           )}
 
           <p className="px-4 py-2.5 text-[11px] text-ink-500 bg-ink-950">
-            Built from the day's board: one or two Legs plus the safest pick graded
-            Play or better. Parlays are a hit-rate product, not an edge product,
-            and the record line above is the scoreboard.
+            Heavy favorites only: every component is a Leg grade or a -186 and
+            heavier favorite. Parlays are a hit-rate product, not an edge
+            product, and the record line above is the scoreboard.
           </p>
         </div>
       )}

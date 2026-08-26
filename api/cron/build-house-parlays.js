@@ -182,12 +182,13 @@ async function buildHouseParlays(req, res) {
         continue;
       }
 
-      // Hit-first composition (owner spec 2026-08-25): Legs plus the
-      // safest Play-or-better anchor, see lib/services/parlay-composer.js.
+      // Heavy favorites only (owner spec 2026-08-26): every component is
+      // a Leg grade or a -186 and heavier favorite, and a board without
+      // enough of them builds nothing. See lib/services/parlay-composer.js.
       const composed = composeParlay(legsPool, size);
       if (!composed) {
-        sizeOutcomes[size] = `pool_short (${legsPool.length} eligible)`;
-        logger.info(`House parlay ${size}-leg for ${today}: composer found no fill`);
+        sizeOutcomes[size] = `no_heavy_favorites (pool ${legsPool.length})`;
+        logger.info(`House parlay ${size}-leg for ${today}: not enough heavy favorites, no build`);
         continue;
       }
 
