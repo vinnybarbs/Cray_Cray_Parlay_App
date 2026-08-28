@@ -1240,6 +1240,19 @@ async function runPreAnalysis(sportSlugs) {
               tour: String(game.sport || '').startsWith('tennis_wta') ? 'wta' : 'atp'
             }, {
               ratings: tennisRatingsProvider,
+              // Elo blend weight ZERO (2026-08-26, first live day): the
+              // point-seeded ratings compress most of a slam draw into a
+              // ~150 Elo band, so every mid-tier matchup read as a coin
+              // flip against a 90/10 market and the model published 20
+              // straight underdogs with fabricated 4-10pp edges (Dzumhur
+              // +900 at 10pp, Elo 62/38 on a match priced 94/6). Ranking
+              // points measure twelve months of activity, not strength.
+              // The market-consensus half stays live (shadow-validated,
+              // 79.3 actual vs 76.9 implied). The ratings provider still
+              // runs so its reads keep logging in edge_factors.elo, and
+              // the weight returns only after the ratings pass offline
+              // validation against stored match results and prices.
+              eloWeight: 0,
               calibrationMultiplier: await getTennisCalibrationMultiplier(supabase)
             });
           } else if (sportDisplay === 'UFC') {
