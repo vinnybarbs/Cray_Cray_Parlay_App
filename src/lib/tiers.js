@@ -6,6 +6,14 @@
 // model the old 10/10 edge_score caused. Negative edges get their own tier
 // so we never silently dress them up.
 
+// Shadow sports: the model's reads compute and display for transparency,
+// but nothing publishes, grades, or alerts until go-live, so NO surface
+// may dress a shadow read in bet-tier language. The digest greys them
+// out; The Board excludes them from its pick list entirely (2026-08-28:
+// a record-less NCAAF week-1 read put New Mexico State +3000 on the
+// board as a Strong Play). Mirror of SHADOW_SPORTS in pre-analyze.
+export const SHADOW_SPORTS = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
+
 // Strong Play restored 2026-08-16 at 7-10pp (owner decision: 7pp is the
 // betting floor, so that band earns its own label). It was merged into
 // Play from 2026-08-10 to 2026-08-16, rows stamped in that window may

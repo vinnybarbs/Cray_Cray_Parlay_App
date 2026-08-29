@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, breakEvenPct } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, breakEvenPct, SHADOW_SPORTS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
@@ -7,11 +7,10 @@ import HouseParlays from '../components/HouseParlays'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 
 // Shadow sports: the board shows the model's read, but nothing publishes
-// until go-live, so no tile may wear bet-tier language. The hero counts
-// already exclude these; the chips and section headers must agree with
-// the hero ("says quiet board but there are a bunch of NFL sharps",
-// owner 2026-08-26).
-const SHADOW_DISPLAY = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
+// until go-live, so no tile may wear bet-tier language. The set lives in
+// lib/tiers.js so every surface (digest chips, hero counts, The Board's
+// pick list) reads the same law.
+const SHADOW_DISPLAY = SHADOW_SPORTS
 
 const SPORT_META = {
   NBA:   { emoji: '🏀', label: 'NBA' },

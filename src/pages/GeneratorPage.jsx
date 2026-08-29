@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import BrandMark from '../components/BrandMark'
-import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS, SHADOW_SPORTS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
@@ -189,6 +189,11 @@ export default function GeneratorPage() {
     if (!data?.gamesBySport) return []
     const rows = []
     for (const [sport, games] of Object.entries(data.gamesBySport)) {
+      // Shadow sports never appear here: this page speaks pure betting
+      // language ("Play it") and a shadow read is not a pick. A week-1
+      // NCAAF read with no records once ranked NMSU +3000 as the top
+      // Strong Play on this list (2026-08-28).
+      if (SHADOW_SPORTS.has(sport)) continue
       for (const g of games) {
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp != null && pp <= -2) continue
@@ -204,6 +209,7 @@ export default function GeneratorPage() {
     if (!data?.gamesBySport) return []
     const rows = []
     for (const [sport, games] of Object.entries(data.gamesBySport)) {
+      if (SHADOW_SPORTS.has(sport)) continue
       for (const g of games) {
         if (!Array.isArray(g.trap_calls)) continue
         for (const t of g.trap_calls) rows.push({ sport, game: g, trap: t })
