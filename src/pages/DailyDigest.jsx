@@ -1599,6 +1599,17 @@ export default function DailyDigest({ onBack }) {
         // Traps are detector calls (lure + negative edge), not any tile
         // whose recommended side happens to be negative.
         c.traps += Array.isArray(g.trap_calls) ? g.trap_calls.length : 0
+        // Alt spotlight rows are real published bet signals with their own
+        // tier, and the cards render them as such, so the hero counts them
+        // too. One game can legally contribute two signals (owner report
+        // 2026-08-31: the Yankees ML and spread were both Sharps while the
+        // hero, counting games, said 2).
+        for (const alt of (Array.isArray(g.published_alts) ? g.published_alts : [])) {
+          if (alt?.tier === 'Sharp Take') c.sharpTakes++
+          else if (alt?.tier === 'Strong Play') c.strongPlays++
+          else if (alt?.tier === 'Play') c.plays++
+          else if (alt?.tier === 'Lean') c.leans++
+        }
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp == null) continue
         // Four actionable tiers since the 2026-08-16 Strong Play restore:
