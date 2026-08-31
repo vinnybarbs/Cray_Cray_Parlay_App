@@ -1,4 +1,4 @@
-const { interpolatePp, applyToEdgeData, _setPoints, _resetCache } = require('../../lib/services/band-calibration');
+const { interpolatePp, applyToEdgeData, _setPoints, _setRawPoints, _resetCache } = require('../../lib/services/band-calibration');
 
 // The seed fit from 2026-08-16 published history (damped 0.5 from claimed
 // centers toward weighted-isotonic delivered): claimed 2.89 -> 2.44,
@@ -96,5 +96,87 @@ describe('applyToEdgeData', () => {
     // NFL has no fitted rows: identity, never the pooled or MLB haircut.
     const nfl = await applyToEdgeData({ edge: 0.0829, edges: { home_ml: 0.0829 } }, 'NFL');
     expect(nfl.edges.home_ml * 100).toBeCloseTo(8.29, 5);
+  });
+});
+
+// The raw band map (promoted 2026-08-31): one fit from RAW claimed pp to
+// delivered pp replaces the flat-k-times-band double shrink for sports
+// that have their own raw fit. The 2026-08-31 MLB fit.
+const RAW_FIT = [
+  { claimed: 2.97, calibrated: 1.07 },
+  { claimed: 5.38, calibrated: 1.07 },
+  { claimed: 8.65, calibrated: 5.7 },
+  { claimed: 12.84, calibrated: 12.84 },
+];
+
+describe('applyToEdgeData raw band map', () => {
+  afterEach(() => _resetCache());
+
+  test('positive sides are recomputed from RAW edges, bypassing flat k', async () => {
+    _setPoints(SEED, 'MLB');
+    _setRawPoints(RAW_FIT, 'MLB');
+    const edgeData = {
+      edge: 0.0216, // raw 8.65 after the pinned 0.25 flat k
+      edgeSide: 'home',
+      edges: { home_ml: 0.0216, away_ml: -0.0216 },
+      edgesRaw: { home_ml: 0.0865, away_ml: -0.0865 },
+    };
+    const out = await applyToEdgeData(edgeData, 'MLB');
+    // Raw 8.65 maps to 5.70 delivered, not 2.16 double-shrunk.
+    expect(out.edges.home_ml * 100).toBeCloseTo(5.7, 2);
+    expect(out.edge * 100).toBeCloseTo(5.7, 2);
+    expect(out.bandSource).toBe('raw');
+  });
+
+  test('the mapped value owns the publish gate', async () => {
+    _setRawPoints(RAW_FIT, 'MLB');
+    const out = await applyToEdgeData({
+      edge: 0.0074, edgeSide: 'home',
+      edges: { home_ml: 0.0074 },
+      edgesRaw: { home_ml: 0.0297 },
+    }, 'MLB');
+    // Raw 2.97 delivers 1.07: below the 2pp gate, and edgesPreBand says so.
+    expect(out.edgesPreBand.home_ml * 100).toBeCloseTo(1.07, 2);
+  });
+
+  test('negative trap sides keep the flat-k value', async () => {
+    _setRawPoints(RAW_FIT, 'MLB');
+    const out = await applyToEdgeData({
+      edge: 0.0216, edgeSide: 'home',
+      edges: { home_ml: 0.0216, away_ml: -0.031 },
+      edgesRaw: { home_ml: 0.0865, away_ml: -0.124 },
+    }, 'MLB');
+    expect(out.edges.away_ml).toBeCloseTo(-0.031, 6);
+  });
+
+  test('a monster raw claim clamps at the 15pp confidence bound', async () => {
+    _setRawPoints(RAW_FIT, 'MLB');
+    const out = await applyToEdgeData({
+      edge: 0.06, edgeSide: 'home',
+      edges: { home_ml: 0.06 },
+      edgesRaw: { home_ml: 0.24 },
+    }, 'MLB');
+    expect(out.edges.home_ml).toBeCloseTo(0.15, 6);
+  });
+
+  test('a sport without a raw fit runs the legacy banded path', async () => {
+    _setPoints(SEED, 'MLB');
+    _setRawPoints(RAW_FIT, 'UFC'); // some OTHER sport has a raw fit
+    const out = await applyToEdgeData({
+      edge: 0.0829,
+      edges: { home_ml: 0.0829 },
+      edgesRaw: { home_ml: 0.19 },
+    }, 'MLB');
+    expect(out.edges.home_ml * 100).toBeCloseTo(5.8, 2);
+    expect(out.bandSource).toBe('flat_k_banded');
+    expect(out.edgesPreBand.home_ml).toBeCloseTo(0.0829, 6);
+  });
+
+  test('missing edgesRaw falls back to the legacy path', async () => {
+    _setPoints(SEED, 'MLB');
+    _setRawPoints(RAW_FIT, 'MLB');
+    const out = await applyToEdgeData({ edge: 0.0829, edges: { home_ml: 0.0829 } }, 'MLB');
+    expect(out.edges.home_ml * 100).toBeCloseTo(5.8, 2);
+    expect(out.bandSource).toBe('flat_k_banded');
   });
 });

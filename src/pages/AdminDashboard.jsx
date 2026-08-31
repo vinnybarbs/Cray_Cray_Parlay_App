@@ -750,10 +750,14 @@ function CalibrationSection() {
         Inside the grade · current calibration
       </div>
       <p className="text-xs text-ink-500 mb-3 leading-relaxed">
-        Every tier is: the sport model's raw edge, times the weekly flat-k
-        multiplier (clamped 0.25 to 1.2), mapped through per-band calibration,
-        then labeled by the ladder. Publication gates on the pre-band edge at
-        2pp, so calibration relabels claims without shrinking what publishes.
+        A sport with its own raw band fit (MLB since 2026-08-31) is sized by
+        ONE calibration: the raw model edge mapped through the raw band table
+        below, and the mapped value owns both the label and the 2pp publish
+        gate. The flat-k multiplier still governs its trap reads. Sports
+        without a raw fit run the old chain: raw edge, times the weekly
+        flat-k multiplier (clamped 0.25 to 1.2), mapped through per-band
+        calibration, then labeled by the ladder, with publication gating on
+        the pre-band edge at 2pp.
       </p>
       {err && <p className="text-signal-neg text-sm">Couldn't load calibration: {err}</p>}
       {!cal && !err && <div className="h-16 bg-ink-850 rounded-sharp animate-pulse" />}
@@ -783,8 +787,35 @@ function CalibrationSection() {
             <p className="text-[10px] text-ink-600 mt-1">Hover a row for the source note. Multiplier 0 means the market is muted.</p>
           </div>
 
+          {(cal.bandsRaw || []).length > 0 && (
+            <div>
+              <div className="text-[11px] text-ink-300 font-semibold mb-1">Raw band map, RAW claimed pp to delivered pp (owns sizing and the gate where a sport has rows)</div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead><tr>
+                    <th className={th}>sport</th><th className={th}>band</th>
+                    <th className={th}>raw claimed center</th><th className={th}>delivered center</th><th className={th}>n</th><th className={th}>fitted</th>
+                  </tr></thead>
+                  <tbody>
+                    {(cal.bandsRaw || []).map((b, i) => (
+                      <tr key={i} className="border-t border-ink-850">
+                        <td className={td}>{b.sport}</td>
+                        <td className={`${td} font-mono`}>{b.band}</td>
+                        <td className={`${td} font-mono`}>{b.claimed_center != null ? Number(b.claimed_center).toFixed(1) : '-'}</td>
+                        <td className={`${td} font-mono`}>{b.calibrated_center != null ? Number(b.calibrated_center).toFixed(1) : '-'}</td>
+                        <td className={`${td} font-mono ${Number(b.sample_n) < 25 ? 'text-signal-neg' : ''}`}>{b.sample_n ?? '-'}</td>
+                        <td className={td}>{b.fitted_at ? new Date(b.fitted_at).toLocaleDateString() : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-ink-600 mt-1">Refit Mondays. A band with n under 25 (red) holds its prior value instead of trusting the fit. The pooled __all__ series is reference only, it never applies to a sport.</p>
+            </div>
+          )}
+
           <div>
-            <div className="text-[11px] text-ink-300 font-semibold mb-1">Band calibration, claimed pp to delivered pp</div>
+            <div className="text-[11px] text-ink-300 font-semibold mb-1">Band calibration, claimed pp to delivered pp (legacy chain, sports without a raw fit)</div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead><tr>
@@ -805,6 +836,28 @@ function CalibrationSection() {
               </table>
             </div>
           </div>
+
+          {(cal.weightChanges || []).length > 0 && (
+            <div>
+              <div className="text-[11px] text-ink-300 font-semibold mb-1">Weight change log, the learning loop's audit trail</div>
+              <div className="space-y-2">
+                {(cal.weightChanges || []).map((c, i) => (
+                  <div key={i} className="border-t border-ink-850 pt-2">
+                    <p className="text-xs text-ink-200">
+                      <span className="font-mono text-ink-400">{c.changed_at ? new Date(c.changed_at).toLocaleDateString() : '-'}</span>
+                      {' '}<span className="font-mono text-ink-100">{c.sport}</span>
+                      {' · '}<span className="font-mono">{c.component}</span>
+                      {' · '}<span className="text-ink-500">{c.source}</span>
+                    </p>
+                    <p className="text-[11px] text-ink-400 font-mono mt-0.5 break-all">
+                      {JSON.stringify(c.before)} to {JSON.stringify(c.after)}
+                    </p>
+                    <p className="text-[11px] text-ink-500 mt-0.5">{c.reason}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div>
             <div className="text-[11px] text-ink-300 font-semibold mb-1">Factor attribution, MLB since the process break (read only)</div>
