@@ -793,13 +793,14 @@ function CalibrationSection() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead><tr>
-                    <th className={th}>sport</th><th className={th}>band</th>
+                    <th className={th}>sport</th><th className={th}>market</th><th className={th}>band</th>
                     <th className={th}>raw claimed center</th><th className={th}>delivered center</th><th className={th}>n</th><th className={th}>fitted</th>
                   </tr></thead>
                   <tbody>
                     {(cal.bandsRaw || []).map((b, i) => (
                       <tr key={i} className="border-t border-ink-850">
                         <td className={td}>{b.sport}</td>
+                        <td className={`${td} font-mono`}>{b.market || '__all__'}</td>
                         <td className={`${td} font-mono`}>{b.band}</td>
                         <td className={`${td} font-mono`}>{b.claimed_center != null ? Number(b.claimed_center).toFixed(1) : '-'}</td>
                         <td className={`${td} font-mono`}>{b.calibrated_center != null ? Number(b.calibrated_center).toFixed(1) : '-'}</td>

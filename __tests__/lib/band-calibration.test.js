@@ -186,6 +186,46 @@ describe('applyToEdgeData raw band map', () => {
     expect(out.edgesPreBand.home_ml).toBeCloseTo(0.0829, 6);
   });
 
+  test('a market-specific map overrides the pooled map for its sides only', async () => {
+    // The band-aware totals re-entry fit (2026-08-31): mid bands earn,
+    // the thin 2-4 band and the failing 10+ tail pin to 0.
+    const TOTALS_FIT = [
+      { claimed: 3.11, calibrated: 0 },
+      { claimed: 5.72, calibrated: 4.29 },
+      { claimed: 8.49, calibrated: 7.58 },
+      { claimed: 14.2, calibrated: 0 },
+    ];
+    _setRawPoints(RAW_FIT, 'MLB');
+    _setRawPoints(TOTALS_FIT, 'MLB', 'total');
+    const out = await applyToEdgeData({
+      edge: 0.0216, edgeSide: 'home',
+      edges: { home_ml: 0.0216, over: 0.0085 },
+      edgesRaw: { home_ml: 0.0865, over: 0.0849 },
+    }, 'MLB');
+    // over goes through the totals map, home_ml through the pooled map.
+    expect(out.edges.over * 100).toBeCloseTo(7.58, 2);
+    expect(out.edges.home_ml * 100).toBeCloseTo(5.7, 2);
+  });
+
+  test('a monster totals claim maps to zero, the tail is an anti-signal', async () => {
+    const TOTALS_FIT = [
+      { claimed: 3.11, calibrated: 0 },
+      { claimed: 5.72, calibrated: 4.29 },
+      { claimed: 8.49, calibrated: 7.58 },
+      { claimed: 14.2, calibrated: 0 },
+    ];
+    _setRawPoints(RAW_FIT, 'MLB');
+    _setRawPoints(TOTALS_FIT, 'MLB', 'total');
+    const out = await applyToEdgeData({
+      edge: 0.0216, edgeSide: 'home',
+      edges: { home_ml: 0.0216, under: 0.0167 },
+      edgesRaw: { home_ml: 0.0865, under: 0.167 },
+    }, 'MLB');
+    // Raw 16.7 sits past the last fitted center, extends at ratio 0.
+    expect(out.edges.under).toBeCloseTo(0, 6);
+    expect(out.edgesPreBand.under).toBeCloseTo(0, 6);
+  });
+
   test('missing edgesRaw falls back to the legacy path', async () => {
     _setPoints(SEED, 'MLB');
     _setRawPoints(RAW_FIT, 'MLB');
