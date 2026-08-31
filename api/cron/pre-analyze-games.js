@@ -1862,7 +1862,11 @@ async function runPreAnalysis(sportSlugs) {
     // Log results to cron_job_logs for admin dashboard visibility
     try {
       await supabase.from('cron_job_logs').insert({
-        job_name: `pre-analyze-${sportSlugs.map(s => slugToSport(s)).join('-')}`,
+        // Deduped exactly like the started row at the top of the run:
+        // the NFL job sweeps two slugs that both map to NFL, and the
+        // undeduped terminal name pre-analyze-NFL-NFL never paired with
+        // its started row, reading as hung runs in every ops check.
+        job_name: `pre-analyze-${[...new Set(sportSlugs.map(s => slugToSport(s)))].join('-')}`,
         status: errors.length === 0 ? 'completed' : 'partial',
         details: JSON.stringify({
           games_found: games.length,
