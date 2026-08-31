@@ -139,6 +139,20 @@ describe('applyToEdgeData raw band map', () => {
     expect(out.edgesPreBand.home_ml * 100).toBeCloseTo(1.07, 2);
   });
 
+  test('a muted market (flat k 0) stays muted, raw claim or not', async () => {
+    _setRawPoints(RAW_FIT, 'MLB');
+    const out = await applyToEdgeData({
+      edge: 0.0216, edgeSide: 'home',
+      // Totals muted: flat k 0 leaves the k-scaled edge at 0 even though
+      // the raw claim is huge. The raw map must not resurrect it.
+      edges: { home_ml: 0.0216, over: 0 },
+      edgesRaw: { home_ml: 0.0865, over: 0.167 },
+    }, 'MLB');
+    expect(out.edges.over).toBe(0);
+    expect(out.edgesPreBand.over).toBe(0);
+    expect(out.edges.home_ml * 100).toBeCloseTo(5.7, 2);
+  });
+
   test('negative trap sides keep the flat-k value', async () => {
     _setRawPoints(RAW_FIT, 'MLB');
     const out = await applyToEdgeData({
