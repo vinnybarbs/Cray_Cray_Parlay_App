@@ -41,24 +41,29 @@ function unitProfit(oddsStr, outcome) {
   return price > 0 ? price / 100 : 100 / Math.abs(price);
 }
 
-// One row per GAME. When a game sat on the board across several daily
-// sessions before it started, each session published its own row, so a
-// single loss could settle two or three times (and hit two tiers). The
+// One row per GAME AND MARKET. When a game sat on the board across several
+// daily sessions before it started, each session published its own row, so
+// a single loss could settle two or three times (and hit two tiers). The
 // methodology promises the final version published before start, so keep
 // only the row with the newest revision timestamp per (matchup, start
-// time). Exact start-time matching keeps doubleheaders separate. The raw
-// rows stay in the database untouched, the ledger is append-only; this
-// only fixes what gets counted.
+// time, bet type). Exact start-time matching keeps doubleheaders separate.
+// bet_type is part of the key because a spread pick and a total pick on
+// the same game are two different bets, and mv_public_record counts them
+// both; a game-level key silently dropped one of each such pair from the
+// feeds (75 rows across the history, audit 2026-08-31). The raw rows stay
+// in the database untouched, the ledger is append-only; this only fixes
+// what gets counted.
 function finalVersionOnly(rows) {
   const winners = new Map();
+  const keyOf = (r) => `${r.home_team}|${r.away_team}|${r.game_date}|${r.bet_type}`;
   for (const r of rows) {
-    const key = `${r.home_team}|${r.away_team}|${r.game_date}`;
+    const key = keyOf(r);
     const ts = r.last_revised_at || r.created_at || '';
     const prev = winners.get(key);
     const prevTs = prev ? (prev.last_revised_at || prev.created_at || '') : '';
     if (!prev || ts > prevTs) winners.set(key, r);
   }
-  return rows.filter(r => winners.get(`${r.home_team}|${r.away_team}|${r.game_date}`) === r);
+  return rows.filter(r => winners.get(keyOf(r)) === r);
 }
 
 function summarize(rows) {
@@ -348,6 +353,29 @@ async function getPublicLedger(req, res) {
       return enrichParlayLegOutcomes(supabase, data || []);
     }) || [];
 
+    // The parlay record counts EVERY settled ticket, not just the 80 cards
+    // the page displays. The page used to derive the record from the
+    // displayed cards, which stays exact only until the table outgrows the
+    // display cap; this is the same full-table count /api/house-parlays
+    // serves the digest, so the two surfaces quote one record.
+    const parlayRecord = await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('house_parlays')
+        .select('status')
+        .in('status', ['won', 'lost']);
+      if (error) throw error;
+      let won = 0, lost = 0;
+      for (const r of data || []) {
+        if (r.status === 'won') won++; else lost++;
+      }
+      const settled = won + lost;
+      return {
+        won,
+        lost,
+        hitRate: settled > 0 ? Math.round((won / settled) * 1000) / 10 : null,
+      };
+    }) || null;
+
     res.json({
       status: 'ok',
       generated_at: new Date().toISOString(),
@@ -364,6 +392,7 @@ async function getPublicLedger(req, res) {
       trapPicks: trapPicks.slice(0, 100),
       openPicks: openUnique,
       parlays,
+      parlayRecord,
     });
   } catch (err) {
     logger.error('Public ledger endpoint error', { error: err.message });

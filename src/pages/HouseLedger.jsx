@@ -445,12 +445,19 @@ export default function HouseLedger() {
                 <summary className="cursor-pointer list-none flex flex-wrap items-center gap-x-3 gap-y-1 bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 select-none">
                   <span className="font-mono text-[10px] uppercase tracking-[0.20em] text-signal-pos">Machine-built parlays</span>
                   {(() => {
-                    const settled = data.parlays.filter(p => p.status === 'won' || p.status === 'lost')
-                    const won = settled.filter(p => p.status === 'won').length
-                    if (settled.length === 0) return <span className="font-mono text-xs text-ink-400">{data.parlays.length} published</span>
+                    // The server record counts every settled ticket; the
+                    // cards below cap at 80, so deriving the record from
+                    // them would drift once the history outgrows the cap.
+                    // The fetched cards stay as the fallback shape only.
+                    const rec = data.parlayRecord
+                    const settled = rec ? rec.won + rec.lost
+                      : data.parlays.filter(p => p.status === 'won' || p.status === 'lost').length
+                    const won = rec ? rec.won
+                      : data.parlays.filter(p => p.status === 'won').length
+                    if (settled === 0) return <span className="font-mono text-xs text-ink-400">{data.parlays.length} published</span>
                     return (
                       <span className="font-mono text-xs text-ink-300 tabular-nums">
-                        Record: <span className="font-bold text-ink-100">{won}-{settled.length - won}</span> ({Math.round((won / settled.length) * 100)}%) · scored on its own, never mixed into the pick record
+                        Record: <span className="font-bold text-ink-100">{won}-{settled - won}</span> ({Math.round((won / settled) * 100)}%) · scored on its own, never mixed into the pick record
                       </span>
                     )
                   })()}
