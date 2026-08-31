@@ -34,14 +34,21 @@ module.exports = async function adminCalibration(req, res) {
   if (!adminUser) return;
 
   try {
-    const [multRes, bandRes, factorRes] = await Promise.all([
+    const [multRes, bandRes, rawBandRes, factorRes, changeRes] = await Promise.all([
       supabase.from('edge_calibration')
         .select('key, multiplier, measured_k, sample_n, source, updated_at')
         .order('key'),
       supabase.from('edge_band_calibration')
         .select('sport, band, claimed_center, calibrated_center, sample_n, fitted_at')
         .order('sport').order('band'),
+      supabase.from('edge_band_calibration_raw')
+        .select('sport, band, claimed_center, calibrated_center, sample_n, fitted_at')
+        .order('sport').order('claimed_center'),
       supabase.rpc('factor_attribution'),
+      supabase.from('model_weight_changes')
+        .select('changed_at, sport, component, before, after, reason, source')
+        .order('changed_at', { ascending: false })
+        .limit(25),
     ]);
 
     res.setHeader('Cache-Control', 'no-store');
@@ -51,12 +58,22 @@ module.exports = async function adminCalibration(req, res) {
       multipliersError: multRes.error?.message || null,
       bands: bandRes.data || [],
       bandsError: bandRes.error?.message || null,
+      // The raw band map: RAW claimed pp to delivered pp, one fit
+      // replacing the flat-k-times-band double shrink. A sport with its
+      // own rows here is sized and gated by this map (promoted for MLB
+      // 2026-08-31); other sports still run flat k plus the banded map.
+      bandsRaw: rawBandRes.data || [],
+      bandsRawError: rawBandRes.error?.message || null,
       // Factor attribution: read-only stage one of the learning loop,
       // MLB since the process-break floor. Slope reads: about 1 is sized
       // right, above 1 underweighted, near 0 priced in, negative
       // anti-signal. Thin samples (under 25) mean read nothing.
       factors: factorRes.data || [],
       factorsError: factorRes.error?.message || null,
+      // The learning loop's audit trail: every weight or formula change,
+      // before and after, with the evidence.
+      weightChanges: changeRes.data || [],
+      weightChangesError: changeRes.error?.message || null,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
