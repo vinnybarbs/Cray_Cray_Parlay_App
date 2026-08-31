@@ -235,14 +235,18 @@ async function getPublicLedger(req, res) {
     // moves in lockstep when the rollup refreshes (hourly, after the
     // settlement windows). The raw-row math above stays only as a
     // fallback for when the MV read fails.
-    const mvAll = await safeQuery(async () => {
+    // All period buckets in one read: the 'all' bucket feeds the summary
+    // exactly as before, and the windowed buckets feed the digest hero's
+    // little record line, now on the ledger too (owner 2026-08-31:
+    // "awesome little data").
+    const mvRows = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('mv_public_record')
-        .select('*')
-        .eq('period_bucket', 'all');
+        .select('*');
       if (error) throw error;
       return data || [];
     }) || [];
+    const mvAll = mvRows.filter(r => r.period_bucket === 'all');
 
     const ACTIONABLE_TIERS = new Set(['Lean', 'Play', 'Strong Play', 'Sharp Take']);
     const shapeMvRow = (r) => {
@@ -259,6 +263,19 @@ async function getPublicLedger(req, res) {
     };
     const mvDim = (type) => mvAll.filter(r => r.dimension_type === type);
     const mvOverall = mvDim('overall')[0] || null;
+
+    // Sharp Take and all-tiers records per window, same shape the digest
+    // hero consumes, so the two surfaces can never disagree.
+    const recordWindows = {};
+    for (const bucket of ['last_3d', 'last_7d', 'last_30d', 'all']) {
+      const rows = mvRows.filter(r => r.period_bucket === bucket);
+      const o = rows.find(r => r.dimension_type === 'overall');
+      const st = rows.find(r => r.dimension_type === 'tier' && r.dimension_value === 'Sharp Take');
+      recordWindows[bucket] = {
+        overall: o ? shapeMvRow(o) : null,
+        sharpTake: st ? shapeMvRow(st) : null,
+      };
+    }
 
     let summary;
     if (mvOverall) {
@@ -342,6 +359,7 @@ async function getPublicLedger(req, res) {
         rollup: 'All headline numbers on this page and the landing page come from one database rollup, mv_public_record, refreshed hourly after settlement runs. Same source, different time windows where labeled.',
       },
       summary,
+      recordWindows,
       picks: actionablePicks.slice(0, 250),
       trapPicks: trapPicks.slice(0, 100),
       openPicks: openUnique,
