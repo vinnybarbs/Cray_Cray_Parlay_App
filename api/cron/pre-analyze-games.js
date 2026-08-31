@@ -406,6 +406,81 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
   return { status: error ? 'error' : 'published', error };
 }
 
+// Map a published pick row back to its side key in the edges dict, so a
+// re-analysis can price the row's OWN market, not just the newly
+// recommended side.
+function sideForPublishedRow(row, game) {
+  if (row.bet_type === 'Total') {
+    if (/^over\b/i.test(row.pick || '')) return 'over';
+    if (/^under\b/i.test(row.pick || '')) return 'under';
+    return null;
+  }
+  const onHome = row.pick && game.home_team && row.pick.includes(game.home_team);
+  const onAway = row.pick && game.away_team && row.pick.includes(game.away_team);
+  if (!onHome && !onAway) return null;
+  if (row.bet_type === 'Spread') return onHome ? 'home_spread' : 'away_spread';
+  return onHome ? 'home_ml' : 'away_ml';
+}
+
+/**
+ * AUTO-DEMOTE: when a re-analysis finds NO side clearing the 2pp gate,
+ * any still-pending published pick for the game must come down with it.
+ * Before this existed, the publication block simply didn't run on a
+ * gate failure, so a published pick kept its stale tier no matter what
+ * the model now believed. That gap put 17 sub-gate picks into the graded
+ * record during the tennis Elo incident (2026-08-30, they stand by owner
+ * decision) and let two muted-market totals wear Sharp Take for an hour
+ * on raw-band promotion day (2026-08-31).
+ *
+ * The demotion target is Lean: the ladder already defines Lean as the
+ * published floor ("published picks whose calibrated pp fell under 2").
+ * The row keeps its pick and price, gets the re-analyzed edge for its
+ * own market when that can be resolved, and the round trip is recorded
+ * in tier_history, so a pick that recovers its edge on a later pass
+ * shows the full journey. Settled rows are never touched, and the trap
+ * and leg domains are out of scope here.
+ */
+async function demoteStaleSuggestion(game, edgeData, sportDisplay) {
+  try {
+    let q = supabase
+      .from('ai_suggestions')
+      .select('id, tier, tier_history, bet_type, pick, odds, edge_pp')
+      .like('session_id', 'auto_digest%')
+      .not('session_id', 'like', 'auto_digest_alt_%')
+      .eq('actual_outcome', 'pending')
+      .is('voided_at', null)
+      .or('tier.not.in.("Trap","Leg"),tier.is.null');
+    q = game.odds_event_id
+      ? q.eq('odds_event_id', game.odds_event_id)
+      : q.eq('home_team', game.home_team).eq('away_team', game.away_team).eq('game_date', game.game_date);
+    const { data } = await q.order('created_at', { ascending: false }).limit(1);
+    const row = data?.[0];
+    if (!row || row.tier === 'Lean') return;
+
+    const side = sideForPublishedRow(row, game);
+    const newEdge = side != null && edgeData?.edges?.[side] != null
+      ? Math.round(edgeData.edges[side] * 1000) / 10 : null;
+    const hist = withTierHistory(row.tier, row.tier_history,
+      historyEntry('Lean', row.odds, newEdge != null ? newEdge : row.edge_pp));
+    const { error } = await supabase
+      .from('ai_suggestions')
+      .update({
+        tier: 'Lean',
+        ...(newEdge != null ? { edge_pp: newEdge } : {}),
+        ...(hist ? { tier_history: hist } : {}),
+        last_revised_at: new Date().toISOString(),
+      })
+      .eq('id', row.id);
+    if (error) {
+      console.warn(`  Auto-demote failed for ${game.game_key}: ${error.message}`);
+    } else {
+      console.log(`  ⬇️ Demoted ${row.tier} to Lean (${sportDisplay} ${row.pick}): re-analysis below the 2pp gate`);
+    }
+  } catch (e) {
+    console.warn(`  Auto-demote exception for ${game.game_key}: ${e.message}`);
+  }
+}
+
 /**
  * Get relevant news snippets for a game's teams.
  *
@@ -1641,6 +1716,10 @@ async function runPreAnalysis(sportSlugs) {
               } catch (e) {
                 console.error(`  ❌ Auto-save exception: ${e.message}`);
               }
+              } else {
+                // No side clears the gate: any published pending pick for
+                // this game comes down to the Lean floor with it.
+                await demoteStaleSuggestion(game, edgeData, sportDisplay);
               }
 
               // Trap publication, independent of the pick above. The
