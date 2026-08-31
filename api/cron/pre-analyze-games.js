@@ -302,6 +302,47 @@ function deriveBetTypeAndPoint(side, oddsCtx) {
  * across the domains (auto_digest_ vs auto_digest_trap_ vs
  * auto_digest_leg_).
  */
+// The headline pick can MOVE onto a market an alt spotlight row already
+// occupies: the dedupe index (home, away, bet_type, pick, point, day)
+// then rejects the headline revision with a unique violation, and the
+// stale headline pick stands while the model's real read exists only as
+// the alt. Found live on raw-band promotion day (2026-08-31): both
+// muted-total Sharp Takes failed to revise onto their spread reads
+// because alt rows already carried "Boston Red Sox -1.5" and "Atlanta
+// Braves -1.5". The headline owns the market: void the redundant alt
+// and let the caller retry the write once.
+async function voidCollidingAltRow(game, payload) {
+  try {
+    let q = supabase
+      .from('ai_suggestions')
+      .select('id')
+      .like('session_id', 'auto_digest_alt_%')
+      .eq('bet_type', payload.bet_type)
+      .eq('pick', payload.pick)
+      .eq('actual_outcome', 'pending')
+      .is('voided_at', null);
+    q = game.odds_event_id
+      ? q.eq('odds_event_id', game.odds_event_id)
+      : q.eq('home_team', game.home_team).eq('away_team', game.away_team).eq('game_date', game.game_date);
+    const { data } = await q.limit(1);
+    const alt = data?.[0];
+    if (!alt) return false;
+    const { error } = await supabase
+      .from('ai_suggestions')
+      .update({
+        voided_at: new Date().toISOString(),
+        voided_reason: 'superseded: the headline pick moved onto this market',
+      })
+      .eq('id', alt.id);
+    if (!error) console.log(`  🔁 Voided redundant alt row ${alt.id}: headline pick took its market`);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
+const UNIQUE_VIOLATION = '23505';
+
 async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick' } = {}) {
   // Match by event id FIRST. Tennis re-emits matches with shifted start
   // times, and the team+game_date match below treats the re-emit as a new
@@ -337,7 +378,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
     if (evExisting) {
       const evHist = withTierHistory(evExisting.tier, evExisting.tier_history,
         historyEntry(payload.tier, payload.odds, payload.edge_pp));
-      const { error } = await supabase
+      const evUpdate = () => supabase
         .from('ai_suggestions')
         .update({
           ...payload,
@@ -347,6 +388,11 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
           last_revised_at: new Date().toISOString(),
         })
         .eq('id', evExisting.id);
+      let { error } = await evUpdate();
+      if (error && error.code === UNIQUE_VIOLATION && domain === 'pick'
+          && await voidCollidingAltRow(game, payload)) {
+        ({ error } = await evUpdate());
+      }
       if (!error) await alertIfNewSharpTake(game, payload, evExisting);
       return { status: error ? 'error' : 'revised', error };
     }
@@ -376,7 +422,7 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
   if (existing) {
     const hist = withTierHistory(existing.tier, existing.tier_history,
       historyEntry(payload.tier, payload.odds, payload.edge_pp));
-    const { error } = await supabase
+    const doUpdate = () => supabase
       .from('ai_suggestions')
       .update({
         ...payload,
@@ -385,10 +431,15 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
         last_revised_at: new Date().toISOString(),
       })
       .eq('id', existing.id);
+    let { error } = await doUpdate();
+    if (error && error.code === UNIQUE_VIOLATION && domain === 'pick'
+        && await voidCollidingAltRow(game, payload)) {
+      ({ error } = await doUpdate());
+    }
     if (!error) await alertIfNewSharpTake(game, payload, existing);
     return { status: error ? 'error' : 'revised', error };
   }
-  const { error } = await supabase
+  const doInsert = () => supabase
     .from('ai_suggestions')
     .insert({
       session_id: sessionId,
@@ -402,6 +453,11 @@ async function upsertDailySuggestion(game, payload, sessionId, { domain = 'pick'
         ? [historyEntry(payload.tier, payload.odds, payload.edge_pp)]
         : null,
     });
+  let { error } = await doInsert();
+  if (error && error.code === UNIQUE_VIOLATION && domain === 'pick'
+      && await voidCollidingAltRow(game, payload)) {
+    ({ error } = await doInsert());
+  }
   if (!error) await alertIfNewSharpTake(game, payload, null);
   return { status: error ? 'error' : 'published', error };
 }
