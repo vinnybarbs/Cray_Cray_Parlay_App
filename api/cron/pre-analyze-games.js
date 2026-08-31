@@ -15,7 +15,7 @@ const { getIntelContext } = require('../../lib/services/data-integrity-agent.js'
 const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson } = require('../../lib/services/claude.js');
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
-const { getUfcContext, formatUfcContext } = require('../../lib/services/ufc-data.js');
+const { getUfcContext, formatUfcContext, isKnownUfcBout } = require('../../lib/services/ufc-data.js');
 const { getProbablePitchersText } = require('../../lib/services/probable-pitchers.js');
 const bandCalibration = require('../../lib/services/band-calibration.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
@@ -1785,7 +1785,19 @@ async function runPreAnalysis(sportSlugs) {
               const publishedPick = mathPick && (
                 (edgeData?.edgesPreBand?.[mathPick.recommended_side] ?? mathPick.signedEdge) * 100 >= 2
               );
-              if (!publishedPick && edgeData && edgeData.homeWinProb != null && edgeData.awayWinProb != null) {
+              // Owner rule 2026-08-31: non-UFC MMA cards never enter the
+              // leg pool. The MMA odds feed carries every promotion, ESPN
+              // results cover UFC-brand events only, so a leg on any other
+              // card has no settlement path and dies in the 3-day
+              // auto-void (ids 16640, 16861).
+              const legEligible = !publishedPick && edgeData
+                && edgeData.homeWinProb != null && edgeData.awayWinProb != null
+                && (sportDisplay !== 'UFC'
+                  || await isKnownUfcBout(supabase, game.home_team, game.away_team));
+              if (!legEligible && !publishedPick && sportDisplay === 'UFC' && edgeData) {
+                console.log(`  Leg skipped for ${game.game_key}: not a settleable UFC-brand bout`);
+              }
+              if (legEligible) {
                 try {
                   const legSide = edgeData.homeWinProb >= edgeData.awayWinProb ? 'home_ml' : 'away_ml';
                   const legProb = Math.max(edgeData.homeWinProb, edgeData.awayWinProb);
