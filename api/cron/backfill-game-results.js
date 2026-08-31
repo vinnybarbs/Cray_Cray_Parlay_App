@@ -34,7 +34,12 @@ const { sportDayISO, sportDayCompact, sportDayParts, daysAgo } = require('../../
 
 async function fetchScoreboard(sport, sportPath, dateStr) {
   try {
-    const groups = (sport === 'NCAAB' || sport === 'NCAAF') ? '&groups=50' : '';
+    // ESPN group ids differ by sport: 50 is Division I BASKETBALL, 80 is
+    // FBS football. NCAAF ran under 50 through the 2026 opener weekend
+    // and captured 2 of the slate's finals, which starved the college
+    // shadow calibration its first weekend.
+    const groups = sport === 'NCAAB' ? '&groups=50'
+      : sport === 'NCAAF' ? '&groups=80' : '';
     const url = `${ESPN_BASE}/${sportPath}/scoreboard?dates=${dateStr}${groups}&limit=200`;
     const res = await fetch(url);
     if (!res.ok) return [];

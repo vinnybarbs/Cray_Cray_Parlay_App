@@ -41,7 +41,13 @@ function sleep(ms) {
  * Fetch standings from ESPN for a given sport
  */
 async function fetchESPNStandings(sport, config) {
-  const url = `${ESPN_STANDINGS}/${config.path}/standings`;
+  // The college configs declare a group id (80 = FBS football, 50 = D1
+  // basketball) that was never sent, so the bare endpoint returned a
+  // partial field (88 of ~134 FBS teams on the 2026-08-28 first NCAAF
+  // sync). Harmless for sports without a group. If ESPN ignores the
+  // param the result is unchanged, so this can only widen coverage.
+  const group = config.groups ? `?group=${config.groups}` : '';
+  const url = `${ESPN_STANDINGS}/${config.path}/standings${group}`;
   console.log(`  Fetching ${sport}: ${url}`);
 
   const res = await fetch(url);
