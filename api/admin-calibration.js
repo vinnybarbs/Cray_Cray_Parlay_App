@@ -42,8 +42,8 @@ module.exports = async function adminCalibration(req, res) {
         .select('sport, band, claimed_center, calibrated_center, sample_n, fitted_at')
         .order('sport').order('band'),
       supabase.from('edge_band_calibration_raw')
-        .select('sport, band, claimed_center, calibrated_center, sample_n, fitted_at')
-        .order('sport').order('claimed_center'),
+        .select('sport, market, band, claimed_center, calibrated_center, sample_n, fitted_at')
+        .order('sport').order('market').order('claimed_center'),
       supabase.rpc('factor_attribution'),
       supabase.from('model_weight_changes')
         .select('changed_at, sport, component, before, after, reason, source')
