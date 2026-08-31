@@ -47,6 +47,71 @@ function OutcomeChip({ outcome, tier }) {
   return <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider ${m.cls}`}>{m.label}</span>
 }
 
+// The digest hero's little windowed record line, on the ledger too
+// (owner 2026-08-31). Same mv_public_record buckets, same populations
+// side by side, so the two surfaces can never disagree.
+const RECORD_PERIODS = [['last_3d', '3d'], ['last_7d', '7d'], ['last_30d', '30d'], ['all', 'all']]
+
+function winRateColor(rate) {
+  if (rate == null) return 'text-ink-300'
+  if (rate >= 60) return 'text-green-400'
+  if (rate >= 50) return 'text-signal-pos'
+  return 'text-signal-neg'
+}
+
+function RecordWindowsLine({ windows }) {
+  const [idx, setIdx] = useState(2) // default 30d, same as the digest
+  if (!windows) return null
+  const [bucket] = RECORD_PERIODS[idx]
+  const w = windows[bucket] || {}
+  const st = w.sharpTake && w.sharpTake.winRate != null ? w.sharpTake : null
+  const o = w.overall && w.overall.winRate != null ? w.overall : null
+  if (!st && !o) return null
+  return (
+    <div
+      className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400"
+      title="Sharp Take record and the all-tiers Model record for the selected window. Same numbers as the Daily Digest."
+    >
+      <span>
+        {'Sharp '}
+        {st ? (
+          <>
+            <span className="tabular-nums text-ink-300">{st.won}-{st.lost}</span>
+            {' '}<span className={`tabular-nums ${winRateColor(st.winRate)}`}>{st.winRate}%</span>
+          </>
+        ) : (
+          <span className="text-ink-500">none</span>
+        )}
+        <span className="text-ink-600">{' · '}</span>
+        {'All '}
+        {o ? (
+          <>
+            <span className="tabular-nums text-ink-300">{o.won}-{o.lost}</span>
+            {' '}<span className={`tabular-nums ${winRateColor(o.winRate)}`}>{o.winRate}%</span>
+          </>
+        ) : (
+          <span className="text-ink-500">none</span>
+        )}
+      </span>
+      <span className="flex items-center gap-1">
+        {RECORD_PERIODS.map(([bucketKey, label], i) => (
+          <button
+            key={bucketKey}
+            onClick={() => setIdx(i)}
+            className={`px-1.5 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-[0.08em] transition-colors ${
+              i === idx
+                ? 'bg-signal-pos-dim/60 text-signal-pos font-semibold'
+                : 'bg-ink-850 text-ink-400 hover:text-ink-200'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </span>
+    </div>
+  )
+}
+
 function ParlayCard({ parlay }) {
   const legs = Array.isArray(parlay.legs) ? parlay.legs : []
   const odds = parlay.combined_odds > 0 ? `+${parlay.combined_odds}` : String(parlay.combined_odds)
@@ -156,6 +221,7 @@ export default function HouseLedger() {
           <h1 className="font-sans font-bold text-3xl md:text-4xl text-ink-100 tracking-[-0.02em] leading-tight">
             Every pick. Published before. Settled after.
           </h1>
+          <RecordWindowsLine windows={data?.recordWindows} />
           <p className="mt-3 text-ink-300 max-w-2xl leading-relaxed text-sm">
             This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The headline is the Sharp Take record, the tier this product exists to find. The full tier table shows where the rest of the edges live.
           </p>
