@@ -13,6 +13,17 @@ const rows = [
 ];
 
 describe('formatMorningBoard', () => {
+  test('every line carries the matchup, totals most of all', () => {
+    // Owner report 2026-09-01: "Over 7.5 · MLB · 7.2pp" with no game
+    // attached is useless in the channel.
+    const msg = formatMorningBoard([
+      { sport: 'MLB', pick: 'Over 7.5', edge_pp: 7.2, tier: 'Strong Play', game_date: '2026-09-01T22:41:00Z', home_team: 'Boston Red Sox', away_team: 'Seattle Mariners' },
+      { sport: 'MLB', pick: 'Tampa Bay Rays -1.5', edge_pp: 12.9, tier: 'Sharp Take', game_date: '2026-09-01T22:41:00Z', home_team: 'Tampa Bay Rays', away_team: 'New York Mets' },
+    ], 'Tuesday, Sep 1');
+    expect(msg).toContain('Over 7.5 · Seattle Mariners @ Boston Red Sox · MLB');
+    expect(msg).toContain('Tampa Bay Rays -1.5 · New York Mets @ Tampa Bay Rays · MLB');
+  });
+
   test('groups tiers in ladder order with legs and traps at the end', () => {
     const msg = formatMorningBoard(rows, 'Saturday, Aug 22');
     const idx = (s) => msg.indexOf(s);

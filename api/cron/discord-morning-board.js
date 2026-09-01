@@ -35,8 +35,16 @@ function gameTimeMt(iso) {
   }
 }
 
+// Every line carries the matchup. A total reads as "Over 7.5" with no
+// game attached, which the owner flagged as useless in the channel
+// (2026-09-01, the first band-aware totals morning), and even for team
+// picks the opponent is the context a reader wants.
+function matchupOf(row) {
+  return row.away_team && row.home_team ? `${row.away_team} @ ${row.home_team}` : null;
+}
+
 function pickLine(row) {
-  const parts = [row.pick, row.sport];
+  const parts = [row.pick, matchupOf(row), row.sport];
   if (row.edge_pp != null) parts.push(`${row.edge_pp}pp`);
   const t = gameTimeMt(row.game_date);
   if (t) parts.push(t);
@@ -66,7 +74,7 @@ function formatMorningBoard(rows, dateLabel, gimmes = []) {
     lines.push('', '**Legs · the gimmes, 65% or better to hit, parlay material**');
     for (const r of legs.sort((a, b) => (b.model_prob ?? 0) - (a.model_prob ?? 0))) {
       const prob = r.model_prob != null ? `${Math.round(r.model_prob * 100)}% to hit` : null;
-      lines.push(`• ${[r.pick, r.sport, prob, gameTimeMt(r.game_date)].filter(Boolean).join(' · ')}`);
+      lines.push(`• ${[r.pick, matchupOf(r), r.sport, prob, gameTimeMt(r.game_date)].filter(Boolean).join(' · ')}`);
     }
   }
   // Owner call 2026-08-25: on a day with no bet-signal tier, say so
@@ -80,7 +88,7 @@ function formatMorningBoard(rows, dateLabel, gimmes = []) {
     lines.push('', 'No Sharp Take edge on the board today. These are not plays, but the market prices them as the day’s highest percenters and the model agrees with the price:');
     for (const g of gimmes) {
       const pct = `${Math.round(g.implied * 100)}% implied`;
-      lines.push(`• ${[g.pick, g.sport, pct, gameTimeMt(g.game_date)].filter(Boolean).join(' · ')}`);
+      lines.push(`• ${[g.pick, matchupOf(g), g.sport, pct, gameTimeMt(g.game_date)].filter(Boolean).join(' · ')}`);
     }
   }
   const traps = byTier.get('Trap') || [];
@@ -143,6 +151,8 @@ async function fetchGimmes(publishedRows, today, windowStart, windowEnd) {
         sport: g.sport,
         implied,
         game_date: g.game_date,
+        home_team: g.home_team,
+        away_team: g.away_team,
       });
     }
     return gimmes.sort((a, b) => b.implied - a.implied).slice(0, 5);
