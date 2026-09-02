@@ -1,4 +1,4 @@
-const { composeParlay, isHeavy, impliedOf, HEAVY_IMPLIED } = require('../../lib/services/parlay-composer');
+const { composeParlay, isHeavy, isModelNegative, impliedOf, HEAVY_IMPLIED } = require('../../lib/services/parlay-composer');
 
 const leg = (id, prob) => ({ id, tier: 'Leg', model_prob: prob, odds: '-180', edge_pp: 0.5 });
 const heavyFave = (id, odds, tier = 'Lean') => ({ id, tier, odds, model_prob: null, implied_prob: null, edge_pp: 1.5 });
@@ -30,7 +30,26 @@ describe('impliedOf', () => {
   });
 });
 
+describe('isModelNegative', () => {
+  test('a heavy the model prices below fair is not parlay material (the Eala -3800 case)', () => {
+    expect(isModelNegative({ tier: 'Leg', odds: '-3800', model_prob: 0.956, implied_prob: 0.969 })).toBe(true);
+  });
+  test('model at or above fair is fine, and no model read means no objection', () => {
+    expect(isModelNegative({ tier: 'Leg', odds: '-620', model_prob: 0.87, implied_prob: 0.87 })).toBe(false);
+    expect(isModelNegative({ tier: 'Lean', odds: '-250', model_prob: null, implied_prob: null })).toBe(false);
+  });
+});
+
 describe('composeParlay', () => {
+  test('model-negative heavies are excluded before ranking', () => {
+    const eala = { id: 'neg', tier: 'Leg', odds: '-3800', model_prob: 0.956, implied_prob: 0.969, edge_pp: -1.3 };
+    const pool = [eala, leg('l1', 0.72), heavyFave('h1', '-250')];
+    const { rows } = composeParlay(pool, 2);
+    expect(rows.map(r => r.id)).toEqual(['l1', 'h1']);
+    // And when excluding it leaves the pool short, the day builds nothing.
+    expect(composeParlay([eala, leg('l1', 0.72)], 2)).toBeNull();
+  });
+
   test('builds only from heavy favorites, highest hit probability first', () => {
     const pool = [lean('x1'), leg('l1', 0.72), heavyFave('h1', '-250'), leg('l2', 0.66)];
     const { rows, composition } = composeParlay(pool, 2);
