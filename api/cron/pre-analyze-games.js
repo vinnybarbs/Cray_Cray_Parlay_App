@@ -537,6 +537,43 @@ async function demoteStaleSuggestion(game, edgeData, sportDisplay) {
   }
 }
 
+// The tennis longshot fence's cleanup arm: a pending published pick at a
+// fenced price (the line drifted out, or it published before the fence
+// shipped) gets voided pre-lock, because the read is a price-dispersion
+// artifact and should not exist at any tier. Settled rows are never
+// touched.
+async function voidFencedTennisRow(game) {
+  try {
+    let q = supabase
+      .from('ai_suggestions')
+      .select('id, pick, odds')
+      .like('session_id', 'auto_digest%')
+      .not('session_id', 'like', 'auto_digest_alt_%')
+      .not('session_id', 'like', 'auto_digest_leg_%')
+      .not('session_id', 'like', 'auto_digest_trap_%')
+      .eq('actual_outcome', 'pending')
+      .is('voided_at', null);
+    q = game.odds_event_id
+      ? q.eq('odds_event_id', game.odds_event_id)
+      : q.eq('home_team', game.home_team).eq('away_team', game.away_team).eq('game_date', game.game_date);
+    const { data } = await q.order('created_at', { ascending: false }).limit(1);
+    const row = data?.[0];
+    if (!row) return;
+    const n = parseInt(String(row.odds), 10);
+    if (!Number.isFinite(n) || n < 251) return;
+    const { error } = await supabase
+      .from('ai_suggestions')
+      .update({
+        voided_at: new Date().toISOString(),
+        voided_reason: 'tennis longshot fence: market-only edges at +251 and lighter prices are cross-book price dispersion, not prediction',
+      })
+      .eq('id', row.id);
+    if (!error) console.log(`  🚧 Voided fenced tennis longshot ${row.id} (${row.pick})`);
+  } catch (e) {
+    console.warn(`  Tennis fence void exception for ${game.game_key}: ${e.message}`);
+  }
+}
+
 /**
  * Get relevant news snippets for a game's teams.
  *
@@ -1688,7 +1725,25 @@ async function runPreAnalysis(sportSlugs) {
                 console.log(`  👻 Shadow (${sportDisplay}): ${displayEdgePp.toFixed(1)}pp stored, no pick published`);
               }
             } else {
-              if (result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2) {
+              // THE TENNIS LONGSHOT FENCE (owner-era data, 2026-09-01): a
+              // market-only model's "edge" on a +251-or-lighter-priced side
+              // can only come from one book's outlier price against the
+              // consensus, which is line-shopping dispersion, not
+              // prediction, and it is largest exactly at long odds. Since
+              // the 1.0 multiplier went live (2026-08-25) that bucket went
+              // 1-19 against a 14 percent implied price for -15.6u,
+              // including 1-14 for -10.6u AFTER Elo was zeroed, so it is
+              // the mechanism, not a leftover of the Elo incident. Fenced
+              // picks never publish, and a pending row that drifted past
+              // the fence price gets voided, not demoted: the read should
+              // not exist at any tier.
+              const TENNIS_LONGSHOT_FENCE = 251;
+              const tennisFenced = (() => {
+                if (sportDisplay !== 'Tennis' || !result.recommended_side) return false;
+                const n = parseInt(String(resolveOddsForPick(oddsCtx, result.recommended_side)), 10);
+                return Number.isFinite(n) && n >= TENNIS_LONGSHOT_FENCE;
+              })();
+              if (result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2 && !tennisFenced) {
               try {
                 const side = result.recommended_side;
                 const { betType, point } = deriveBetTypeAndPoint(side, oddsCtx);
@@ -1772,6 +1827,9 @@ async function runPreAnalysis(sportSlugs) {
               } catch (e) {
                 console.error(`  ❌ Auto-save exception: ${e.message}`);
               }
+              } else if (tennisFenced) {
+                console.log(`  🚧 Tennis longshot fence: ${result.recommended_pick} not published`);
+                await voidFencedTennisRow(game);
               } else {
                 // No side clears the gate: any published pending pick for
                 // this game comes down to the Lean floor with it.
