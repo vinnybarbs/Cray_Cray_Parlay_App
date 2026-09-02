@@ -207,6 +207,16 @@ async function buildHouseParlays(req, res) {
 
       const { combinedDecimal, combinedOdds, combinedEdgePp, modelProb, fairProb, evPct } = combineLegs(composed.rows);
 
+      // Backstop behind the composer's model-negative leg filter: a
+      // ticket the model prices below fair never publishes, whatever
+      // assembled it. A house product with a negative edge on its own
+      // card poisons the record it is judged on (owner, 2026-09-02).
+      if (combinedEdgePp < 0) {
+        sizeOutcomes[size] = `negative_edge (${combinedEdgePp}pp)`;
+        logger.info(`House parlay ${size}-leg for ${today}: combined edge ${combinedEdgePp}pp, no build`);
+        continue;
+      }
+
       const record = {
         parlay_date: today,
         legs_count: size,
