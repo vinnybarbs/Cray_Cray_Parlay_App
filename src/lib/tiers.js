@@ -38,6 +38,11 @@ export function tierRange(label) {
 // stay in lockstep with lib/services/pick-grader.js.
 const SHARP_TAKE_PRICE_FENCE = -150
 
+// Longshot tier ceiling (owner rule 2026-09-02): a side priced +300 or
+// longer is never labeled above Lean, whatever the claimed edge. Mirror
+// of lib/services/pick-grader.js, see the rationale there.
+const LONGSHOT_TIER_CEILING_ODDS = 300
+
 // Break-even win percentage for an American price: risk / (risk + win).
 // -150 needs 60.0, -180 needs 64.3, +122 needs only 45.0.
 export function breakEvenPct(americanOdds) {
@@ -61,6 +66,10 @@ export function edgeTier(signedPp, americanOdds = null) {
   }
   if (signedPp < 2) {
     return { label: 'Skip', subtitle: 'pass on it', color: 'text-ink-300', bg: 'bg-ink-850 shadow-hairline' }
+  }
+  const oCeil = americanOdds != null ? Number(String(americanOdds).replace(/[^0-9-]/g, '')) : null
+  if (oCeil != null && Number.isFinite(oCeil) && oCeil >= LONGSHOT_TIER_CEILING_ODDS) {
+    return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
   }
   if (signedPp < 4) {
     return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
