@@ -867,6 +867,21 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
+          // The longshot rail on the shadow surface (owner, 2026-09-02:
+          // "why do I still see +1400 on the board for ncaaf"). A shadow
+          // sport's read at +300 or longer is a recordless-team artifact,
+          // not information, so it never wears the green Model Pick
+          // banner: it renders as an explicit non-read. Live sports show
+          // their banner as usual, already capped at Lean by the tier
+          // ceiling.
+          const railOdds = Number(String(lockOddsFor(game) ?? '').replace(/[^0-9-]/g, ''))
+          if (game.recommended_pick && signedPp != null && signedPp >= 2
+              && SHADOW_DISPLAY.has(sport) && Number.isFinite(railOdds) && railOdds >= 300) return (
+            <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
+              <div className="font-mono text-[9px] text-ink-500 uppercase tracking-[0.14em] mb-0.5">No credible read · +300 or longer never rates above Lean</div>
+              <div className="text-ink-400 font-mono text-sm tabular-nums">{game.recommended_pick}</div>
+            </div>
+          )
           if (game.recommended_pick && signedPp != null && signedPp >= 2) return (
             <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
               <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick</div>
