@@ -1793,10 +1793,13 @@ async function runPreAnalysis(sportSlugs) {
                   reasoning: pickReasoning,
                   risk_level: result.edge_score >= 8 ? 'Low' : 'Medium',
                   generate_mode: 'auto_digest',
-                  // 6 = calibrated devig regime (edge_calibration multipliers
-                  // + real spread/total baselines). Calibration refresh only
-                  // trusts picks from this regime forward.
-                  pipeline_version: 6,
+                  // 7 = market-anchored base regime (2026-09-02, owner
+                  // rule: the consensus price is the likelihood estimate
+                  // in every sport, the model's claim is the factor stack
+                  // arguing off it). 6 was the calibrated devig regime.
+                  // Calibration fits key off the regime boundary date so
+                  // old-regime claims never grade new-regime labels.
+                  pipeline_version: 7,
                   edge_pp: edgePp,
                   edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
                   tier: pickTier,
