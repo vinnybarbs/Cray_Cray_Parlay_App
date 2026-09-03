@@ -59,15 +59,24 @@ function edgeBadgeClass(score) {
 // edgeTier / formatPp / edgePpForSide now live in src/lib/tiers.js, one
 // grading language shared by digest, generator, landing, and ledger.
 
-// Build a readable pick label for one side using market context already on the game row.
+// Build a readable pick label for one side using market context already on
+// the game row. Spread and total lines carry their published price in
+// parens (owner, 2026-09-03: the odds are the likelihood and the cost,
+// every market row shows them like ML always has). Older analysis rows
+// without stored side prices just omit the parens.
+function sidePriceSuffix(price) {
+  if (price == null) return ''
+  return ` (${price > 0 ? '+' : ''}${price})`
+}
+
 function sidePickText(game, side) {
   switch (side) {
     case 'home_ml':     return game.moneyline_home != null ? `${game.home_team} ML ${game.moneyline_home > 0 ? '+' : ''}${game.moneyline_home}` : `${game.home_team} ML`
     case 'away_ml':     return game.moneyline_away != null ? `${game.away_team} ML ${game.moneyline_away > 0 ? '+' : ''}${game.moneyline_away}` : `${game.away_team} ML`
-    case 'home_spread': return game.spread != null ? `${game.home_team} ${game.spread > 0 ? '+' : ''}${game.spread}` : `${game.home_team} spread`
-    case 'away_spread': return game.spread != null ? `${game.away_team} ${(-game.spread) > 0 ? '+' : ''}${-game.spread}` : `${game.away_team} spread`
-    case 'over':        return game.total != null ? `Over ${game.total}` : 'Over'
-    case 'under':       return game.total != null ? `Under ${game.total}` : 'Under'
+    case 'home_spread': return game.spread != null ? `${game.home_team} ${game.spread > 0 ? '+' : ''}${game.spread}${sidePriceSuffix(game.spread_home_price)}` : `${game.home_team} spread`
+    case 'away_spread': return game.spread != null ? `${game.away_team} ${(-game.spread) > 0 ? '+' : ''}${-game.spread}${sidePriceSuffix(game.spread_away_price)}` : `${game.away_team} spread`
+    case 'over':        return game.total != null ? `Over ${game.total}${sidePriceSuffix(game.over_price)}` : 'Over'
+    case 'under':       return game.total != null ? `Under ${game.total}${sidePriceSuffix(game.under_price)}` : 'Under'
     default:            return side
   }
 }
@@ -940,7 +949,15 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
             <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">
               {alt.bet_type} spotlight{alt.tier ? ` · ${alt.tier}` : ''}
             </div>
-            <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{alt.pick}</div>
+            <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">
+              {alt.pick}
+              {alt.odds != null && (() => {
+                const n = parseInt(alt.odds, 10)
+                return Number.isFinite(n)
+                  ? <span className="text-ink-400"> ({n > 0 ? `+${n}` : n})</span>
+                  : null
+              })()}
+            </div>
             {alt.edge_pp != null && (
               <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">{formatPp(Number(alt.edge_pp))} on this market alone</div>
             )}
