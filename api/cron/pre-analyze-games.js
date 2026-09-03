@@ -1625,6 +1625,12 @@ async function runPreAnalysis(sportSlugs) {
             total: oddsCtx.total,
             moneyline_home: oddsCtx.ml_home,
             moneyline_away: oddsCtx.ml_away,
+            // Per-side juice so spread and total rows can show their
+            // price the way ML rows always have (owner, 2026-09-03).
+            spread_home_price: oddsCtx.spread_home_odds,
+            spread_away_price: oddsCtx.spread_away_odds,
+            over_price: oddsCtx.over_odds,
+            under_price: oddsCtx.under_odds,
             analysis_snippet: result.analysis_snippet,
             // Deterministic edge_score from edge-calculator (clamp(0,10, edgePct + confBonus)).
             // Falls back to LLM-supplied number only when calc has no market data.
