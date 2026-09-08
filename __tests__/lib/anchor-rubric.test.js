@@ -38,3 +38,33 @@ describe('_dampedModelMargin', () => {
     expect(dampedFav).toBeCloseTo(-dampedDog, 10);
   });
 });
+
+describe('the dial board', () => {
+  const calc = new EdgeCalculator({});
+
+  test('sport row overrides pooled row overrides code default', () => {
+    const dials = new Map([
+      ['__all__|venue_weight', 0.25],
+      ['MLB|venue_weight', 0.3125],
+      ['__all__|spread_claim_damp', 0.7],
+    ]);
+    expect(calc._dial(dials, 'MLB', 'venue_weight')).toBe(0.3125);
+    expect(calc._dial(dials, 'NFL', 'venue_weight')).toBe(0.25);
+    expect(calc._dial(dials, 'MLB', 'spread_claim_damp')).toBe(0.7);
+    expect(calc._dial(dials, 'MLB', 'sos_sensitivity')).toBe(0.15);
+  });
+
+  test('no table at all serves the shipped defaults', () => {
+    expect(calc._dial(null, 'MLB', 'form_weight')).toBe(0);
+    expect(calc._dial(null, 'MLB', 'pitcher_anchor_damp')).toBe(0.5);
+    expect(calc._dial(null, 'MLB', 'spread_claim_damp')).toBe(0.5);
+    expect(calc._dial(null, 'MLB', 'max_net_adjustment')).toBe(0.15);
+  });
+
+  test('a dialed venue weight reaches the venue impact', () => {
+    const base = calc._venueSplitImpact(0.10, 20, 'NFL');
+    const dialed = calc._venueSplitImpact(0.10, 20, 'NFL', 0.35);
+    expect(base).toBeCloseTo(0.10 * 0.25, 10);
+    expect(dialed).toBeCloseTo(0.10 * 0.35, 10);
+  });
+});

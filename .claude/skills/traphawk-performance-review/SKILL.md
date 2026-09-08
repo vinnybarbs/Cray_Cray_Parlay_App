@@ -122,6 +122,25 @@ select * from factor_attribution('2026-08-17', 'NFL');  -- once football grades
 
 Reading it: slope near 1 means sized right and not priced away, well above 1 suggests underweighted, near 0 means priced in, negative means anti-signal. Three traps to name in every report: the slopes are UNIVARIATE and the factors are correlated with each other and with the base blend, so a hot streak-slope may be borrowing venue's credit; small avg impacts make slopes explosively noisy (a 12x slope on a 0.7pp factor is a shrug, not a finding); and one week of games is one regime.
 
+## 3e. The dial board (owner design 2026-09-08)
+
+Every tunable factor weight is a dial in `sport_dials` (sport row overrides '__all__' row overrides the code default baked into edge-calculator.js). Read it every review and print it as a table next to the factor attribution slopes:
+
+```sql
+select sport, dial, value, updated_at from sport_dials order by dial, sport;
+```
+
+Proposing a dial move requires the THREE-TEST COUNTERFACTUAL, all three on the same window:
+1. Replay the losing picks the move targets with the candidate value (rescale the stored factor impacts in the pick's factor stack, re-derive side and tier, re-grade against finals). The move must turn the targeted losses into a better record, not just a different one.
+2. Replay the sport's ENTIRE published record the same way. The move must improve the whole, otherwise it is overfitting last week's losers.
+3. Replay the sport's SHADOW reads. The move must not promote picks that lost, a good dial change cannot manufacture garbage publications.
+
+Passes all three: propose the exact number, damped to at most 25 percent of the current weight per step unless the same reading has repeated across two consecutive Mondays (a repeat earns the full measured move). Fails any: file it as a note with the failing test named. When NO dial setting rescues a sport in test 2, say so explicitly, that is the signal the missing edge is a data source (a feed, a prior, a news signal), not a weight, and the recommendation should name what source would have carried the information.
+
+Every applied move is written to sport_dials AND logged to model_weight_changes with before, after, and the evidence, by the code-shipping session, never by a review agent directly.
+
+Current dials at protocol ship (2026-09-08): form_weight 0 ('__all__'), pitcher_anchor_damp 0.5 (MLB), spread_claim_damp 0.5 ('__all__'), venue_weight 0.25 ('__all__') and 0.3125 (MLB), sos_sensitivity 0.15, max_net_adjustment 0.15.
+
 THE STAGING RULE, non-negotiable: this table changes no coefficients. A nudge proposal requires the same direction on n of at least 50 across two consecutive Monday reviews, moves one factor at a time by at most 25 percent of its current weight, and ships only with the owner's explicit approval on the specific number. Track proposals and their outcomes here in the review so the loop's own record is auditable. First baseline (2026-08-24, clean era, MLB): every active factor positive (venue 7.4 on 129, home_adv 3.2 on 93, seed 1.3 on 92, pitcher 3.8 on 41), injury dead at -0.03, consistent with the replay's finding that the adjustments help while the base blend is what disagrees with the market wrongly.
 
 ## 4. Traps and legs
