@@ -19,6 +19,17 @@ order by created_at desc limit 20;
 
 Fold anything relevant into your brief under a short "From the other workers" note, especially findings from the last 24 hours that Vince has not acted on yet.
 
+## 0b. Directive compliance sweep
+
+The `directives` table is the standing law of the system: every owner decision that must not evaporate, with where it is enforced and, for the mechanical ones, a `check_sql` that returns violating rows. Run the sweep every check:
+
+```sql
+select id, left(directive, 80) as directive, check_sql
+from directives where status = 'active' and check_sql is not null;
+```
+
+Execute each `check_sql` exactly as stored. Any returned row is a FINDING named after its directive, reported at the top of the brief next to cron failures, never buried. An empty result on every check gets one line: "directive compliance clean, N checks". Also flag any active directive whose enforcement you know to be gone (a fence removed from code, a protocol nobody runs): a directive with dead enforcement is a finding even with no violating rows. Never edit the directives table during a check; propose changes to the owner.
+
 ## 1. Cron completions, last 24h
 
 ```sql
