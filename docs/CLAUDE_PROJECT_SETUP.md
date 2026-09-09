@@ -90,6 +90,16 @@ agent_reports row. Cron is UTC and does not follow Mountain time: after
 `0 13`, `0 16`) to hold the same local times, and reverse it in March.
 Full history in docs/SCHEDULED.md.
 
+GOAL STATE, pending a one time owner action: these three routines load
+skills from the account, which lags the repo until a skills save is
+confirmed. Their replacements clone main at fire time and read the
+skills from the checkout, so a merged skill change is live at the next
+firing with nothing to remember. They must be created from the
+claude.ai Routines UI (a routine created from inside a session cannot
+carry the Supabase connector or a repo source). The exact settings and
+the three prompts are in docs/routines. After the cutover the account
+skill save matters only for ad hoc desktop chats.
+
 ## 5b. How skills reach the routines
 
 The routines load skills from the ACCOUNT skills folder, not from the
