@@ -22,7 +22,7 @@ const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { playerKey } = require('../../lib/services/tennis-data.js');
 const { recordFromRecordsPayload } = require('../../lib/services/ufc-data.js');
 
-const SITE_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
+const SITE_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports';
 const CORE_BASE = 'http://sports.core.api.espn.com/v2/sports';
 
 const DEFAULT_DAYS = 3;

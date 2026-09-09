@@ -31,7 +31,7 @@ function slugToTitle(slug) {
 
 async function getEspnLive() {
   try {
-    const res = await fetch('https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard');
+    const res = await fetch('https://site.web.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard');
     if (!res.ok) return null;
     const data = await res.json();
     const event = (data.events || [])[0];

@@ -1536,7 +1536,7 @@ async function runPreAnalysis(sportSlugs) {
         // pick, and trap calls. Any line move, injury note, or intel row
         // changes the hash and the game re-analyzes as before. Grading
         // meta (accuracy) and the playbook are deliberately excluded.
-        const contextHash = crypto.createHash('sha256').update(JSON.stringify({
+        const contextInputs = {
           odds: [oddsCtx.spread, oddsCtx.total, oddsCtx.ml_home, oddsCtx.ml_away],
           rank: rankCtx,
           news: newsCtx,
@@ -1558,7 +1558,14 @@ async function runPreAnalysis(sportSlugs) {
           } : null,
           pick: mathPick ? [mathPick.recommended_side, mathPick.recommended_pick] : null,
           traps: trapCalls.map(t => [t.side, t.edge_pp, t.lure_score]),
-        })).digest('hex');
+        };
+        const contextHash = crypto.createHash('sha256').update(JSON.stringify(contextInputs)).digest('hex');
+        // Per-input fingerprints stored next to the hash so a dead change
+        // gate can be diagnosed from the table (which input churned between
+        // two runs) instead of guessed at. MLB gated near zero for two weeks
+        // of ops checks with the culprit unidentifiable from the outside.
+        const contextParts = Object.fromEntries(Object.entries(contextInputs).map(([k, v]) =>
+          [k, crypto.createHash('sha256').update(JSON.stringify(v ?? null)).digest('hex').slice(0, 10)]));
 
         if (prior && prior.context_hash && prior.context_hash === contextHash && prior.prior_snippet) {
           await supabase
@@ -1661,6 +1668,7 @@ async function runPreAnalysis(sportSlugs) {
             expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString(),
             stale: false,
             context_hash: contextHash,
+            context_parts: contextParts,
             // Refinement loop fields
             analysis_version: prior ? prior.version + 1 : 1,
             prior_analysis: prior ? prior.prior_snippet : null,

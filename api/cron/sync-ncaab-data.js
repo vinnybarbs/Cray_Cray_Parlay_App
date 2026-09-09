@@ -11,7 +11,7 @@ const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 // Game days are US Eastern calendar dates (see lib/services/sport-day.js).
 const { sportDayISO, sportDayCompact, sportDayParts, daysAgo } = require('../../lib/services/sport-day.js');
 
-const ESPN_BASE = 'http://site.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
+const ESPN_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports/basketball/mens-college-basketball';
 
 async function fetchJSON(url) {
   const res = await fetch(url);

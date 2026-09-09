@@ -19,7 +19,7 @@
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { parseRankingsPayload, parseScoreboardPayload } = require('../../lib/services/tennis-data.js');
 
-const SITE_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
+const SITE_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports';
 const TOURS = ['atp', 'wta'];
 
 const DEFAULT_DAYS = 3;

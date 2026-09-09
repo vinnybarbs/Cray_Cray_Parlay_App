@@ -55,7 +55,15 @@ where job_name like 'pre-analyze%' and status in ('completed','partial')
 group by 1 order by 1;
 ```
 
-Two thresholds: daily narration_cost above 6.00 dollars is a cost regression (raised from 2.50 on 2026-08-18 by owner decision, the full tennis draw narrates by design and lands the normal day near 5), and skipped = 0 across a full day means the change gate is not firing (a churning input in the context hash; news ordering and tennis result ordering were both fixed with deterministic tiebreakers, so a new collapse means a new churning input). Healthy state after August 2026: a meaningful share of stale games skip in every sport.
+The ONLY cost threshold is 6.00 dollars per day: above it is a cost regression. (The owner set 6.00 on 2026-08-18; the earlier 2.50 figure is retired and must not be reported as a second threshold or a conflict.) The full tennis draw narrates by design and lands a normal day near 5. Separately, skipped = 0 across a full day for a sport means the change gate is not firing for it (a churning input in the context hash). Since 2026-09-09 every analysis stores `context_parts`, a per-input fingerprint map (odds, rank, news, injuries, trends, stats, tennis, pitchers, edge, pick, traps). To name the churning input, compare the parts of two consecutive versions of the same game:
+
+```sql
+select game_key, analysis_version, generated_at, context_parts
+from game_analysis where sport = 'MLB' and analysis_version > 1
+order by generated_at desc limit 10;
+```
+
+The key whose fingerprint changed between versions while nothing real changed is the culprit; report it by name. Healthy state after August 2026: a meaningful share of stale games skip in every sport.
 
 ## 3. Integrity sweep findings
 
