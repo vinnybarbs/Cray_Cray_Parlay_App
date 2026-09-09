@@ -109,7 +109,12 @@ const SLUG_TO_SPORT = {
 // season openers (NCAAF 2026-08-29, NFL 2026-09-10): remove the sport
 // from this set and seed its edge_calibration multipliers from the
 // preseason market_shadow_calibration() measured_k.
-const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'NFL', 'NCAAF']);
+// NFL went LIVE 2026-09-09 ahead of the 09-10 opener (directive 12):
+// moneyline and spread publish through the ladder, totals stay muted at
+// flat 0 until the shadow record clears break even (preseason totals
+// ran 37.5 percent). NCAAF remains shadowed while the program strength
+// prior accrues attribution.
+const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'NCAAF']);
 // Model routing for the three-way soccer family only. SHADOW_SPORTS
 // answers "does it publish"; this set answers "which model prices it".
 const SOCCER_1X2_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
