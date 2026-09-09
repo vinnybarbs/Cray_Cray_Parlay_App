@@ -102,17 +102,25 @@ async function buildHouseParlays(req, res) {
     // Cutoff so we never publish a leg whose game has started or is about to.
     const cutoff = new Date(Date.now() + MIN_MINUTES_TO_START * 60 * 1000).toISOString();
 
-    // Candidate legs come from the house's own digest picks for today,
-    // spotlight (alt-market) rows included: they are published graded
-    // picks like any other and a -175 spread favorite is exactly the
-    // kind of component a hit-first parlay wants.
-    const { data: candidates, error } = await supabase
+    // The pool is every published pick or Leg whose GAME is inside the
+    // board window, whatever day it was published. The old selection was
+    // keyed by publish-day session id, so a US Open leg published on
+    // Monday for a Tuesday match was invisible on Tuesday, and three
+    // days of "no_heavy_favorites" (2026-09-07 to 09-09) were reported
+    // while six qualifying heavies sat on the board. Spotlight alt rows
+    // and Leg rows are published graded picks like any other. Traps,
+    // Skips and voided rows never enter.
+    const horizon = new Date(Date.now() + 30 * 60 * 60 * 1000).toISOString();
+    const { data: poolRows, error } = await supabase
       .from('ai_suggestions')
-      .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob')
-      .in('session_id', [sessionId, `auto_digest_alt_spread_${today}`, `auto_digest_alt_total_${today}`])
+      .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob, session_id')
+      .like('session_id', 'auto_digest%')
+      .in('tier', ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Leg'])
       .eq('actual_outcome', 'pending')
+      .is('voided_at', null)
       .not('odds', 'is', null)
-      .gt('game_date', cutoff);
+      .gt('game_date', cutoff)
+      .lt('game_date', horizon);
 
     if (error) throw error;
 
@@ -120,17 +128,9 @@ async function buildHouseParlays(req, res) {
     // win on games with no betting edge (high hit probability, thin
     // payout). They rank BELOW every positive-edge pick, so they only
     // enter a parlay when the day's pick pool is short.
-    const { data: legRows, error: legError } = await supabase
-      .from('ai_suggestions')
-      .select('id, sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, model_prob, implied_prob')
-      .eq('session_id', `auto_digest_leg_${today}`)
-      .eq('actual_outcome', 'pending')
-      .not('odds', 'is', null)
-      .gt('game_date', cutoff);
-    // A failed leg query used to be discarded silently, shrinking the
-    // pool with no witness. It is not fatal (picks can still build), but
-    // it must be visible in the run log.
-    if (legError) logger.error('House parlay leg pool query failed:', legError);
+    const candidates = (poolRows || []).filter(r => r.tier !== 'Leg');
+    const legRows = (poolRows || []).filter(r => r.tier === 'Leg');
+    const legError = null;
 
     // Correlation exclusion for the MVP is cross game only.
     // Keep at most one leg per game: a positive-edge pick always beats a
