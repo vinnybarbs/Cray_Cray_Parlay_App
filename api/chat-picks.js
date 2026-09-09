@@ -654,7 +654,7 @@ async function executeTool(name, args) {
         try {
           const tour = args.tour || 'pga';
           const tourPath = { pga: 'golf/pga', lpga: 'golf/lpga', european: 'golf/eur' }[tour] || 'golf/pga';
-          const espnRes = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${tourPath}/scoreboard`);
+          const espnRes = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/${tourPath}/scoreboard`);
           if (!espnRes.ok) return { message: 'No golf tournament data available right now' };
           const espnData = await espnRes.json();
           const events = espnData.events || [];

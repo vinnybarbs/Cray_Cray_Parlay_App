@@ -8,7 +8,7 @@
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 
-const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports';
+const ESPN_BASE = 'https://site.web.api.espn.com/apis/site/v2/sports';
 
 const SPORT_PATHS = {
   NFL: 'football/nfl',
@@ -32,7 +32,7 @@ function sleep(ms) {
 // last-N form windows, ATS cutoffs, and freshness ordering downstream.
 const { sportDayISO, sportDayCompact, sportDayParts, daysAgo } = require('../../lib/services/sport-day.js');
 
-async function fetchScoreboard(sport, sportPath, dateStr) {
+async function fetchScoreboard(sport, sportPath, dateStr, errors = []) {
   try {
     // ESPN group ids differ by sport: 50 is Division I BASKETBALL, 80 is
     // FBS football. NCAAF ran under 50 through the 2026 opener weekend
@@ -42,7 +42,10 @@ async function fetchScoreboard(sport, sportPath, dateStr) {
       : sport === 'NCAAF' ? '&groups=80' : '';
     const url = `${ESPN_BASE}/${sportPath}/scoreboard?dates=${dateStr}${groups}&limit=200`;
     const res = await fetch(url);
-    if (!res.ok) return [];
+    // A non-OK response is a finding, not a quiet empty day: ESPN denied
+    // site.api.espn.com to this host for 22 hours on 2026-09-08 and this
+    // job reported success the whole time while writing nothing.
+    if (!res.ok) { errors.push(`${sport} ${dateStr} HTTP ${res.status}`); return []; }
     const data = await res.json();
     
     const games = [];
@@ -148,7 +151,7 @@ async function backfillGameResults(req, res) {
         // ESPN's ?dates= buckets are Eastern days, so walk back in Eastern.
         const dateStr = sportDayCompact(daysAgo(d));
 
-        const games = await fetchScoreboard(sport, sportPath, dateStr);
+        const games = await fetchScoreboard(sport, sportPath, dateStr, results.errors);
 
         for (const game of games) {
           const { error } = await supabase
@@ -175,6 +178,15 @@ async function backfillGameResults(req, res) {
 
     const duration = Date.now() - startTime;
     console.log(`\n📊 Backfill complete in ${(duration / 1000).toFixed(1)}s:`, results);
+
+    // Log so the ops check can see starvation: HTTP failures with nothing
+    // ingested is partial, never completed.
+    const httpFailures = results.errors.filter(e => / HTTP \d+$/.test(e)).length;
+    await supabase.from('cron_job_logs').insert({
+      job_name: 'backfill-game-results',
+      status: httpFailures > 0 && results.total_games === 0 ? 'partial' : 'completed',
+      details: JSON.stringify({ days, sports, ...results, http_failures: httpFailures, duration_ms: duration }),
+    });
 
     return res.status(200).json({ success: true, duration_ms: duration, ...results });
 

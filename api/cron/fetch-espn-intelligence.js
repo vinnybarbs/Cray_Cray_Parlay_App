@@ -27,7 +27,7 @@ async function espnFetch(path) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
   try {
-    const res = await fetch(`https://site.api.espn.com/apis/site/v2/sports/${path}`, {
+    const res = await fetch(`https://site.web.api.espn.com/apis/site/v2/sports/${path}`, {
       headers: { 'User-Agent': 'CrayCrayParlay/1.0' },
       signal: controller.signal
     });
@@ -136,7 +136,7 @@ async function fetchStandings(sport) {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT);
-    const res = await fetch(`https://site.api.espn.com/apis/v2/sports/${sport.espn}/standings`, {
+    const res = await fetch(`https://site.web.api.espn.com/apis/v2/sports/${sport.espn}/standings`, {
       headers: { 'User-Agent': 'CrayCrayParlay/1.0' },
       signal: controller.signal
     });

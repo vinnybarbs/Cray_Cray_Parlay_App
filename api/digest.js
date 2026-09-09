@@ -268,7 +268,7 @@ async function getDigest(req, res) {
     // 6. Golf tournaments (leaderboard from ESPN + outright odds)
     const golfResult = await safeQuery(async () => {
       try {
-        const espnRes = await fetch('https://site.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard');
+        const espnRes = await fetch('https://site.web.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard');
         if (!espnRes.ok) return null;
         const espnData = await espnRes.json();
         const events = espnData.events || [];

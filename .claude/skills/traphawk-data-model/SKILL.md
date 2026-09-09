@@ -16,7 +16,7 @@ Math picks the side, Claude narrates. `api/cron/pre-analyze-games.js` computes p
 | Tier | Rule |
 |---|---|
 | Sharp Take | edge >= 10pp AND price lighter than -150 (the chalk fence, 2026-08-10: heavier chalk publishes as Play, break-even at -150 is 60 percent and heavy-chalk claimed edges measured as mostly vig) |
-| Play | edge 4-10pp, or a 10pp+ edge fenced for price. Strong Play (7-10pp) merged into Play 2026-08-10; historical rows keep the stored label, treat them as Play |
+| Play | edge 4-7pp, or a 10pp+ edge fenced for price. Strong Play (7-10pp) was merged into Play 2026-08-10 and RESTORED 2026-08-16 by owner decision (7pp is the betting floor, that band earns its own label), so Strong Play is a LIVE tier; only rows stamped 08-10 to 08-16 carry Play for a 7-10pp edge |
 | Lean | edge >= 2pp (2pp is the floor for a published pick) |
 | Skip | edge between -2pp and 2pp |
 | Trap | lure-based, side priced <= -2pp that casual bettors are drawn to (`lib/services/trap-detector.js`). NOT simply the inverse of a pick |

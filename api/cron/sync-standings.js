@@ -9,7 +9,7 @@
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 
-const ESPN_STANDINGS = 'https://site.api.espn.com/apis/v2/sports';
+const ESPN_STANDINGS = 'https://site.web.api.espn.com/apis/v2/sports';
 
 const SPORT_CONFIGS = {
   NBA:   { path: 'basketball/nba',                        season: () => currentSeason('NBA') },
@@ -195,10 +195,12 @@ async function syncStandings(req, res) {
       try {
         const teams = await fetchESPNStandings(sport, config);
         let upserted = 0;
+        const seenTeamIds = [];
 
         for (const team of teams) {
           const teamId = await ensureTeam(team);
           if (!teamId) continue;
+          seenTeamIds.push(teamId);
 
           const { error } = await supabase
             .from('standings')
@@ -224,7 +226,26 @@ async function syncStandings(req, res) {
           if (!error) upserted++;
         }
 
-        results[sport] = { found: teams.length, upserted };
+        // Purge teams that left the table: standings are keyed by calendar
+        // year, so a relegated or promoted club keeps last season's full
+        // record under the same season key (EPL 2026-09-09: Burnley
+        // 4-10-24 and Wolves 3-11-24 sat beside 3-match rows and made the
+        // league read 20 wins against 68 losses). Only on a real fetch,
+        // never on an empty one, so a blocked ESPN cannot wipe a table.
+        let purged = 0;
+        if (teams.length >= 10 && seenTeamIds.length >= 10) {
+          const { data: sportTeams } = await supabase
+            .from('teams').select('id').eq('sport', sport);
+          const staleIds = (sportTeams || []).map(t => t.id).filter(id => !seenTeamIds.includes(id));
+          if (staleIds.length > 0) {
+            const { error: purgeErr, count } = await supabase
+              .from('standings').delete({ count: 'exact' })
+              .eq('season', season).in('team_id', staleIds);
+            if (!purgeErr) purged = count || 0;
+          }
+        }
+
+        results[sport] = { found: teams.length, upserted, purged };
         console.log(`✅ ${sport}: ${upserted}/${teams.length} teams synced (season ${season})`);
 
       } catch (err) {
@@ -235,12 +256,14 @@ async function syncStandings(req, res) {
       await sleep(500);
     }
 
-    // Log to cron_job_logs
+    // Log to cron_job_logs. Every sport finding zero teams is ESPN
+    // starvation (a denied host, 2026-09-08), never a completed sync.
     const duration = Date.now() - startTime;
+    const allEmpty = sports.length > 0 && sports.every(s => (results[s]?.found ?? 0) === 0);
     await supabase.from('cron_job_logs').insert({
       job_name: 'sync-standings',
-      status: 'completed',
-      details: JSON.stringify({ results, duration_ms: duration })
+      status: allEmpty ? 'partial' : 'completed',
+      details: JSON.stringify({ results, duration_ms: duration, ...(allEmpty ? { error: 'every sport returned zero teams from ESPN' } : {}) })
     });
 
     console.log(`\n📊 Standings sync complete in ${(duration / 1000).toFixed(1)}s`, results);

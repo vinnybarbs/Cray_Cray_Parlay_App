@@ -23,7 +23,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../../shared/logger');
 
-const SITE = 'https://site.api.espn.com/apis/site/v2/sports';
+const SITE = 'https://site.web.api.espn.com/apis/site/v2/sports';
 const CORE = 'http://sports.core.api.espn.com/v2/sports';
 
 const ESPN_PROBES = [
