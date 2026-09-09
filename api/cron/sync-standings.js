@@ -113,37 +113,73 @@ async function fetchESPNStandings(sport, config) {
  */
 async function ensureTeam(teamData) {
   try {
-    // Try exact name match
+    const espnId = teamData.espn_id != null ? String(teamData.espn_id) : null;
+
+    // Identity first: the ESPN id is the only key that cannot collide.
+    if (espnId) {
+      const { data: byId } = await supabase
+        .from('teams')
+        .select('id')
+        .eq('sport', teamData.sport)
+        .eq('provider_ids->>espn', espnId)
+        .limit(1);
+      if (byId?.length) return byId[0].id;
+    }
+
+    // A name match is only trusted when the candidate does not already
+    // belong to a different ESPN team. The old last-word fallback let
+    // Sporting Kansas City land on Orlando City SC's row (%City%) and
+    // folded Newcastle, West Ham and Leeds into Manchester United
+    // (%United%), so those clubs never got rows and the wrong club's
+    // record priced live MLS and EPL games (2026-09-09).
+    const claimIfFree = async (rows) => {
+      const row = (rows || []).find(r => {
+        const existing = r.provider_ids?.espn != null ? String(r.provider_ids.espn) : null;
+        return !existing || !espnId || existing === espnId;
+      });
+      if (!row) return null;
+      if (espnId && row.provider_ids?.espn == null) {
+        await supabase.from('teams')
+          .update({ provider_ids: { ...(row.provider_ids || {}), espn: espnId } })
+          .eq('id', row.id);
+      }
+      return row.id;
+    };
+
+    // Exact name match
     const { data: exact } = await supabase
       .from('teams')
-      .select('id')
+      .select('id, name, provider_ids')
       .eq('sport', teamData.sport)
       .eq('name', teamData.name)
-      .limit(1);
+      .limit(3);
+    const exactId = await claimIfFree(exact);
+    if (exactId) return exactId;
 
-    if (exact?.length) return exact[0].id;
-
-    // Try ilike match on full name (handles "LA Clippers" vs "Los Angeles Clippers")
+    // Containment match on the full name (handles "LA Clippers" vs
+    // "Los Angeles Clippers")
     const { data: fuzzyFull } = await supabase
       .from('teams')
-      .select('id, name')
+      .select('id, name, provider_ids')
       .eq('sport', teamData.sport)
       .ilike('name', `%${teamData.name}%`)
-      .limit(1);
+      .limit(3);
+    const fullId = await claimIfFree(fuzzyFull);
+    if (fullId) return fullId;
 
-    if (fuzzyFull?.length) return fuzzyFull[0].id;
-
-    // Try mascot match (last word)
+    // Mascot match (last word), never for soccer where the last word is a
+    // club suffix shared across the league (United, City, FC, Town).
+    const SOCCER = new Set(['EPL', 'MLS']);
     const mascot = teamData.name.split(' ').slice(-1)[0];
-    if (mascot.length >= 4) { // Avoid short matches like "FC"
+    if (!SOCCER.has(teamData.sport) && mascot.length >= 4) {
       const { data: fuzzyMascot } = await supabase
         .from('teams')
-        .select('id, name')
+        .select('id, name, provider_ids')
         .eq('sport', teamData.sport)
         .ilike('name', `%${mascot}%`)
-        .limit(1);
-
-      if (fuzzyMascot?.length) return fuzzyMascot[0].id;
+        .limit(3);
+      const mascotId = await claimIfFree(fuzzyMascot);
+      if (mascotId) return mascotId;
     }
 
     // Insert new team
