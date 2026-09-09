@@ -46,10 +46,12 @@ work, and results. You never change code or data; your only write is
 your own agent_reports row at the end of every run, and every scheduled
 run must file one. Code and data changes go to the code shipping session
 through the build queue or the blackboard. Follow the repo skills in
-.claude/skills exactly. Run git pull in the project folder before any
-scheduled task so the skills are current, and stop with a report if the
-pull fails. Plain punctuation in everything you write: no em dashes, en
-dashes, semicolons, or arrows.
+.claude/skills exactly. Run git pull in the project folder at the start
+of every chat so the skills are current, and stop with a report if the
+pull fails. The scheduled analysts are cloud Routines outside this
+project; never create schedules here. When repo skills change, package
+them and ask me to confirm the account save. Plain punctuation in
+everything you write: no em dashes, en dashes, semicolons, or arrows.
 
 ## 4. Memory (the only file, paste verbatim as MEMORY.md)
 
@@ -61,33 +63,41 @@ database, the database is right.
 Do not create per topic memory files. The old project accumulated seven
 traphawk_*.md files that all went stale within a week.
 
-## 5. Scheduled tasks
+## 5. The scheduled analysts are cloud Routines, not project schedules
 
-Three schedules, nothing else. Each prompt starts with the pull.
+The three TrapHawk analysts run as Claude Code Remote Routines: fresh
+cloud sessions with the account skills and the Supabase connector and
+no repository folder at all. They are NOT project schedules, the
+project's Scheduled panel stays empty on purpose, and they must never
+be recreated inside the project. Manage them through the Claude Code
+Remote connector (list_triggers, update_trigger), by id:
 
-**TrapHawk daily ops check**, every day 08:10 America/Denver:
+| Routine | Trigger id | Cron (UTC) | Local (MDT) |
+|---|---|---|---|
+| TrapHawk daily ops check | trig_015qoYxVhMJyekxCgUaV1atQ | `0 14 * * *` | 08:00 daily |
+| TrapHawk weekly calibration review | trig_01XdGMb6AvwbjCHJWNGJPTFn | `0 12 * * 1` | 06:00 Mondays |
+| TrapHawk monthly API cost audit | trig_01LP5t3AcowYb1vXr7XSNdCW | `0 15 2 * *` | 09:00 on the 2nd |
 
-> cd to the project folder and run git pull. Then run the
-> traphawk-ops-check skill end to end, including the directive
-> compliance sweep, and file your report to agent_reports as agent
-> ops-check. Lead with ALL CLEAR or the findings in severity order.
+Each prompt invokes its skill by name and files exactly one
+agent_reports row. Cron is UTC and does not follow Mountain time: after
+2026-11-01 (MST, UTC-7) shift each schedule one hour later (`0 15`,
+`0 13`, `0 16`) to hold the same local times, and reverse it in March.
+Full history in docs/SCHEDULED.md.
 
-**TrapHawk weekly calibration**, Mondays 07:00 America/Denver (after the
-06:40 UTC band refit has run):
+## 5b. How skills reach the routines
 
-> cd to the project folder and run git pull. Then run the
-> traphawk-performance-review skill end to end, including the dial board
-> section and its three test counterfactual protocol, and file your
-> report to agent_reports as agent calibration-review with the findings
-> JSON. Any dial move you recommend must name the exact number and the
-> three test results.
+The routines load skills from the ACCOUNT skills folder, not from the
+repo. The chain is: a skill changes in `.claude/skills` through a pull
+request; the desktop project packages the changed skills and opens a
+"Skills update verification" chat asking you to confirm the save to
+your account; until you confirm, every routine runs the previous
+version. Confirm every skills save the same day it appears. The
+packaged `.skill` files are derived artifacts and are not committed to
+the repo; `.claude/skills` is the only source.
 
-**TrapHawk monthly API cost**, the 1st of each month 09:00
-America/Denver:
-
-> cd to the project folder and run git pull. Then run the
-> traphawk-cost-audit skill and file your report to agent_reports as
-> agent cost-audit.
+The project itself has three jobs and no schedules: packaging skill
+updates for your confirmation, ad hoc analysis chats against the same
+four tables the routines use, and the status board.
 
 ## 6. First chat in the new project: verification prompt (paste verbatim)
 
@@ -131,4 +141,8 @@ instructions to follow.
   encode the operating model.
 - Three local Claude Code routines duplicated the project schedules and
   reported only to the owner, invisible to the blackboard.
-- Nothing enforced that the clone was on main before a scheduled run.
+- Nothing enforced that the clone was on main before a chat, and a
+  month of uncommitted code sat on a side branch in the folder.
+- The three analysts were assumed to be project schedules; they are
+  cloud Routines and were never missing. Skill updates reach them only
+  through the account save, which sat unconfirmed.

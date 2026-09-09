@@ -10,6 +10,14 @@
  * picked side, the pick demotes to Lean. Tightening only, a pick never
  * promotes here.
  *
+ * This endpoint also runs a re-stamp sweep first. A pick's game_date is
+ * written once at generation from the feed's commence_time and was never
+ * refreshed, so when a match moved the pick kept the old time. Settlement
+ * only looks a day or so either side of game_date, which meant a moved
+ * match could never be graded, before or after it was played. The sweep
+ * pulls the current commence_time for each pending pick's event and
+ * corrects game_date when the feed has moved it.
+ *
  * Endpoint: POST /cron/reprice-pending-picks?secret=...
  * Schedule: every 30 minutes (pg_cron, 20260810190000).
  */
@@ -19,6 +27,11 @@ const { withTierHistory, historyEntry } = require('../../lib/services/tier-histo
 
 const WINDOW_MIN = 90;          // only picks starting within this window
 const DEMOTE_DRIFT_PP = 1.0;    // implied-prob move against us that triggers demotion
+
+const RESTAMP_LOOKBACK_DAYS = 7;                        // matches the settlement checker's lookback
+const RESTAMP_MIN_DRIFT_MS = 10 * 60 * 1000;            // ignore sub-10-minute jitter
+const RESTAMP_MAX_MOVE_MS = 14 * 24 * 60 * 60 * 1000;   // sanity guard against a garbage feed value
+const RESTAMP_CHUNK = 200;                              // event ids per odds_cache lookup
 
 function impliedPct(american) {
   const o = Number(american);
@@ -52,6 +65,88 @@ async function currentPriceFor(row, pickTeam) {
   // Average implied across books, then back to a representative price.
   const avgImplied = prices.map(impliedPct).reduce((a, b) => a + b, 0) / prices.length;
   return { avgImplied };
+}
+
+/**
+ * Correct game_date on pending picks whose event has moved in the feed.
+ *
+ * Keyed on odds_event_id, so no name matching is involved. Tightly bounded:
+ * pending and unvoided only, within the settlement lookback, and a move is
+ * ignored unless it is more than RESTAMP_MIN_DRIFT_MS and less than
+ * RESTAMP_MAX_MOVE_MS away from the stamped time.
+ */
+async function runRestamp() {
+  const startTime = Date.now();
+  const summary = { checked: 0, restamped: 0, no_event_id: 0, no_market: 0, held: 0, out_of_range: 0, errors: [] };
+  try {
+    const since = new Date(Date.now() - RESTAMP_LOOKBACK_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rows, error } = await supabase
+      .from('ai_suggestions')
+      .select('id, game_date, odds_event_id')
+      .eq('actual_outcome', 'pending')
+      .is('voided_at', null)
+      .gte('game_date', since);
+    if (error) throw error;
+
+    const pending = rows || [];
+    summary.checked = pending.length;
+
+    // One lookup per chunk of event ids rather than one per pick.
+    const eventIds = [...new Set(pending.map(r => r.odds_event_id).filter(Boolean))];
+    const feedTimeByEvent = new Map();
+    for (let i = 0; i < eventIds.length; i += RESTAMP_CHUNK) {
+      const { data: odds, error: oddsErr } = await supabase
+        .from('odds_cache')
+        .select('external_game_id, commence_time')
+        .in('external_game_id', eventIds.slice(i, i + RESTAMP_CHUNK));
+      if (oddsErr) throw oddsErr;
+      for (const o of odds || []) {
+        if (!o.external_game_id || !o.commence_time) continue;
+        const t = new Date(o.commence_time).getTime();
+        if (!Number.isFinite(t)) continue;
+        const prev = feedTimeByEvent.get(o.external_game_id);
+        if (prev == null || t > prev) feedTimeByEvent.set(o.external_game_id, t);
+      }
+    }
+
+    for (const row of pending) {
+      try {
+        if (!row.odds_event_id) { summary.no_event_id++; continue; }
+        const feedMs = feedTimeByEvent.get(row.odds_event_id);
+        if (feedMs == null) { summary.no_market++; continue; }
+        const stampedMs = new Date(row.game_date).getTime();
+        if (!Number.isFinite(stampedMs)) { summary.no_market++; continue; }
+
+        const move = Math.abs(feedMs - stampedMs);
+        if (move < RESTAMP_MIN_DRIFT_MS) { summary.held++; continue; }
+        if (move > RESTAMP_MAX_MOVE_MS) { summary.out_of_range++; continue; }
+
+        const { error: upErr } = await supabase
+          .from('ai_suggestions')
+          .update({ game_date: new Date(feedMs).toISOString() })
+          .eq('id', row.id)
+          .eq('actual_outcome', 'pending');
+        if (upErr) summary.errors.push(`id ${row.id}: ${upErr.message}`);
+        else summary.restamped++;
+      } catch (e) {
+        summary.errors.push(`id ${row.id}: ${e.message}`);
+      }
+    }
+
+    await supabase.from('cron_job_logs').insert({
+      job_name: 'restamp-pending-game-dates',
+      status: summary.errors.length === 0 ? 'completed' : 'partial',
+      details: JSON.stringify({ ...summary, errors: summary.errors.slice(0, 5), duration_ms: Date.now() - startTime }),
+    });
+  } catch (error) {
+    try {
+      await supabase.from('cron_job_logs').insert({
+        job_name: 'restamp-pending-game-dates', status: 'failed',
+        details: JSON.stringify({ error: error.message }),
+      });
+    } catch { /* best-effort */ }
+  }
+  return summary;
 }
 
 async function runReprice() {
@@ -134,7 +229,11 @@ async function repricePendingPicks(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
   res.status(202).json({ status: 'accepted', message: 'Reprice sweep started' });
-  runReprice().catch(err => console.error('Reprice error:', err.message));
+  // Re-stamp first: a corrected game_date can pull a pick into the reprice
+  // window on this same run instead of waiting another 30 minutes.
+  runRestamp()
+    .then(() => runReprice())
+    .catch(err => console.error('Reprice error:', err.message));
 }
 
 module.exports = repricePendingPicks;

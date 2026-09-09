@@ -156,7 +156,11 @@ Trap record from the mv tier row (fade framing). If trap_signals is populated, g
 
 ## 5. Shadow sports and CLV
 
-Shadow promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded publishable picks (claimed edge 2pp or more) whose actual win rate meets or beats fair implied. One call returns everything:
+The shadow list as of 2026-09-09 is the soccer family plus NCAAF. Tennis was promoted 2026-08-10, UFC on 2026-08-25, and NFL went live 2026-09-09 (moneyline and spread, totals muted), all at owner direction, and all publish through the normal ladder. A promoted sport is judged on its published record, its calibration, and its CLV, NEVER against the 75 publishable bar. Reporting a live sport as short of the bar is a reporting error, not a finding. `shadow_model_readiness()` still returns blocks for promoted sports, those blocks are stale.
+
+NCAAF was planned to flip at the 2026-08-29 opener and did NOT. It is still shadowed and publishing nothing, held back because 0-0 records made the calculator base 50/50; the program strength prior (ncaaf_team_strength) now accrues attribution on its shadow reads. Treat the flip as an open owner decision, not as done.
+
+For the sports still in the list, promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded publishable picks (claimed edge 2pp or more) whose actual win rate meets or beats fair implied AND positive units. One call returns everything:
 
 ```sql
 select public.shadow_model_readiness();
