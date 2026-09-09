@@ -15,9 +15,13 @@ checked out on `main`, at a stable path with no spaces, for example
   OneDrive), those rewrite files under git and break pulls.
 - Nothing else in the folder. No personal notes, no downloads, no second
   checkout.
-- The clone must track `origin/main`. Scheduled tasks run `git pull`
-  before doing anything, so an uncommitted local change would block
-  every run; keep the clone read only in practice.
+- The clone must track `origin/main`. The project's shell cannot modify
+  or delete existing files in the folder (verified 2026-09-09), which is
+  a feature: the project can never edit code or skills. It also means
+  the project cannot `git pull`. YOU run the pull, from a terminal,
+  before starting project work, and the project verifies freshness and
+  stops if the folder is behind. The owner's pull is:
+  `cd ~/GHRepositories/Cray_Cray_Parlay_App && rm -f .git/index.lock && git pull`.
 - The `.claude/skills` directory in the clone is what the project runs.
   Skills are updated only through pull requests, never edited in the
   clone.
@@ -46,12 +50,14 @@ work, and results. You never change code or data; your only write is
 your own agent_reports row at the end of every run, and every scheduled
 run must file one. Code and data changes go to the code shipping session
 through the build queue or the blackboard. Follow the repo skills in
-.claude/skills exactly. Run git pull in the project folder at the start
-of every chat so the skills are current, and stop with a report if the
-pull fails. The scheduled analysts are cloud Routines outside this
-project; never create schedules here. When repo skills change, package
-them and ask me to confirm the account save. Plain punctuation in
-everything you write: no em dashes, en dashes, semicolons, or arrows.
+.claude/skills exactly. At the start of every chat run git fetch origin
+and git status -uno in the project folder; if the folder is behind
+origin/main or not on main, stop and ask me to run the pull myself,
+never attempt to pull, modify, or delete files in the folder. The
+scheduled analysts are cloud Routines outside this project; never
+create schedules here. When repo skills change, package them and ask
+me to confirm the account save. Plain punctuation in everything you
+write: no em dashes, en dashes, semicolons, or arrows.
 
 ## 4. Memory (the only file, paste verbatim as MEMORY.md)
 
@@ -102,9 +108,10 @@ four tables the routines use, and the status board.
 ## 6. First chat in the new project: verification prompt (paste verbatim)
 
 Verify this project is set up correctly and report each line as PASS or
-FAIL with the evidence. In the project folder run: git rev-parse
---abbrev-ref HEAD (must be main); git fetch origin and git status -uno
-(must be clean and not behind); git remote get-url origin (must be the
+FAIL with the evidence. Do not pull, modify, or delete anything in the
+folder; if it is behind, that is a FAIL I fix myself. In the project
+folder run: git rev-parse --abbrev-ref HEAD (must be main); git fetch
+origin and git status -uno (must be clean and not behind); git remote get-url origin (must be the
 vinnybarbs/Cray_Cray_Parlay_App repository); ls .claude/skills (must list
 traphawk-cost-audit, traphawk-data-model, traphawk-ops-check,
 traphawk-performance-review, traphawk-ship); confirm the folder path has
