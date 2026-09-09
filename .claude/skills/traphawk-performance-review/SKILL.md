@@ -48,7 +48,7 @@ Ladder change 2026-08-10: Strong Play merged into Play, the live ladder is Sharp
 
 Owner decision 2026-08-10: MLB spreads re-entered production at multiplier 0.21 (the shadow-fitted k) and MLB totals on probation at 0.10 even though the shadow measured a negative k. Tennis left the shadow list the same day and publishes through the ladder at 0.50. Every weekly review must report how these three re-entries are performing against their published record AND their shadow record, and recommend re-muting any of them that runs below break-even on a real published sample. Do not silently accept the multipliers as settled.
 
-Football plan, same owner decision: NFL and NCAAF are in SHADOW_SPORTS through preseason. Every preseason game gets full analysis and its raw edges get shadow graded, nothing publishes. Weekly reviews during preseason must report the football shadow record per market. Go-live is a deliberate flip at the openers, NCAAF 2026-08-29 and NFL 2026-09-10: remove the sport from SHADOW_SPORTS and seed its multipliers from the preseason measured_k. Do not promote early on a hot preseason sample, and do not let the flip date slip silently.
+Football plan, same owner decision: NFL and NCAAF are in SHADOW_SPORTS through preseason. The NCAAF opener passed on 2026-08-29 with the flip not taken, so it stays shadowed until records accumulate or a preseason strength source seeds the base. Every preseason game gets full analysis and its raw edges get shadow graded, nothing publishes. Weekly reviews during preseason must report the football shadow record per market. Go-live is a deliberate flip at the openers, NCAAF 2026-08-29 and NFL 2026-09-10: remove the sport from SHADOW_SPORTS and seed its multipliers from the preseason measured_k. Do not promote early on a hot preseason sample, and do not let the flip date slip silently.
 
 ## 3. Edge calibration
 
@@ -130,13 +130,17 @@ Trap record from the mv tier row (fade framing). If trap_signals is populated, g
 
 ## 5. Shadow sports and CLV
 
-Shadow promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded publishable picks (claimed edge 2pp or more) whose actual win rate meets or beats fair implied. One call returns everything:
+The shadow list as of 2026-08-30 is the soccer family plus NFL and NCAAF. Tennis was promoted 2026-08-10 and UFC on 2026-08-25, both at owner direction, and both publish through the normal ladder. A promoted sport is judged on its published record, its calibration, and its CLV, NEVER against the 75 publishable bar. Reporting a live sport as short of the bar is a reporting error, not a finding. `shadow_model_readiness()` still returns a UFC metrics block, that block is stale, read the Tennis block only for its in_production note.
+
+NCAAF was planned to flip out of the list at the 2026-08-29 opener and did NOT. It is still shadowed and publishing nothing, held back because 0-0 records make the calculator base 50/50 and would fabricate dog edges. Treat the flip as an open owner decision, not as done. NFL go-live is 2026-09-10.
+
+For the sports still in the list, promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded publishable picks (claimed edge 2pp or more) whose actual win rate meets or beats fair implied AND positive units. One call returns everything:
 
 ```sql
 select public.shadow_model_readiness();
 ```
 
-Report each model's publishable record against implied AND its units ("Tennis 30-7 on 37 publishable, 81.1 actual vs 78.2 implied, -0.28u, needs 75 and positive units"). Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record (the Aug 2026 lesson: the aggregate made Tennis look below-market while its publishable bucket was beating its own claims). And never judge on win rate alone: the same Tennis bucket won 81 percent and still lost units, because at heavy chalk the vig eats a 3 point edge. When a model calibrates well but cannot beat the vig, weigh the leg alternative in the promotion decision: it may belong in the Leg Pool feeding parlays, not the pick record. For CLV, the `pick_clv` view (shipped 2026-08-10) computes closing line value for every moneyline pick since 2026-07-11, joined by event id or kickoff instant. Canonical query:
+Report each still-shadowed model's publishable record against implied AND its units, in the form "48-33 on 81 publishable, 59.3 actual against 56.0 implied, plus 2.1u, needs 75 and positive units". Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record. The Aug 2026 lesson came from Tennis while it was still shadowed: the aggregate made it look below-market while its publishable bucket was beating its own claims, and that same bucket won 81 percent and still lost units, because at heavy chalk the vig eats a 3 point edge. Win rate alone is never enough. When a model calibrates well but cannot beat the vig, weigh the leg alternative in the promotion decision: it may belong in the Leg Pool feeding parlays, not the pick record. For CLV, the `pick_clv` view (shipped 2026-08-10) computes closing line value for every moneyline pick since 2026-07-11, joined by event id or kickoff instant. Canonical query:
 
 ```sql
 select tier, count(*) as n, round(avg(clv_pp), 2) as avg_clv_pp,
