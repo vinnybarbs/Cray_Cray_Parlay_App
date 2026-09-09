@@ -535,6 +535,12 @@ app.post('/cron/build-house-parlays', buildHouseParlays);
 const settleHouseParlays = require('./api/cron/settle-house-parlays');
 app.post('/cron/settle-house-parlays', settleHouseParlays);
 
+// Skills to Supabase: the cloud routines read .claude/skills from the
+// skills table, synced at every start (below) and on demand here.
+const syncSkillsEndpoint = require('./api/cron/sync-skills');
+app.post('/cron/sync-skills', syncSkillsEndpoint);
+const { syncSkills } = require('./lib/services/skill-sync');
+
 // Admin dashboard - protected by secret query param
 const { getAdminDashboard } = require('./api/admin-dashboard');
 app.get('/api/admin/dashboard', getAdminDashboard);
@@ -550,9 +556,12 @@ app.get('/api/digest', getDigest);
 app.get('/api/deep-research', deepResearch);
 
 app.listen(PORT, () => {
-  logger.info(`Backend server started`, { 
-    port: PORT, 
+  logger.info(`Backend server started`, {
+    port: PORT,
     environment: process.env.NODE_ENV || 'development',
     url: `http://localhost:${PORT}`
   });
+  // The deploy is the skill sync. Fail-soft, never blocks serving.
+  syncSkills({ source: 'server-start' }).catch(err =>
+    logger.error('Skill sync at start failed', { error: err.message }));
 });
