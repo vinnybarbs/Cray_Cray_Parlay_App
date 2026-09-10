@@ -22,6 +22,7 @@ const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
+const { applyPricePenalties } = require('../../lib/services/price-penalties.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
@@ -1802,32 +1803,45 @@ async function runPreAnalysis(sportSlugs) {
                 // cleared the pre-band gate, so it publishes at the
                 // ladder floor instead of wearing a non-published label.
                 let pickTier = (() => {
-                  const t = pickGrader.edgeTier(edgePp, pickOdds);
+                  const t = pickGrader.edgeTier(edgePp);
                   return t === 'Skip' ? 'Lean' : t;
                 })();
                 let pickReasoning = result.analysis_snippet;
-                // Same-team moneyline claims are the same opinion resampled,
-                // so a team on a graded losing streak this week costs the
-                // claim exposure_guard_pp (dial, 2pp) and the tier falls out
-                // of the adjusted claim (exposure-guard.js). The published
-                // edge_pp IS the adjusted claim, so the record scores what
-                // was actually published.
+                // Every rail is a pp deduction, the tier is nothing but the
+                // band of the adjusted claim, and the published edge_pp IS
+                // the adjusted claim so the record scores what was actually
+                // published (owner, 2026-09-10: "we score ourselves off pp").
+                // 1. Price rails (price-penalties.js): -150 or heavier
+                //    deducts chalk_penalty_pp, +300 or longer deducts
+                //    longshot_penalty_pp scaled by price. Dial board.
+                // 2. Exposure guard (exposure-guard.js): a team on two
+                //    straight graded moneyline losses this week costs the
+                //    claim exposure_guard_pp. Runs on the priced claim so
+                //    its bet-tier floor sees what would actually publish.
                 let publishedEdgePp = edgePp;
+                const priced = await applyPricePenalties(supabase, { sport: sportDisplay, edgePp, odds: pickOdds });
+                if (priced.applied) {
+                  console.log(`  💲 ${priced.reason}`);
+                  publishedEdgePp = priced.edgePp;
+                  pickReasoning = pickReasoning ? `${pickReasoning} ${priced.reason}` : priced.reason;
+                }
                 if (betType === 'Moneyline' && (isHomeMl || isAwayMl)) {
                   const guard = await applyExposureGuard(supabase, {
                     sport: sportDisplay,
                     team: isHomeMl ? game.home_team : game.away_team,
-                    edgePp,
+                    edgePp: publishedEdgePp,
                   });
                   if (guard.applied) {
                     console.log(`  🛑 ${guard.reason}`);
                     publishedEdgePp = guard.edgePp;
-                    pickTier = (() => {
-                      const t = pickGrader.edgeTier(publishedEdgePp, pickOdds);
-                      return t === 'Skip' ? 'Lean' : t;
-                    })();
                     pickReasoning = pickReasoning ? `${pickReasoning} ${guard.reason}` : guard.reason;
                   }
+                }
+                if (publishedEdgePp !== edgePp) {
+                  pickTier = (() => {
+                    const t = pickGrader.edgeTier(publishedEdgePp);
+                    return t === 'Skip' ? 'Lean' : t;
+                  })();
                 }
 
                 const sessionId = `auto_digest_${siteDay()}`;
@@ -1962,8 +1976,12 @@ async function runPreAnalysis(sportSlugs) {
                   const altPp = Math.round(altEdge * 1000) / 10;
                   const { betType, point } = deriveBetTypeAndPoint(alt.side, oddsCtx);
                   const altOdds = formatAmericanOdds(altOddsRaw);
+                  // The price rails deduct from spotlight claims too; the
+                  // published edge_pp is the adjusted claim.
+                  const altPriced = await applyPricePenalties(supabase, { sport: sportDisplay, edgePp: altPp, odds: altOdds });
+                  const altPublishedPp = altPriced.applied ? altPriced.edgePp : altPp;
                   const altTier = (() => {
-                    const t = pickGrader.edgeTier(altPp, altOdds);
+                    const t = pickGrader.edgeTier(altPublishedPp);
                     return t === 'Skip' ? 'Lean' : t;
                   })();
                   const altPayload = {
@@ -1972,12 +1990,12 @@ async function runPreAnalysis(sportSlugs) {
                     pick: altText,
                     point,
                     odds: altOdds,
-                    confidence: Math.min(10, Math.max(1, Math.round(altPp))),
-                    reasoning: `${betType} spotlight: this market cleared the publish gate on its own, independent of the headline read. ${result.analysis_snippet || ''}`.trim(),
-                    risk_level: altPp >= 8 ? 'Low' : 'Medium',
+                    confidence: Math.min(10, Math.max(1, Math.round(altPublishedPp))),
+                    reasoning: `${betType} spotlight: this market cleared the publish gate on its own, independent of the headline read. ${result.analysis_snippet || ''}${altPriced.applied ? ` ${altPriced.reason}` : ''}`.trim(),
+                    risk_level: altPublishedPp >= 8 ? 'Low' : 'Medium',
                     generate_mode: 'auto_digest',
                     pipeline_version: 6,
-                    edge_pp: altPp,
+                    edge_pp: altPublishedPp,
                     edge_pp_raw: altEdgeRaw != null ? Math.round(altEdgeRaw * 1000) / 10 : null,
                     tier: altTier,
                     model_prob: null,

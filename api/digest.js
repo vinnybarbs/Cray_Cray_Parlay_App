@@ -109,7 +109,7 @@ async function getDigest(req, res) {
       const key = `${game.home_team}|${game.away_team}`;
       const p = pickByMatchup.get(key);
       game.published_pick = p
-        ? { pick: p.pick, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at }
+        ? { pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at }
         : null;
       game.published_alts = altsByMatchup.get(key) || null;
     }

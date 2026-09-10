@@ -33,16 +33,58 @@ export function tierRange(label) {
   return t ? t.range : null
 }
 
-// Sharp Take chalk fence: no Sharp Take heavier than -150. Break-even at
-// -150 is 60 percent, and heavy-chalk claimed edges measured as mostly
-// vig (45d: chalk Sharp Takes +2.8u vs dog Sharp Takes +25.3u). Must
-// stay in lockstep with lib/services/pick-grader.js.
-const SHARP_TAKE_PRICE_FENCE = -150
+// The price rails as pp deductions (owner, 2026-09-10: "we should be
+// tweaking pp not adjusting tier label by feel"). Mirror of
+// lib/services/price-penalties.js with the same code defaults; the dial
+// board (sport_dials chalk_penalty_pp, longshot_penalty_pp) is the
+// source of truth on the server, and a published pick's edge_pp already
+// carries its deduction, so apply this ONLY to raw game_analysis reads
+// that have not been published, never to a stored edge_pp.
+export const CHALK_ODDS_FENCE = -150
+export const LONGSHOT_ODDS_FLOOR = 300
+export const DEFAULT_CHALK_PENALTY_PP = 3
+export const DEFAULT_LONGSHOT_PENALTY_PP = 6
+const LEAN_FLOOR_PP = 2
 
-// Longshot tier ceiling (owner rule 2026-09-02): a side priced +300 or
-// longer is never labeled above Lean, whatever the claimed edge. Mirror
-// of lib/services/pick-grader.js, see the rationale there.
-const LONGSHOT_TIER_CEILING_ODDS = 300
+function parseOdds(americanOdds) {
+  if (americanOdds == null) return null
+  const o = Number(String(americanOdds).replace(/[^0-9-]/g, ''))
+  return Number.isFinite(o) && o !== 0 ? o : null
+}
+
+// { edgePp, penaltyPp, kind, applied }: chalk at -150 or heavier deducts a
+// flat chalkPp; a longshot at +300 or longer deducts longshotPp scaled by
+// price over 300. Floors at the 2pp Lean gate, never touches Skip or Trap.
+export function pricePenaltyPp(edgePp, americanOdds, { chalkPp = DEFAULT_CHALK_PENALTY_PP, longshotPp = DEFAULT_LONGSHOT_PENALTY_PP } = {}) {
+  const none = { edgePp, penaltyPp: 0, kind: null, applied: false }
+  const pp = Number(edgePp)
+  if (!Number.isFinite(pp) || pp < LEAN_FLOOR_PP) return none
+  const o = parseOdds(americanOdds)
+  if (o == null) return none
+  let kind = null
+  let penaltyPp = 0
+  if (o < 0 && o <= CHALK_ODDS_FENCE) { kind = 'chalk'; penaltyPp = Number(chalkPp) }
+  else if (o >= LONGSHOT_ODDS_FLOOR) { kind = 'longshot'; penaltyPp = Number(longshotPp) * (o / LONGSHOT_ODDS_FLOOR) }
+  if (!kind || !Number.isFinite(penaltyPp) || penaltyPp <= 0) return none
+  penaltyPp = Math.round(penaltyPp * 10) / 10
+  const adjusted = Math.round(Math.max(LEAN_FLOOR_PP, pp - penaltyPp) * 10) / 10
+  if (adjusted === Math.round(pp * 10) / 10) return none
+  return { edgePp: adjusted, penaltyPp, kind, applied: true }
+}
+
+// The claim after the price rails, for raw (unpublished) reads.
+export function priceAdjustedPp(edgePp, americanOdds) {
+  return pricePenaltyPp(edgePp, americanOdds).edgePp
+}
+
+// The pp a game is scored on: the published pick's edge_pp when the row
+// exists (it already carries the exposure guard and price deductions),
+// otherwise the raw read with the price rails applied client side.
+export function finalPpFor(game) {
+  const published = game?.published_pick?.edge_pp
+  if (published != null && Number.isFinite(Number(published))) return Number(published)
+  return priceAdjustedPp(edgePpForSide(game?.edges, game?.recommended_side), lockOddsFor(game))
+}
 
 // Break-even win percentage for an American price: risk / (risk + win).
 // -150 needs 60.0, -180 needs 64.3, +122 needs only 45.0.
@@ -52,10 +94,12 @@ export function breakEvenPct(americanOdds) {
   return o > 0 ? 100 * 100 / (o + 100) : 100 * -o / (-o + 100)
 }
 
-// Tier label scheme from signed edge in percentage points, plus the price
-// fence when the pick's American odds are known.
+// Tier label scheme from signed edge in percentage points. The tier is
+// nothing but the pp band: price no longer moves labels here, it moves
+// the pp (pricePenaltyPp above) before the pp reaches this ladder. A
+// second argument is ignored on purpose.
 // Sharp-Quant aesthetic: graphite frame + amber/crimson signal accent.
-export function edgeTier(signedPp, americanOdds = null) {
+export function edgeTier(signedPp) {
   if (signedPp == null || Number.isNaN(signedPp)) {
     return { label: '-', subtitle: '', color: 'text-ink-400', bg: 'bg-ink-850 shadow-hairline' }
   }
@@ -68,10 +112,6 @@ export function edgeTier(signedPp, americanOdds = null) {
   if (signedPp < 2) {
     return { label: 'Skip', subtitle: 'pass on it', color: 'text-ink-300', bg: 'bg-ink-850 shadow-hairline' }
   }
-  const oCeil = americanOdds != null ? Number(String(americanOdds).replace(/[^0-9-]/g, '')) : null
-  if (oCeil != null && Number.isFinite(oCeil) && oCeil >= LONGSHOT_TIER_CEILING_ODDS) {
-    return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
-  }
   if (signedPp < 4) {
     return { label: 'Lean', subtitle: 'lean it', color: 'text-signal-pos/80', bg: 'bg-ink-850 shadow-hairline' }
   }
@@ -79,11 +119,6 @@ export function edgeTier(signedPp, americanOdds = null) {
     return { label: 'Play', subtitle: 'play it', color: 'text-signal-pos', bg: 'bg-ink-850 shadow-hairline' }
   }
   if (signedPp < 10) {
-    return { label: 'Strong Play', subtitle: 'strong play', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/25 shadow-hairline-pos' }
-  }
-  const o = americanOdds != null ? Number(String(americanOdds).replace(/[^0-9-]/g, '')) : null
-  // Fenced 10pp+ chalk drops one rung to Strong Play, mirror of pick-grader.
-  if (o != null && Number.isFinite(o) && o < 0 && o <= SHARP_TAKE_PRICE_FENCE) {
     return { label: 'Strong Play', subtitle: 'strong play', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/25 shadow-hairline-pos' }
   }
   return { label: 'Sharp Take', subtitle: 'sharp take', color: 'text-signal-pos', bg: 'bg-signal-pos-dim/40 shadow-hairline-pos-bright' }

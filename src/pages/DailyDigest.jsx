@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, breakEvenPct, SHADOW_SPORTS } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, breakEvenPct, SHADOW_SPORTS } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
@@ -282,7 +282,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                   legacy 0-10 edge_score. Showing both on one screen confused
                   users: "is it 12.3pp or 10/10?" The pp number is the truth;
                   edge_score is a saturated derivative of the same data. */}
-              <EdgeChip signedPp={edgePpForSide(analysis.edges, analysis.recommended_side)} odds={lockOddsFor(analysis)} shadow={SHADOW_DISPLAY.has(analysis.sport)} />
+              <EdgeChip signedPp={finalPpFor(analysis)} shadow={SHADOW_DISPLAY.has(analysis.sport)} />
               {analysis.edge_movement && (
                 <span className="text-sm flex items-center gap-1 text-ink-300">
                   Movement: {edgeMovementIcon(analysis.edge_movement)}
@@ -645,8 +645,11 @@ function DeepResearchModal({ gameKey, game, onClose }) {
 // Take" reads as a model take with documented hit-rate range, not as 10/10
 // confidence in a coin flip.
 
-function EdgeChip({ signedPp, odds = null, leg = false, size = 'md', shadow = false }) {
-  let tier = edgeTier(signedPp, odds)
+// signedPp is the FINAL claim (finalPpFor: the published edge_pp when the
+// row exists, else the raw read with the price rails applied), so the
+// number and the label always agree and nothing is penalized twice.
+function EdgeChip({ signedPp, leg = false, size = 'md', shadow = false }) {
+  let tier = edgeTier(signedPp)
   // A 65%+ side below the 2pp floor is a Leg, not a Skip. The tile body
   // already said so, but the corner chip contradicted it (2026-08-12:
   // "can't find any leg labels").
@@ -828,10 +831,11 @@ function TierPathNote({ published }) {
 function GameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
 
-  // Signed edge in pp for the recommended side. When the math returned a real
-  // pick, this reflects that bet's edge. When it didn't (no-edge game), we
-  // fall back to null so the chip renders "-".
-  const signedPp = edgePpForSide(game.edges, game.recommended_side)
+  // Signed edge in pp for the recommended side: the published claim when
+  // the pick row exists (it carries the price rails and the exposure guard
+  // as pp deductions), else the raw read with the price rails applied.
+  // When the math returned no pick this is null and the chip renders "-".
+  const signedPp = finalPpFor(game)
 
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden flex flex-col">
@@ -869,7 +873,6 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           </div>
           <EdgeChip
             signedPp={signedPp}
-            odds={lockOddsFor(game)}
             shadow={SHADOW_DISPLAY.has(sport)}
             leg={signedPp != null && signedPp < 2 && signedPp > -2
               && Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0) >= 0.65}
@@ -895,13 +898,13 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           // sport's read at +300 or longer is a recordless-team artifact,
           // not information, so it never wears the green Model Pick
           // banner: it renders as an explicit non-read. Live sports show
-          // their banner as usual, already capped at Lean by the tier
-          // ceiling.
+          // their banner as usual with the longshot price penalty already
+          // deducted from the claim (price-penalties.js).
           const railOdds = Number(String(lockOddsFor(game) ?? '').replace(/[^0-9-]/g, ''))
           if (game.recommended_pick && signedPp != null && signedPp >= 2
               && SHADOW_DISPLAY.has(sport) && Number.isFinite(railOdds) && railOdds >= 300) return (
             <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
-              <div className="font-mono text-[9px] text-ink-500 uppercase tracking-[0.14em] mb-0.5">No credible read · +300 or longer never rates above Lean</div>
+              <div className="font-mono text-[9px] text-ink-500 uppercase tracking-[0.14em] mb-0.5">No credible read · the longshot price penalty leaves +300 or longer at Lean</div>
               <div className="text-ink-400 font-mono text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
@@ -1136,7 +1139,9 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   // work is done and the data exists, so the user gets it all (Vince,
   // 2026-08-02). Traps are detector calls rendered as their OWN tiles,
   // independent of the pick, since one game can carry both.
-  const ppFor = (g) => edgePpForSide(g.edges, g.recommended_side)
+  // The final claim: the published edge_pp when the row exists, else the
+  // raw read with the price rails applied (tiers.js finalPpFor).
+  const ppFor = (g) => finalPpFor(g)
   // Best edge first, everywhere. Unsorted, the collapsed preview showed
   // the first three games by schedule and the section's headline chip
   // came from whichever game the API returned first (2026-08-12: a Lean
@@ -1147,7 +1152,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   // Tier-narrowed view when a tier chip is active.
   const pickGames = (filter === 'All' || filter === 'Legs' || filter === 'Traps')
     ? allPickGames
-    : allPickGames.filter(g => edgeTier(ppFor(g), lockOddsFor(g))?.label === filter)
+    : allPickGames.filter(g => edgeTier(ppFor(g))?.label === filter)
   const legOf = (g) => {
     const prob = Math.max(g.calc_home_prob ?? 0, g.calc_away_prob ?? 0)
     const pp = ppFor(g)
@@ -1185,7 +1190,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   const injuryCode = ANALYSIS_SPORT_TO_CODE[sport] || sport
   const injuryEntry = injuries[injuryCode]
   const topSignedPp = pickGames[0] ? ppFor(pickGames[0]) : null
-  const topTier = edgeTier(topSignedPp, pickGames[0] ? lockOddsFor(pickGames[0]) : null)
+  const topTier = edgeTier(topSignedPp)
 
   // Use game_key from the DB directly (returned by /api/digest)
   function getGameKey(game) {
@@ -1241,7 +1246,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
         >
           {topGames.map((game, i) => {
             const pp = ppFor(game)
-            const rawTier = edgeTier(pp, lockOddsFor(game))
+            const rawTier = edgeTier(pp)
             const tier = SHADOW_DISPLAY.has(sport)
               ? { ...rawTier, bg: 'bg-ink-850 shadow-hairline', color: 'text-ink-300' }
               : rawTier
@@ -1613,7 +1618,7 @@ export default function DailyDigest({ onBack }) {
   // 2026-08-18: "board sort is still buggy"). Volume breaks ties.
   const bestPickPp = (games) => games.reduce((best, g) => {
     if (!g.recommended_pick) return best
-    const pp = edgePpForSide(g.edges, g.recommended_side)
+    const pp = finalPpFor(g)
     return pp != null && pp > best ? pp : best
   }, -Infinity)
   const sportSections = data
@@ -1656,13 +1661,13 @@ export default function DailyDigest({ onBack }) {
           else if (alt?.tier === 'Play') c.plays++
           else if (alt?.tier === 'Lean') c.leans++
         }
-        const pp = edgePpForSide(g.edges, g.recommended_side)
+        const pp = finalPpFor(g)
         if (pp == null) continue
         // Four actionable tiers since the 2026-08-16 Strong Play restore:
         // Sharp Take 10+, Strong Play 7-10, Play 4-7, Lean 2-4. The count
-        // applies the same chalk fence as the tier chips. Legs mirror the
+        // scores the same final claim as the tier chips. Legs mirror the
         // SportSection legOf rule: no-edge games with a 65%+ side.
-        const label = edgeTier(pp, lockOddsFor(g))?.label
+        const label = edgeTier(pp)?.label
         if (label === 'Sharp Take') c.sharpTakes++
         else if (label === 'Strong Play') c.strongPlays++
         else if (label === 'Play') c.plays++
