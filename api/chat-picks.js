@@ -980,6 +980,7 @@ Return ONLY valid JSON array with this format:
       let edgePp = null, edgePpRaw = null, tier = null;
       try {
         const { sideForPick, edgeTier } = require('../lib/services/pick-grader.js');
+        const { applyPricePenalties } = require('../lib/services/price-penalties.js');
         const { data: ga } = await supabase
           .from('game_analysis')
           .select('edges, edges_raw')
@@ -1000,7 +1001,11 @@ Return ONLY valid JSON array with this format:
             edgePp = Math.round(signed * 1000) / 10;
             const raw = ga?.[0]?.edges_raw?.[side];
             edgePpRaw = raw != null ? Math.round(raw * 1000) / 10 : edgePp;
-            tier = edgeTier(edgePp, pick.odds);
+            // The price rails deduct from the claim; the stored edge_pp
+            // is the adjusted claim and the tier is its band.
+            const priced = await applyPricePenalties(supabase, { sport: pick.sport, edgePp, odds: pick.odds });
+            if (priced.applied) edgePp = priced.edgePp;
+            tier = edgeTier(edgePp);
           }
         }
       } catch { /* snapshot is best-effort, never block saving the pick */ }

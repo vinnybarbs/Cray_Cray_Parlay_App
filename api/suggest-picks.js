@@ -25,12 +25,17 @@ async function storeAISuggestions(suggestions, options = {}) {
     
     // Prepare suggestions for database
     const { edgeTier } = require('../lib/services/pick-grader.js');
-    const suggestionRecords = suggestions.map(suggestion => {
+    const { applyPricePenalties } = require('../lib/services/price-penalties.js');
+    const suggestionRecords = await Promise.all(suggestions.map(async suggestion => {
       // annotatePicksWithEdges puts edgePp/signedEdge on picks that were
       // graded against game_analysis.edges. Snapshot it so the pick row
       // carries its own edge even after the analysis cache regenerates.
-      const edgePp = suggestion.edgePp
+      // The price rails deduct from the claim first (price-penalties.js);
+      // the stored edge_pp is the adjusted claim and the tier is its band.
+      const rawPp = suggestion.edgePp
         ?? (suggestion.signedEdge != null ? Math.round(suggestion.signedEdge * 1000) / 10 : null);
+      const priced = await applyPricePenalties(supabase, { sport: suggestion.sport || 'NFL', edgePp: rawPp, odds: suggestion.odds });
+      const edgePp = priced.applied ? priced.edgePp : rawPp;
       return {
         session_id: sessionId,
         sport: suggestion.sport || 'NFL',
@@ -50,10 +55,10 @@ async function storeAISuggestions(suggestions, options = {}) {
         user_id: options.userId || null,
         pipeline_version: 6,
         edge_pp: edgePp,
-        edge_pp_raw: suggestion.edgePpRaw ?? edgePp,
-        tier: edgeTier(edgePp, suggestion.odds)
+        edge_pp_raw: suggestion.edgePpRaw ?? rawPp,
+        tier: edgeTier(edgePp)
       };
-    });
+    }));
 
     // Insert suggestions one by one, skipping exact dupes (unique index prevents them)
     let inserted = 0;
