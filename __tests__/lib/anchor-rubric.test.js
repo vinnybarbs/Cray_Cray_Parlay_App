@@ -55,6 +55,13 @@ describe('spread anchored margin (2026-09-10)', () => {
     expect(moved).toBeCloseTo(44.5 + 0.5 * (full - marketFromProb), 10);
   });
 
+  test('the final clamp never sits inside the market anchor', () => {
+    expect(calc._clampWinProb(0.995, null)).toBeCloseTo(0.98, 10);
+    expect(calc._clampWinProb(1.06, 0.9973)).toBeCloseTo(0.9973, 10);
+    expect(calc._clampWinProb(0.001, 0.005)).toBeCloseTo(0.005, 10);
+    expect(calc._clampWinProb(0.55, 0.62)).toBeCloseTo(0.55, 10);
+  });
+
   test('the spread alone implies a market win probability when no moneyline exists', () => {
     expect(calc._anchorFromSpread(-44.5, 16)).toBeCloseTo(0.9973, 3);
     expect(calc._anchorFromSpread(3, 13.5)).toBeCloseTo(0.412, 2);
