@@ -39,6 +39,30 @@ describe('_dampedModelMargin', () => {
   });
 });
 
+describe('spread anchored margin (2026-09-10)', () => {
+  const calc = new EdgeCalculator({});
+
+  test('a point spread anchors the market margin at the spread, not the moneyline', () => {
+    // ND -44.5, sigma 16: the moneyline-derived margin (from a 0.99 prob)
+    // sits near 37, the spread says 44.5. Agreeing with the market must
+    // return exactly the spread.
+    const agree = calc._dampedModelMargin(0.997, 0.997, 16, 0.5, 44.5);
+    expect(agree).toBeCloseTo(44.5, 10);
+    // A factor stack that disagrees moves off the spread by half its delta.
+    const full = calc._dampedModelMargin(0.95, null, 16);
+    const marketFromProb = calc._dampedModelMargin(0.997, null, 16);
+    const moved = calc._dampedModelMargin(0.95, 0.997, 16, 0.5, 44.5);
+    expect(moved).toBeCloseTo(44.5 + 0.5 * (full - marketFromProb), 10);
+  });
+
+  test('the spread alone implies a market win probability when no moneyline exists', () => {
+    expect(calc._anchorFromSpread(-44.5, 16)).toBeCloseTo(0.9973, 3);
+    expect(calc._anchorFromSpread(3, 13.5)).toBeCloseTo(0.412, 2);
+    expect(calc._anchorFromSpread(null, 16)).toBeNull();
+    expect(calc._anchorFromSpread(-3, 0)).toBeNull();
+  });
+});
+
 describe('the dial board', () => {
   const calc = new EdgeCalculator({});
 

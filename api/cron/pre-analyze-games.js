@@ -669,7 +669,7 @@ async function getInjuryContext(homeTeam, awayTeam) {
 /**
  * Get rankings context
  */
-async function getRankingsContext(homeTeam, awayTeam) {
+async function getRankingsContext(homeTeam, awayTeam, sport = null) {
   try {
     // Full-team-name match prevents collisions like "%Sox%" catching both
     // White Sox and Red Sox rows. Same rationale as edge-calculator.js.
@@ -682,10 +682,16 @@ async function getRankingsContext(homeTeam, awayTeam) {
     if (!homeQ || !awayQ) return result;
 
     // Primary source: current_standings (populated by sync-standings cron from ESPN)
-    const { data: standingsData } = await supabase
+    // Sport filter is mandatory: without it a college football game read
+    // the school's BASKETBALL standings (Rice at Notre Dame, 2026-09-12,
+    // showed 7-11 and 4-14 on a football tile), and the record then fed
+    // the fallback base blend when no moneyline existed to anchor.
+    let standingsQuery = supabase
       .from('current_standings')
       .select('team_name, wins, losses, ties, win_percentage, point_differential, streak, division_rank')
       .or(`team_name.ilike.%${homeQ}%,team_name.ilike.%${awayQ}%`);
+    if (sport) standingsQuery = standingsQuery.eq('sport', sport);
+    const { data: standingsData } = await standingsQuery;
 
     if (standingsData) {
       for (const s of standingsData) {
@@ -1363,7 +1369,7 @@ async function runPreAnalysis(sportSlugs) {
         const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx, tennisData, pitcherCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
           skipTeamCtx ? null : getInjuryContext(game.home_team, game.away_team),
-          skipTeamCtx ? Promise.resolve(emptyRankCtx) : getRankingsContext(game.home_team, game.away_team),
+          skipTeamCtx ? Promise.resolve(emptyRankCtx) : getRankingsContext(game.home_team, game.away_team, sportDisplay),
           skipTeamCtx ? null : getRecentResults(game.home_team, game.sport),
           skipTeamCtx ? null : getRecentResults(game.away_team, game.sport),
           getPastAccuracy(game.sport),
