@@ -539,7 +539,7 @@ app.post('/cron/settle-house-parlays', settleHouseParlays);
 // skills table, synced at every start (below) and on demand here.
 const syncSkillsEndpoint = require('./api/cron/sync-skills');
 app.post('/cron/sync-skills', syncSkillsEndpoint);
-const { syncSkills } = require('./lib/services/skill-sync');
+const { syncSkills, recordServerStart } = require('./lib/services/skill-sync');
 
 // Admin dashboard - protected by secret query param
 const { getAdminDashboard } = require('./api/admin-dashboard');
@@ -561,7 +561,11 @@ app.listen(PORT, () => {
     environment: process.env.NODE_ENV || 'development',
     url: `http://localhost:${PORT}`
   });
-  // The deploy is the skill sync. Fail-soft, never blocks serving.
-  syncSkills({ source: 'server-start' }).catch(err =>
-    logger.error('Skill sync at start failed', { error: err.message }));
+  // The deploy witness and the skill sync. Fail-soft, never blocks
+  // serving. The witness row carries the Railway commit so anyone can
+  // tell which build is serving from cron_job_logs alone; the skills
+  // table sync alone proved a false witness on 2026-09-10 when a build
+  // served for 90 minutes with its start sync never written.
+  recordServerStart().then(() => syncSkills({ source: 'server-start', retries: 3 })).catch(err =>
+    logger.error('Server start bookkeeping failed', { error: err.message }));
 });

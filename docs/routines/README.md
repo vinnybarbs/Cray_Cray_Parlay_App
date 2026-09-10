@@ -33,10 +33,13 @@ files from its folder.
 
 ## Telling which build is serving
 
-The skills table doubles as a deploy witness. `select name, sha256,
-synced_at, synced_from from skills` shows the moment the last server
-start synced (synced_from server-start) and the hash of each skill it
-carried. If a merge changed a skill and the hash has not moved after
-about five minutes, the deploy has not landed; POST /cron/sync-skills
-with the cron secret re-syncs from whatever build is serving, so an
-unchanged hash after that call is proof the old build still serves.
+Every server start writes one cron_job_logs row, job_name server-start,
+whose details carry the Railway commit sha, branch, and deployment id:
+`select created_at, details from cron_job_logs where job_name = 'server-start' order by created_at desc limit 3`.
+That is the deploy witness. Compare the commit against the latest
+main merge; a server-start older than the merge by more than 30
+minutes is a finding for the ops check. The skills table synced_at is
+secondary (its start sync is best effort with retries; on 2026-09-10 a
+build served for 90 minutes with the sync never written, which is why
+the witness moved to its own row). POST /cron/sync-skills with the
+cron secret re-syncs skills from whatever build is serving.
