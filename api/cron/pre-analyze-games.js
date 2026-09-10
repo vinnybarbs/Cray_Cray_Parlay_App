@@ -1274,7 +1274,7 @@ async function runPreAnalysis(sportSlugs) {
     // 2. Check which games already have analysis (fresh or stale)
     const { data: existingAnalysis } = await supabase
       .from('game_analysis')
-      .select('game_key, generated_at, stale, analysis_snippet, edge_score, analysis_version, recommended_pick, context_hash')
+      .select('game_key, generated_at, stale, analysis_snippet, edge_score, analysis_version, recommended_pick, context_hash, context_parts')
       .in('game_key', games.map(g => g.game_key));
 
     const existingKeys = new Set();
@@ -1290,7 +1290,8 @@ async function runPreAnalysis(sportSlugs) {
           prior_edge: ea.edge_score,
           prior_pick: ea.recommended_pick,
           version: ea.analysis_version || 1,
-          context_hash: ea.context_hash || null
+          context_hash: ea.context_hash || null,
+          context_parts: ea.context_parts || null
         };
       }
     }
@@ -1322,6 +1323,11 @@ async function runPreAnalysis(sportSlugs) {
     // 3. Analyze each game
     let analyzed = 0;
     let skippedUnchanged = 0;
+    // Which context input forced each re-narration, tallied per key for
+    // the run log. The per-input fingerprints alone could not answer it:
+    // game_analysis keeps one row per game, so by the time anyone looked
+    // the prior fingerprints were gone (ops checks, fifteen reports).
+    const changedKeyCounts = {};
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
     const errors = [];
@@ -1580,6 +1586,14 @@ async function runPreAnalysis(sportSlugs) {
           continue;
         }
 
+        // Name the inputs that differ from the prior version, at the one
+        // moment both fingerprint maps exist.
+        let contextChangedKeys = null;
+        if (prior && prior.context_parts && typeof prior.context_parts === 'object') {
+          contextChangedKeys = Object.keys(contextParts).filter(k => prior.context_parts[k] !== contextParts[k]);
+          for (const k of contextChangedKeys) changedKeyCounts[k] = (changedKeyCounts[k] || 0) + 1;
+        }
+
         // Model tiering by audience (owner decision 2026-08-19, cost).
         // Sonnet narrates anything a bettor acts on: a publishable pick
         // (pre-band 2pp+), a trap call, or a possible leg (65%+ side).
@@ -1669,6 +1683,7 @@ async function runPreAnalysis(sportSlugs) {
             stale: false,
             context_hash: contextHash,
             context_parts: contextParts,
+            context_changed_keys: contextChangedKeys,
             // Refinement loop fields
             analysis_version: prior ? prior.version + 1 : 1,
             prior_analysis: prior ? prior.prior_snippet : null,
@@ -2090,6 +2105,7 @@ async function runPreAnalysis(sportSlugs) {
           existing_fresh: existingKeys.size,
           analyzed,
           skipped_unchanged: skippedUnchanged,
+          changed_keys: changedKeyCounts,
           errors: errors.slice(0, 5),
           duration_ms: duration,
           cost: estimatedCost
