@@ -1,5 +1,9 @@
-const { applyExposureGuard, shouldDemote, demoteTier } = require('../../lib/services/exposure-guard');
+const { applyExposureGuard, shouldPenalize, _resetDialCache } = require('../../lib/services/exposure-guard');
 
+// The chain ends at limit() for the record lookup; the dial lookup ends at
+// eq(), which in this mock returns the builder (not a promise), so the
+// guard falls through to its 2pp default exactly as it would on a dial
+// read failure.
 function mockSupabase({ data = null, error = null, capture = {} } = {}) {
   const builder = {};
   const record = (name) => (...args) => {
@@ -15,62 +19,51 @@ function mockSupabase({ data = null, error = null, capture = {} } = {}) {
   return { from: record('from'), _capture: capture };
 }
 
-describe('demoteTier', () => {
-  test('steps one rung down the ladder', () => {
-    expect(demoteTier('Sharp Take')).toBe('Strong Play');
-    expect(demoteTier('Strong Play')).toBe('Play');
-    expect(demoteTier('Play')).toBe('Lean');
-  });
+beforeEach(() => _resetDialCache());
 
-  test('tiers off the ladder pass through', () => {
-    expect(demoteTier('Lean')).toBe('Lean');
-    expect(demoteTier('Trap')).toBe('Trap');
+describe('shouldPenalize', () => {
+  test('two straight losses', () => {
+    expect(shouldPenalize([{ actual_outcome: 'lost' }, { actual_outcome: 'lost' }])).toBe(true);
   });
-});
-
-describe('shouldDemote', () => {
-  test('two most recent losses trigger', () => {
-    expect(shouldDemote([{ actual_outcome: 'lost' }, { actual_outcome: 'lost' }])).toBe(true);
+  test('a cash anywhere in the last two clears it', () => {
+    expect(shouldPenalize([{ actual_outcome: 'won' }, { actual_outcome: 'lost' }])).toBe(false);
+    expect(shouldPenalize([{ actual_outcome: 'lost' }, { actual_outcome: 'won' }])).toBe(false);
   });
-
-  test('a cash in the last two clears the streak', () => {
-    expect(shouldDemote([{ actual_outcome: 'won' }, { actual_outcome: 'lost' }])).toBe(false);
-    expect(shouldDemote([{ actual_outcome: 'lost' }, { actual_outcome: 'won' }])).toBe(false);
-  });
-
-  test('thin history never demotes', () => {
-    expect(shouldDemote([{ actual_outcome: 'lost' }])).toBe(false);
-    expect(shouldDemote([])).toBe(false);
-    expect(shouldDemote(null)).toBe(false);
+  test('needs a full streak', () => {
+    expect(shouldPenalize([{ actual_outcome: 'lost' }])).toBe(false);
+    expect(shouldPenalize([])).toBe(false);
+    expect(shouldPenalize(null)).toBe(false);
   });
 });
 
 describe('applyExposureGuard', () => {
-  test('demotes a Sharp Take after back-to-back team losses', async () => {
+  test('deducts 2pp from the claim after back-to-back team losses', async () => {
     const supabase = mockSupabase({ data: [{ actual_outcome: 'lost' }, { actual_outcome: 'lost' }] });
-    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Houston Astros', tier: 'Sharp Take' });
-    expect(r.demoted).toBe(true);
-    expect(r.tier).toBe('Strong Play');
+    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Houston Astros', edgePp: 11.6 });
+    expect(r.applied).toBe(true);
+    expect(r.penaltyPp).toBe(2);
+    expect(r.edgePp).toBeCloseTo(9.6, 10);
     expect(r.reason).toContain('Houston Astros');
+    expect(r.reason).toContain('11.6 to 9.6');
     expect(supabase._capture.ilike[0]).toEqual(['pick', 'Houston Astros %']);
   });
 
-  test('leaves the tier alone when the team just cashed', async () => {
+  test('leaves the claim alone when the team just cashed', async () => {
     const supabase = mockSupabase({ data: [{ actual_outcome: 'won' }, { actual_outcome: 'lost' }] });
-    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Houston Astros', tier: 'Sharp Take' });
-    expect(r).toEqual({ tier: 'Sharp Take', demoted: false, reason: null });
+    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Houston Astros', edgePp: 11.6 });
+    expect(r).toEqual({ edgePp: 11.6, penaltyPp: 0, applied: false, reason: null });
   });
 
-  test('only bet tiers are demotable, and lower tiers skip the query', async () => {
+  test('research labels under 4pp are never penalized, and skip the query', async () => {
     const supabase = mockSupabase({ data: [{ actual_outcome: 'lost' }, { actual_outcome: 'lost' }] });
-    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Colorado Rockies', tier: 'Play' });
-    expect(r).toEqual({ tier: 'Play', demoted: false, reason: null });
+    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Colorado Rockies', edgePp: 3.5 });
+    expect(r).toEqual({ edgePp: 3.5, penaltyPp: 0, applied: false, reason: null });
     expect(supabase._capture.from).toBeUndefined();
   });
 
   test('fails soft on query error', async () => {
     const supabase = mockSupabase({ error: { message: 'down' } });
-    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Houston Astros', tier: 'Strong Play' });
-    expect(r).toEqual({ tier: 'Strong Play', demoted: false, reason: null });
+    const r = await applyExposureGuard(supabase, { sport: 'MLB', team: 'Houston Astros', edgePp: 8.0 });
+    expect(r).toEqual({ edgePp: 8.0, penaltyPp: 0, applied: false, reason: null });
   });
 });

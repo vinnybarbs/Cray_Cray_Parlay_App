@@ -1808,16 +1808,24 @@ async function runPreAnalysis(sportSlugs) {
                 let pickReasoning = result.analysis_snippet;
                 // Same-team moneyline claims are the same opinion resampled,
                 // so a team on a graded losing streak this week costs the
-                // claim one rung until it cashes (exposure-guard.js).
+                // claim exposure_guard_pp (dial, 2pp) and the tier falls out
+                // of the adjusted claim (exposure-guard.js). The published
+                // edge_pp IS the adjusted claim, so the record scores what
+                // was actually published.
+                let publishedEdgePp = edgePp;
                 if (betType === 'Moneyline' && (isHomeMl || isAwayMl)) {
                   const guard = await applyExposureGuard(supabase, {
                     sport: sportDisplay,
                     team: isHomeMl ? game.home_team : game.away_team,
-                    tier: pickTier,
+                    edgePp,
                   });
-                  if (guard.demoted) {
+                  if (guard.applied) {
                     console.log(`  🛑 ${guard.reason}`);
-                    pickTier = guard.tier;
+                    publishedEdgePp = guard.edgePp;
+                    pickTier = (() => {
+                      const t = pickGrader.edgeTier(publishedEdgePp, pickOdds);
+                      return t === 'Skip' ? 'Lean' : t;
+                    })();
                     pickReasoning = pickReasoning ? `${pickReasoning} ${guard.reason}` : guard.reason;
                   }
                 }
@@ -1840,7 +1848,7 @@ async function runPreAnalysis(sportSlugs) {
                   // Calibration fits key off the regime boundary date so
                   // old-regime claims never grade new-regime labels.
                   pipeline_version: 7,
-                  edge_pp: edgePp,
+                  edge_pp: publishedEdgePp,
                   edge_pp_raw: sideEdgeRaw != null ? Math.round(sideEdgeRaw * 1000) / 10 : null,
                   tier: pickTier,
                   model_prob: isHomeMl ? edgeData?.homeWinProb ?? null
