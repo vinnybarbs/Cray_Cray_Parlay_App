@@ -30,3 +30,13 @@ Each routine files exactly one agent_reports row and begins it with
 ran on. The account skill copies and the desktop project's skills save
 no longer matter to the routines; the desktop project reads the same
 files from its folder.
+
+## Telling which build is serving
+
+The skills table doubles as a deploy witness. `select name, sha256,
+synced_at, synced_from from skills` shows the moment the last server
+start synced (synced_from server-start) and the hash of each skill it
+carried. If a merge changed a skill and the hash has not moved after
+about five minutes, the deploy has not landed; POST /cron/sync-skills
+with the cron secret re-syncs from whatever build is serving, so an
+unchanged hash after that call is proof the old build still serves.
