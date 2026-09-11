@@ -96,3 +96,23 @@ describe('standingsFromGames', () => {
     expect(rf.standingsFromGames([], 'Boston Red Sox')).toBeNull();
   });
 });
+
+describe('parseVariants and dial overrides', () => {
+  test('parses names, kinds, and dial maps', () => {
+    expect(rf.parseVariants('july:july;base:current;chalk5:current:chalk_penalty_pp=5,spread_claim_damp=0.25;bad:nope'))
+      .toEqual([
+        { name: 'july', kind: 'july', dials: {} },
+        { name: 'base', kind: 'current', dials: {} },
+        { name: 'chalk5', kind: 'current', dials: { chalk_penalty_pp: 5, spread_claim_damp: 0.25 } },
+      ]);
+  });
+  test('the live calculator honors overrides ahead of the board', () => {
+    const { EdgeCalculator } = require('../../lib/services/edge-calculator');
+    const calc = new EdgeCalculator({});
+    const dials = new Map([['MLB|spread_claim_damp', 0.5]]);
+    expect(calc._dial(dials, 'MLB', 'spread_claim_damp')).toBe(0.5);
+    calc.dialOverrides = { spread_claim_damp: 0.25 };
+    expect(calc._dial(dials, 'MLB', 'spread_claim_damp')).toBe(0.25);
+    expect(calc._dial(dials, 'MLB', 'form_weight')).toBe(0);
+  });
+});
