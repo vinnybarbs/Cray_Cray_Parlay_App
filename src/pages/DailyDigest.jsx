@@ -662,16 +662,20 @@ function EdgeChip({ signedPp, leg = false, size = 'md', shadow = false }) {
   if (shadow) {
     tier = { label: 'Shadow', subtitle: 'publishes at go-live', color: 'text-ink-300', bg: 'bg-ink-850 shadow-hairline' }
   }
-  const pp = formatPp(signedPp)
-  const isNeg = signedPp != null && signedPp < 0
-  const isPos = signedPp != null && signedPp > 0
+  // A shadow sport's number is withheld along with its label (owner,
+  // 2026-09-11: recordless week-2 reads are not information, "almost
+  // just shouldn't show anything"). The read is stored for the shadow
+  // record; the board shows it at go-live.
+  const pp = shadow ? null : formatPp(signedPp)
+  const isNeg = !shadow && signedPp != null && signedPp < 0
+  const isPos = !shadow && signedPp != null && signedPp > 0
   const arrow = isPos ? '▲' : isNeg ? '▼' : '·'
   const padding = size === 'sm' ? 'px-2 py-1' : 'px-2.5 py-1.5'
   const ppSize = size === 'sm' ? 'text-[11px]' : 'text-sm'
-  const ppTooltip = pp == null
-    ? 'No model edge available for this side'
-    : shadow
-      ? `${pp} · Shadow read. This sport is in shadow mode: the model's edge shows for transparency, but nothing publishes or grades until go-live`
+  const ppTooltip = shadow
+    ? 'Shadow read. The model grades this sport into its shadow record, and the numbers show on the board at go-live'
+    : pp == null
+      ? 'No model edge available for this side'
       : `${pp} · ${tier.label}. The gap between the model's win-probability and the book's implied probability, in percentage points`
   return (
     <div
@@ -694,14 +698,27 @@ function EdgeChip({ signedPp, leg = false, size = 'md', shadow = false }) {
 // signed edges. Math-recommended side is highlighted. Below ±2pp we render
 // the value muted so users see "no edge" rather than mistaking 0.4pp for a play.
 
-function MarketRow({ sides, recommendedSide }) {
+// A two way market has ONE edge. The devigged sides sum to one, so the
+// other side's number is always the exact mirror and reads as a second,
+// opposite claim ("all we've done is match and opposite the edge",
+// owner 2026-09-10). The number renders on the side the model leans to
+// and the mirror side shows a dot. Shadow sports withhold the number on
+// both sides (owner 2026-09-11) and say so once under the rows.
+function MarketRow({ sides, recommendedSide, shadow = false }) {
   const hasAnyEdge = sides.some(s => s.signedPp != null)
+  const leanSide = (() => {
+    const known = sides.filter(s => s.signedPp != null)
+    if (known.length === 0) return null
+    const best = known.reduce((a, b) => (b.signedPp > a.signedPp ? b : a))
+    return known.some(s => s !== best && s.signedPp === best.signedPp) ? null : best.side
+  })()
   return (
     <div className="rounded-sharp bg-ink-850 shadow-hairline px-3 py-2">
       <div className="space-y-1">
         {sides.map(s => {
           const tier = edgeTier(s.signedPp)
-          const isPick = s.side === recommendedSide
+          const isPick = !shadow && s.side === recommendedSide
+          const isLean = s.side === leanSide
           const muted = s.signedPp == null || Math.abs(s.signedPp) < 2
           return (
             <div key={s.side} className="flex items-center justify-between gap-3 text-xs">
@@ -711,7 +728,16 @@ function MarketRow({ sides, recommendedSide }) {
                   {s.text}
                 </span>
               </div>
-              {s.calMuted ? (
+              {shadow ? (
+                <span className="flex-shrink-0 font-mono text-[11px] text-ink-600" title="Shadow read, the number shows at go-live">·</span>
+              ) : !isLean ? (
+                <span
+                  className="flex-shrink-0 font-mono text-[11px] text-ink-600"
+                  title="The mirror of the other side. A two way market has one edge, shown on the side the model leans to"
+                >
+                  ·
+                </span>
+              ) : s.calMuted ? (
                 // The model graded this side, but weekly calibration measured
                 // this market's edge at zero predictive value for this sport,
                 // so it carries no weight. A flat +0.0pp read as a bug
@@ -734,11 +760,16 @@ function MarketRow({ sides, recommendedSide }) {
           )
         })}
       </div>
+      {shadow && (
+        <div className="font-mono text-[10px] text-ink-500 mt-1.5 italic">
+          Shadow read stored for the record. Numbers show at go-live.
+        </div>
+      )}
     </div>
   )
 }
 
-function MarketTabs({ game }) {
+function MarketTabs({ game, shadow = false }) {
   const { edges, edges_raw: edgesRaw, recommended_side } = game
   // Calibration-muted: the raw model computed a real edge but the
   // calibrated value is exactly zero, meaning the market's multiplier is
@@ -799,6 +830,7 @@ function MarketTabs({ game }) {
       <MarketRow
         sides={sidesByTab[activeTab] || []}
         recommendedSide={recommended_side}
+        shadow={shadow}
       />
     </div>
   )
@@ -887,25 +919,21 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
         {(() => {
           const legProb = Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0)
           const isLegGame = signedPp != null && signedPp < 2 && signedPp > -2 && legProb >= 0.65
+          // A shadow sport shows no read at all (owner, 2026-09-11: the
+          // week-2 NCAAF reads off 0-0 records are mirrors and noise,
+          // "almost just shouldn't show anything"). The read is still
+          // computed and graded into the shadow record that decides
+          // go-live; the board withholds it until then.
+          if (SHADOW_DISPLAY.has(sport)) return (
+            <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
+              <div className="font-mono text-[9px] text-ink-500 uppercase tracking-[0.14em] mb-0.5">Shadow · read withheld until go-live</div>
+              <div className="font-mono text-[11px] text-ink-400">Graded into the shadow record, not shown, not bettable.</div>
+            </div>
+          )
           if (game.recommended_pick && signedPp != null && signedPp <= -2) return (
             <div className="bg-signal-neg-dim/30 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-signal-neg/40">
               <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">Trap · fade this side</div>
               <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
-            </div>
-          )
-          // The longshot rail on the shadow surface (owner, 2026-09-02:
-          // "why do I still see +1400 on the board for ncaaf"). A shadow
-          // sport's read at +300 or longer is a recordless-team artifact,
-          // not information, so it never wears the green Model Pick
-          // banner: it renders as an explicit non-read. Live sports show
-          // their banner as usual with the longshot price penalty already
-          // deducted from the claim (price-penalties.js).
-          const railOdds = Number(String(lockOddsFor(game) ?? '').replace(/[^0-9-]/g, ''))
-          if (game.recommended_pick && signedPp != null && signedPp >= 2
-              && SHADOW_DISPLAY.has(sport) && Number.isFinite(railOdds) && railOdds >= 300) return (
-            <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
-              <div className="font-mono text-[9px] text-ink-500 uppercase tracking-[0.14em] mb-0.5">No credible read · the longshot price penalty leaves +300 or longer at Lean</div>
-              <div className="text-ink-400 font-mono text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
           if (game.recommended_pick && signedPp != null && signedPp >= 2) return (
@@ -984,7 +1012,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
 
         {/* Per-market tabs */}
         <div className="mb-3">
-          <MarketTabs game={game} />
+          <MarketTabs game={game} shadow={SHADOW_DISPLAY.has(sport)} />
         </div>
 
         {/* Analysis snippet (expandable) */}
@@ -1216,11 +1244,9 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                 {trapEntries.length > 0 && <span className="text-signal-neg"> · {trapEntries.length} trap{trapEntries.length !== 1 ? 's' : ''}</span>}
                 {bubbleGames.length > 0 && <span className="text-ink-500"> · {bubbleGames.length} on the bubble</span>}
                 {upcomingCount > 0 && <span className="text-ink-500"> · {upcomingCount} next 24h</span>}
-                {!expanded && topSignedPp != null && (
+                {!expanded && topSignedPp != null && !SHADOW_DISPLAY.has(sport) && (
                   <span className="ml-2 text-ink-500">
-                    · Top: {SHADOW_DISPLAY.has(sport)
-                      ? <span className="font-semibold text-ink-300">{formatPp(topSignedPp)} shadow read</span>
-                      : <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>}
+                    · Top: <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>
                   </span>
                 )}
               </p>
@@ -1258,12 +1284,12 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-0.5 gap-x-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
-                    {formatPp(pp) ?? '-'}
+                    {SHADOW_DISPLAY.has(sport) ? 'Shadow' : (formatPp(pp) ?? '-')}
                   </span>
                   <span className="text-ink-200 truncate">{game.away_team} @ {game.home_team}</span>
                 </div>
-                <span className="font-mono text-signal-pos text-xs font-medium flex-shrink-0 truncate sm:max-w-[140px] tabular-nums pl-9 sm:pl-0">
-                  {game.recommended_pick || '-'}
+                <span className={`font-mono text-xs font-medium flex-shrink-0 truncate sm:max-w-[140px] tabular-nums pl-9 sm:pl-0 ${SHADOW_DISPLAY.has(sport) ? 'text-ink-500' : 'text-signal-pos'}`}>
+                  {SHADOW_DISPLAY.has(sport) ? 'read withheld' : (game.recommended_pick || '-')}
                 </span>
               </div>
             )
