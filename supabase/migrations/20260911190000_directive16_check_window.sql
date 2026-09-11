@@ -7,7 +7,7 @@
 -- since PR 149 the marker lands even when the claim already sits at the
 -- Lean floor and nothing comes off.
 UPDATE directives SET updated_at = now(),
-  check_sql = 'select id, sport, tier, odds, edge_pp, edge_pp_raw from ai_suggestions where voided_at is null and session_id like ''auto_digest%'' and created_at > ''2026-09-11 09:30:00-06'' and odds ~ ''^[+-]?[0-9]+$'' and tier in (''Sharp Take'',''Strong Play'',''Play'',''Lean'') and ((odds::numeric <= -150 and reasoning not like ''%Chalk price:%'') or (odds::numeric >= 300 and reasoning not like ''%Longshot price:%''))'
+  check_sql = 'select id, sport, tier, odds, edge_pp, edge_pp_raw from ai_suggestions where voided_at is null and session_id like ''auto_digest%'' and created_at > ''2026-09-11 11:00:00-06'' and odds ~ ''^[+-]?[0-9]+$'' and tier in (''Sharp Take'',''Strong Play'',''Play'',''Lean'') and ((odds::numeric <= -150 and reasoning not like ''%Chalk price:%'') or (odds::numeric >= 300 and reasoning not like ''%Longshot price:%''))'
 WHERE id = 16;
 
 UPDATE build_queue SET updated_at = now(), status = 'open', priority = 'high',
