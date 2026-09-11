@@ -68,7 +68,8 @@ export function pricePenaltyPp(edgePp, americanOdds, { chalkPp = DEFAULT_CHALK_P
   if (!kind || !Number.isFinite(penaltyPp) || penaltyPp <= 0) return none
   penaltyPp = Math.round(penaltyPp * 10) / 10
   const adjusted = Math.round(Math.max(LEAN_FLOOR_PP, pp - penaltyPp) * 10) / 10
-  if (adjusted === Math.round(pp * 10) / 10) return none
+  // Railed but already at the Lean floor: applied, nothing comes off.
+  if (adjusted === Math.round(pp * 10) / 10) return { edgePp, penaltyPp: 0, kind, applied: true }
   return { edgePp: adjusted, penaltyPp, kind, applied: true }
 }
 

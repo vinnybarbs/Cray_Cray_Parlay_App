@@ -37,6 +37,13 @@ describe('pricePenaltyPp', () => {
     expect(edgeTier(pricePenaltyPp(4, '+1300').edgePp)).toBe('Lean');
   });
 
+  test('a railed claim already at the floor keeps its marker with a zero deduction', () => {
+    const r = pricePenaltyPp(2.0, '-410');
+    expect(r).toMatchObject({ edgePp: 2.0, penaltyPp: 0, kind: 'chalk', applied: true });
+    expect(r.reason).toContain('Chalk price');
+    expect(r.reason).toContain('no deduction');
+  });
+
   test('skips and traps are not priced, they are not picks', () => {
     expect(pricePenaltyPp(1, '+1300').applied).toBe(false);
     expect(pricePenaltyPp(-5, '-200').applied).toBe(false);

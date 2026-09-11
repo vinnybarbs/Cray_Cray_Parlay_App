@@ -19,7 +19,7 @@ const grader = require('../../lib/services/pick-grader');
 
 describe('frontend price penalty mirror', () => {
   const ui = loadTiers();
-  const cases = [[12, '-160'], [12, '-150'], [12, '-149'], [9, '+300'], [15, '+450'], [15, '+1300'], [2.5, '-200'], [4, '+1300'], [1, '+1300'], [-5, '-200'], [12, null]];
+  const cases = [[12, '-160'], [12, '-150'], [12, '-149'], [9, '+300'], [15, '+450'], [15, '+1300'], [2.5, '-200'], [4, '+1300'], [2.0, '-410'], [1, '+1300'], [-5, '-200'], [12, null]];
   test.each(cases)('pp %s at %s', (pp, odds) => {
     const b = backend.pricePenaltyPp(pp, odds);
     const f = ui.pricePenaltyPp(pp, odds);
