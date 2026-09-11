@@ -73,3 +73,26 @@ describe('JULY_MULTIPLIERS', () => {
     expect(rf.JULY_MULTIPLIERS['MLB:spread']).toBe(0.6);
   });
 });
+
+describe('standingsFromGames', () => {
+  const g = (h, a, hs, as, d) => ({ home_team_name: h, away_team_name: a, home_score: hs, away_score: as, date: d });
+  test('season record, venue splits, last ten, and streak from the games before the date', () => {
+    const rows = [
+      g('Boston Red Sox', 'Kansas City Royals', 5, 3, '2026-09-10'),
+      g('Boston Red Sox', 'Kansas City Royals', 4, 1, '2026-09-09'),
+      g('New York Yankees', 'Boston Red Sox', 6, 2, '2026-09-08'),
+      g('New York Yankees', 'Boston Red Sox', 1, 7, '2026-09-07'),
+    ];
+    const s = rf.standingsFromGames(rows, 'Boston Red Sox');
+    expect(s.record).toBe('3-1');
+    expect(s.home_record).toBe('2-0');
+    expect(s.away_record).toBe('1-1');
+    expect(s.streak).toBe('W2');
+    expect(s.last_10).toBe('3-1');
+    expect(s.win_percentage).toBe('0.750');
+    expect(s.playoff_seed).toBeNull();
+  });
+  test('no games is null', () => {
+    expect(rf.standingsFromGames([], 'Boston Red Sox')).toBeNull();
+  });
+});
