@@ -38,9 +38,13 @@ async function loadDials() {
   return dials;
 }
 
-async function log(status, details) {
+// The grade pass logs under its own cron name so the ops check finds it
+// where it expects it (2026-09-11: it looked for grade-nfl-props rows
+// and called the job a silent witness while the row sat under
+// analyze-nfl-props).
+async function log(status, details, jobName = 'analyze-nfl-props') {
   try {
-    await supabase.from('cron_job_logs').insert({ job_name: 'analyze-nfl-props', status, details: JSON.stringify(details) });
+    await supabase.from('cron_job_logs').insert({ job_name: jobName, status, details: JSON.stringify(details) });
   } catch { /* best effort */ }
 }
 
@@ -173,7 +177,7 @@ async function runGrade() {
     .not('season', 'is', null);
   if (error) throw error;
   summary.pending = (pending || []).length;
-  if (summary.pending === 0) { await log('completed', { ...summary, duration_ms: Date.now() - started }); return summary; }
+  if (summary.pending === 0) { await log('completed', { ...summary, duration_ms: Date.now() - started }, 'grade-nfl-props'); return summary; }
 
   const keys = [...new Set(pending.map(p => p.player_key))];
   const seasons = [...new Set(pending.map(p => p.season))];
@@ -200,7 +204,7 @@ async function runGrade() {
     summary[outcome]++;
   }
   summary.duration_ms = Date.now() - started;
-  await log(summary.errors.length ? 'partial' : 'completed', summary);
+  await log(summary.errors.length ? 'partial' : 'completed', summary, 'grade-nfl-props');
   return summary;
 }
 
@@ -214,7 +218,7 @@ async function analyzeNflProps(req, res) {
       if (mode === 'grade') await runGrade(); else await runRead();
     } catch (err) {
       console.error('analyze-nfl-props error:', err.message);
-      await log('failed', { mode, error: err.message });
+      await log('failed', { mode, error: err.message }, mode === 'grade' ? 'grade-nfl-props' : 'analyze-nfl-props');
     }
   })();
 }
