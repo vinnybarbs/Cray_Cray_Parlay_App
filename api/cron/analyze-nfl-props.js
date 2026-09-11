@@ -51,14 +51,25 @@ async function runRead() {
   const now = new Date();
   const horizon = new Date(now.getTime() + WINDOW_HOURS * 3600 * 1000);
 
-  const { data: props, error } = await supabase
-    .from('player_props')
-    .select('event_id, commence_time, home_team, away_team, market, player_name, player_key, line, over_price, under_price, yes_price, bookmaker')
-    .eq('sport', SPORT)
-    .gt('commence_time', now.toISOString())
-    .lt('commence_time', horizon.toISOString());
-  if (error) throw error;
-  summary.props = (props || []).length;
+  // A week of NFL props across 8 books is several thousand rows, past
+  // the 1000 row default page, so page explicitly (the first live run
+  // read 1000 of 5157 and priced 230 of the week's groups).
+  const props = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('player_props')
+      .select('event_id, commence_time, home_team, away_team, market, player_name, player_key, line, over_price, under_price, yes_price, bookmaker')
+      .eq('sport', SPORT)
+      .gt('commence_time', now.toISOString())
+      .lt('commence_time', horizon.toISOString())
+      .order('id', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw error;
+    props.push(...(data || []));
+    if (!data || data.length < 1000) break;
+  }
+  summary.props = props.length;
+  summary.thin_books = 0;
 
   // Group by event, market, player.
   const groups = new Map();
@@ -91,6 +102,7 @@ async function runRead() {
     if (!(meta.market in propEdge.STAT_COLUMN)) { summary.not_modeled++; continue; }
     const consensus = propEdge.consensusFromBooks(rows);
     if (!consensus) { summary.no_consensus++; continue; }
+    if (consensus.books < Math.max(1, Number(dials.prop_min_books))) { summary.thin_books++; continue; }
     const baseline = propEdge.playerBaseline(history.get(meta.player_key) || [], meta.market, dials);
     if (!baseline) { summary.no_history++; continue; }
     const read = propEdge.propRead({
