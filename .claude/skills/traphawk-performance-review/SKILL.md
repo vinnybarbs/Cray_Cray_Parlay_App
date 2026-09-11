@@ -146,7 +146,7 @@ Passes all three: propose the exact number, damped to at most 25 percent of the 
 
 Every applied move is written to sport_dials AND logged to model_weight_changes with before, after, and the evidence, by the code-shipping session, never by a review agent directly.
 
-Current dials at protocol ship (2026-09-08): form_weight 0 ('__all__'), pitcher_anchor_damp 0.5 (MLB), spread_claim_damp 0.5 ('__all__'), venue_weight 0.25 ('__all__') and 0.3125 (MLB), sos_sensitivity 0.15, max_net_adjustment 0.15.
+Current dials at protocol ship (2026-09-08): form_weight 0 ('__all__'), pitcher_anchor_damp 0.5 (MLB), spread_claim_damp 0.5 ('__all__'), total_claim_damp (2026-09-11: MLB 1, football and off-season sports 0.5, times a season sample confidence of min(1, games/5); totals anchor at the book total and the PPG model argues off it), venue_weight 0.25 ('__all__') and 0.3125 (MLB), sos_sensitivity 0.15, max_net_adjustment 0.15.
 
 THE STAGING RULE, non-negotiable: this table changes no coefficients. A nudge proposal requires the same direction on n of at least 50 across two consecutive Monday reviews, moves one factor at a time by at most 25 percent of its current weight, and ships only with the owner's explicit approval on the specific number. Track proposals and their outcomes here in the review so the loop's own record is auditable. First baseline (2026-08-24, clean era, MLB): every active factor positive (venue 7.4 on 129, home_adv 3.2 on 93, seed 1.3 on 92, pitcher 3.8 on 41), injury dead at -0.03, consistent with the replay's finding that the adjustments help while the base blend is what disagrees with the market wrongly.
 

@@ -99,3 +99,40 @@ describe('the dial board', () => {
     expect(dialed).toBeCloseTo(0.10 * 0.35, 10);
   });
 });
+
+describe('totals step one (2026-09-11): the book total is the anchor', () => {
+  const calc = new EdgeCalculator({});
+
+  test('a full season at damp 1 prices the raw scoring total exactly as before', () => {
+    const r = calc._anchoredModelTotal(9.4, 8.5, 1, 140);
+    expect(r.modeledTotal).toBeCloseTo(9.4, 10);
+    expect(r.confidence).toBe(1);
+  });
+
+  test('damp 0.5 prices half the disagreement with the book', () => {
+    const r = calc._anchoredModelTotal(60.5, 56.5, 0.5, 12);
+    expect(r.modeledTotal).toBeCloseTo(58.5, 10);
+  });
+
+  test('a week-2 college total off one game barely moves off the book', () => {
+    // Louisville, 56.5 book, scoring model 78 off a single blowout: the
+    // old path claimed 35pp raw. Damp 0.5 times confidence 0.2 keeps 10
+    // percent of the disagreement.
+    const r = calc._anchoredModelTotal(78, 56.5, 0.5, 1);
+    expect(r.confidence).toBeCloseTo(0.2, 10);
+    expect(r.modeledTotal).toBeCloseTo(56.5 + 0.1 * 21.5, 10);
+    expect(calc._anchoredModelTotal(78, 56.5, 0.5, 0).modeledTotal).toBeCloseTo(56.5, 10);
+  });
+
+  test('agreeing with the book changes nothing at any damp', () => {
+    expect(calc._anchoredModelTotal(50.5, 50.5, 0.3, 2).modeledTotal).toBeCloseTo(50.5, 10);
+  });
+
+  test('no book total means no anchor, the scoring total stands', () => {
+    expect(calc._anchoredModelTotal(52, null, 0.5, 3).modeledTotal).toBe(52);
+  });
+
+  test('the dial default is 1 so an unseeded sport reproduces shipped behavior', () => {
+    expect(calc._dial(null, 'MLB', 'total_claim_damp')).toBe(1);
+  });
+});
