@@ -49,6 +49,9 @@ describe('playerBaseline', () => {
     expect(b.mean).toBeCloseTo(300, 6);
     expect(b.games).toBe(2);
   });
+  test('the dial board carries a minimum book count for a consensus', () => {
+    expect(pe.DIAL_DEFAULTS.prop_min_books).toBe(2);
+  });
   test('no history or an unmodeled market is null', () => {
     expect(pe.playerBaseline([], 'player_pass_yds')).toBeNull();
     expect(pe.playerBaseline(log([1]), 'player_anytime_td')).toBeNull();
