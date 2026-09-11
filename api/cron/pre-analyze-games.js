@@ -23,6 +23,7 @@ const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 const { applyPricePenalties } = require('../../lib/services/price-penalties.js');
+const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
@@ -1549,8 +1550,13 @@ async function runPreAnalysis(sportSlugs) {
         // pick, and trap calls. Any line move, injury note, or intel row
         // changes the hash and the game re-analyzes as before. Grading
         // meta (accuracy) and the playbook are deliberately excluded.
+        // Odds and the edge are QUANTIZED in the hash (owner ruling
+        // 2026-09-11, change-gate.js): moneylines to 5 cents, lines to a
+        // half point, the edge to 1pp. Same day MLB boards tick a cent
+        // every twenty minutes and the gate never skipped (sixteen ops
+        // reports); a real line move still re-narrates.
         const contextInputs = {
-          odds: [oddsCtx.spread, oddsCtx.total, oddsCtx.ml_home, oddsCtx.ml_away],
+          odds: quantizeOdds(oddsCtx),
           rank: rankCtx,
           news: newsCtx,
           injuries: injuryCtx,
@@ -1565,10 +1571,7 @@ async function runPreAnalysis(sportSlugs) {
           // checks' tenth-report finding, prime suspect confirmed). The
           // prompt still gets the full text with stats.
           pitchers: pitcherCtx ? pitcherCtx.replace(/\s*\([^)]*\)/g, '') : null,
-          edge: edgeData ? {
-            edge: edgeData.edge, side: edgeData.edgeSide,
-            home: edgeData.homeWinProb, implied: edgeData.impliedHomeProb
-          } : null,
+          edge: quantizeEdge(edgeData),
           pick: mathPick ? [mathPick.recommended_side, mathPick.recommended_pick] : null,
           traps: trapCalls.map(t => [t.side, t.edge_pp, t.lure_score]),
         };
@@ -1784,7 +1787,30 @@ async function runPreAnalysis(sportSlugs) {
                 const n = parseInt(String(resolveOddsForPick(oddsCtx, result.recommended_side)), 10);
                 return Number.isFinite(n) && n >= TENNIS_LONGSHOT_FENCE;
               })();
-              if (result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2 && !tennisFenced) {
+              // THE RAW GATE (owner ruling 2026-09-11, directive 17): the
+              // model must clear 2pp on its own before calibration touches
+              // it. Calibration multipliers are measured on claims that
+              // cleared the gate, so using one above 1 to lift a sub-gate
+              // read into publication applies the measurement outside its
+              // own sample (UFC:ml 1.2 published a -410 Lean off a 1.7pp
+              // read with a blank data profile). Calibration sizes a claim,
+              // it never creates one.
+              const rawGatePp = edgeData?.edgesRaw?.[result.recommended_side] != null
+                ? edgeData.edgesRaw[result.recommended_side] * 100 : gateEdgePp;
+              // THE DATA PROFILE GATE (same ruling, "blind is not
+              // sustainable"): a UFC pick needs both fighters in
+              // ufc_fighters, the same settleable-bout test the leg pool
+              // already applies. A read built on a blank profile is
+              // dispersion between books, not a read.
+              const profileOk = sportDisplay !== 'UFC'
+                || !result.recommended_pick
+                || await isKnownUfcBout(supabase, game.home_team, game.away_team);
+              const publishGateOpen = !!result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2
+                && rawGatePp != null && rawGatePp >= 2 && profileOk && !tennisFenced;
+              if (result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2 && !tennisFenced && !publishGateOpen) {
+                console.log(`  ⛔ Publish gate closed for ${game.game_key}: raw ${rawGatePp != null ? rawGatePp.toFixed(1) : 'n/a'}pp vs calibrated ${gateEdgePp.toFixed(1)}pp, profile ${profileOk ? 'ok' : 'blank'}`);
+              }
+              if (publishGateOpen) {
               try {
                 const side = result.recommended_side;
                 const { betType, point } = deriveBetTypeAndPoint(side, oddsCtx);
@@ -2044,9 +2070,9 @@ async function runPreAnalysis(sportSlugs) {
               // is unchanged by the calibration layer. (mathPick carries
               // recommended_side; an earlier version read a nonexistent
               // .side key and silently fell back to the calibrated edge.)
-              const publishedPick = mathPick && (
-                (edgeData?.edgesPreBand?.[mathPick.recommended_side] ?? mathPick.signedEdge) * 100 >= 2
-              );
+              // A pick the raw or profile gate closed did not publish, so
+              // the game is leg eligible like any other no-pick game.
+              const publishedPick = publishGateOpen;
               // Owner rule 2026-08-31: non-UFC MMA cards never enter the
               // leg pool. The MMA odds feed carries every promotion, ESPN
               // results cover UFC-brand events only, so a leg on any other
