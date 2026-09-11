@@ -474,6 +474,10 @@ app.post('/cron/sync-nfl-props', syncNflProps);
 // their grading against nflverse stat lines (?mode=grade).
 const analyzeNflProps = require('./api/cron/analyze-nfl-props');
 app.post('/cron/analyze-nfl-props', analyzeNflProps);
+// The counterfactual replay harness: a formula over the games we already
+// analyzed, as-of data, graded at stored prices, into replay_picks.
+const replayFormula = require('./api/cron/replay-formula');
+app.post('/cron/replay-formula', replayFormula);
 const syncNflPlayerStats = require('./api/cron/sync-nfl-player-stats');
 app.post('/cron/sync-nfl-player-stats', syncNflPlayerStats);
 const repricePendingPicks = require('./api/cron/reprice-pending-picks');
