@@ -470,6 +470,10 @@ app.post('/cron/backfill-trap-signals', backfillTrapSignals);
 // Football props data collection (shadow-first, publishes nothing).
 const syncNflProps = require('./api/cron/sync-nfl-props');
 app.post('/cron/sync-nfl-props', syncNflProps);
+// NFL prop reads (shadow record in prop_reads, publishes nothing) and
+// their grading against nflverse stat lines (?mode=grade).
+const analyzeNflProps = require('./api/cron/analyze-nfl-props');
+app.post('/cron/analyze-nfl-props', analyzeNflProps);
 const syncNflPlayerStats = require('./api/cron/sync-nfl-player-stats');
 app.post('/cron/sync-nfl-player-stats', syncNflPlayerStats);
 const repricePendingPicks = require('./api/cron/reprice-pending-picks');
