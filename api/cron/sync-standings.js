@@ -40,14 +40,18 @@ function sleep(ms) {
 /**
  * Fetch standings from ESPN for a given sport
  */
-async function fetchESPNStandings(sport, config) {
+async function fetchESPNStandings(sport, config, seasonOverride = null) {
   // The college configs declare a group id (80 = FBS football, 50 = D1
   // basketball) that was never sent, so the bare endpoint returned a
   // partial field (88 of ~134 FBS teams on the 2026-08-28 first NCAAF
   // sync). Harmless for sports without a group. If ESPN ignores the
   // param the result is unchanged, so this can only widen coverage.
-  const group = config.groups ? `?group=${config.groups}` : '';
-  const url = `${ESPN_STANDINGS}/${config.path}/standings${group}`;
+  // A season override pulls a past season's final table (the prior
+  // season record shown on a 0-0 tile, 2026-09-12); ESPN takes ?season=.
+  const params = [];
+  if (config.groups) params.push(`group=${config.groups}`);
+  if (seasonOverride) params.push(`season=${seasonOverride}`);
+  const url = `${ESPN_STANDINGS}/${config.path}/standings${params.length ? '?' + params.join('&') : ''}`;
   console.log(`  Fetching ${sport}: ${url}`);
 
   const res = await fetch(url);
@@ -217,6 +221,9 @@ async function syncStandings(req, res) {
 
   const sportsParam = (req.query.sports || 'NBA,NHL,MLB,NFL,NCAAB').toUpperCase();
   const sports = sportsParam.split(',').map(s => s.trim()).filter(s => SPORT_CONFIGS[s]);
+  // ?season=2025 stores that season's table under its own key instead of
+  // the current one (prior_season_standings view reads year minus one).
+  const seasonOverride = /^\d{4}$/.test(String(req.query.season || '')) ? parseInt(req.query.season, 10) : null;
 
   res.status(202).json({ status: 'accepted', message: `Syncing standings for ${sports.join(', ')}` });
 
@@ -226,10 +233,10 @@ async function syncStandings(req, res) {
   try {
     for (const sport of sports) {
       const config = SPORT_CONFIGS[sport];
-      const season = config.season();
+      const season = seasonOverride || config.season();
 
       try {
-        const teams = await fetchESPNStandings(sport, config);
+        const teams = await fetchESPNStandings(sport, config, seasonOverride);
         let upserted = 0;
         const seenTeamIds = [];
 

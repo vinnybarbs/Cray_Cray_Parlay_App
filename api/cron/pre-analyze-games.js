@@ -24,6 +24,7 @@ const trapDetector = require('../../lib/services/trap-detector.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 const { applyPricePenalties } = require('../../lib/services/price-penalties.js');
 const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.js');
+const { withSeasonFloor } = require('../../lib/services/season-floor.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
@@ -716,6 +717,27 @@ async function getRankingsContext(homeTeam, awayTeam, sport = null) {
       }
     }
 
+    // A 0-0 football team before its first game shows last season's
+    // final record next to it (owner 2026-09-12: week-one tiles read
+    // 0-0 vs 0-0). prior_season_standings is filled by sync-standings
+    // with ?season=<last year>; missing rows leave the record as is.
+    if ((sport === 'NFL' || sport === 'NCAAF') && (result.home_record === '0-0' || result.away_record === '0-0')) {
+      try {
+        const { data: prior } = await supabase
+          .from('prior_season_standings')
+          .select('team_name, record')
+          .eq('sport', sport)
+          .or(`team_name.ilike.%${homeQ}%,team_name.ilike.%${awayQ}%`);
+        for (const p of prior || []) {
+          const pLower = String(p.team_name).toLowerCase();
+          const isHome = pLower.includes(homeLower) || homeLower.includes(pLower);
+          const isAway = pLower.includes(awayLower) || awayLower.includes(pLower);
+          if (isHome && result.home_record === '0-0' && p.record) result.home_record = `0-0 (${p.record} last yr)`;
+          if (isAway && result.away_record === '0-0' && p.record) result.away_record = `0-0 (${p.record} last yr)`;
+        }
+      } catch { /* prior season is a courtesy, never a blocker */ }
+    }
+
     // Secondary source: rankings_cache (AP Top 25, adds rank for college teams).
     // Full-team-name match, same rationale as standings block above.
     const { data: rankData } = await supabase
@@ -765,6 +787,8 @@ async function getRecentResults(teamName, sportSlug, limit = 5) {
     // Filter by sport if we have a valid mapping
     if (sportName) {
       query = query.eq('sport', sportName);
+      // NFL preseason never feeds a trend line (season-floor.js).
+      query = withSeasonFloor(query, sportName);
     }
     
     const { data } = await query;
