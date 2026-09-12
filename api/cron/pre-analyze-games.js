@@ -26,6 +26,7 @@ const { applyPricePenalties } = require('../../lib/services/price-penalties.js')
 const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.js');
 const { withSeasonFloor } = require('../../lib/services/season-floor.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
+const { tileRecords } = require('../../lib/services/tile-records.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
@@ -684,38 +685,18 @@ async function getRankingsContext(homeTeam, awayTeam, sport = null) {
     const result = { home_rank: null, away_rank: null, home_record: null, away_record: null, home_streak: null, away_streak: null };
     if (!homeQ || !awayQ) return result;
 
-    // Primary source: current_standings (populated by sync-standings cron from ESPN)
-    // Sport filter is mandatory: without it a college football game read
-    // the school's BASKETBALL standings (Rice at Notre Dame, 2026-09-12,
+    // Records: the standings table or the scoreboard record on our own
+    // settled results, whichever has seen more games, matched through
+    // the shared team matcher (lib/services/tile-records.js). The sport
+    // filter is mandatory: without it a college football game read the
+    // school's BASKETBALL standings (Rice at Notre Dame, 2026-09-12,
     // showed 7-11 and 4-14 on a football tile), and the record then fed
     // the fallback base blend when no moneyline existed to anchor.
-    let standingsQuery = supabase
-      .from('current_standings')
-      .select('team_name, wins, losses, ties, win_percentage, point_differential, streak, division_rank')
-      .or(`team_name.ilike.%${homeQ}%,team_name.ilike.%${awayQ}%`);
-    if (sport) standingsQuery = standingsQuery.eq('sport', sport);
-    const { data: standingsData } = await standingsQuery;
-
-    if (standingsData) {
-      for (const s of standingsData) {
-        const sLower = s.team_name.toLowerCase();
-        // Bidirectional match: either the standings name contains the full query,
-        // or the query contains the standings name (handles cases where ESPN uses
-        // a slightly shorter form than the odds feed, e.g. "LA Dodgers" vs "Los Angeles Dodgers").
-        const isHome = sLower.includes(homeLower) || homeLower.includes(sLower);
-        const isAway = sLower.includes(awayLower) || awayLower.includes(sLower);
-
-        const record = s.ties > 0 ? `${s.wins}-${s.losses}-${s.ties}` : `${s.wins}-${s.losses}`;
-        if (isHome && !result.home_record) {
-          result.home_record = record;
-          result.home_streak = s.streak || null;
-        }
-        if (isAway && !result.away_record) {
-          result.away_record = record;
-          result.away_streak = s.streak || null;
-        }
-      }
-    }
+    const rec = await tileRecords(supabase, { sport, homeTeam: homeQ, awayTeam: awayQ });
+    result.home_record = rec.home_record;
+    result.away_record = rec.away_record;
+    result.home_streak = rec.home_streak;
+    result.away_streak = rec.away_streak;
 
     // A 0-0 football team before its first game shows last season's
     // final record next to it (owner 2026-09-12: week-one tiles read

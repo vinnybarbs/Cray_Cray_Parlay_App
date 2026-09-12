@@ -128,6 +128,26 @@ select 'player_props', max(last_updated) from player_props;
 
 closing_lines captures every 15 minutes. A stale newest is a finding even when every logged job reads green. house_parlays is NO LONGER a silent witness: since 2026-08-18 build-house-parlays files a cron_job_logs row per run with per-size outcomes (built, already_published, pool_short, no_heavy_favorites, negative_edge, each with the pool count). Read those rows instead of inferring from row timestamps, and know the design: since 2026-09-09 the builds run at 04:58, 09:58 and 13:58 MT, 13 minutes behind the analysis slots, the first run builds the day's 2-leg and 3-leg and the later runs are catch-ups that only build a size the earlier ones missed. A later run that writes no new parlay while both sizes exist is HEALTHY (the Aug 14-16 "afternoon build failures" were this misread). The pool is every pending published pick or Leg whose game sits inside the 30 hour board window, whatever day it was published. The real alert conditions: a day that never gets both sizes, or no_heavy_favorites repeating across runs while heavies (Leg tier or implied 65 percent or more) are visibly on the board.
 
+## 8. Model sanity tripwires (directive 18)
+
+The sections above prove the machine ran. This one asks whether the reads make sense, because on 2026-09-12 every one of them was green while every NFL home team read 5pp above the market, MLB had published 117 home picks to 9 away in a week, and 123 of 124 NCAAF tiles showed 0-0 two weeks into the season. Directive 18's check_sql already runs this in section 0b; read the rows here and name the cause:
+
+```sql
+select tripwire, sport, n, value, detail from public.model_sanity_findings() order by 1, 2;
+```
+
+Every row is a finding at the top of the brief. What each wire means and where to look:
+
+- `side_balance`: 75 percent or more of a sport's bet-tier picks on one side of the field in 7 days (20 or more). A model that likes one side is pricing the venue, not the game. Look for a factor that always argues one way (home advantage on an anchored base was the 09-12 case, seed and venue splits are the next suspects) and check the anchored_mean_raw wire for the same sport.
+- `anchored_mean_raw`: the mean raw home moneyline read across a sport's anchored games (10 or more) sits 2pp or more from zero. Anchored reads average near the market by construction, so a mean that far off is a bias in the factor stack. Pull the factor impacts for that sport and find the one whose sign never changes.
+- `factor_at_cap`: more than half of a sport's games carry a single factor at 8pp or more. A factor pinned at its cap on most rows is a broken input (injured reserve at full weight put every NFL team at the 8pp injury cap in week 1), not a signal.
+- `home_adv_on_anchor`: any anchored game carrying a Home advantage factor after PR 156. This is a regression, file it as a bug.
+- `stale_tile_record`: a team with a settled result this season whose tile shows blank or 0-0. The tile takes the standings record or the scoreboard record on our own results, whichever has more games (lib/services/tile-records.js). A hit means a name that neither source matched or a standings feed serving the wrong record (college conference records, 09-12). Name the teams, they are in the detail.
+- `recordless_pick`: a bet-tier pick published on a team sport whose tile carries no record. Users see a pick with no context. Same causes as above, higher impact.
+- `clv_negative`: a sport and market whose average price closing line value is -1pp or worse over 14 days (20 or more picks). The market closes against us: the model is wrong in a consistent direction on that market. Say which market and point the Monday review at pick_clv_by_factor for it. Muting is a dial decision for the owner, not for the check.
+
+An empty result gets one line: "model sanity clean, 7 wires". A tripped wire is fixed at the source or explained on the blackboard the same day.
+
 ## Reporting
 
 Keep it terse. ALL CLEAR plus the two or three numbers that prove it, or findings ranked by user impact (public stats wrong beats a noisy log). Plain punctuation, no em dashes, en dashes, semicolons, or arrows.

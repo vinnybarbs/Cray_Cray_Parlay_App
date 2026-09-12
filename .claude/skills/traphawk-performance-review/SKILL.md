@@ -176,6 +176,22 @@ where actual_outcome in ('won','lost','push')
 group by tier order by tier;
 ```
 
+Since 2026-09-11 `pick_clv_all` extends this to spreads and totals (price_clv_pp, line_clv_points, same_line), and since 2026-09-12 `pick_clv_by_factor` splits it by the factor stack, one row per pick per factor with impact_for_pick signed toward the picked side. This is how the next double count gets named by the market instead of by hand (home advantage on the anchored base was found by hand on 09-12 after ten days). Canonical query, per sport, last 30 days, factors that argued FOR the pick:
+
+```sql
+select sport, factor_key, count(*) as n,
+       round(avg(price_clv_pp), 2) as avg_price_clv_pp,
+       round(100.0 * count(*) filter (where price_clv_pp > 0) / count(*), 1) as pct_beat_close,
+       count(*) filter (where actual_outcome = 'won') as won,
+       count(*) filter (where actual_outcome = 'lost') as lost
+from pick_clv_by_factor
+where game_date >= now() - interval '30 days' and impact_for_pick > 0
+group by sport, factor_key having count(*) >= 20
+order by sport, avg_price_clv_pp;
+```
+
+A factor whose picks close negative against the market is pricing something the book already priced: that is a double count candidate for the anchored path, and it goes through the three test counterfactual like any dial move. A factor whose picks close positive earns its keep whatever its win rate says this week. Also report side balance per sport (home versus away share of bet-tier picks) next to this table: the model_sanity_findings() tripwires flag 75 percent one way daily, the review explains why.
+
 Report average CLV in pp and percent beating close per tier. First baseline, 2026-08-10 over 229 picks: overall +0.19pp and 53.3 percent beating close, Sharp Take +1.81pp. CLV is the earliest honest signal of edge drift, a tier whose CLV goes negative is losing its edge before the win rate shows it. Under 50 percent beating close is not marketing material, say so honestly.
 
 ## 6. Historical context that prevents false findings
