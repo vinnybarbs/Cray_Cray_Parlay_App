@@ -96,3 +96,12 @@ describe('EdgeCalculator.restAdjustment', () => {
     expect(EdgeCalculator.restAdjustment(game, '2026-06-01', '2026-09-06')).toBe(0); // 104 days
   });
 });
+
+describe('injured reserve carries no weight (2026-09-12)', () => {
+  const fi = require('../../lib/services/football-injuries');
+  test('IR is zero, a game-day out still counts', () => {
+    expect(fi.positionImpact('QB', 'injured reserve')).toBe(0);
+    expect(fi.positionImpact('QB', 'IR')).toBe(0);
+    expect(fi.positionImpact('QB', 'out')).toBeCloseTo(-0.06, 10);
+  });
+});

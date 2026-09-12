@@ -136,3 +136,24 @@ describe('totals step one (2026-09-11): the book total is the anchor', () => {
     expect(calc._dial(null, 'MLB', 'total_claim_damp')).toBe(1);
   });
 });
+
+describe('home advantage never stacks on the market anchor (2026-09-12)', () => {
+  test('an anchored game carries no home advantage adjustment', async () => {
+    const { EdgeCalculator } = require('../../lib/services/edge-calculator');
+    const calc = new EdgeCalculator({});
+    calc._loadDials = async () => null;
+    calc.getTeamRecord = async () => null;
+    calc.getRecentForm = async () => null;
+    calc.getInjuryImpact = async () => 0;
+    calc._getScheduleStrength = async () => null;
+    calc.getStandingsSnapshot = async (team) => ({ team_name: team, record: '0-0', streak: null, last_10: null, home_record: '0-0', away_record: '0-0', playoff_seed: null, win_percentage: '0.000' });
+    calc._getCalibration = async () => ({});
+    const game = { sport: 'americanfootball_nfl', home_team: 'Detroit Lions', away_team: 'New Orleans Saints', game_date: '2026-09-13T17:00:00Z',
+      markets: { h2h: [{ name: 'Detroit Lions', price: -340 }, { name: 'New Orleans Saints', price: 270 }] } };
+    const out = await calc.calculateEdge(game);
+    expect(out).not.toBeNull();
+    expect((out.factors.adjustments || []).some(a => a.factor === 'Home advantage')).toBe(false);
+    expect(out.factors.marketAnchored).toBe(true);
+    expect(Math.abs(out.edgesRaw.home_ml)).toBeLessThan(0.005);
+  });
+});
