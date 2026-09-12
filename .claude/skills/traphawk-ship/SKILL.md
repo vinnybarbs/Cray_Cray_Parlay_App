@@ -51,6 +51,10 @@ Do not declare a change live until you have production evidence. The standard lo
 
 All Claude usage goes through `lib/services/claude.js` (MODELS map, WRITING_STYLE injection via `complete()`). New model calls: prefer `complete()`, and if you must use raw `messages.create`, import and include WRITING_STYLE in the system prompt. Narration cost logs into cron_job_logs at standard Sonnet rates. Any new recurring call site must log enough to be auditable (tokens or cost in cron_job_logs or agent_intel), because the monthly cost audit reconciles DB records against the Anthropic console.
 
+## Base changes re-audit every factor (directive 19)
+
+Any change to what a read is based on (the market anchor, the record blend, a new anchor source, a new sport model) lists every factor in the stack in the PR and says, per factor, whether the new base already prices it. A factor that prices the same thing as the base is a double count and comes off the anchored path before the change ships. The market anchor landed 2026-09-02 without this list, home advantage counted twice for ten days, and 36 of 47 anchor-era MLB moneyline picks went to the home side beating the close 22 percent of the time. After the deploy, run `select * from model_sanity_findings()` and confirm the anchored_mean_raw and side_balance wires stay quiet for the sport.
+
 ## Cost guardrails on changes
 
 Before adding or re-scheduling any Claude-calling job, estimate its daily cost (calls per day times tokens times rate) and say the number out loud in the PR. The August 2026 audit traced a $7.60/day bill to unexamined defaults: a 3-hour re-narration clock, web search for data already synced, and uncached multi-turn search loops. New work should not reintroduce those patterns: cache multi-turn loops, gate regeneration on input change, and use a plain API when the task is a lookup rather than a judgment.

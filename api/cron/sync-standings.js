@@ -33,6 +33,14 @@ function currentSeason(sport) {
   return new Date().getFullYear();
 }
 
+/** "12-4" or "12-4-1" to { wins, losses, ties }; anything else is null. */
+function parseOverallRecord(v) {
+  if (v == null) return null;
+  const m = String(v).trim().match(/^(\d+)-(\d+)(?:-(\d+))?$/);
+  if (!m) return null;
+  return { wins: Number(m[1]), losses: Number(m[2]), ties: m[3] != null ? Number(m[3]) : null };
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -87,15 +95,20 @@ async function fetchESPNStandings(sport, config, seasonOverride = null) {
       // NHL "7-2-1, 0 PTS"). Keep just the record portion.
       const cleanDisplay = (v) => typeof v === 'string' ? v.split(',')[0].trim() : v;
 
+      // College feeds list the conference record under wins and losses
+      // and the season record under an "overall" summary (2026-09-12: 123
+      // of 124 FBS teams stored 0-0 two weeks into the season). When a
+      // summary of the form W-L or W-L-T is present it is the record.
+      const overall = parseOverallRecord(stats.overall ?? stats.total ?? stats.Overall);
       teams.push({
         espn_id: team.id,
         name: team.displayName,
         abbreviation: team.abbreviation,
         sport,
         conference,
-        wins: parseInt(stats.wins) || 0,
-        losses: parseInt(stats.losses) || 0,
-        ties: thirdCol,
+        wins: overall ? overall.wins : (parseInt(stats.wins) || 0),
+        losses: overall ? overall.losses : (parseInt(stats.losses) || 0),
+        ties: overall && overall.ties != null ? overall.ties : thirdCol,
         points_for: parseInt(stats.pointsFor) || 0,
         points_against: parseInt(stats.pointsAgainst) || 0,
         point_differential: parseInt(stats.pointDifferential) || 0,
@@ -317,3 +330,4 @@ async function syncStandings(req, res) {
 }
 
 module.exports = syncStandings;
+module.exports.parseOverallRecord = parseOverallRecord;
