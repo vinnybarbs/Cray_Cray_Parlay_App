@@ -197,7 +197,7 @@ async function getDigest(req, res) {
     const modelAccuracyResult = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('mv_public_record')
-        .select('period_bucket, dimension_type, dimension_value, won, lost, push, total')
+        .select('period_bucket, dimension_type, dimension_value, won, lost, push, total, roi_units')
         .in('period_bucket', ['last_3d', 'last_7d', 'last_30d', 'all']);
       if (error) throw error;
 
@@ -210,8 +210,13 @@ async function getDigest(req, res) {
           out[r.dimension_value] = {
             won,
             lost,
+            push: r.push || 0,
             total: decided,
             winRate: decided > 0 ? Math.round((won / decided) * 1000) / 10 : null,
+            // Units from the same rollup, for the owner's band ladder on
+            // the hero (2026-09-12): a band can win 60 percent and lose
+            // money at chalk, so the rate alone is not a sanity check.
+            units: r.roi_units != null && Number.isFinite(Number(r.roi_units)) ? Math.round(Number(r.roi_units) * 10) / 10 : null,
           };
         }
         return out;

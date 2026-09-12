@@ -1717,6 +1717,27 @@ export default function DailyDigest({ onBack }) {
   // itself. Falls back to the overall record only if tier data is absent.
   const HERO_PERIODS = [['last_3d', '3d'], ['last_7d', '7d'], ['last_30d', '30d'], ['all', 'all-time']]
   const [heroPeriodIdx, setHeroPeriodIdx] = useState(2) // default 30d
+  // The band ladder: every tier's record and units for the selected
+  // window, from the same mv_public_record rollup. Owner's quick sanity
+  // check (2026-09-12: "show all bands now too"), collapsed by default so
+  // the hero stays a two number trust anchor for everyone else. The
+  // toggle is remembered per browser.
+  const [bandsOpen, setBandsOpen] = useState(() => {
+    try { return window.localStorage.getItem('th_hero_bands') === '1' } catch { return false }
+  })
+  const toggleBands = () => {
+    setBandsOpen(v => {
+      try { window.localStorage.setItem('th_hero_bands', v ? '0' : '1') } catch { /* per-browser convenience only */ }
+      return !v
+    })
+  }
+  const HERO_BANDS = ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Leg', 'Trap']
+  const heroBands = (() => {
+    const [period] = HERO_PERIODS[heroPeriodIdx]
+    const byTier = data?.modelAccuracy?.[period]?.byTier
+    if (!byTier) return []
+    return HERO_BANDS.map(label => ({ label, ...(byTier[label] || {}) })).filter(b => b.won != null || b.lost != null)
+  })()
   const heroHitRate = (() => {
     const [period, label] = HERO_PERIODS[heroPeriodIdx]
     const st = data?.modelAccuracy?.[period]?.byTier?.['Sharp Take']
@@ -1831,6 +1852,16 @@ export default function DailyDigest({ onBack }) {
                         {label === 'all-time' ? 'all' : label}
                       </button>
                     ))}
+                    <button
+                      onClick={toggleBands}
+                      aria-expanded={bandsOpen}
+                      className={`px-1.5 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-[0.08em] transition-colors ${
+                        bandsOpen ? 'bg-ink-700 text-ink-100 font-semibold' : 'bg-ink-850 text-ink-400 hover:text-ink-200'
+                      }`}
+                      title="Every band's record and units for this window"
+                    >
+                      bands
+                    </button>
                   </span>
                 </span>
               )}
@@ -1843,6 +1874,26 @@ export default function DailyDigest({ onBack }) {
               </button>
             </div>
           </div>
+
+          {bandsOpen && heroBands.length > 0 && (
+            <div
+              className="mb-4 -mt-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-400"
+              title="Record, hit rate and units per band for the selected window. Same rollup as the ledger. Traps are graded as the fade, Legs need no edge."
+            >
+              {heroBands.map(b => (
+                <div key={b.label} className="min-w-0 flex flex-wrap items-baseline gap-x-1.5">
+                  <span className="text-ink-300 truncate">{b.label}</span>
+                  <span className="tabular-nums text-ink-200">{b.won ?? 0}-{b.lost ?? 0}{b.push ? `-${b.push}` : ''}</span>
+                  {b.winRate != null && <span className={`tabular-nums ${winRateColor(b.winRate)}`}>{b.winRate}%</span>}
+                  {b.units != null && (
+                    <span className={`tabular-nums ${b.units > 0 ? 'text-signal-pos' : b.units < 0 ? 'text-signal-neg' : 'text-ink-400'}`}>
+                      {b.units > 0 ? '+' : ''}{b.units.toFixed(1)}u
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="min-w-0">
             {/* Count-first headline, math-derived, instantly tells you what's actionable today */}
