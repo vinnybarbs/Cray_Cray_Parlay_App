@@ -160,11 +160,13 @@ The shadow list as of 2026-09-09 is the soccer family plus NCAAF. Tennis was pro
 
 NCAAF was planned to flip at the 2026-08-29 opener and did NOT. It is still shadowed and publishing nothing, held back because 0-0 records made the calculator base 50/50; the program strength prior (ncaaf_team_strength) now accrues attribution on its shadow reads. Treat the flip as an open owner decision, not as done.
 
-For the sports still in the list, promotion is judged on PERFORMANCE, not read volume. The bar: 75 graded publishable picks (claimed edge 2pp or more) whose actual win rate meets or beats fair implied AND positive units. One call returns everything:
+For the sports still in the list, promotion is judged on PERFORMANCE, not read volume. The bar (directive 20, 2026-09-13): 75 graded publishable reads (raw claim 2pp or more) whose actual win rate meets or beats implied, positive units, AND a positive average closing line value. One call returns every sport and market from the shadow ledger:
 
 ```sql
-select public.shadow_model_readiness();
+select * from public.shadow_market_readiness() order by sport, market;
 ```
+
+`shadow_reads_graded` underneath it grades the better side of every market in every stored read against the final and the closing consensus, for every sport, so a muted market on a live sport (MLB totals, NFL totals) is judged the same way as a shadow sport, and re-entry cites the same numbers. Read it per market: a sport is not one thing, NCAAF moneylines can be at the bar while NCAAF totals are nowhere near it. The older `shadow_model_readiness()` call is the UFC and soccer history and stays for that; it never covered NCAAF. Caveats: spread and total reads that stored no price grade at -110 (price_default true), same-day doubleheaders resolve to the first result row, and a read is the row's LAST version (the analysis is re-run through the day), so the ledger scores the read as it stood at the last analysis, not at open.
 
 Report each model's publishable record against implied AND its units ("Tennis 30-7 on 37 publishable, 81.1 actual vs 78.2 implied, -0.28u, needs 75 and positive units"). Never judge a shadow model on its sub-2pp reads, those are Skips by our own ladder and were never candidates for the record (the Aug 2026 lesson: the aggregate made Tennis look below-market while its publishable bucket was beating its own claims). And never judge on win rate alone: the same Tennis bucket won 81 percent and still lost units, because at heavy chalk the vig eats a 3 point edge. When a model calibrates well but cannot beat the vig, weigh the leg alternative in the promotion decision: it may belong in the Leg Pool feeding parlays, not the pick record. For CLV, the `pick_clv` view (shipped 2026-08-10) computes closing line value for every moneyline pick since 2026-07-11, joined by event id or kickoff instant. Canonical query:
 

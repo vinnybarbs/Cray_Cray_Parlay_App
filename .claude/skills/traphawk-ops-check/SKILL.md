@@ -146,6 +146,8 @@ Every row is a finding at the top of the brief. What each wire means and where t
 - `recordless_pick`: a bet-tier pick published on a team sport whose tile carries no record. Users see a pick with no context. Same causes as above, higher impact.
 - `clv_negative`: a sport and market whose average price closing line value is -1pp or worse over 14 days (20 or more picks). The market closes against us: the model is wrong in a consistent direction on that market. Say which market and point the Monday review at pick_clv_by_factor for it. Muting is a dial decision for the owner, not for the check.
 
+Directive 20 (2026-09-13) adds the shadow ledger to the sweep: `shadow_market_readiness()` filtered to shadow sports and muted markets reports a market that has reached the go-live bar (75 publishable graded reads, actual at or above implied, positive units, positive closing line value) as an OWNER DECISION, and a shadow market closing -1pp or worse on 50 or more reads as not ready. Name the sport and the market; never suggest flipping a sport whole when only one of its markets is at the bar.
+
 An empty result gets one line: "model sanity clean, 7 wires". A tripped wire is fixed at the source or explained on the blackboard the same day.
 
 ## Reporting
