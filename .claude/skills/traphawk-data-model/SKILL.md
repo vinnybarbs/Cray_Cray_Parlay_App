@@ -101,3 +101,8 @@ Job schedules live in `cron.job`. Some Claude-calling jobs (fact-check-picks, en
 ## Writing style is enforced in code
 
 `WRITING_STYLE` in `lib/services/claude.js` bans em dashes, en dashes, semicolons, and arrows in all model output. `complete()` injects it automatically. Any new raw `messages.create` call site must import and include it, and your own prose to the user follows the same rule.
+
+
+## Publication per market (2026-09-13)
+
+Whether a (sport, market) reaches the graded record is three dials on `sport_dials`: `publish_ml`, `publish_spread`, `publish_total`, 1 or 0 per sport (`__all__` 1; the shadow sports NCAAF, EPL, MLS, Soccer, World Cup, Champions League, Copa America, Euros start at 0 on all three). The SHADOW_SPORTS constants in code are only the fail-soft mirror. `/api/digest` sends `publishMarkets` and the board withholds a shadow market's read (src/lib/publish-flags.js). A mute is different: the market's `edge_calibration` multiplier at 0 while its publish dial stays 1. `shadow_reads_graded` and `shadow_market_readiness()` are the shadow ledger; `promote_ready_markets()` (daily) opens a market that clears the bar; `file_replay_candidates()` (Sunday sweep) files dial candidates in build_queue. `home_margin_shift` is the MLB spread transform dial.

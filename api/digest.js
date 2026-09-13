@@ -2,6 +2,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../shared/logger');
 const { getTennisContext } = require('../lib/services/tennis-data');
 const { getUfcContext } = require('../lib/services/ufc-data');
+const { publishFlagsAll } = require('../lib/services/publish-markets.js');
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -401,9 +402,15 @@ async function getDigest(req, res) {
       return data && data.length > 0 ? data[0].commence_time : null;
     });
 
+    // Which markets publish per sport (dial board publish_ml, publish_spread,
+    // publish_total, 2026-09-13). The board withholds a shadow market's read
+    // and shows a sport as shadow only when none of its markets publishes.
+    const publishMarkets = await safeQuery(() => publishFlagsAll(supabase));
+
     res.json({
       status: 'ok',
       timestamp: new Date().toISOString(),
+      publishMarkets: publishMarkets || {},
       gamesBySport: gamesBySport || {},
       injuries: injuriesBySport || {},
       yesterdayResults: yesterdayResultsResult || {},

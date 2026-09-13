@@ -148,6 +148,8 @@ Every row is a finding at the top of the brief. What each wire means and where t
 
 Directive 20 (2026-09-13) adds the shadow ledger to the sweep: `shadow_market_readiness()` filtered to shadow sports and muted markets reports a market that has reached the go-live bar (75 publishable graded reads, actual at or above implied, positive units, positive closing line value) as an OWNER DECISION, and a shadow market closing -1pp or worse on 50 or more reads as not ready. Name the sport and the market; never suggest flipping a sport whole when only one of its markets is at the bar.
 
+Directive 21 (the dial freeze through 2026-09-27) has a check_sql too: any model_weight_changes row in the window whose source is not sunday-sweep-approved, promote_ready_markets or weekly-refresh is a finding, name it. Two routines also leave witnesses to read here: weekly-replay-sweep (Sunday 23:00 MT) logs job_name replay-formula with candidates_filed in its details and files "Sunday sweep candidate" rows in build_queue; promote-ready-markets (daily 07:00 MT) writes an agent_reports row from agent promote-ready-markets the morning it opens a market, so a new row there is a go-live to report at the top of the brief.
+
 An empty result gets one line: "model sanity clean, 7 wires". A tripped wire is fixed at the source or explained on the blackboard the same day.
 
 ## Reporting

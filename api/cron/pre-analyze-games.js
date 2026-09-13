@@ -27,6 +27,7 @@ const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.j
 const { withSeasonFloor } = require('../../lib/services/season-floor.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { tileRecords } = require('../../lib/services/tile-records.js');
+const { marketPublishOpen } = require('../../lib/services/publish-markets.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
@@ -119,6 +120,14 @@ const SLUG_TO_SPORT = {
 // ran 37.5 percent). NCAAF remains shadowed while the program strength
 // prior accrues attribution.
 const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'NCAAF']);
+// THE TENNIS LONGSHOT FENCE (directive 4). +251 from 2026-09-01; +111
+// from 2026-09-13: the 30 day published record split favorites 27-8
+// +5.2u against dogs at +111 or longer 12-33 -10.4u (26.7 percent at
+// prices needing about 40), with positive closing line value on both,
+// so the dog band inside the old fence was the whole Tennis loss. A
+// fenced side never publishes at any tier; a pending row that drifts
+// past the fence is voided, not demoted.
+const TENNIS_LONGSHOT_FENCE = 111;
 // Model routing for the three-way soccer family only. SHADOW_SPORTS
 // answers "does it publish"; this set answers "which model prices it".
 const SOCCER_1X2_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
@@ -569,12 +578,12 @@ async function voidFencedTennisRow(game) {
     const row = data?.[0];
     if (!row) return;
     const n = parseInt(String(row.odds), 10);
-    if (!Number.isFinite(n) || n < 251) return;
+    if (!Number.isFinite(n) || n < TENNIS_LONGSHOT_FENCE) return;
     const { error } = await supabase
       .from('ai_suggestions')
       .update({
         voided_at: new Date().toISOString(),
-        voided_reason: 'tennis longshot fence: market-only edges at +251 and lighter prices are cross-book price dispersion, not prediction',
+        voided_reason: `tennis longshot fence: market-only edges at +${TENNIS_LONGSHOT_FENCE} and lighter prices are cross-book price dispersion, not prediction`,
       })
       .eq('id', row.id);
     if (!error) console.log(`  🚧 Voided fenced tennis longshot ${row.id} (${row.pick})`);
@@ -1766,7 +1775,13 @@ async function runPreAnalysis(sportSlugs) {
             // from the calibrated pp below.
             const gateEdgePp = edgeData?.edgesPreBand?.[result.recommended_side] != null
               ? edgeData.edgesPreBand[result.recommended_side] * 100 : displayEdgePp;
-            if (SHADOW_SPORTS.has(sportDisplay)) {
+            // Publication is decided per MARKET on the dial board
+            // (publish_ml, publish_spread, publish_total, 2026-09-13): the
+            // shadow ledger judges markets, not sports, and the daily
+            // promotion routine flips a market live the morning it clears
+            // the bar. SHADOW_SPORTS above is only the fail-soft mirror.
+            const shadowMarket = !!result.recommended_side && !(await marketPublishOpen(supabase, sportDisplay, result.recommended_side));
+            if (shadowMarket || (!result.recommended_side && SHADOW_SPORTS.has(sportDisplay))) {
               // Shadow mode: the board shows the read and game_analysis
               // stores the edges for calibration measurement, but nothing
               // reaches the graded record until the model proves out.
@@ -1786,7 +1801,6 @@ async function runPreAnalysis(sportSlugs) {
               // picks never publish, and a pending row that drifted past
               // the fence price gets voided, not demoted: the read should
               // not exist at any tier.
-              const TENNIS_LONGSHOT_FENCE = 251;
               const tennisFenced = (() => {
                 if (sportDisplay !== 'Tennis' || !result.recommended_side) return false;
                 const n = parseInt(String(resolveOddsForPick(oddsCtx, result.recommended_side)), 10);
@@ -1999,6 +2013,8 @@ async function runPreAnalysis(sportSlugs) {
               try {
                 const altSides = chooseAltMarkets(edgeData?.edgesPreBand, result.recommended_side);
                 for (const alt of altSides) {
+                  // A spotlight market publishes only if its own dial is open.
+                  if (!(await marketPublishOpen(supabase, sportDisplay, alt.side))) continue;
                   const altText = buildPickText(alt.side, oddsCtx, game);
                   const altOddsRaw = resolveOddsForPick(oddsCtx, alt.side);
                   const altEdge = edgeData?.edges?.[alt.side];
