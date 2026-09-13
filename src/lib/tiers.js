@@ -13,6 +13,9 @@
 // a record-less NCAAF week-1 read put New Mexico State +3000 on the
 // board as a Strong Play). Mirror of SHADOW_SPORTS in pre-analyze.
 // NFL went live 2026-09-09 (moneyline and spread; totals stay muted).
+// Since 2026-09-13 this set is only the FALLBACK: publication is per
+// sport and market on the dial board and reaches the client as
+// publishMarkets on /api/digest (src/lib/publish-flags.js).
 export const SHADOW_SPORTS = new Set(['NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
 
 // Strong Play restored 2026-08-16 at 7-10pp (owner decision: 7pp is the

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, breakEvenPct, SHADOW_SPORTS } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, breakEvenPct } from '../lib/tiers'
+import { setPublishFlags, isShadowSport, isShadowMarket } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
@@ -10,7 +11,9 @@ import BrandMark, { SignOutButton } from '../components/BrandMark'
 // until go-live, so no tile may wear bet-tier language. The set lives in
 // lib/tiers.js so every surface (digest chips, hero counts, The Board's
 // pick list) reads the same law.
-const SHADOW_DISPLAY = SHADOW_SPORTS
+// Shadow is decided per sport and market by the dial board (publishMarkets
+// on /api/digest); see src/lib/publish-flags.js.
+const SHADOW_DISPLAY = { has: (sport) => isShadowSport(sport) }
 
 const SPORT_META = {
   NBA:   { emoji: '🏀', label: 'NBA' },
@@ -185,7 +188,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
         const res = await fetch(`${API_BASE}/api/deep-research?game_key=${encodeURIComponent(gameKey)}`)
         if (!res.ok) throw new Error(`Server error ${res.status}`)
         const json = await res.json()
-        if (!cancelled) setData(json)
+        if (!cancelled) { setPublishFlags(json?.publishMarkets); setData(json) }
       } catch (err) {
         if (!cancelled) setError(err.message)
       } finally {
@@ -830,7 +833,7 @@ function MarketTabs({ game, shadow = false }) {
       <MarketRow
         sides={sidesByTab[activeTab] || []}
         recommendedSide={recommended_side}
-        shadow={shadow}
+        shadow={shadow || isShadowMarket(game.sport, activeTab)}
       />
     </div>
   )
@@ -1627,6 +1630,7 @@ export default function DailyDigest({ onBack }) {
       const res = await fetch(`${API_BASE}/api/digest`)
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const json = await res.json()
+      setPublishFlags(json?.publishMarkets)
       setData(json)
     } catch (err) {
       setError(err.message)

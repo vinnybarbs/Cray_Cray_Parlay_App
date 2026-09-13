@@ -3,6 +3,7 @@
  *
  * POST /cron/replay-formula?secret=...&sport=MLB&days=30&formulas=july,current
  * POST /cron/replay-formula?secret=...&sport=MLB&days=30&variants=base:current;chalk5:current:chalk_penalty_pp=5
+ * POST /cron/replay-formula?secret=...&sport=MLB&days=30&variants=...&file=1   (Sunday sweep: file candidates)
  *
  * Runs lib/replay/replay-formula.js on Railway, where the database is
  * reachable, writes one row per pick to replay_picks and one summary row
@@ -29,6 +30,15 @@ async function replayFormula(req, res) {
   (async () => {
     try {
       const summary = await runReplay(supabase, { sport, days, formulas, variants, runId, log: (m) => console.warn(m) });
+      // file=1 (the Sunday sweep): every variant is scored against base
+      // with the three test counterfactual in SQL and the ones that pass
+      // land in build_queue for the owner's Monday yes or no.
+      if (String(req.query.file || '') === '1' && summary.run_id) {
+        try {
+          const { data, error } = await supabase.rpc('file_replay_candidates', { p_run_id: summary.run_id });
+          summary.candidates_filed = error ? `error: ${error.message}` : data;
+        } catch (e) { summary.candidates_filed = `error: ${e.message}`; }
+      }
       await supabase.from('cron_job_logs').insert({ job_name: 'replay-formula', status: summary.write_error ? 'partial' : 'completed', details: JSON.stringify(summary) });
     } catch (err) {
       console.error('replay-formula error:', err.message);
