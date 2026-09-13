@@ -25,6 +25,22 @@ The gotcha that has bitten before: any DROP plus CREATE of `mv_public_record` (o
 GRANT SELECT ON public.mv_public_record TO anon, authenticated, service_role;
 ```
 
+## Nothing changes in a vacuum (directive 22, the propagation table)
+
+Every change moves every surface that sees it, BEFORE merge, and the PR body carries the filled-in row so a skipped surface shows in review. Find the row for what you changed and touch every surface on it:
+
+| You changed | Move all of these |
+|---|---|
+| A dial value or a new dial | sport_dials row; model_weight_changes row with evidence; the dial list in traphawk-performance-review; the code default that mirrors it (DIAL_DEFAULTS, price-penalties, prop-edge, publish-markets); the Edge Anatomy dial board; the replay harness if the sweep should vary it |
+| A rule, gate, fence or rail | directives (text, enforcement, check_sql); the traphawk-ops-check section that reads it; the code constant AND its client mirror (src/lib/tiers.js, src/lib/publish-flags.js); the mirror test in __tests__/lib |
+| The formula or what a read is based on | directive 19 factor audit in the PR; band map regime reset and fit floor; traphawk-performance-review; Edge Anatomy chain and traces; lib/replay if a new dial must be replayable |
+| A table, view or function | traphawk-data-model; every skill query that reads it; the tripwire or readiness function that should see it; the migration file in supabase/migrations AND applied to production |
+| A cron job or routine | cron.job (secret stays there, never in the repo); traphawk-ops-check silent witnesses; the migration file |
+| Anything user facing | the digest API payload, the DailyDigest render, the shadow and publish flags, the Edge Anatomy note |
+| Anything at all | agent_reports row; the build_queue item opened or closed |
+
+The mechanical half runs without you: `select * from public.doc_drift_findings()` reports an undocumented dial, a dead enforcement function or a broken directive check every morning (directive 22), and `__tests__/lib/drift.test.js` fails the build when a server constant and its client or SQL mirror disagree (shadow list, season floors, tier ladder, rail defaults) or a dial default is named in no skill.
+
 ## Branch and PR flow
 
 Work on the session's designated claude/ branch. After a squash merge, the branch must be restarted from origin/main before new work (`git fetch origin main && git checkout -B <branch> origin/main`), then push with `--force-with-lease`. Never stack on merged history. PRs merge by squash.
