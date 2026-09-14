@@ -399,9 +399,7 @@ app.get('/api/parlays/pending', ...getPendingParlays);
 
 // Cron endpoints
 const cronCheckParlays = require('./api/cron-check-parlays');
-const cronSummarizeNews = require('./api/cron-summarize-news');
 app.post('/api/cron/check-parlays', cronCheckParlays);
-app.post('/api/cron/summarize-news', cronSummarizeNews);
 
 // Add learning analysis endpoints
 const { analyzeOutcomes, getLessons, getPerformanceSummary } = require('./api/analyze-outcomes');
@@ -455,6 +453,9 @@ const syncNflInjuries = require('./api/cron/sync-nfl-injuries');
 app.post('/cron/sync-nfl-injuries', syncNflInjuries);
 const watchNflInactives = require('./api/cron/watch-nfl-inactives');
 app.post('/cron/watch-nfl-inactives', watchNflInactives);
+// Sleeper's NFL player feed, one pull a day (owner 2026-09-14).
+const syncSleeperPlayers = require('./api/cron/sync-sleeper-players');
+app.post('/cron/sync-sleeper-players', syncSleeperPlayers);
 
 // Probe every upstream data source so we get a loud alert when ESPN (or any
 // other vendor) silently changes JSON shape. Writes to data_source_health.
@@ -536,8 +537,6 @@ app.get('/api/ats', async (req, res) => {
 });
 
 // Enrich articles with full content + AI betting analysis
-const enrichArticles = require('./api/cron/enrich-articles');
-app.post('/cron/enrich-articles', enrichArticles);
 
 // Fetch structured ESPN intelligence (injuries, scores, standings)
 const fetchEspnIntelligence = require('./api/cron/fetch-espn-intelligence');

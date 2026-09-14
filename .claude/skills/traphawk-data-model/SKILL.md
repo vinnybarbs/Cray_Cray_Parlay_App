@@ -97,7 +97,7 @@ SELECT net.http_post(
   body := '{}'::jsonb, timeout_milliseconds := 300000);
 ```
 
-Job schedules live in `cron.job`. Some Claude-calling jobs (fact-check-picks, enrich-articles) do NOT write cron_job_logs, so absence of logs is not absence of runs.
+Job schedules live in `cron.job`. Some Claude-calling jobs (fact-check-picks) do NOT write cron_job_logs, so absence of logs is not absence of runs. The RSS news path is gone since 2026-09-14 (owner, build_queue 36): `news_articles` and `news_sources` are frozen history, nothing writes them, and the narration prompt's "Recent news" lines, the digest fact sheet articles, the fact check and the golf notes come from ESPN's news API through `lib/services/espn-news.js` (one cached call per sport per 30 minutes, articles tagged to teams and athletes, no model call). `nfl_player_status` is the daily Sleeper snapshot (`sync-sleeper-players`, 06:30 MT): injury status and notes, practice participation, depth chart position and order per rostered player, a replay input next to `nfl_injury_reports`.
 
 ## Writing style is enforced in code
 
