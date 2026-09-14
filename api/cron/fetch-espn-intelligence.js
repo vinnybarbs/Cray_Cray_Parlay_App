@@ -14,14 +14,34 @@ const { logger } = require('../../shared/logger');
 
 const FETCH_TIMEOUT = 10000;
 
-// In-season sports and their ESPN slugs
+// Sports and their ESPN slugs. Football was missing until 2026-09-14,
+// so the NFL and NCAAF injury rows the narration prompt read dated from
+// November 2025 (build_queue 11).
 const ACTIVE_SPORTS = [
   { code: 'NBA', espn: 'basketball/nba', slug: 'basketball_nba' },
   { code: 'NCAAB', espn: 'basketball/mens-college-basketball', slug: 'basketball_ncaab' },
   { code: 'NHL', espn: 'hockey/nhl', slug: 'icehockey_nhl' },
   { code: 'MLB', espn: 'baseball/mlb', slug: 'baseball_mlb' },
+  { code: 'NFL', espn: 'football/nfl', slug: 'americanfootball_nfl' },
+  { code: 'NCAAF', espn: 'football/college-football', slug: 'americanfootball_ncaaf' },
   { code: 'EPL', espn: 'soccer/eng.1', slug: 'soccer_epl' },
 ];
+
+// ESPN lists healthy players with status Active alongside real
+// absences (608 of 800 NFL lines on 2026-09-14). Those are noise for a
+// summary that a word counter reads.
+const NOISE_STATUSES = new Set(['active', 'healthy', 'probable']);
+
+/** One ESPN injury item to a summary line, or null for noise. Pure, for tests. */
+function mapInjuryItem(item) {
+  const status = item?.status || item?.type?.description;
+  if (!status || NOISE_STATUSES.has(String(status).toLowerCase().trim())) return null;
+  const player = item?.athlete?.displayName || item?.shortComment?.split('(')[0]?.trim() || 'Unknown';
+  const position = item?.athlete?.position?.abbreviation || item?.athlete?.position?.name || '?';
+  const kind = item?.details?.type || null;
+  const comment = item?.longComment || item?.shortComment || '';
+  return { player, position, status, details: [kind, comment].filter(Boolean).join(': ') };
+}
 
 async function espnFetch(path) {
   const controller = new AbortController();
@@ -66,12 +86,8 @@ async function fetchInjuries(sport) {
   const injuries = [];
 
   for (const teamData of data.injuries) {
-    const teamName = teamData.displayName;
-    const teamInjuries = (teamData.injuries || []).map(item => ({
-      player: item.shortComment?.split('(')[0]?.trim() || 'Unknown',
-      status: item.status || 'Unknown',
-      details: item.longComment || item.shortComment || '',
-    }));
+    const teamName = teamData.displayName || teamData.team?.displayName;
+    const teamInjuries = (teamData.injuries || []).map(mapInjuryItem).filter(Boolean);
 
     if (teamInjuries.length > 0) {
       injuries.push({
@@ -260,6 +276,17 @@ async function fetchEspnIntelligence(req, res) {
 
     const duration = Date.now() - startTime;
 
+    // Directive 14: judged by rows written. Every sport with zero injury
+    // teams is starvation, not a quiet day (an injury list is never empty).
+    const totalInjuryTeams = Object.values(results).reduce((s, r) => s + r.injuries, 0);
+    try {
+      await supabase.from('cron_job_logs').insert({
+        job_name: 'fetch-espn-intelligence',
+        status: totalInjuryTeams > 0 ? 'completed' : 'partial',
+        details: JSON.stringify({ results, duration_ms: duration }),
+      });
+    } catch (e) { /* don't block on logging */ }
+
     res.json({
       success: true,
       results,
@@ -269,8 +296,16 @@ async function fetchEspnIntelligence(req, res) {
 
   } catch (err) {
     logger.error('ESPN intelligence fetch error:', err);
+    try {
+      await supabase.from('cron_job_logs').insert({
+        job_name: 'fetch-espn-intelligence', status: 'failed',
+        details: JSON.stringify({ error: err.message }),
+      });
+    } catch (e) { /* best-effort */ }
     res.status(500).json({ error: err.message });
   }
 }
 
 module.exports = fetchEspnIntelligence;
+module.exports.mapInjuryItem = mapInjuryItem;
+module.exports.ACTIVE_SPORTS = ACTIVE_SPORTS;
