@@ -65,3 +65,29 @@ describe('home margin shift: a negative shift lowers every home cover probabilit
     expect(calc._homeCoverProb(-1.5, 0.4, 4.0, 'junk')).toBeCloseTo(base, 12);
   });
 });
+
+describe('shadow narration: a whole-sport shadow read needs no Claude call', () => {
+  test('carries the math pick, the three largest factors, zero tokens and the shadow model tag', () => {
+    const r = pm.shadowNarration(
+      { recommended_pick: 'Michigan Wolverines ML +170', recommended_side: 'home_ml', signedEdge: 0.025 },
+      { adjustments: [
+        { factor: 'Program strength, home', impact: 0.032 },
+        { factor: 'Injury impact (Michigan Wolverines)', impact: -0.008 },
+        { factor: 'Rest', impact: 0.004 },
+        { factor: 'Weather', impact: 0.001 },
+        { factor: 'junk', impact: 'x' },
+      ] });
+    expect(r.recommended_pick).toBe('Michigan Wolverines ML +170');
+    expect(r.recommended_side).toBe('home_ml');
+    expect(r.key_factors).toEqual(['Program strength, home +3.2pp', 'Injury impact (Michigan Wolverines) -0.8pp', 'Rest +0.4pp']);
+    expect(r.model_used).toBe('shadow-silent');
+    expect(r.prompt_tokens).toBe(0);
+    expect(r.completion_tokens).toBe(0);
+    expect(r.analysis_snippet).toMatch(/Shadow read/);
+  });
+  test('no pick and no factors still returns a complete result', () => {
+    const r = pm.shadowNarration(null, null);
+    expect(r.recommended_pick).toBeNull();
+    expect(r.key_factors).toEqual([]);
+  });
+});
