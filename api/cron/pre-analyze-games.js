@@ -27,7 +27,7 @@ const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.j
 const { withSeasonFloor } = require('../../lib/services/season-floor.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { tileRecords } = require('../../lib/services/tile-records.js');
-const { marketPublishOpen } = require('../../lib/services/publish-markets.js');
+const { marketPublishOpen, sportIsShadow, shadowNarration } = require('../../lib/services/publish-markets.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
@@ -1629,7 +1629,17 @@ async function runPreAnalysis(sportSlugs) {
           || (edgeData?.homeWinProb >= 0.65 || edgeData?.awayWinProb >= 0.65);
         const narrationModel = audienceWorthy ? MODELS.NARRATION : MODELS.UTILITY;
 
-        const result = await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx, pitcherCtx, narrationModel);
+        // A whole-sport shadow read is never narrated (owner 2026-09-14):
+        // the math runs, the edges are stored and graded into the shadow
+        // ledger, and the board withholds the read anyway, so the Claude
+        // call bought prose nobody could see. NCAAF narration alone
+        // breached the daily cost ceiling three Saturdays running.
+        // Narration resumes the morning promote_ready_markets opens a
+        // market for the sport.
+        const shadowSilent = !isTennis && await sportIsShadow(supabase, sportDisplay);
+        const result = shadowSilent
+          ? shadowNarration(mathPick, edgeData?.factors)
+          : await analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, playbook, prior, edgeData, mathPick, tennisCtx, pitcherCtx, narrationModel);
 
         // After the prompt is built: expose the tennis 30-day match record
         // through the stored record fields (tiles/digest), without letting
