@@ -49,19 +49,15 @@ async function getEspnLive() {
 }
 
 async function getNewsLines(playerName) {
+  // ESPN golf news tagged to the player (since 2026-09-14, the RSS path
+  // is gone). Two newest lines inside five days.
   try {
-    const q = playerName.replace(/[(),]/g, '').trim();
+    const q = String(playerName || '').replace(/[(),]/g, '').trim();
     if (!q) return null;
-    const fiveDaysAgo = new Date(Date.now() - 5 * 86400e3).toISOString();
-    const { data } = await supabase
-      .from('news_articles')
-      .select('title, betting_summary')
-      .gte('published_at', fiveDaysAgo)
-      .or(`title.ilike.%${q}%,summary.ilike.%${q}%`)
-      .order('published_at', { ascending: false })
-      .limit(2);
-    if (!data || data.length === 0) return null;
-    return data.map(a => a.betting_summary ? `${a.title}: ${a.betting_summary}` : a.title).join(' | ');
+    const { getNewsArticles } = require('../../lib/services/espn-news.js');
+    const arts = await getNewsArticles('Golf', [q], { maxAgeDays: 5, limit: 2 });
+    if (!arts || arts.length === 0) return null;
+    return arts.map(a => a.description ? `${a.headline}: ${a.description.substring(0, 150)}` : a.headline).join(' | ');
   } catch {
     return null;
   }

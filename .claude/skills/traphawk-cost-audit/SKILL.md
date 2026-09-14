@@ -18,7 +18,7 @@ Start by reading `agent_reports` for the last month (other workers may have alre
 | Web search fees | n/a | console only, $10 per 1000 searches, agent_debug has per-agent search counts |
 | Fact-check picks | Sonnet | NOT logged, count via ai_suggestions.fact_checked_at |
 | Golf notes | Sonnet | NOT logged, 1 call per tournament per run, 3 runs/day |
-| Enrich articles, news summarizer | Haiku | NOT logged, count news_articles.betting_summary |
+| Enrich articles, news summarizer | Haiku | RETIRED 2026-09-14 (owner, build_queue 36): both jobs unscheduled and the code removed, so this line is zero from that date. Before it, count news_articles.betting_summary |
 | Learning analyzer | Opus 4.8 | daily |
 | De-Genny chat | Sonnet | user-driven, usually zero |
 
@@ -65,7 +65,7 @@ select
      and published_at >= date_trunc('month', now())) as articles_enriched;
 ```
 
-Estimate fact-check at roughly 3k in / 1.5k out Sonnet tokens per check, golf at 2k in / 3k out per tournament call, enrichment at about 1.5k Haiku tokens per article.
+Estimate fact-check at roughly 3k in / 1.5k out Sonnet tokens per check, golf at 2k in / 3k out per tournament call, enrichment at about 1.5k Haiku tokens per article (only for months before 2026-09-14; the news path has no model call since then).
 
 ## Reconciliation
 

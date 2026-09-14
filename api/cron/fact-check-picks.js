@@ -131,14 +131,14 @@ async function gatherRealData(pick) {
   data.home_injuries = homeInjuries?.[0]?.summary || 'No injury data';
   data.away_injuries = awayInjuries?.[0]?.summary || 'No injury data';
 
-  // Get relevant articles
-  const { data: articles } = await supabase
-    .from('news_articles')
-    .select('title, betting_summary')
-    .or(`title.ilike.%${homeNick}%,title.ilike.%${awayNick}%`)
-    .order('published_at', { ascending: false })
-    .limit(5);
-  data.articles = (articles || []).map(a => `${a.title}: ${a.betting_summary || 'no analysis'}`);
+  // Related news: ESPN's news API tagged to the two clubs (since
+  // 2026-09-14 the RSS table is frozen and the enrichment pass is gone).
+  let articles = [];
+  try {
+    const { getNewsArticles } = require('../../lib/services/espn-news.js');
+    articles = await getNewsArticles(pick.sport, [pick.home_team, pick.away_team], { maxAgeDays: 5, limit: 5 });
+  } catch { articles = []; }
+  data.articles = (articles || []).map(a => `${a.headline}: ${a.description || 'no summary'}`);
 
   return data;
 }

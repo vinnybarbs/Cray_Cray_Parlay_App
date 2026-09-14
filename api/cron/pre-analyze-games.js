@@ -34,6 +34,7 @@ const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../..
 const { getCalibrationMultiplier } = require('../../lib/services/calibration-multiplier.js');
 const { practiceReportText } = require('../../lib/services/nfl-inactives.js');
 const { nflWeekFor } = require('../../lib/services/prop-edge.js');
+const espnNews = require('../../lib/services/espn-news.js');
 
 // One provider per process; the Elo table load is cached inside it, so a
 // 40-match tennis slate costs one pair of table reads, not 40.
@@ -605,36 +606,13 @@ async function voidFencedTennisRow(game) {
  * hallucinated cross-sport context. Source-of-truth beats coverage.
  */
 async function getNewsContext(homeTeam, awayTeam, sport) {
+  // Since 2026-09-14 (owner, build_queue 36): one structured ESPN news
+  // call per sport, articles tagged to the two clubs, newest five inside
+  // three days. The RSS ingester and the enrichment pass are gone. Sports
+  // without an ESPN news path (tennis, UFC, national team tournaments)
+  // get no news lines; their context comes from their own tables.
   try {
-    const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-
-    // Strip chars that break PostgREST filter syntax (commas, parens).
-    // Apostrophes are fine, supabase-js URL-encodes them.
-    const homeQuery = homeTeam.replace(/[(),]/g, '').trim();
-    const awayQuery = awayTeam.replace(/[(),]/g, '').trim();
-    if (!homeQuery || !awayQuery) return null;
-
-    const { data } = await supabase
-      .from('news_articles')
-      .select('title, summary, betting_summary, content, published_at')
-      .gte('published_at', threeDaysAgo)
-      .or(`title.ilike.%${homeQuery}%,title.ilike.%${awayQuery}%,summary.ilike.%${homeQuery}%,summary.ilike.%${awayQuery}%`)
-      .order('published_at', { ascending: false })
-      // Deterministic tiebreaker. 37 percent of articles share a published_at
-      // with another article, and without a secondary key Postgres returns
-      // ties in planner-dependent order, so the top-5 set shuffled between
-      // runs, churned the context hash, and re-narrated MLB for nothing.
-      .order('id', { ascending: false })
-      .limit(5);
-
-    if (!data || data.length === 0) return null;
-
-    return data.map(a => {
-      let line = `- ${a.title}`;
-      if (a.betting_summary) line += ` | BETTING: ${a.betting_summary}`;
-      if (a.content && !a.betting_summary) line += ` | ${a.content.substring(0, 150)}`;
-      return line;
-    }).join('\n');
+    return await espnNews.getNewsText(sport, [homeTeam, awayTeam], { maxAgeDays: 3, limit: 5 });
   } catch {
     return null;
   }

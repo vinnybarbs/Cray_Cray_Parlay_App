@@ -478,18 +478,17 @@ async function deepResearch(req, res) {
       return data || [];
     });
 
-    // 3. News articles mentioning either team (last 5 days, limit 10)
-    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString();
+    // 3. News about either team: ESPN's news API, tagged to the clubs,
+    //    last 5 days, limit 10 (since 2026-09-14 the RSS table is frozen).
     const articlesResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('news_articles')
-        .select('title, betting_summary, published_at, sentiment')
-        .or(`title.ilike.%${home_team}%,title.ilike.%${away_team}%`)
-        .gt('published_at', fiveDaysAgo)
-        .order('published_at', { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data || [];
+      const { getNewsArticles } = require('../lib/services/espn-news.js');
+      const arts = await getNewsArticles(sportCode, [home_team, away_team], { maxAgeDays: 5, limit: 10 });
+      return (arts || []).map(a => ({
+        title: a.headline,
+        betting_summary: a.description || null,
+        published_at: a.published,
+        sentiment: null,
+      }));
     });
 
     // 4. Current odds lines for this matchup. odds_cache stores one row per
