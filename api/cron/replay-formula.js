@@ -35,7 +35,7 @@ async function replayFormula(req, res) {
       // land in build_queue for the owner's Monday yes or no.
       if (String(req.query.file || '') === '1' && summary.run_id) {
         try {
-          const { data, error } = await supabase.rpc('file_replay_candidates', { p_run_id: summary.run_id });
+          const { data, error } = await supabase.rpc('file_replay_candidates', { p_run_id: summary.run_id, p_variants: summary.variants || [] });
           summary.candidates_filed = error ? `error: ${error.message}` : data;
         } catch (e) { summary.candidates_filed = `error: ${e.message}`; }
       }
