@@ -19,10 +19,101 @@
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const propEdge = require('../../lib/services/prop-edge.js');
 const { edgeTier } = require('../../lib/services/pick-grader.js');
+const { teamAbbr, nameKey } = require('../../lib/services/nfl-inactives.js');
+const { getWeatherForGames } = require('../../lib/services/weather-data.js');
 
 const SPORT = 'NFL';
+const ODDS_SPORT = 'americanfootball_nfl';
 const DIAL_SPORT = 'NFL_props';
 const WINDOW_HOURS = 24 * 4;
+// A week's stat file is in when this many player lines exist for it;
+// a pending read whose player has none after that is a book void.
+const WEEK_FILE_MIN_ROWS = 100;
+const VOID_AFTER_HOURS = 24;
+
+// ---------------------------------------------------------------------
+// v2 shadow inputs (2026-09-14, owner: yards markets can become reliable
+// with the right data). Every loader is fail soft: a missing input
+// leaves its factor at 1 and the v2 read still prices.
+// ---------------------------------------------------------------------
+
+/** Opponent allowance table from this season and last, pooled per game. */
+async function loadAllowance(season) {
+  const rows = [];
+  try {
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from('nfl_player_game_stats')
+        .select('opponent, game_id, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions')
+        .in('season', [season, season - 1])
+        .eq('season_type', 'REG')
+        .order('id', { ascending: true })
+        .range(from, from + 999);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 1000) break;
+    }
+  } catch { /* fail soft: empty table, ratios stay 1 */ }
+  return propEdge.allowanceTable(rows);
+}
+
+/** Player availability by name key: Sleeper status first, the week's official designation second. */
+async function loadStatuses(season, week) {
+  const byName = new Map();
+  try {
+    const { data } = await supabase.from('nfl_player_status').select('full_name, team, injury_status').not('injury_status', 'is', null);
+    for (const r of data || []) byName.set(nameKey(r.full_name), { status: r.injury_status, team: r.team, source: 'sleeper' });
+  } catch { /* optional */ }
+  try {
+    if (season != null && week != null) {
+      const { data } = await supabase.from('nfl_injury_reports').select('full_name, team, report_status')
+        .eq('season', season).eq('week', week).in('report_status', ['Out', 'Doubtful']);
+      for (const r of data || []) {
+        const k = nameKey(r.full_name);
+        if (!byName.has(k)) byName.set(k, { status: r.report_status, team: r.team, source: 'nflverse' });
+      }
+    }
+  } catch { /* optional */ }
+  return byName;
+}
+
+/** Median spread and total per event from every book, keyed by home|away. */
+async function loadGameLines(now, horizon) {
+  const byGame = new Map();
+  try {
+    const { data } = await supabase
+      .from('odds_cache')
+      .select('home_team, away_team, market_type, outcomes')
+      .eq('sport', ODDS_SPORT)
+      .in('market_type', ['spreads', 'totals'])
+      .gt('commence_time', now.toISOString())
+      .lt('commence_time', horizon.toISOString());
+    for (const r of data || []) {
+      const k = `${r.home_team}|${r.away_team}`;
+      if (!byGame.has(k)) byGame.set(k, { totals: [], homeSpreads: [] });
+      const g = byGame.get(k);
+      for (const o of r.outcomes || []) {
+        if (r.market_type === 'totals' && o?.name === 'Over' && Number.isFinite(Number(o.point))) g.totals.push(Number(o.point));
+        if (r.market_type === 'spreads' && o?.name === r.home_team && Number.isFinite(Number(o.point))) g.homeSpreads.push(Number(o.point));
+      }
+    }
+  } catch { /* optional */ }
+  const out = new Map();
+  for (const [k, g] of byGame) {
+    out.set(k, { total: propEdge.median(g.totals), homeSpread: propEdge.median(g.homeSpreads) });
+  }
+  return out;
+}
+
+/** Wind and roof per event, keyed by "away @ home". */
+async function loadWeather(events) {
+  const byGame = new Map();
+  try {
+    const { weather } = await getWeatherForGames(events.map(e => ({ home_team: e.home_team, away_team: e.away_team, game_date: e.commence_time })));
+    for (const w of weather || []) byGame.set(w.game, { wind_mph: w.wind_mph, roof: w.roof });
+  } catch { /* optional */ }
+  return byGame;
+}
 
 async function loadDials() {
   const dials = { ...propEdge.DIAL_DEFAULTS };
@@ -91,7 +182,7 @@ async function runRead() {
     const slice = playerKeys.slice(i, i + 100);
     const { data } = await supabase
       .from('nfl_player_game_stats')
-      .select('player_key, season, week, season_type, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions')
+      .select('player_key, season, week, season_type, team, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions')
       .in('player_key', slice)
       .order('season', { ascending: false })
       .order('week', { ascending: false });
@@ -100,6 +191,28 @@ async function runRead() {
       history.get(r.player_key).push(r);
     }
   }
+
+  // v2 inputs, one load each for the whole slate.
+  const events = [...new Map([...groups.values()].map(g => [g.meta.event_id, g.meta])).values()];
+  const firstWeek = events.length ? propEdge.nflWeekFor(events.map(e => e.commence_time).sort()[0]) : null;
+  const seasonNow = firstWeek ? firstWeek.season : propEdge.nflWeekFor(now)?.season || now.getUTCFullYear();
+  const [allowance, statuses, lines, weather] = await Promise.all([
+    loadAllowance(seasonNow),
+    loadStatuses(firstWeek?.season, firstWeek?.week),
+    loadGameLines(now, horizon),
+    loadWeather(events),
+  ]);
+  // Slate average implied points, the self normalizing scoring environment.
+  const implied = [];
+  for (const e of events) {
+    const l = lines.get(`${e.home_team}|${e.away_team}`);
+    if (!l || l.total == null || l.homeSpread == null) continue;
+    implied.push(propEdge.impliedTeamPoints(l.total, l.homeSpread), propEdge.impliedTeamPoints(l.total, -l.homeSpread));
+  }
+  const slateAvg = implied.length ? implied.reduce((a, b) => a + b, 0) / implied.length : null;
+  summary.v2 = { allowance_opponents: Object.keys(allowance.byOpponent).length, allowance_games: allowance.leagueGames,
+    statuses: statuses.size, lines: lines.size, weather: weather.size, slate_avg_implied: slateAvg ? Math.round(slateAvg * 10) / 10 : null,
+    read: 0, unavailable: 0, no_team: 0 };
 
   const out = [];
   for (const { meta, rows } of groups.values()) {
@@ -115,7 +228,45 @@ async function runRead() {
     }, dials);
     if (!read) { summary.no_consensus++; continue; }
     const wk = propEdge.nflWeekFor(meta.commence_time);
+
+    // v2: the same baseline scaled by opponent allowance, the team's
+    // implied points and the wind, skipped when the player is listed
+    // out. Stored next to v1, graded next to v1, never published.
+    const homeAbbr = teamAbbr(meta.home_team), awayAbbr = teamAbbr(meta.away_team);
+    const statusRow = statuses.get(nameKey(meta.player_name)) || null;
+    const lastTeam = (history.get(meta.player_key) || []).find(g => g.team)?.team || null;
+    let team = [homeAbbr, awayAbbr].includes(lastTeam) ? lastTeam
+      : [homeAbbr, awayAbbr].includes(statusRow?.team) ? statusRow.team : null;
+    const opponent = team ? (team === homeAbbr ? awayAbbr : homeAbbr) : null;
+    const line = lines.get(`${meta.home_team}|${meta.away_team}`) || null;
+    const teamSpread = line && line.homeSpread != null ? (team === homeAbbr ? line.homeSpread : -line.homeSpread) : null;
+    const teamImplied = team && line ? propEdge.impliedTeamPoints(line.total, teamSpread) : null;
+    const wx = weather.get(`${meta.away_team} @ ${meta.home_team}`) || null;
+    const opp = propEdge.allowanceRatio(allowance, opponent, meta.market);
+    const v2 = propEdge.propReadV2({
+      market: meta.market, line: consensus.line, anchorOverProb: consensus.overProb,
+      mean: baseline.mean, sigma: baseline.sigma, games: baseline.games,
+      oppRatio: opponent ? opp.ratio : 1,
+      envRatio: teamImplied != null && slateAvg ? teamImplied / slateAvg : 1,
+      windMph: wx?.wind_mph, roof: wx?.roof, status: statusRow?.status || null,
+    }, dials);
+    if (!team) summary.v2.no_team++;
+    if (v2?.skipped) summary.v2.unavailable++; else if (v2) summary.v2.read++;
+    const v2Cols = v2 && !v2.skipped ? {
+      v2_mean: Math.round(v2.meanV2 * 100) / 100,
+      v2_prob: Math.round(v2.dampedProb * 10000) / 10000,
+      v2_edge_pp: v2.edgePp,
+      v2_side: v2.side,
+      v2_tier: edgeTier(v2.edgePp),
+      v2_outcome: 'pending',
+      v2_factors: { ...v2.factors, team, opponent, opp_games: opp.games, team_implied: teamImplied != null ? Math.round(teamImplied * 10) / 10 : null, status_source: statusRow?.source || null },
+    } : {
+      v2_mean: null, v2_prob: null, v2_edge_pp: null, v2_side: null, v2_tier: null, v2_outcome: null,
+      v2_factors: { skipped: v2?.skipped || 'no_read', status: v2?.status || null, team, opponent },
+    };
+
     out.push({
+      ...v2Cols,
       sport: SPORT,
       event_id: meta.event_id,
       commence_time: meta.commence_time,
@@ -169,9 +320,11 @@ async function runRead() {
 async function runGrade() {
   const started = Date.now();
   const summary = { pending: 0, graded: 0, won: 0, lost: 0, push: 0, no_stat: 0, errors: [] };
+  summary.voided = 0;
+  summary.v2_graded = 0;
   const { data: pending, error } = await supabase
     .from('prop_reads')
-    .select('id, player_key, season, week, market, line, side')
+    .select('id, player_key, season, week, market, line, side, commence_time, v2_side')
     .eq('actual_outcome', 'pending')
     .lt('commence_time', new Date(Date.now() - 4 * 3600 * 1000).toISOString())
     .not('season', 'is', null);
@@ -190,18 +343,39 @@ async function runGrade() {
       .in('season', seasons);
     for (const r of data || []) stats.set(`${r.player_key}|${r.season}|${r.week}`, r);
   }
+  // Which (season, week) files have landed: a week with a real stat
+  // file has hundreds of player lines. A pending read older than a day
+  // whose player has no line in a landed week is a book void, not a
+  // pick that waits forever (13 such rows after week 1, 2026-09-14).
+  const landed = new Set();
+  for (const wk of [...new Set(pending.map(p => `${p.season}|${p.week}`))]) {
+    const [season, week] = wk.split('|').map(Number);
+    const { count } = await supabase.from('nfl_player_game_stats').select('id', { count: 'exact', head: true }).eq('season', season).eq('week', week);
+    if ((count || 0) >= WEEK_FILE_MIN_ROWS) landed.add(wk);
+  }
+  const voidBefore = Date.now() - VOID_AFTER_HOURS * 3600 * 1000;
   for (const p of pending) {
     const row = stats.get(`${p.player_key}|${p.season}|${p.week}`);
-    if (!row) { summary.no_stat++; continue; }
+    if (!row) {
+      if (landed.has(`${p.season}|${p.week}`) && new Date(p.commence_time).getTime() < voidBefore) {
+        const { error: vErr } = await supabase.from('prop_reads')
+          .update({ actual_outcome: 'void', v2_outcome: p.v2_side ? 'void' : null, graded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('id', p.id);
+        if (vErr) summary.errors.push(vErr.message); else summary.voided++;
+      } else summary.no_stat++;
+      continue;
+    }
     const actual = row[propEdge.STAT_COLUMN[p.market]];
     const outcome = propEdge.gradeRead(p.side, p.line, actual);
     if (!outcome) { summary.no_stat++; continue; }
+    const v2Outcome = p.v2_side ? propEdge.gradeRead(p.v2_side, p.line, actual) : null;
     const { error: upErr } = await supabase.from('prop_reads')
-      .update({ actual_value: actual, actual_outcome: outcome, graded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .update({ actual_value: actual, actual_outcome: outcome, v2_outcome: v2Outcome, graded_at: new Date().toISOString(), updated_at: new Date().toISOString() })
       .eq('id', p.id);
     if (upErr) { summary.errors.push(upErr.message); continue; }
     summary.graded++;
     summary[outcome]++;
+    if (v2Outcome) summary.v2_graded++;
   }
   summary.duration_ms = Date.now() - started;
   await log(summary.errors.length ? 'partial' : 'completed', summary, 'grade-nfl-props');

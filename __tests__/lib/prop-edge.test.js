@@ -105,3 +105,66 @@ describe('nflWeekFor and gradeRead', () => {
     expect(pe.gradeRead('over', 4, null)).toBeNull();
   });
 });
+
+// v2 shadow read (2026-09-14): the v1 baseline scaled by opponent
+// allowance, team implied points and wind, skipped when the player is
+// listed out. Stored beside v1, graded beside v1, never published.
+describe('v2 shadow read', () => {
+  const lines = [
+    { opponent: 'DAL', game_id: 'g1', passing_yards: 300, passing_tds: 2, rushing_yards: 100, receiving_yards: 300, receptions: 20 },
+    { opponent: 'DAL', game_id: 'g1', passing_yards: 0, passing_tds: 0, rushing_yards: 50, receiving_yards: 0, receptions: 0 },
+    { opponent: 'DAL', game_id: 'g2', passing_yards: 260, passing_tds: 1, rushing_yards: 90, receiving_yards: 260, receptions: 18 },
+    { opponent: 'DAL', game_id: 'g3', passing_yards: 280, passing_tds: 3, rushing_yards: 80, receiving_yards: 280, receptions: 22 },
+    { opponent: 'NYJ', game_id: 'g4', passing_yards: 180, passing_tds: 1, rushing_yards: 120, receiving_yards: 180, receptions: 15 },
+    { opponent: 'NYJ', game_id: 'g5', passing_yards: 200, passing_tds: 0, rushing_yards: 110, receiving_yards: 200, receptions: 14 },
+    { opponent: 'NYJ', game_id: 'g6', passing_yards: 190, passing_tds: 1, rushing_yards: 130, receiving_yards: 190, receptions: 16 },
+  ];
+  test('allowanceTable pools per game and allowanceRatio compares to the league', () => {
+    const t = pe.allowanceTable(lines);
+    expect(t.byOpponent.DAL.games).toBe(3);
+    expect(t.byOpponent.DAL.passing_yards).toBeCloseTo(280, 5);
+    expect(t.leagueGames).toBe(6);
+    expect(t.league.passing_yards).toBeCloseTo(235, 5);
+    expect(pe.allowanceRatio(t, 'DAL', 'player_pass_yds').ratio).toBeCloseTo(280 / 235, 5);
+    expect(pe.allowanceRatio(t, 'NYJ', 'player_rush_yds').ratio).toBeGreaterThan(1);
+    expect(pe.allowanceRatio(t, 'KC', 'player_pass_yds')).toEqual({ ratio: 1, games: 0 });
+  });
+  test('allowanceRatio needs three games before it argues', () => {
+    const t = pe.allowanceTable(lines.slice(0, 2));
+    expect(pe.allowanceRatio(t, 'DAL', 'player_pass_yds').ratio).toBe(1);
+  });
+  test('impliedTeamPoints splits the total by the spread', () => {
+    expect(pe.impliedTeamPoints(43.5, -2.5)).toBeCloseTo(23, 5);
+    expect(pe.impliedTeamPoints(43.5, 2.5)).toBeCloseTo(20.5, 5);
+    expect(pe.impliedTeamPoints(null, 2.5)).toBeNull();
+  });
+  test('windFactor drags passing markets outdoors from 15 mph and ignores domes and rushing', () => {
+    expect(pe.windFactor('player_pass_yds', 10, 'none', 0.1)).toBe(1);
+    expect(pe.windFactor('player_pass_yds', 30, 'none', 0.1)).toBeCloseTo(0.9, 5);
+    expect(pe.windFactor('player_pass_yds', 22.5, 'none', 0.1)).toBeCloseTo(0.95, 5);
+    expect(pe.windFactor('player_pass_yds', 30, 'dome', 0.1)).toBe(1);
+    expect(pe.windFactor('player_rush_yds', 30, 'none', 0.1)).toBe(1);
+  });
+  test('propReadV2 scales the mean by half the measured ratios and keeps the v1 anchor and damp', () => {
+    const base = { market: 'player_pass_yds', line: 250, anchorOverProb: 0.5, mean: 250, sigma: 45, games: 17 };
+    const flat = pe.propReadV2({ ...base, oppRatio: 1, envRatio: 1 });
+    expect(flat.meanV2).toBeCloseTo(250, 5);
+    // normCdf is a polynomial approximation, exact to about 1e-7 at zero.
+    expect(Math.abs(flat.edgeOver)).toBeLessThan(1e-6);
+    const soft = pe.propReadV2({ ...base, oppRatio: 1.2, envRatio: 1.1 });
+    expect(soft.meanV2).toBeCloseTo(250 * 1.1 * 1.05, 5);
+    expect(soft.side).toBe('over');
+    expect(soft.factors.opp_factor).toBeCloseTo(1.1, 3);
+    const windy = pe.propReadV2({ ...base, oppRatio: 1, envRatio: 1, windMph: 30, roof: 'none' });
+    expect(windy.side).toBe('under');
+    expect(windy.factors.wind_factor).toBeCloseTo(0.9, 3);
+  });
+  test('a player listed out is skipped, questionable is priced', () => {
+    const base = { market: 'player_rush_yds', line: 50, anchorOverProb: 0.5, mean: 60, sigma: 22, games: 10 };
+    expect(pe.propReadV2({ ...base, status: 'Out' })).toEqual({ skipped: 'unavailable', status: 'Out' });
+    expect(pe.propReadV2({ ...base, status: 'IR' }).skipped).toBe('unavailable');
+    expect(pe.propReadV2({ ...base, status: 'Questionable' }).side).toBe('over');
+    expect(pe.isUnavailable('doubtful')).toBe(true);
+    expect(pe.isUnavailable(null)).toBe(false);
+  });
+});
