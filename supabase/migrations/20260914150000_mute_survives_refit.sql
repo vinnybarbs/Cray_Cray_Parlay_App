@@ -187,7 +187,7 @@ begin
   -- starts with the edge_calibration key.
   for d in
     select e.key, e.multiplier, e.source, e.updated_at,
-           (select m.after from model_weight_changes m where m.component ilike e.key || ' %' or m.component ilike e.key || '%' order by m.changed_at desc limit 1) as latest_after
+           (select m.after from model_weight_changes m where m.component ilike e.key || ' %' or m.component = e.key order by m.changed_at desc limit 1) as latest_after
       from edge_calibration e
      where e.multiplier <> 0
   loop
