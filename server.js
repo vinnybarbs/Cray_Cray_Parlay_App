@@ -446,6 +446,16 @@ app.post('/cron/discord-morning-board', discordMorningBoard);
 const syncNflverseStats = require('./api/cron/sync-nflverse-player-stats');
 app.post('/cron/sync-nflverse-player-stats', syncNflverseStats);
 
+// NFL availability the line prices earlier and later than the Friday
+// designation list (build_queue 11, 2026-09-14): the official practice
+// report and depth charts from nflverse every 6 hours, and a late
+// scratch watch near kickoff that re-reads a game through the existing
+// formula when ESPN's game summary flips a player to Out.
+const syncNflInjuries = require('./api/cron/sync-nfl-injuries');
+app.post('/cron/sync-nfl-injuries', syncNflInjuries);
+const watchNflInactives = require('./api/cron/watch-nfl-inactives');
+app.post('/cron/watch-nfl-inactives', watchNflInactives);
+
 // Probe every upstream data source so we get a loud alert when ESPN (or any
 // other vendor) silently changes JSON shape. Writes to data_source_health.
 const probeDataSources = require('./api/cron/probe-data-sources');

@@ -47,7 +47,7 @@ Work on the session's designated claude/ branch. After a squash merge, the branc
 
 ## Sandbox limits (things that fail locally but work in production)
 
-- ESPN APIs (site.api.espn.com, sports.core.api.espn.com) are blocked by the dev proxy. Code against recorded payload shapes, verify in prod.
+- ESPN APIs (site.api.espn.com, sports.core.api.espn.com), nflverse releases and the live app are blocked under the Default (Trusted) cloud environment. A session started in a Custom environment that lists site.web.api.espn.com, site.api.espn.com, sports.core.api.espn.com, github.com (nflverse release downloads), craycrayparlayapp-production.up.railway.app and traphawk.io can probe them directly (2026-09-14). Otherwise code against recorded payload shapes and verify in prod.
 - External APIs generally: test through mocked fetch, then verify live after deploy.
 
 ## File a build report

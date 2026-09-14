@@ -32,6 +32,8 @@ const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/disc
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
 const { getCalibrationMultiplier } = require('../../lib/services/calibration-multiplier.js');
+const { practiceReportText } = require('../../lib/services/nfl-inactives.js');
+const { nflWeekFor } = require('../../lib/services/prop-edge.js');
 
 // One provider per process; the Elo table load is cached inside it, so a
 // 40-match tennis slate costs one pair of table reads, not 40.
@@ -641,8 +643,18 @@ async function getNewsContext(homeTeam, awayTeam, sport) {
 /**
  * Get injury context from ESPN intelligence (news_cache table)
  */
-async function getInjuryContext(homeTeam, awayTeam) {
+async function getInjuryContext(homeTeam, awayTeam, sport = null, gameDate = null) {
   try {
+    // NFL: the official practice report (nflverse, nfl_injury_reports)
+    // carries Wednesday to Friday participation the ESPN status list
+    // lacks. Narration context only; the injury factor's math reads the
+    // ESPN feed unchanged. Falls through to news_cache before the week's
+    // report is in.
+    if (sport === 'NFL' && gameDate) {
+      const report = await practiceReportText(supabase, homeTeam, awayTeam, gameDate, nflWeekFor);
+      if (report) return report;
+    }
+
     // Try exact team name match in news_cache (ESPN injuries)
     const { data } = await supabase
       .from('news_cache')
@@ -1384,7 +1396,7 @@ async function runPreAnalysis(sportSlugs) {
         // Fetch context in parallel: DB queries + news
         const [newsCtxRaw, injuryCtx, rankCtx, homeTrend, awayTrend, accuracy, playerStatsCtx, intelCtx, tennisData, pitcherCtx] = await Promise.all([
           getNewsContext(game.home_team, game.away_team, sportDisplay),
-          skipTeamCtx ? null : getInjuryContext(game.home_team, game.away_team),
+          skipTeamCtx ? null : getInjuryContext(game.home_team, game.away_team, sportDisplay, game.game_date),
           skipTeamCtx ? Promise.resolve(emptyRankCtx) : getRankingsContext(game.home_team, game.away_team, sportDisplay),
           skipTeamCtx ? null : getRecentResults(game.home_team, game.sport),
           skipTeamCtx ? null : getRecentResults(game.away_team, game.sport),
@@ -2224,3 +2236,6 @@ async function runPreAnalysis(sportSlugs) {
 }
 
 module.exports = preAnalyzeGames;
+// watch-nfl-inactives re-runs the NFL slate in process after a late
+// scratch marks an analysis stale.
+module.exports.runPreAnalysis = runPreAnalysis;
