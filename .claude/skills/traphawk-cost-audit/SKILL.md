@@ -19,7 +19,7 @@ Start by reading `agent_reports` for the last month (other workers may have alre
 | Fact-check picks | Sonnet | NOT logged, count via ai_suggestions.fact_checked_at |
 | Golf notes | Sonnet | NOT logged, 1 call per tournament per run, 3 runs/day |
 | Enrich articles, news summarizer | Haiku | RETIRED 2026-09-14 (owner, build_queue 36): both jobs unscheduled and the code removed, so this line is zero from that date. Before it, count news_articles.betting_summary |
-| Learning analyzer | Opus 4.8 | daily |
+| Learning analyzer | Opus 4.8 | RETIRED 2026-09-15 (owner): analyze-outcomes-daily unscheduled, the route stays but nothing calls it, so this line is zero from that date. Before it, five picks a day into ai_suggestions.post_analysis |
 | De-Genny chat | Sonnet | user-driven, usually zero |
 
 Weather costs zero (Open-Meteo API since Aug 2026). Pricing changes matter: Sonnet 5 intro pricing ($2/$10 per MTok) ends 2026-08-31, standard is $3/$15. Opus 4.8 is $5/$25, Haiku 4.5 $1/$5. The logged `cost` field always uses standard Sonnet rates, so billed narration cost is lower than logged until the intro window closes.
@@ -71,7 +71,7 @@ Estimate fact-check at roughly 3k in / 1.5k out Sonnet tokens per check, golf at
 
 Build a where-the-money-goes table in dollars per day per call site, sum it, and compare against the console (console.anthropic.com, Cost page, filter to the Cray key). Token cost and web search cost are separate console lines. If the console exceeds your bottom-up sum by more than about 20%, something is calling the API without logging: check for new code paths since the last audit (`git log` on lib/services and api/cron) before assuming rate changes.
 
-The console chart grouped by model is the fastest cross-check: Sonnet should dominate, Opus should be a sliver (injury scout plus learning analyzer). An Opus surge means a model assignment regressed.
+The console chart grouped by model is the fastest cross-check: Sonnet should dominate, Opus should be a sliver (injury scout only since 2026-09-15). An Opus surge means a model assignment regressed.
 
 ## Flags worth raising
 
