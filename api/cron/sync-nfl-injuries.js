@@ -23,7 +23,8 @@
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { parseCsv, defaultSeason } = require('./sync-nflverse-player-stats.js');
-const { mapInjuryRow, latestDepthChartRows } = require('../../lib/services/nfl-inactives.js');
+const { mapInjuryRow, depthChartRows } = require('../../lib/services/nfl-inactives.js');
+const { DEPTH_WINDOW_DAYS } = require('../../lib/services/football-injuries.js');
 
 const INJURIES_URL = (season) =>
   `https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_${season}.csv`;
@@ -83,55 +84,70 @@ async function syncInjuries(season, summary) {
 /**
  * The depth chart release is a snapshot history (518k lines, 49MB on
  * 2026-09-14) and parsing it whole peaked at 627MB of heap. The first
- * two columns are dt and team, so find each team's newest dt with a
- * cheap slice per line and parse only those lines.
+ * two columns are dt and team, so keep, with a cheap slice per line,
+ * only the lines at or after sinceIso and parse those. Since 2026-09-15
+ * the table holds a rolling DEPTH_WINDOW_DAYS window per club (the
+ * depth gate reads each player's best rank over it), and each run
+ * keeps only snapshots newer than what is stored.
  */
-function latestDepthChartText(text) {
+function recentDepthChartText(text, sinceIso) {
   const lines = text.split(/\r?\n/);
   const header = lines[0] || '';
-  const newest = new Map();
-  const dtTeam = (line) => {
+  const dtOf = (line) => {
     const i1 = line.indexOf(',');
-    if (i1 < 0) return null;
-    const i2 = line.indexOf(',', i1 + 1);
-    if (i2 < 0) return null;
-    return [line.slice(0, i1), line.slice(i1 + 1, i2)];
+    return i1 < 0 ? null : line.slice(0, i1);
   };
-  for (let i = 1; i < lines.length; i++) {
-    const p = dtTeam(lines[i]);
-    if (!p) continue;
-    const prev = newest.get(p[1]);
-    if (!prev || p[0] > prev) newest.set(p[1], p[0]);
-  }
   const kept = [header];
+  let newest = null;
   for (let i = 1; i < lines.length; i++) {
-    const p = dtTeam(lines[i]);
-    if (p && newest.get(p[1]) === p[0]) kept.push(lines[i]);
+    const dt = dtOf(lines[i]);
+    if (!dt) continue;
+    if (!newest || dt > newest) newest = dt;
+    if (!sinceIso || dt >= sinceIso) kept.push(lines[i]);
   }
-  return { text: kept.join('\n'), lines_in_file: Math.max(0, lines.filter(l => l !== '').length - 1) };
+  return { text: kept.join('\n'), newest, lines_in_file: Math.max(0, lines.filter(l => l !== '').length - 1) };
 }
-
 async function syncDepthCharts(season, summary) {
   const s = summary.depth_charts;
   const got = await download(DEPTH_URL(season));
   if (got.missing) { s.status = 'skipped'; s.reason = 'season file not published yet'; return; }
-  const latest = latestDepthChartText(got.text);
+  const windowStart = new Date(Date.now() - DEPTH_WINDOW_DAYS * 24 * 3600 * 1000).toISOString();
+  // Only snapshots newer than the newest stored one are parsed and
+  // written, so the six hourly run touches a day of rows, not a month.
+  let sinceIso = windowStart;
+  const [{ data: maxRow }, { data: minRow }] = await Promise.all([
+    supabase.from('nfl_depth_charts').select('snapshot_at').order('snapshot_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('nfl_depth_charts').select('snapshot_at').order('snapshot_at', { ascending: true }).limit(1).maybeSingle(),
+  ]);
+  const storedNewest = maxRow?.snapshot_at ? new Date(maxRow.snapshot_at).toISOString() : null;
+  const storedOldest = minRow?.snapshot_at ? new Date(minRow.snapshot_at).toISOString() : null;
+  // Backfill the whole window when the table does not reach back to it
+  // (first run after the window shipped, or a gap), otherwise only what
+  // is newer than stored.
+  const backfillEdge = new Date(Date.now() - (DEPTH_WINDOW_DAYS - 2) * 24 * 3600 * 1000).toISOString();
+  const backfill = !storedOldest || storedOldest > backfillEdge;
+  if (!backfill && storedNewest && storedNewest > sinceIso) sinceIso = storedNewest.replace(/\.\d{3}Z$/, 'Z');
+  const recent = recentDepthChartText(got.text, sinceIso);
   got.text = null;
-  s.rows_in_file = latest.lines_in_file;
-  const rows = latestDepthChartRows(rowsAsObjects(latest.text));
+  s.rows_in_file = recent.lines_in_file;
+  s.newest_in_file = recent.newest;
+  s.since = sinceIso;
+  s.backfill = backfill;
+  const rows = depthChartRows(rowsAsObjects(recent.text), sinceIso)
+    .filter(r => backfill || !storedNewest || r.snapshot_at > storedNewest);
   s.rows_mapped = rows.length;
-  if (rows.length === 0) { s.status = 'partial'; s.reason = 'file downloaded, no snapshot rows'; return; }
-  // Each team's chart is replaced whole: drop the slots the newest
-  // snapshot no longer lists, then upsert the snapshot.
-  const snapshotByTeam = new Map();
-  for (const r of rows) snapshotByTeam.set(r.team, r.snapshot_at);
-  for (const [team, snap] of snapshotByTeam) {
-    const { error } = await supabase.from('nfl_depth_charts').delete().eq('team', team).lt('snapshot_at', snap);
-    if (error) summary.errors.push(`depth delete ${team}: ${error.message}`);
+  // Roll the window: drop snapshots older than DEPTH_WINDOW_DAYS.
+  const { error: delErr } = await supabase.from('nfl_depth_charts').delete().lt('snapshot_at', windowStart);
+  if (delErr) summary.errors.push(`depth window delete: ${delErr.message}`);
+  if (rows.length === 0) {
+    s.status = storedNewest ? 'completed' : 'partial';
+    s.reason = storedNewest ? 'no snapshot newer than stored' : 'file downloaded, no snapshot rows';
+    return;
   }
-  await upsertChunks('nfl_depth_charts', rows, 'team,pos_grp,pos_abb,pos_slot,pos_rank', summary, 'depth_charts');
-  s.teams = snapshotByTeam.size;
-  s.newest_snapshot = [...snapshotByTeam.values()].sort().pop() || null;
+  await upsertChunks('nfl_depth_charts', rows, 'team,snapshot_at,pos_grp,pos_abb,pos_slot,pos_rank', summary, 'depth_charts');
+  s.teams = new Set(rows.map(r => r.team)).size;
+  s.snapshots = new Set(rows.map(r => r.snapshot_at)).size;
+  s.newest_snapshot = rows.map(r => r.snapshot_at).sort().pop() || null;
   s.status = s.rows_upserted > 0 ? 'completed' : 'partial';
 }
 
@@ -182,4 +198,4 @@ async function syncNflInjuries(req, res) {
 module.exports = syncNflInjuries;
 module.exports.runSync = runSync;
 module.exports.rowsAsObjects = rowsAsObjects;
-module.exports.latestDepthChartText = latestDepthChartText;
+module.exports.recentDepthChartText = recentDepthChartText;

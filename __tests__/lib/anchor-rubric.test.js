@@ -152,8 +152,38 @@ describe('home advantage never stacks on the market anchor (2026-09-12)', () => 
       markets: { h2h: [{ name: 'Detroit Lions', price: -340 }, { name: 'New Orleans Saints', price: 270 }] } };
     const out = await calc.calculateEdge(game);
     expect(out).not.toBeNull();
-    expect((out.factors.adjustments || []).some(a => a.factor === 'Home advantage')).toBe(false);
+    expect((out.adjustments || []).some(a => a.factor === 'Home advantage')).toBe(false);
     expect(out.factors.marketAnchored).toBe(true);
     expect(Math.abs(out.edgesRaw.home_ml)).toBeLessThan(0.005);
+  });
+});
+
+describe('the playoff seed prior is a dial and football runs it at zero (2026-09-15)', () => {
+  function anchoredCalc(dials) {
+    const { EdgeCalculator } = require('../../lib/services/edge-calculator');
+    const calc = new EdgeCalculator({});
+    calc._loadDials = async () => dials;
+    calc.getTeamRecord = async () => null;
+    calc.getRecentForm = async () => null;
+    calc.getInjuryImpact = async () => 0;
+    calc._getScheduleStrength = async () => null;
+    calc.getStandingsSnapshot = async (team) => ({ team_name: team, record: '1-0', streak: null, last_10: null, home_record: '1-0', away_record: '0-0', playoff_seed: team === 'Detroit Lions' ? 1 : 7, win_percentage: '1.000' });
+    calc._getCalibration = async () => ({});
+    return calc;
+  }
+  const game = { sport: 'americanfootball_nfl', home_team: 'Detroit Lions', away_team: 'New Orleans Saints', game_date: '2026-09-13T17:00:00Z',
+    markets: { h2h: [{ name: 'Detroit Lions', price: -340 }, { name: 'New Orleans Saints', price: 270 }] } };
+
+  test('seed_weight 0 removes the seed row from an anchored read', async () => {
+    const out = await anchoredCalc(new Map([['NFL|seed_weight', 0]])).calculateEdge(game);
+    expect(out).not.toBeNull();
+    expect((out.adjustments || []).some(a => /playoff seed/i.test(a.factor))).toBe(false);
+  });
+
+  test('seed_weight 1 keeps the prior (the pre 2026-09-15 read)', async () => {
+    const out = await anchoredCalc(new Map([['__all__|seed_weight', 1]])).calculateEdge(game);
+    const row = (out.adjustments || []).find(a => /playoff seed/i.test(a.factor));
+    expect(row).toBeDefined();
+    expect(row.impact).toBeCloseTo(0.03, 5);
   });
 });

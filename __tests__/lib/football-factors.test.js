@@ -1,4 +1,4 @@
-const { positionImpact, teamImpact, getFootballInjuryImpact, _setTeams, _resetCache } = require('../../lib/services/football-injuries');
+const { positionImpact, teamImpact, getFootballInjuryImpact, depthWeight, lookupRank, _setTeams, _setDepthRanks, _resetCache } = require('../../lib/services/football-injuries');
 const { footballTotalPenalty } = require('../../lib/services/weather-data');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator');
 
@@ -35,6 +35,70 @@ describe('teamImpact', () => {
   });
 });
 
+describe('the depth chart gate (2026-09-15)', () => {
+  test('rank 1 full, rank 2 the dial, rank 3 and below nothing, unknown the other dial', () => {
+    expect(depthWeight(1)).toBe(1);
+    expect(depthWeight(2)).toBe(0.5);
+    expect(depthWeight(2, { depth2: 0.25 })).toBe(0.25);
+    expect(depthWeight(3)).toBe(0);
+    expect(depthWeight(4)).toBe(0);
+    expect(depthWeight(null)).toBe(0.5);
+    expect(depthWeight(undefined, { unknown: 0 })).toBe(0);
+  });
+
+  test('positionImpact scales by the gate weight', () => {
+    expect(positionImpact('QB', 'Out', 1)).toBeCloseTo(-0.06, 5);
+    expect(positionImpact('QB', 'Out', 0.5)).toBeCloseTo(-0.03, 5);
+    expect(positionImpact('QB', 'Out', 0)).toBe(0);
+  });
+
+  test('lookupRank prefers the ESPN id, then name and position, then name', () => {
+    const ranks = new Map([['GB', new Map([
+      ['id:4047365', 1], ['name:josh jacobs|RB', 1], ['name:josh jacobs', 1],
+      ['name:chris brooks|RB', 2], ['name:chris brooks', 2],
+    ])]]);
+    expect(lookupRank(ranks, 'GB', { player: 'J. Jacobs', position: 'RB', espnId: '4047365' })).toBe(1);
+    expect(lookupRank(ranks, 'GB', { player: 'Chris Brooks', position: 'RB' })).toBe(2);
+    expect(lookupRank(ranks, 'GB', { player: 'Chris Brooks', position: 'FB' })).toBe(2);
+    expect(lookupRank(ranks, 'GB', { player: 'Nobody', position: 'RB' })).toBeNull();
+    expect(lookupRank(ranks, 'KC', { player: 'Chris Brooks', position: 'RB' })).toBeNull();
+    expect(lookupRank(null, 'GB', { player: 'Chris Brooks' })).toBeNull();
+  });
+
+  test('a third string quarterback out costs nothing and the starter costs 6pp', async () => {
+    _setTeams(new Map([
+      ['kansas city chiefs', [
+        { player: 'Garrett Nussmeier', position: 'QB', status: 'Out', espnId: '999' },
+      ]],
+      ['green bay packers', [
+        { player: 'Josh Jacobs', position: 'RB', status: 'Out', espnId: '4047365' },
+        { player: 'Jordan Love', position: 'QB', status: 'Out' },
+      ]],
+    ]));
+    const ranks = new Map([
+      ['KC', new Map([['id:999', 3], ['name:garrett nussmeier', 3]])],
+      // Jacobs is rank 4 on the newest chart but the window floor is 1.
+      ['GB', new Map([['id:4047365', 1], ['name:josh jacobs', 1], ['name:jordan love|QB', 1], ['name:jordan love', 1]])],
+    ]);
+    const kc = await getFootballInjuryImpact('Kansas City Chiefs', { depthRanks: ranks });
+    expect(kc.impact).toBe(0);
+    expect(kc.out).toBe(1);
+    expect(kc.lines[0]).toMatchObject({ depth_rank: 3, depth_weight: 0 });
+    const gb = await getFootballInjuryImpact('Green Bay Packers', { depthRanks: ranks });
+    expect(gb.impact).toBeCloseTo(-0.075, 5);
+    expect(gb.keyLoss).toContain('Jordan Love');
+    expect(gb.keyLoss).toContain('rank 1');
+  });
+
+  test('a player the chart does not list costs the unknown share, never zero by default', async () => {
+    _setTeams(new Map([['denver broncos', [{ player: 'Mystery Man', position: 'QB', status: 'Out' }]]]));
+    const r = await getFootballInjuryImpact('Denver Broncos', { depthRanks: new Map([['DEN', new Map()]]) });
+    expect(r.impact).toBeCloseTo(-0.03, 5);
+    const z = await getFootballInjuryImpact('Denver Broncos', { depthRanks: new Map([['DEN', new Map()]]), unknownWeight: 0 });
+    expect(z.impact).toBe(0);
+  });
+});
+
 describe('getFootballInjuryImpact', () => {
   afterEach(() => _resetCache());
 
@@ -45,8 +109,11 @@ describe('getFootballInjuryImpact', () => {
         { player: 'Some Punter', position: 'P', status: 'Out' },
       ]],
     ]));
+    // No depth ranks supplied: every line is unknown rank at half weight.
     const r = await getFootballInjuryImpact('Chiefs');
-    expect(r.impact).toBeCloseTo(-0.017, 4);
+    expect(r.impact).toBeCloseTo(-0.0085, 4);
+    const full = await getFootballInjuryImpact('Chiefs', { unknownWeight: 1 });
+    expect(full.impact).toBeCloseTo(-0.017, 4);
     expect(r.questionable).toBe(1);
     expect(r.out).toBe(1);
     expect(r.keyLoss).toContain('Mahomes');

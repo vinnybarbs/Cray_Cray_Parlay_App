@@ -2,7 +2,7 @@ process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase
 process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy';
 
 const {
-  teamAbbr, normalizeAbbr, mapInjuryRow, latestDepthChartRows,
+  teamAbbr, normalizeAbbr, mapInjuryRow, latestDepthChartRows, depthChartRows,
   parseSummaryInjuries, diffScratches, matchEvent, linesForTeam, practiceReportText,
 } = require('../../lib/services/nfl-inactives');
 const { mapInjuryItem, ACTIVE_SPORTS } = require('../../api/cron/fetch-espn-intelligence');
@@ -61,22 +61,37 @@ describe('latestDepthChartRows (nflverse depth_charts snapshot history)', () => 
     expect(out.find(r => r.team === 'ARI' && r.pos_rank === 1).player_name).toBe('New Guy');
     expect(out.find(r => r.team === 'LA').player_name).toBe('Ram');
   });
+
+  test('with a window start every snapshot at or after it is kept, keyed by snapshot (2026-09-15 depth gate)', () => {
+    const rows = [
+      { dt: '2026-08-01T00:00:00Z', team: 'GB', player_name: 'Josh Jacobs', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '1' },
+      { dt: '2026-09-06T11:29:30Z', team: 'GB', player_name: 'Josh Jacobs', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '4' },
+      { dt: '2026-09-15T12:39:14Z', team: 'GB', player_name: 'Josh Jacobs', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '4' },
+      { dt: '2026-09-15T12:39:14Z', team: 'GB', player_name: 'Josh Jacobs', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '4' },
+    ];
+    const out = depthChartRows(rows, '2026-08-18T00:00:00Z');
+    expect(out).toHaveLength(2);
+    expect(out.map(r => r.snapshot_at)).toEqual(['2026-09-06T11:29:30.000Z', '2026-09-15T12:39:14.000Z']);
+  });
 });
 
-describe('latestDepthChartText (two pass filter before the parse)', () => {
-  const { latestDepthChartText, rowsAsObjects } = require('../../api/cron/sync-nfl-injuries');
-  test('keeps the header and only each team newest snapshot lines', () => {
-    const text = [
-      'dt,team,player_name,pos_abb,pos_slot,pos_rank',
-      '2026-09-01T00:00:00Z,ARI,Old Guy,QB,1,1',
-      '2026-09-14T13:53:31Z,ARI,New Guy,QB,1,1',
-      '2026-09-10T00:00:00Z,LAR,Ram,RB,1,1',
-      '',
-    ].join('\n');
-    const out = latestDepthChartText(text);
+describe('recentDepthChartText (cheap line filter before the parse)', () => {
+  const { recentDepthChartText, rowsAsObjects } = require('../../api/cron/sync-nfl-injuries');
+  const text = [
+    'dt,team,player_name,pos_abb,pos_slot,pos_rank',
+    '2026-09-01T00:00:00Z,ARI,Old Guy,QB,1,1',
+    '2026-09-14T13:53:31Z,ARI,New Guy,QB,1,1',
+    '2026-09-10T00:00:00Z,LAR,Ram,RB,1,1',
+    '',
+  ].join('\n');
+  test('keeps the header and the lines at or after the window start, and reports the newest dt', () => {
+    const out = recentDepthChartText(text, '2026-09-10T00:00:00Z');
     expect(out.lines_in_file).toBe(3);
-    const rows = rowsAsObjects(out.text);
-    expect(rows.map(r => r.player_name)).toEqual(['New Guy', 'Ram']);
+    expect(out.newest).toBe('2026-09-14T13:53:31Z');
+    expect(rowsAsObjects(out.text).map(r => r.player_name)).toEqual(['New Guy', 'Ram']);
+  });
+  test('no window start keeps everything', () => {
+    expect(rowsAsObjects(recentDepthChartText(text, null).text)).toHaveLength(3);
   });
 });
 
@@ -147,9 +162,10 @@ describe('the read stores the report lines it was priced on', () => {
       { player: 'Chamarri Conner', position: 'S', status: 'Questionable' },
     ]]]));
     const r = await getFootballInjuryImpact('Kansas City Chiefs');
+    // No depth ranks supplied: rank unknown, the gate's unknown share.
     expect(r.lines).toEqual([
-      { player: 'Josh Simmons', position: 'OT', status: 'out' },
-      { player: 'Chamarri Conner', position: 'S', status: 'questionable' },
+      { player: 'Josh Simmons', position: 'OT', status: 'out', depth_rank: null, depth_weight: 0.5 },
+      { player: 'Chamarri Conner', position: 'S', status: 'questionable', depth_rank: null, depth_weight: 0.5 },
     ]);
   });
   test('overrideTeams overlays the game summary lines so a re-read prices the scratch', async () => {
