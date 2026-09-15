@@ -1,4 +1,4 @@
-const { positionImpact, teamImpact, getFootballInjuryImpact, depthWeight, lookupRank, _setTeams, _setDepthRanks, _resetCache } = require('../../lib/services/football-injuries');
+const { positionImpact, teamImpact, getFootballInjuryImpact, depthWeight, positionGroup, lookupRank, _setTeams, _setDepthRanks, _resetCache } = require('../../lib/services/football-injuries');
 const { footballTotalPenalty } = require('../../lib/services/weather-data');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator');
 
@@ -36,14 +36,27 @@ describe('teamImpact', () => {
 });
 
 describe('the depth chart gate (2026-09-15)', () => {
-  test('rank 1 full, rank 2 the dial, rank 3 and below nothing, unknown the other dial', () => {
-    expect(depthWeight(1)).toBe(1);
-    expect(depthWeight(2)).toBe(0.5);
-    expect(depthWeight(2, { depth2: 0.25 })).toBe(0.25);
-    expect(depthWeight(3)).toBe(0);
-    expect(depthWeight(4)).toBe(0);
-    expect(depthWeight(null)).toBe(0.5);
-    expect(depthWeight(undefined, { unknown: 0 })).toBe(0);
+  test('the ladder: only the starting quarterback, receivers taper, one starter per line slot', () => {
+    expect(depthWeight(1, 'QB')).toBe(1);
+    expect(depthWeight(2, 'QB')).toBe(0);
+    expect(depthWeight(1, 'WR')).toBe(1);
+    expect(depthWeight(2, 'WR')).toBe(0.8);
+    expect(depthWeight(3, 'WR')).toBe(0.6);
+    expect(depthWeight(4, 'WR')).toBe(0.2);
+    expect(depthWeight(5, 'WR')).toBe(0);
+    expect(depthWeight(2, 'RB')).toBe(0.5);
+    expect(depthWeight(3, 'RB')).toBe(0);
+    expect(depthWeight(2, 'LT')).toBe(0);
+    expect(depthWeight(2, 'CB')).toBe(0.5);
+    expect(depthWeight(2, 'DE')).toBe(0.5);
+    expect(depthWeight(2, 'S')).toBe(0.3);
+    expect(depthWeight(2, 'K')).toBe(0);
+    expect(depthWeight(2, 'XX')).toBe(0.5);
+    expect(depthWeight(null, 'QB')).toBe(0.5);
+    expect(depthWeight(undefined, 'QB', { unknown: 0 })).toBe(0);
+    expect(positionGroup('LCB')).toBe('CB');
+    expect(positionGroup('nt')).toBe('DL');
+    expect(positionGroup('??')).toBeNull();
   });
 
   test('positionImpact scales by the gate weight', () => {
@@ -65,10 +78,11 @@ describe('the depth chart gate (2026-09-15)', () => {
     expect(lookupRank(null, 'GB', { player: 'Chris Brooks' })).toBeNull();
   });
 
-  test('a third string quarterback out costs nothing and the starter costs 6pp', async () => {
+  test('a backup quarterback out costs nothing and the starter costs 6pp', async () => {
     _setTeams(new Map([
       ['kansas city chiefs', [
         { player: 'Garrett Nussmeier', position: 'QB', status: 'Out', espnId: '999' },
+        { player: 'Backup Guy', position: 'QB', status: 'Out', espnId: '998' },
       ]],
       ['green bay packers', [
         { player: 'Josh Jacobs', position: 'RB', status: 'Out', espnId: '4047365' },
@@ -76,14 +90,15 @@ describe('the depth chart gate (2026-09-15)', () => {
       ]],
     ]));
     const ranks = new Map([
-      ['KC', new Map([['id:999', 3], ['name:garrett nussmeier', 3]])],
+      ['KC', new Map([['id:999', 3], ['name:garrett nussmeier', 3], ['id:998', 2], ['name:backup guy', 2]])],
       // Jacobs is rank 4 on the newest chart but the window floor is 1.
       ['GB', new Map([['id:4047365', 1], ['name:josh jacobs', 1], ['name:jordan love|QB', 1], ['name:jordan love', 1]])],
     ]);
     const kc = await getFootballInjuryImpact('Kansas City Chiefs', { depthRanks: ranks });
     expect(kc.impact).toBe(0);
-    expect(kc.out).toBe(1);
+    expect(kc.out).toBe(2);
     expect(kc.lines[0]).toMatchObject({ depth_rank: 3, depth_weight: 0 });
+    expect(kc.lines[1]).toMatchObject({ depth_rank: 2, depth_weight: 0 });
     const gb = await getFootballInjuryImpact('Green Bay Packers', { depthRanks: ranks });
     expect(gb.impact).toBeCloseTo(-0.075, 5);
     expect(gb.keyLoss).toContain('Jordan Love');
