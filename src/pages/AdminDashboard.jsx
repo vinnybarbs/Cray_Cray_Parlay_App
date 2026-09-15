@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 
@@ -715,6 +716,27 @@ function RecentPicksSection({ recentPicks }) {
 // Inside the grade: the live calibration state behind every published
 // tier (owner request 2026-08-25). Self-contained fetch against the
 // admin calibration endpoint so the main dashboard payload stays lean.
+// Live dials per market (owner 2026-09-15). Read only: the page shows the
+// board, the sizing, the rails and every read in the window. Nothing on
+// it writes a dial.
+const DIAL_MARKETS = ['MLB', 'NFL', 'NCAAF', 'NBA', 'NHL', 'NCAAB', 'EPL', 'MLS', 'Tennis', 'UFC', 'NFL_props']
+function LiveDialsSection() {
+  const navigate = useNavigate()
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4">
+      <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold mb-1">Live dials by market</div>
+      <p className="text-xs text-ink-500 mb-3 leading-relaxed">The dial board, multipliers, band map, rails and every read in the window, traced in the Edge Anatomy order. Read only.</p>
+      <div className="flex flex-wrap gap-1.5">
+        {DIAL_MARKETS.map(m => (
+          <button key={m} onClick={() => navigate(`/admin/dials?sport=${m}`)} className="font-mono text-xs px-3 py-1.5 rounded-sharp border bg-ink-800 text-ink-200 border-ink-700 hover:text-white hover:border-ink-500">
+            {m === 'NFL_props' ? 'NFL props' : m}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function CalibrationSection() {
   const [cal, setCal] = useState(null)
   const [err, setErr] = useState(null)
@@ -1033,6 +1055,9 @@ export default function AdminDashboard({ onBack }) {
                 color="purple"
               />
             </div>
+
+            {/* Live dials per market, read only */}
+            <LiveDialsSection />
 
             {/* System Health row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

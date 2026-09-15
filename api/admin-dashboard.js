@@ -17,6 +17,26 @@ function getSupabase() {
   return createClient(url, key);
 }
 
+// Since 2026-09-15 (owner: "add all users so far to admin ability") the
+// allowlist also lives in admin_users, seeded with every account at the
+// time. The env list stays as the floor so the owner can never be locked
+// out by a bad row. Cached briefly, the table changes by hand.
+let _tableCache = { at: 0, emails: null };
+const TABLE_TTL_MS = 5 * 60 * 1000;
+async function tableAdmins(supabase) {
+  if (_tableCache.emails && Date.now() - _tableCache.at < TABLE_TTL_MS) return _tableCache.emails;
+  try {
+    const { data, error } = await supabase.from('admin_users').select('email');
+    if (error) return _tableCache.emails || new Set();
+    const emails = new Set((data || []).map(r => String(r.email || '').toLowerCase()).filter(Boolean));
+    _tableCache = { at: Date.now(), emails };
+    return emails;
+  } catch {
+    return _tableCache.emails || new Set();
+  }
+}
+function _resetAdminCache() { _tableCache = { at: 0, emails: null }; }
+
 // Verify the caller's Supabase JWT and check the allowlist. Returns the user
 // on success, or null after writing the error response.
 async function requireAdmin(req, res, supabase) {
@@ -32,7 +52,7 @@ async function requireAdmin(req, res, supabase) {
     return null;
   }
   const email = (data.user.email || '').toLowerCase();
-  if (!ADMIN_EMAILS.includes(email)) {
+  if (!ADMIN_EMAILS.includes(email) && !(await tableAdmins(supabase)).has(email)) {
     logger.warn('Non-admin attempted admin dashboard', { email });
     res.status(403).json({ error: 'Forbidden' });
     return null;
@@ -292,4 +312,4 @@ async function getAdminDashboard(req, res) {
   }
 }
 
-module.exports = { getAdminDashboard, requireAdmin, getSupabase };
+module.exports = { getAdminDashboard, requireAdmin, getSupabase, _resetAdminCache };

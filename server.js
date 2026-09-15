@@ -566,6 +566,9 @@ app.get('/api/admin/dashboard', getAdminDashboard);
 // factor attribution, tier ladder). Same admin JWT allowlist.
 const adminCalibration = require('./api/admin-calibration');
 app.get('/api/admin/calibration', adminCalibration);
+// The live dial board per market, read only (owner 2026-09-15).
+const adminDials = require('./api/admin-dials');
+app.get('/api/admin/dials', adminDials);
 
 // Daily Digest - public endpoint, no auth required
 const { getDigest, deepResearch } = require('./api/digest');

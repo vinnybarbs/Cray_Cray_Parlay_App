@@ -7,6 +7,7 @@ import DailyDigest from './pages/DailyDigest'
 import GeneratorPage from './pages/GeneratorPage'
 import ChatPicks from './pages/ChatPicks'
 import AdminDashboard from './pages/AdminDashboard'
+import DialsDashboard from './pages/DialsDashboard'
 import HouseLedger from './pages/HouseLedger'
 
 // App-level router. HashRouter (mounted in main.jsx) keeps every pre-existing
@@ -93,6 +94,7 @@ function AppRoutes() {
       {/* The House Ledger is deliberately public. It IS the marketing. */}
       <Route path="/ledger" element={<HouseLedger />} />
       <Route path="/admin" element={<AdminRoute />} />
+      <Route path="/admin/dials" element={<DialsDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
