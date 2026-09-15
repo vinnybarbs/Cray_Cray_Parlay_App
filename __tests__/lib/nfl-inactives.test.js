@@ -68,6 +68,7 @@ describe('latestDepthChartRows (nflverse depth_charts snapshot history)', () => 
       { dt: '2026-09-06T11:29:30Z', team: 'GB', player_name: 'Josh Jacobs', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '4' },
       { dt: '2026-09-15T12:39:14Z', team: 'GB', player_name: 'Josh Jacobs', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '4' },
       { dt: '2026-09-15T12:39:14Z', team: 'GB', player_name: 'Josh Jacobs', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '4' },
+      { dt: '2026-09-15T12:39:14Z', team: 'GB', player_name: '', pos_grp: 'Offense', pos_abb: 'RB', pos_slot: '11', pos_rank: '5' },
     ];
     const out = depthChartRows(rows, '2026-08-18T00:00:00Z');
     expect(out).toHaveLength(2);
