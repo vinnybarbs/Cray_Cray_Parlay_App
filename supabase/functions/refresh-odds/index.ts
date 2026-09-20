@@ -3,8 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-ignore - Deno imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-const SPORTS = [
-  // Team sports
+const TEAM_SPORTS = [
   "americanfootball_nfl",
   // Preseason NFL is a SEPARATE sport key on The Odds API. Without it the
   // whole August slate is invisible (americanfootball_nfl carries only
@@ -18,12 +17,14 @@ const SPORTS = [
   "baseball_mlb",
   "soccer_epl",
   "soccer_usa_mls",
-  "mma_mixed_martial_arts",
-  // Tennis only returns data when a tournament is in season. The old list
-  // stopped at the slams plus three spring Masters, so the feed went dark
-  // every summer (last tennis odds 2026-07-12, the end of Wimbledon).
-  // Cover the full Masters and WTA 1000 calendar. Out-of-season or unknown
-  // keys are skipped by the per-sport error handling below at no cost.
+  "mma_mixed_martial_arts"
+];
+// Tennis tournament keys rotate weekly and only return data in season. A
+// hand list went dark twice (2026-07-12 after Wimbledon, 2026-09-13 after
+// the US Open, when Beijing and Tokyo were not on it). Since 2026-09-19
+// the run DISCOVERS every active tennis_ key from the free sports list
+// call and this list is only the fallback when that call fails.
+const TENNIS_FALLBACK = [
   "tennis_atp_aus_open_singles",
   "tennis_atp_indian_wells",
   "tennis_atp_miami_open",
@@ -35,6 +36,8 @@ const SPORTS = [
   "tennis_atp_canadian_open",
   "tennis_atp_cincinnati_open",
   "tennis_atp_us_open",
+  "tennis_atp_china_open",
+  "tennis_atp_japan_open",
   "tennis_atp_shanghai_masters",
   "tennis_atp_paris_masters",
   "tennis_wta_aus_open_singles",
@@ -154,11 +157,25 @@ async function checkAvailableSports(oddsApiKey: string): Promise<string[]> {
   }
   
   await logRateLimit(response);
-  const data = await response.json() as Array<{ key: string }>;
-  const keys = data.map(s => s.key);
+  const data = await response.json() as Array<{ key: string; active?: boolean }>;
+  const keys = data.filter(s => s.active !== false).map(s => s.key);
   console.log(`✅ Available sports: ${keys.join(", ")}`);
   
   return keys;
+}
+
+// The team sports plus every tennis key the API lists as active today.
+// Falls back to the hand list when the list call fails, so a bad minute
+// on the free endpoint never blanks tennis.
+async function resolveSports(oddsApiKey: string): Promise<{ sports: string[]; tennis: string[]; discovered: boolean }> {
+  try {
+    const active = await checkAvailableSports(oddsApiKey);
+    const tennis = active.filter(k => k.startsWith("tennis_")).sort();
+    return { sports: [...TEAM_SPORTS, ...tennis], tennis, discovered: true };
+  } catch (e) {
+    console.log("⚠️ Sports discovery failed, using the tennis fallback list:", (e as Error).message);
+    return { sports: [...TEAM_SPORTS, ...TENNIS_FALLBACK], tennis: TENNIS_FALLBACK, discovered: false };
+  }
 }
 
 async function fetchCoreMarkets(
@@ -270,8 +287,13 @@ async function refreshOdds(req: Request): Promise<Response> {
     let totalGames = 0;
     let totalOddsInserted = 0;
     const skippedForTime: string[] = [];
+    // Per sport witness for the cron_job_logs row (directive 14): games
+    // fetched and rows written, so the ops check judges the feed by rows.
+    const perSport: Record<string, { games: number; rows: number }> = {};
+    const resolved = await resolveSports(oddsApiKey);
+    console.log(`🎾 Tennis keys this run (${resolved.discovered ? "discovered" : "fallback"}): ${resolved.tennis.join(", ") || "none"}`);
 
-    for (const sport of SPORTS) {
+    for (const sport of resolved.sports) {
       if (Date.now() - startTime > TIME_BUDGET_MS) {
         skippedForTime.push(sport);
         continue;
@@ -299,6 +321,7 @@ async function refreshOdds(req: Request): Promise<Response> {
           .filter(g => g?.commence_time && new Date(g.commence_time).getTime() < horizonMs);
         console.log(`✅ Fetched ${games.length} games for ${sport} inside ${HORIZON_DAYS}d horizon`);
         coreGames[sport] = games;
+        perSport[sport] = { games: games.length, rows: 0 };
 
         const now = new Date().toISOString();
         const rows: any[] = [];
@@ -336,7 +359,7 @@ async function refreshOdds(req: Request): Promise<Response> {
             .from("odds_cache")
             .upsert(chunk, { onConflict: "external_game_id,bookmaker,market_type" });
           if (error) console.log(`⚠️ Error inserting ${sport} chunk:`, error.message || error);
-          else totalOddsInserted += chunk.length;
+          else { totalOddsInserted += chunk.length; perSport[sport].rows += chunk.length; }
         }
         totalGames += games.length;
       } catch (err) {
@@ -441,6 +464,23 @@ async function refreshOdds(req: Request): Promise<Response> {
 
     console.log("✅ Refresh complete!");
     console.log(`📊 Processed ${totalGames} games, ${totalOddsInserted} rows, ${duration}ms`);
+
+    // Directive 14: a run that fetched games but wrote nothing is partial,
+    // never completed. Cron status alone is not proof of ingestion.
+    try {
+      const status = totalGames > 0 && totalOddsInserted === 0 ? "partial" : "completed";
+      await supabase.from("cron_job_logs").insert({
+        job_name: "refresh-odds-hourly",
+        status,
+        details: JSON.stringify({
+          games: totalGames, rows: totalOddsInserted, per_sport: perSport,
+          tennis_keys: resolved.tennis, tennis_discovered: resolved.discovered,
+          skipped_for_time: skippedForTime, duration_ms: duration
+        })
+      });
+    } catch (e) {
+      console.log("⚠️ cron_job_logs insert failed:", (e as Error).message);
+    }
 
     return new Response(JSON.stringify({
       status: "success",
