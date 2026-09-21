@@ -2079,12 +2079,13 @@ async function runPreAnalysis(sportSlugs) {
               // never in the pick record, graded on its own line, and a
               // backfill pool for machine parlays.
               //
-              // Floor at 65%: books cap MLB favorites around -250 (71%
-              // implied) and a full slate's strongest no-pick favorite
-              // often sits in the mid-60s, so a 70% floor produced zero
-              // legs across entire MLB slates. 65% is about -186, still a
-              // genuinely heavy favorite in any sport.
-              const LEG_PROB_FLOOR = 0.65;
+              // The floor is the leg_prob_floor dial per sport (owner
+              // 2026-09-21: "legs should be reserved for near sure
+              // things"): 0.75 for everyone, 0.80 for NFL, 0.70 for MLB
+              // where books cap favorites near -250. Before the dial a
+              // flat 0.65 (about -186) let every NFL -200 favorite in,
+              // and the 30 day NFL leg pool ran 18 legs at break even.
+              const LEG_PROB_FLOOR = await edgeCalc.dialValue(sportDisplay, 'leg_prob_floor');
               // Owner clarification 2026-08-25: a Leg means a GIMME, the
               // model's own 65%-plus read, and the label does not loosen
               // in rebuild weeks. The quiet-day content problem is solved
