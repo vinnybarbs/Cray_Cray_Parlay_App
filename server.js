@@ -442,6 +442,11 @@ app.post('/cron/backfill-game-results', backfillGameResults);
 
 const discordMorningBoard = require('./api/cron/discord-morning-board');
 app.post('/cron/discord-morning-board', discordMorningBoard);
+const discordReceipts = require('./api/cron/discord-receipts');
+app.post('/cron/discord-receipts', discordReceipts);
+const { discordModelFeed, discordDialBoard } = require('./api/cron/discord-model-feed');
+app.post('/cron/discord-model-feed', discordModelFeed);
+app.post('/cron/discord-dial-board', discordDialBoard);
 
 // Per-player per-game NFL stat lines from nflverse: props settlement
 // truth and prop model history. Backfills a season on demand, keeps the
