@@ -976,7 +976,6 @@ function TermSheet({ onStartTrial }) {
     'Daily digest across every sport · ML / spread / total',
     'Per-side edges, signed and tier-graded',
     'Negative edges visible (Trap label)',
-    'De-Genny chat for picks on demand',
     'Machine-built parlays · published and settled on The House Ledger',
     'Settlement tracking · every pick graded after the game',
     'Hit rate by tier and sport · refreshed after every settlement',
