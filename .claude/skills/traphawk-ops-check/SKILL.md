@@ -75,7 +75,7 @@ group by 1, 2 order by 2 desc, 1;
 ```
 
 - Any `agent_error`: pull the payloads and read them.
-- `record_mismatch`: list team, ours vs actual. One or two from games that just ended is normal timing lag. A wave of them, or repeats across runs, means a data problem.
+- `record_mismatch`: list team, ours vs actual, and the source. One or two from games that just ended is normal timing lag. A wave of them, or repeats across runs, means a data problem. Since 2026-09-21 (directive 24) the records search only reaches ESPN, CBS Sports, Yahoo Sports, Fox Sports and the official league sites, and Wikipedia is never a source for any sub-agent. A mismatch citing anything off that list is dropped before insert and counted in the `record_check_summary` payload as `dropped_unapproved_source`. A nonzero count means the verifier reached for an off-list source, so report it. Wikipedia rows dated before 2026-09-22 predate the fence.
 - Confirm caching is alive: latest `agent_debug` payloads should show `cache_read_tokens` well above zero for records-verifier and injury-scout chunks. Zero reads after the first run of a day means the cache breakpoints regressed and the sweep is billing full price again.
 - Confirm `weather` rows exist with `payload->>'source' = 'open-meteo'` on days with MLB or MLS games.
 

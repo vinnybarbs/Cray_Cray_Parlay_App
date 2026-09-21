@@ -224,6 +224,7 @@ Every Tuesday 09:00 MT `run_football_lookback(8)` scores each settled anchored N
 
 ## 6. Historical context that prevents false findings
 
+- Wikipedia is never a data source (directive 24, 2026-09-21). The six MLB `record_mismatch` rows from the 2026-09-21 04:45 MT sweep cited Wikipedia pages a game behind and were timing lag, not data errors. Records now verify only against ESPN, CBS Sports, Yahoo Sports, Fox Sports and the official league sites.
 - `record_mismatch` rows in agent_intel for Tennis or UFC dated before 2026-08-05 are FALSE POSITIVES. The verifier was comparing 30-day form (stored by design in the record columns) against season records. Fixed 2026-08-05, and the tennis model prices off market consensus and never reads those columns, so they never contaminated reads.
 - The Leg tier shipped 2026-08-05 and requires a 65 percent model-probability side with no edge. Zero or few Leg rows shortly after that date is the feature being honest, not broken.
 - Rows with `voided_at` set are retroactively voided picks (first use: MLB spreads published under the 0.60 seed multiplier, voided 2026-08-06). mv_public_record excludes them. When counting from raw ai_suggestions, always filter `voided_at is null` to match the public record.
