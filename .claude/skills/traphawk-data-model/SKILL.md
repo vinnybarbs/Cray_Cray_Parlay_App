@@ -69,7 +69,7 @@ Skipping this silently zeroes every public stat on the site.
 
 - `game_analysis`: one row per game, upserted per re-analysis (`analysis_version` increments, token counts are the LAST version only, so cron logs are the source for total spend). `context_hash` gates re-narration: unchanged inputs extend `expires_at` with no model call. `stale` is set by intel updates.
 - `cron_job_logs`: `details` is TEXT, cast `details::jsonb` before extracting. Pre-analyze rows carry cost, analyzed, skipped_unchanged, games_found.
-- `agent_intel`: integrity sweep output. kind in record_mismatch, injury, weather, record_check_summary, agent_debug, agent_error. agent_debug payloads carry per-sub-agent input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, web_searches.
+- `agent_intel`: integrity sweep output. kind in record_mismatch, injury, weather, record_check_summary, agent_debug, agent_error. agent_debug payloads carry per-sub-agent input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, web_searches. record_mismatch payload.source is a standings URL on ESPN, CBS Sports, Yahoo Sports, Fox Sports or a league site, never Wikipedia (directive 24, 2026-09-21), and record_check_summary carries checked, mismatches and dropped_unapproved_source.
 - `house_parlays`: machine parlays with honest math (model_win_prob, fair_win_prob, ev_pct).
 - `tennis_rankings`, `tennis_match_results`, `ufc_fighters`, `ufc_fight_results`: player-sport context synced from ESPN. Player keys are normalized: NFD strip accents, lowercase, strip punctuation ("Fábián Marozsán" becomes "fabian marozsan").
 - `golf_field`: tournament fields with prices and research notes.
