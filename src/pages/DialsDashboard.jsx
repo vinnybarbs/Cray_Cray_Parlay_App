@@ -96,10 +96,10 @@ function DialBoard({ dials, rails, publish, sport }) {
   )
 }
 
-function Sizing({ multipliers, bandsRaw, weightChanges }) {
+function Sizing({ multipliers, bucketTargets, weightChanges }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <Panel title="Sizing · multipliers and the raw band map" sub="A raw claim times the flat multiplier for the key, or through the sport's raw band map where one is fit. A multiplier of 0 is an owner mute.">
+      <Panel title="Sizing · multipliers and bucket floors" sub="The tier is the raw claim times the multiplier for the key minus the price rails, nothing else (directive 25). A multiplier of 0 is an owner mute. Each bucket must deliver its floor in pp over break even, or the Monday scorecard names it.">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead><tr><th className={th}>Key</th><th className={`${th} text-right`}>Multiplier</th><th className={`${th} text-right`}>Measured k</th><th className={`${th} text-right`}>n</th><th className={th}>Source</th></tr></thead>
@@ -117,19 +117,17 @@ function Sizing({ multipliers, bandsRaw, weightChanges }) {
             </tbody>
           </table>
         </div>
-        {bandsRaw.length > 0 && (
+        {bucketTargets.length > 0 && (
           <div className="overflow-x-auto mt-3">
             <table className="w-full text-xs">
-              <thead><tr><th className={th}>Map</th><th className={th}>Band</th><th className={`${th} text-right`}>Claimed</th><th className={`${th} text-right`}>Delivers</th><th className={`${th} text-right`}>n</th><th className={th}>Fit</th></tr></thead>
+              <thead><tr><th className={th}>Scope</th><th className={th}>Bucket</th><th className={`${th} text-right`}>Floor pp</th><th className={th}>Set</th></tr></thead>
               <tbody>
-                {bandsRaw.map((b, i) => (
+                {bucketTargets.map((b, i) => (
                   <tr key={i} className="border-t border-ink-800">
-                    <td className={`${td} font-mono`}>{b.sport}:{b.market}</td>
-                    <td className={`${td} font-mono`}>{b.band}</td>
-                    <td className={tdn}>{Number(b.claimed_center).toFixed(2)}</td>
-                    <td className={tdn}>{Number(b.calibrated_center).toFixed(2)}</td>
-                    <td className={tdn}>{b.sample_n}</td>
-                    <td className={`${td} text-ink-400 whitespace-nowrap`}>{when(b.fitted_at)}</td>
+                    <td className={`${td} font-mono`}>{b.sport}</td>
+                    <td className={td}>{b.band}</td>
+                    <td className={tdn}>{Number(b.floor_pp).toFixed(1)}</td>
+                    <td className={`${td} text-ink-400 whitespace-nowrap`}>{when(b.updated_at)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -335,7 +333,7 @@ export default function DialsDashboard({ onBack }) {
         {data && !error && (
           <>
             <DialBoard dials={data.dials || []} rails={data.rails || []} publish={data.publish || {}} sport={sport} />
-            <Sizing multipliers={data.multipliers || []} bandsRaw={data.bandsRaw || []} weightChanges={data.weightChanges || []} />
+            <Sizing multipliers={data.multipliers || []} bucketTargets={data.bucketTargets || []} weightChanges={data.weightChanges || []} />
             {sport === 'NFL_props' ? <PropRows reads={data.propReads || []} /> : (
               <div className="space-y-4">
                 <div className="text-xs text-ink-400 uppercase tracking-wider font-semibold">Reads in the window · {(data.reads || []).length}</div>

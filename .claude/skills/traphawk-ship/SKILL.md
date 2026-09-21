@@ -33,7 +33,7 @@ Every change moves every surface that sees it, BEFORE merge, and the PR body car
 |---|---|
 | A dial value or a new dial | sport_dials row; model_weight_changes row with evidence; the dial list in traphawk-performance-review; the code default that mirrors it (DIAL_DEFAULTS, price-penalties, prop-edge, publish-markets); the Edge Anatomy dial board; the replay harness if the sweep should vary it |
 | A rule, gate, fence or rail | directives (text, enforcement, check_sql); the traphawk-ops-check section that reads it; the code constant AND its client mirror (src/lib/tiers.js, src/lib/publish-flags.js); the mirror test in __tests__/lib |
-| The formula or what a read is based on | directive 19 factor audit in the PR; band map regime reset and fit floor; traphawk-performance-review; Edge Anatomy chain and traces; lib/replay if a new dial must be replayable |
+| The formula or what a read is based on | directive 19 factor audit in the PR; band_fit_floors advance for the bucket scorecard (directive 9 as amended, no band map to reset); traphawk-performance-review; Edge Anatomy chain and traces; lib/replay if a new dial must be replayable |
 | A table, view or function | traphawk-data-model; every skill query that reads it; the tripwire or readiness function that should see it; the migration file in supabase/migrations AND applied to production |
 | A cron job or routine | cron.job (secret stays there, never in the repo); traphawk-ops-check silent witnesses; the migration file |
 | Anything user facing | the digest API payload, the DailyDigest render, the shadow and publish flags, the Edge Anatomy note |

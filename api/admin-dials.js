@@ -81,8 +81,8 @@ module.exports = async function adminDials(req, res) {
       supabase.from('sport_dials').select('sport, dial, value, updated_at').in('sport', ['__all__', dialSport]),
       supabase.from('edge_calibration').select('key, multiplier, measured_k, sample_n, source, updated_at')
         .or(`key.eq.__global__,key.eq.${keyPrefix},key.like.${keyPrefix}:%`),
-      supabase.from('edge_band_calibration_raw').select('sport, market, band, claimed_center, calibrated_center, sample_n, fitted_at')
-        .in('sport', ['__all__', keyPrefix]).order('sport').order('market').order('claimed_center'),
+      supabase.from('bucket_targets').select('sport, band, floor_pp, updated_at')
+        .in('sport', ['__all__', keyPrefix]).order('sport').order('floor_pp'),
       supabase.from('model_weight_changes').select('changed_at, sport, component, before, after, reason, source')
         .in('sport', ['__all__', dialSport]).order('changed_at', { ascending: false }).limit(10),
     ]);
@@ -92,7 +92,7 @@ module.exports = async function adminDials(req, res) {
     const payload = {
       sport, sports: SPORTS, props: PROPS, days,
       dials: grouped.factors, rails: grouped.rails, publish: grouped.publish,
-      multipliers: multRes.data || [], bandsRaw: bandRes.data || [], weightChanges: changeRes.data || [],
+      multipliers: multRes.data || [], bucketTargets: bandRes.data || [], weightChanges: changeRes.data || [],
       errors: [dialRes.error, multRes.error, bandRes.error, changeRes.error].filter(Boolean).map(e => e.message),
       fetched_at: new Date().toISOString(),
     };
