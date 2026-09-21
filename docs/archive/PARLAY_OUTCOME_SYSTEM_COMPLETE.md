@@ -10,7 +10,6 @@ Your comprehensive parlay outcome tracking and management system is now **FULLY 
 
 **ParlayOutcomeChecker Service** (`lib/services/parlay-outcome-checker.js`)
 - **ESPN API Integration**: Free game results for NFL, NBA, MLB, NHL
-- **API-Sports Fallback**: Premium data source for enhanced accuracy
 - **Smart Team Matching**: Handles team name variations across APIs
 - **Bet Type Logic**: Supports moneyline, spread, and over/under outcomes
 - **Game Completion Detection**: Only checks games 4+ hours after start time
@@ -120,7 +119,6 @@ Your comprehensive parlay outcome tracking and management system is now **FULLY 
 - Handles overtime and extended games
 
 ### **Error Recovery:**
-- **API Failures**: Graceful fallbacks between ESPN/API-Sports
 - **Team Mismatches**: Logs warnings for manual review
 - **Invalid Bets**: Skips unrecognized bet types safely
 
@@ -141,7 +139,6 @@ curl -X POST "https://pcjhulzyqmhrhsrgvwvx.supabase.co/functions/v1/check-parlay
 ### 🔑 **REQUIRED ENVIRONMENT:**
 - **SUPABASE_URL**: ✅ Configured  
 - **SUPABASE_SERVICE_ROLE_KEY**: ✅ Configured
-- **APISPORTS_API_KEY**: Optional (uses ESPN as fallback)
 
 ## 🚀 **READY FOR USERS!**
 

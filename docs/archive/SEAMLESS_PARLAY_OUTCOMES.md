@@ -96,7 +96,6 @@ const checkOutcomesAndFetchParlays = async () => {
 
 ### API Integration
 - **ESPN API:** Free game results and scores
-- **API Sports:** Team data and game information (100 calls/day)
 - **Smart Logic:** Handles different bet types and edge cases
 
 ## Deployment

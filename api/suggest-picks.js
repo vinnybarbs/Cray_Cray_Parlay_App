@@ -406,7 +406,7 @@ async function generatePlayerPropSuggestions({ sports, riskLevel, numSuggestions
   }
 }
 
-async function getApiSportsPlayerAggregates(playerName, playerId = null, maxGames = 5) {
+async function getPlayerGameAggregates(playerName, playerId = null, maxGames = 5) {
   try {
     let query = supabase
       .from('player_game_stats')
@@ -577,7 +577,7 @@ async function convertPropOddsToSuggestions(propOdds, playerData, numSuggestions
 
     let apiStats = null;
     if (odds.sport === 'americanfootball_nfl') {
-      apiStats = await getApiSportsPlayerAggregates(playerName);
+      apiStats = await getPlayerGameAggregates(playerName);
     }
     
     // Create suggestion with raw UTC commence_time so frontend can format consistently
@@ -745,7 +745,7 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
 
   let statSnippet = '';
 
-  // PHASE 1: Prioritize API-Sports DB stats from player_game_stats (per-game averages, last N games)
+  // PHASE 1: Prioritize our own player_game_stats rows (per-game averages, last N games)
   try {
     if (!statSnippet && apiStats && odds.sport === 'americanfootball_nfl') {
       const games = apiStats.games || 0;
@@ -798,7 +798,7 @@ function generatePropReasoning(playerName, marketType, outcome, odds, seasonStat
       }
     }
 
-    // PHASE 2: ESPN recent box score stats (fallback if no API-Sports snippet)
+    // PHASE 2: ESPN recent box score stats (fallback if no stored snippet)
     if (!statSnippet && recentStats && typeof recentStats === 'object') {
       const { ESPNPlayerStatsBoxScore } = require('../lib/services/espn-player-stats-boxscore');
       const statsService = new ESPNPlayerStatsBoxScore(null);

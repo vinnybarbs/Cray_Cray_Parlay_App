@@ -22,7 +22,7 @@ WITH cache_summary AS (
   
   -- Team Stats Cache
   SELECT 
-    'Team Stats (API-Sports)',
+    'Team Stats',
     sport,
     COUNT(*),
     COUNT(DISTINCT team_id),
@@ -80,7 +80,7 @@ ORDER BY
   CASE data_source 
     WHEN 'Your Parlays' THEN 1 
     WHEN 'Odds Cache (The Odds API)' THEN 2
-    WHEN 'Team Stats (API-Sports)' THEN 3
+    WHEN 'Team Stats' THEN 3
     WHEN 'News & Analysis (Serper)' THEN 4
   END,
   sport;

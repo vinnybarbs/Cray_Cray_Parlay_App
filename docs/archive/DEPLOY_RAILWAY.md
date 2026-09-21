@@ -19,7 +19,6 @@ Set these in Railway's environment settings for the service:
 - CRON_SECRET: secret used to protect `/cron/refresh-odds` (required for scheduled job)
 - FRONTEND_URL: (optional) the deployed frontend hostname (used in CORS)
 - NODE_ENV: set to "production"
-- Any other keys present in `.env.example` that you need (e.g., SERPER_API_KEY, APISPORTS_API_KEY)
 
 Railway setup (quick steps)
 ---------------------------

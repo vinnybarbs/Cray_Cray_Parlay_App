@@ -144,7 +144,6 @@ create table if not exists teams (
   id uuid primary key default gen_random_uuid(),
   sport varchar(20) not null,
   name text not null,
-  api_sports_id integer,
   provider_ids jsonb,
   created_at timestamptz default now(),
   unique (sport, name)

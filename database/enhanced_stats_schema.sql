@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS team_season_stats (
     
     -- Metadata
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    api_source VARCHAR(50) DEFAULT 'api-sports',
+    api_source VARCHAR(50) DEFAULT 'espn',
     data_quality VARCHAR(20) DEFAULT 'good', -- good, partial, stale
     
     UNIQUE(team_id, sport, season),
@@ -91,7 +91,7 @@ CREATE TABLE IF NOT EXISTS player_season_stats (
     
     -- Metadata
     last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    api_source VARCHAR(50) DEFAULT 'api-sports',
+    api_source VARCHAR(50) DEFAULT 'espn',
     data_quality VARCHAR(20) DEFAULT 'good',
     
     UNIQUE(player_id, team_id, sport, season),

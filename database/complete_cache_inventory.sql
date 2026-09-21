@@ -76,7 +76,7 @@ SELECT 'Data Sources' as section, 'Odds-API (The Odds API)' as source,
 FROM odds_cache 
 GROUP BY sport, bookmaker
 UNION ALL
-SELECT 'Data Sources', 'API-Sports', 
+SELECT 'Data Sources', 'ESPN', 
        sport, 'Team Stats' as bookmaker, COUNT(*) as records, MAX(last_updated)
 FROM team_stats_cache 
 GROUP BY sport

@@ -47,7 +47,6 @@ Daily Edge Functions → Supabase Cache
 3. **Compelling Output**: Taglines + expandable context + rich reasoning
 
 ### Budget Optimization:
-- **API Sports**: 100 calls/day across 9 sports (seasonal allocation)
 - **Serper**: 200 searches/day (60 NFL during season, scaled for others)
 - **Performance**: Fast agent responses with rich external intelligence
 

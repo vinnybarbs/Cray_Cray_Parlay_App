@@ -489,7 +489,7 @@ DROP FUNCTION IF EXISTS public.determine_outcome(TEXT, TEXT, NUMERIC, TEXT, TEXT
 
 ## Out-of-scope follow-ups (queued)
 
-1. **Spec 2: ESPN backfill coverage.** Fix UFC MMA parser in Railway cron; add EPL (`soccer/eng.1`) to Railway backfill; research Tennis data source (no ESPN scoreboard, API-Sports cancelled, so this is research first).
+1. **Spec 2: ESPN backfill coverage.** Fix UFC MMA parser in Railway cron; add EPL (`soccer/eng.1`) to Railway backfill; research Tennis data source (no ESPN scoreboard, the prior stats provider is gone, so this is research first).
 2. **Player Props settlement.** Add a `settle_player_props()` function that joins ai_suggestions to `player_game_stats`. Separate bet-type logic, different data source.
 3. **Delete dead edge function source files** (`supabase/functions/check-outcomes/`, `supabase/functions/check-parlay-outcomes/`) after a week of observed stability. Cleanup PR, not architectural.
 4. **Fix parlay creation code path to set `suggestion_id`.** This IS in scope for the implementation PR, but might need separate follow-up if the parlay-tracker file has surprises.

@@ -178,7 +178,6 @@ game_analysis (game_key) -- unique constraint for upserts
 | POST | `/cron/fetch-espn-intelligence` | ESPN injuries/scores/standings |
 | POST | `/cron/enrich-articles` | AI article enrichment |
 | POST | `/cron/fact-check-picks` | AI fact-checking |
-| POST | `/api/sync-apisports` | API-Sports sync (being deprecated) |
 
 ### Admin / Debug
 
@@ -308,7 +307,7 @@ Alternative flow that returns ranked individual picks instead of a parlay:
 
 ## Known Issues / Tech Debt
 
-1. **API-Sports dependency.** Being replaced by ESPN. Some sync code still references it.
+1. **Stats provider.** ESPN and nflverse are the only stats sources. The prior provider was removed on 2026-09-21.
 2. **Team name normalization.** ESPN names don't always match Odds API names (e.g., "LA Clippers" vs "Los Angeles Clippers"). `team_aliases` table helps but isn't comprehensive.
 3. **Golf/Tennis.** Tournament sports have different data models than team sports. Golf is leaderboard-based, tennis is match-based but tournament-scoped.
 4. **Player props settlement.** Currently skipped (marked as push). Need player stat ingestion to resolve.

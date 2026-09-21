@@ -9,7 +9,6 @@
 pg_cron (Supabase) → Edge Functions (Supabase) → Database (Supabase)
 ```
 - ✅ refresh-odds Edge Function: Gets odds from The Odds API → Supabase database
-- ❌ sync-sports-stats Edge Function: Gets team stats from API-Sports → Supabase database (NO CRON JOB)
 - ❌ refresh-sports-intelligence Edge Function: Gets news from Serper → Supabase database (NO CRON JOB)
 
 **System 2: Express Server (ISOLATED)**

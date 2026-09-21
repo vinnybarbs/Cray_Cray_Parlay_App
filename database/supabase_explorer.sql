@@ -199,7 +199,6 @@ FROM odds_cache
 UNION ALL
 SELECT 
   'API Usage Summary',
-  'API-Sports',
   COUNT(DISTINCT sport),
   COUNT(DISTINCT team_id),
   COUNT(*),

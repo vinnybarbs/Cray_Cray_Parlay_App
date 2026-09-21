@@ -19,7 +19,6 @@
 -- curl -X POST "http://localhost:5001/api/refresh-stats"
 
 -- What this does:
--- - Fetches team statistics for NFL, NBA, NHL, etc. from API-Sports
 -- - Stores offensive/defensive metrics, recent form, head-to-head records
 -- - Enables AI to find line value edges based on team performance gaps
 
