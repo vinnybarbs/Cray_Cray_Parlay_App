@@ -59,7 +59,7 @@ Football plan, same owner decision: NFL and NCAAF are in SHADOW_SPORTS through p
 
 ## 3. Bucket scorecard (directive 25, owner 2026-09-21: buckets, not bands)
 
-The tier is the scored claim: raw edge times the sport multiplier dial minus the price rails, nothing else. There is no band map (identity since 2026-09-21) and no scheduled refit of any calibration table. The bands are buckets the picks fall into, and each bucket carries a floor in `bucket_targets`: the pp it must deliver over break even at the price (Lean 2, Play 4, Strong Play 7, Sharp Take 10, per sport override allowed). A Lean at -110 must therefore win 54.4 percent or better, a Sharp Take 62.4 or better. One call, the public record's population (deduped, voided rows out, soccer v1 out, band_fit_floors honored per sport):
+The tier is the raw claim minus the price rails, nothing else: every multiplier is 1 since 2026-09-21 (owner: no haircut out of fear), a multiplier is a dial the sweep may propose moving with evidence, the publish gate reads the raw claim alone, and a mute is a publish dial at 0. There is no band map (identity since 2026-09-21) and no scheduled refit of any calibration table. The bands are buckets the picks fall into, and each bucket carries a floor in `bucket_targets`: the pp it must deliver over break even at the price (Lean 2, Play 4, Strong Play 7, Sharp Take 10, per sport override allowed). A Lean at -110 must therefore win 54.4 percent or better, a Sharp Take 62.4 or better. One call, the public record's population (deduped, voided rows out, soccer v1 out, band_fit_floors honored per sport):
 
 ```sql
 select * from bucket_scorecard(30);                      -- 30 days, 50 rows to judge

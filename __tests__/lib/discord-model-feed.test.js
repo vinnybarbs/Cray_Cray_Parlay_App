@@ -42,10 +42,17 @@ describe('formatDirective', () => {
 describe('formatDialBoard', () => {
   const multipliers = [
     { key: '__global__', multiplier: '0.25' },
-    { key: 'MLB', multiplier: '1.0' }, { key: 'MLB:ml', multiplier: '1.0' }, { key: 'MLB:spread', multiplier: '1.0' }, { key: 'MLB:total', multiplier: '0' },
-    { key: 'NFL:ml', multiplier: '0.25' }, { key: 'NFL:spread', multiplier: '0.10' }, { key: 'NFL:total', multiplier: '0' },
-    { key: 'EPL', multiplier: '0.00' }, { key: 'MLS', multiplier: '0.00' },
-    { key: 'Tennis:ml', multiplier: '0.4986' },
+    { key: 'MLB', multiplier: '1.0' }, { key: 'MLB:ml', multiplier: '1.0' }, { key: 'MLB:spread', multiplier: '1.0' }, { key: 'MLB:total', multiplier: '1.0' },
+    { key: 'NFL:ml', multiplier: '1.0' }, { key: 'NFL:spread', multiplier: '1.0' }, { key: 'NFL:total', multiplier: '1.0' },
+    { key: 'EPL', multiplier: '1.0' }, { key: 'MLS', multiplier: '1.0' },
+    { key: 'Tennis:ml', multiplier: '1.0' },
+  ];
+  const publishDials = [
+    { sport: 'MLB', dial: 'publish_total', value: '0' },
+    { sport: 'NFL', dial: 'publish_total', value: '0' },
+    { sport: 'EPL', dial: 'publish_ml', value: '0' }, { sport: 'EPL', dial: 'publish_spread', value: '0' }, { sport: 'EPL', dial: 'publish_total', value: '0' },
+    { sport: 'MLS', dial: 'publish_ml', value: '0' }, { sport: 'MLS', dial: 'publish_spread', value: '0' }, { sport: 'MLS', dial: 'publish_total', value: '0' },
+    { sport: '__all__', dial: 'publish_ml', value: '1' },
   ];
   const changes = [
     { changed_at: '2026-09-21T18:11:10Z', sport: 'MLB', component: 'MLB, MLB:ml, MLB:spread multiplier 0.25 to 1', after: { multiplier: 1 }, source: 'owner-approved-2026-09-21' },
@@ -57,7 +64,7 @@ describe('formatDialBoard', () => {
   ];
 
   test('one field per live sport with multipliers and the week\'s moves, defaults first', () => {
-    const e = formatDialBoard({ multipliers, changes, bucketTargets, weekLabel: 'week of Sep 21' });
+    const e = formatDialBoard({ multipliers, changes, bucketTargets, publishDials, weekLabel: 'week of Sep 21' });
     expect(e.title).toBe('🎛️ Dial board · week of Sep 21');
     const names = e.fields.map(f => f.name);
     expect(names[0]).toBe('Every sport (defaults)');
@@ -65,7 +72,8 @@ describe('formatDialBoard', () => {
     expect(names).toContain('NFL');
     expect(names).toContain('Tennis');
     const byName = Object.fromEntries(e.fields.map(f => [f.name, f.value]));
-    expect(byName.MLB).toContain('ml 1.00 · spread 1.00 · total 0.00 (muted)');
+    expect(byName.MLB).toContain('ml 1.00 · spread 1.00 · total 1.00');
+    expect(byName.MLB).toContain('Muted (publish dial 0): total');
     expect(byName.MLB).toContain('Moved this week:');
     expect(byName.MLB).toContain('multiplier 0.25 to 1');
     expect(byName.NFL).toContain('No dial moves this week.');
@@ -73,15 +81,15 @@ describe('formatDialBoard', () => {
     expect(e.description).toContain('Fallback multiplier __global__ 0.25');
   });
 
-  test('a sport with every multiplier muted and no moves stays off the board', () => {
-    const e = formatDialBoard({ multipliers, changes, bucketTargets, weekLabel: 'w' });
+  test('a shadow sport (every publish dial 0) with no moves stays off the board', () => {
+    const e = formatDialBoard({ multipliers, changes, bucketTargets, publishDials, weekLabel: 'w' });
     const names = e.fields.map(f => f.name);
     expect(names).not.toContain('EPL');
     expect(names).not.toContain('MLS');
   });
 
   test('bucket floors close the card, highest first', () => {
-    const e = formatDialBoard({ multipliers, changes, bucketTargets: [...bucketTargets, { sport: 'NFL', band: 'Lean', floor_pp: '3' }], weekLabel: 'w' });
+    const e = formatDialBoard({ multipliers, changes, bucketTargets: [...bucketTargets, { sport: 'NFL', band: 'Lean', floor_pp: '3' }], publishDials, weekLabel: 'w' });
     const floors = e.fields[e.fields.length - 1];
     expect(floors.name).toContain('Bucket floors');
     expect(floors.value).toContain('Sharp Take 10pp · Strong Play 7pp · Play 4pp · Lean 2pp');
@@ -91,7 +99,7 @@ describe('formatDialBoard', () => {
 
   test('every field value fits the Discord limit', () => {
     const many = Array.from({ length: 60 }, (_, i) => ({ sport: 'MLB', component: `move ${i} ${'x'.repeat(100)}`, after: { v: i } }));
-    const e = formatDialBoard({ multipliers, changes: many, bucketTargets, weekLabel: 'w' });
+    const e = formatDialBoard({ multipliers, changes: many, bucketTargets, publishDials, weekLabel: 'w' });
     for (const f of e.fields) expect(f.value.length).toBeLessThanOrEqual(1024);
   });
 });

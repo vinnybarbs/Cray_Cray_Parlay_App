@@ -88,17 +88,32 @@ function sportOfKey(key) {
  * (the shadow soccer family) stays out. The __all__ row is the
  * defaults. Values are clipped to Discord's field limit.
  */
-function formatDialBoard({ multipliers = [], changes = [], bucketTargets = [], weekLabel }) {
+function formatDialBoard({ multipliers = [], changes = [], bucketTargets = [], publishDials = [], weekLabel }) {
   const bySport = new Map();
-  const ensure = (s) => { if (!bySport.has(s)) bySport.set(s, { mult: [], moves: [] }); return bySport.get(s); };
+  const ensure = (s) => { if (!bySport.has(s)) bySport.set(s, { mult: [], moves: [], muted: [], shadow: false }); return bySport.get(s); };
   let globalLine = null;
   for (const m of multipliers) {
     if (m.key === '__global__') { globalLine = `__global__ ${Number(m.multiplier).toFixed(2)}`; continue; }
     const sport = sportOfKey(m.key);
     if (!sport) continue;
     const market = m.key.includes(':') ? m.key.split(':')[1] : 'sport';
-    const val = Number(m.multiplier);
-    ensure(sport).mult.push(`${market} ${val.toFixed(2)}${val === 0 ? ' (muted)' : ''}`);
+    ensure(sport).mult.push(`${market} ${Number(m.multiplier).toFixed(2)}`);
+  }
+  // A mute is a publish dial at 0 (directive 25 as amended): a sport with
+  // every market off is a shadow sport and stays off the board unless it
+  // moved this week.
+  const flags = new Map();
+  for (const d of publishDials) {
+    if (!d.sport || !/^publish_(ml|spread|total)$/.test(d.dial) || d.sport === '__all__') continue;
+    if (!flags.has(d.sport)) flags.set(d.sport, {});
+    flags.get(d.sport)[d.dial.replace('publish_', '')] = Number(d.value);
+  }
+  for (const [sport, f] of flags) {
+    const off = Object.entries(f).filter(([, v]) => v === 0).map(([k]) => k);
+    if (off.length === 0) continue;
+    const row = ensure(sport);
+    if (off.length === Object.keys(f).length && off.length >= 3) row.shadow = true;
+    else row.muted = off;
   }
   for (const c of changes) {
     const sport = c.sport || '__all__';
@@ -107,11 +122,11 @@ function formatDialBoard({ multipliers = [], changes = [], bucketTargets = [], w
   const fields = [];
   const order = [...bySport.keys()].sort((a, b) => (a === '__all__' ? -1 : b === '__all__' ? 1 : a.localeCompare(b)));
   for (const sport of order) {
-    const { mult, moves } = bySport.get(sport);
-    const allMuted = mult.length > 0 && mult.every(l => l.includes('(muted)'));
-    if ((mult.length === 0 || allMuted) && moves.length === 0) continue;
+    const { mult, moves, muted, shadow } = bySport.get(sport);
+    if ((mult.length === 0 || shadow) && moves.length === 0) continue;
     const lines = [];
     if (mult.length) lines.push(`Multipliers: ${mult.join(' · ')}`);
+    if (muted.length) lines.push(`Muted (publish dial 0): ${muted.join(', ')}`);
     lines.push(moves.length ? 'Moved this week:' : 'No dial moves this week.');
     lines.push(...moves);
     fields.push({ name: sport === '__all__' ? 'Every sport (defaults)' : sport, value: clip(lines.join('\n'), 1024), inline: false });
@@ -126,7 +141,7 @@ function formatDialBoard({ multipliers = [], changes = [], bucketTargets = [], w
   }
   return {
     title: clip(`🎛️ Dial board · ${weekLabel}`, 256),
-    description: [globalLine ? `Fallback multiplier ${globalLine}.` : null, 'The tier is the raw claim times the multiplier minus the price rails (directive 25). Every dial move below carries its evidence row.'].filter(Boolean).join(' '),
+    description: [globalLine ? `Fallback multiplier ${globalLine}.` : null, 'The tier is the raw claim minus the price rails; multipliers are dials at 1 unless the sweep proves otherwise (directive 25). A mute is a publish dial at 0. Every move below carries its evidence row.'].filter(Boolean).join(' '),
     color: DIAL_COLOR,
     fields: fields.slice(0, 25),
     footer: { text: 'Dials move only through sport_dials plus a model_weight_changes row (directives 7, 8, 21, 25). Text on purpose: no pixels.' },
@@ -203,15 +218,16 @@ async function runModelFeed() {
 async function runDialBoard() {
   const startTime = Date.now();
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString();
-  const [multRes, chRes, tgtRes] = await Promise.all([
+  const [multRes, chRes, tgtRes, pubRes] = await Promise.all([
     supabase.from('edge_calibration').select('key, multiplier, source, updated_at').order('key'),
     supabase.from('model_weight_changes').select('changed_at, sport, component, after, source').gte('changed_at', since).order('changed_at', { ascending: true }),
     supabase.from('bucket_targets').select('sport, band, floor_pp').order('sport'),
+    supabase.from('sport_dials').select('sport, dial, value').like('dial', 'publish_%'),
   ]);
-  const err = multRes.error || chRes.error || tgtRes.error;
+  const err = multRes.error || chRes.error || tgtRes.error || pubRes.error;
   if (err) throw err;
   const weekLabel = `week of ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Denver', month: 'short', day: 'numeric' })}`;
-  const embed = formatDialBoard({ multipliers: multRes.data || [], changes: chRes.data || [], bucketTargets: tgtRes.data || [], weekLabel });
+  const embed = formatDialBoard({ multipliers: multRes.data || [], changes: chRes.data || [], bucketTargets: tgtRes.data || [], publishDials: pubRes.data || [], weekLabel });
   const result = await sendDiscordEmbeds([embed], 'model');
   await supabase.from('cron_job_logs').insert({
     job_name: 'discord-dial-board',

@@ -1824,10 +1824,16 @@ async function runPreAnalysis(sportSlugs) {
               const profileOk = sportDisplay !== 'UFC'
                 || !result.recommended_pick
                 || await isKnownUfcBout(supabase, game.home_team, game.away_team);
-              const publishGateOpen = !!result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2
+              // RAW ONLY (owner 2026-09-21, directive 25 amended): the gate
+              // reads the raw claim and nothing else. The multiplier is a
+              // dial that sizes the label, so it can neither open the gate
+              // (the ruling above) nor close it (NFL at 0.25 needed an 8pp
+              // raw read to publish and shipped three weeks of legs). A
+              // scaled claim under 2pp still publishes, at the Lean floor.
+              const publishGateOpen = !!result.recommended_pick
                 && rawGatePp != null && rawGatePp >= 2 && profileOk && !tennisFenced;
-              if (result.recommended_pick && gateEdgePp != null && gateEdgePp >= 2 && !tennisFenced && !publishGateOpen) {
-                console.log(`  ⛔ Publish gate closed for ${game.game_key}: raw ${rawGatePp != null ? rawGatePp.toFixed(1) : 'n/a'}pp vs calibrated ${gateEdgePp.toFixed(1)}pp, profile ${profileOk ? 'ok' : 'blank'}`);
+              if (result.recommended_pick && rawGatePp != null && rawGatePp >= 2 && !tennisFenced && !publishGateOpen) {
+                console.log(`  ⛔ Publish gate closed for ${game.game_key}: raw ${rawGatePp.toFixed(1)}pp, profile ${profileOk ? 'ok' : 'blank'}`);
               }
               if (publishGateOpen) {
               try {

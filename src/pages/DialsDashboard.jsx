@@ -99,7 +99,7 @@ function DialBoard({ dials, rails, publish, sport }) {
 function Sizing({ multipliers, bucketTargets, weightChanges }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <Panel title="Sizing · multipliers and bucket floors" sub="The tier is the raw claim times the multiplier for the key minus the price rails, nothing else (directive 25). A multiplier of 0 is an owner mute. Each bucket must deliver its floor in pp over break even, or the Monday scorecard names it.">
+      <Panel title="Sizing · multipliers and bucket floors" sub="The tier is the raw claim minus the price rails (directive 25). Multipliers are dials at 1 unless the sweep proves a sport should move; a mute is a publish dial at 0, never a multiplier. Each bucket must deliver its floor in pp over break even, or the Monday scorecard names it.">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead><tr><th className={th}>Key</th><th className={`${th} text-right`}>Multiplier</th><th className={`${th} text-right`}>Measured k</th><th className={`${th} text-right`}>n</th><th className={th}>Source</th></tr></thead>
