@@ -35,7 +35,7 @@ async function checkTeams() {
     console.log(`  - ${team.name || 'N/A'}`);
     console.log(`    ID: ${team.id}`);
     console.log(`    League: ${team.league || 'NULL'}`);
-    console.log(`    API-Sports ID: ${team.api_sports_id || team.external_id || 'NULL'}`);
+    console.log(`    External ID: ${team.external_id || 'NULL'}`);
     console.log('');
   });
 

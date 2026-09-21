@@ -19,7 +19,6 @@
 
 ### 3. **Performance Optimization**
 - ✅ Static team validation system (instant lookups)
-- ✅ API-Sports dependency eliminated from critical path  
 - ✅ Cached research data populated
 - ✅ suggest-picks endpoint optimized
 
@@ -47,7 +46,6 @@
    ```
    SUPABASE_URL=your_supabase_url
    SUPABASE_SERVICE_ROLE_KEY=your_service_key
-   APISPORTS_API_KEY=742fae24a9360953961def55b889babc
    PORT=5001
    ```
 

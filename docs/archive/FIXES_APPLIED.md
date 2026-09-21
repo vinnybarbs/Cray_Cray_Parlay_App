@@ -4,7 +4,6 @@
 
 ## Major Updates
 
-### 🎯 NEW: Real NFL Stats Integration (API-Sports)
 **GAME CHANGER**: Replaced Google searches with real NFL statistics API!
 
 **What's New**:
@@ -75,7 +74,6 @@ d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric
 ✅ Research Phase Complete: X/Y games researched
 ```
 
-### 3. ⚠️ API Sports Key - OPTIONAL BUT RECOMMENDED
 **Status**: Not configured (player verification disabled)
 
 **Impact**: 
@@ -85,7 +83,6 @@ d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric
 
 **To Fix** (Optional):
 1. Get free API key from https://dashboard.api-football.com/register
-2. Add to `.env`: `API_SPORTS_KEY=your_key_here`
 3. Restart server
 4. Player verification will auto-enable
 
@@ -119,7 +116,6 @@ Expected output:
 ✅ Configured SERPER_API_KEY
 ✅ Configured OPENAI_API_KEY
 ✅ Configured GEMINI_API_KEY
-❌ Missing API_SPORTS_KEY (optional)
 ```
 
 ## Research Data Flow

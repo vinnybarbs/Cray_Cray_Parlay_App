@@ -10,7 +10,6 @@ Complete guide to deploy the new parlay builder architecture with Vercel (fronte
 - [ ] Vercel account
 - [ ] Railway account
 - [ ] GitHub repository connected to both Vercel and Railway
-- [ ] API keys: Odds API, OpenAI, Serper, API-Sports
 
 ---
 
@@ -67,7 +66,6 @@ PORT=5001
 ODDS_API_KEY=your_odds_api_key_here
 OPENAI_API_KEY=your_openai_key_here
 SERPER_API_KEY=your_serper_key_here
-APISPORTS_API_KEY=your_apisports_key_here
 
 # Supabase (Backend)
 SUPABASE_URL=https://xxxxx.supabase.co
@@ -199,7 +197,6 @@ Add:
 ODDS_API_KEY=your_key
 OPENAI_API_KEY=your_key
 SERPER_API_KEY=your_key
-APISPORTS_API_KEY=your_key
 
 # Supabase
 SUPABASE_URL=https://xxxxx.supabase.co
@@ -249,7 +246,6 @@ Monitor usage:
 - **Odds API**: 100k calls/month
 - **OpenAI**: Pay per token
 - **Serper**: Check dashboard
-- **API-Sports**: 100 calls/day
 
 ---
 
@@ -310,7 +306,6 @@ Monitor usage:
 - **Odds API**: Free tier (100k calls/month)
 - **OpenAI**: ~$10-50 (depends on usage)
 - **Serper**: Free tier available
-- **API-Sports**: Free tier (100 calls/day)
 
 **Total**: ~$15-60/month depending on traffic
 

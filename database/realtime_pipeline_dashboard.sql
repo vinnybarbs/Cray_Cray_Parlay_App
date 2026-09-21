@@ -198,7 +198,7 @@ SELECT
         THEN 'Manually trigger odds refresh or check API keys'
         
         WHEN NOT EXISTS (SELECT 1 FROM team_stats_cache LIMIT 1)
-        THEN 'Manually trigger stats sync or check API-Sports key'
+        THEN 'Manually trigger stats sync or check the stats sync'
         
         WHEN NOT EXISTS (SELECT 1 FROM news_cache LIMIT 1)
         THEN 'Manually trigger news refresh or check Serper API key'

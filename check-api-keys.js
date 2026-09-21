@@ -10,7 +10,6 @@ const keys = {
   'ODDS_API_KEY': process.env.ODDS_API_KEY,
   'SERPER_API_KEY': process.env.SERPER_API_KEY,
   'OPENAI_API_KEY': process.env.OPENAI_API_KEY,
-  'APISPORTS_API_KEY': process.env.APISPORTS_API_KEY || process.env.API_SPORTS_KEY
 };
 
 let allConfigured = true;
@@ -47,5 +46,4 @@ console.log('\n📊 Feature Status:\n');
 console.log(`   Odds Data: ${keys.ODDS_API_KEY ? '✅ Enabled' : '❌ Disabled'}`);
 console.log(`   External Research (Serper): ${keys.SERPER_API_KEY ? '✅ Enabled' : '❌ Disabled - No research will be performed'}`);
 console.log(`   AI Analysis (OpenAI): ${keys.OPENAI_API_KEY ? '✅ Enabled' : '❌ Disabled'}`);
-console.log(`   Player Verification: ${keys.APISPORTS_API_KEY ? '✅ Enabled' : '❌ Disabled - Player props may have errors'}`);
 console.log('');
