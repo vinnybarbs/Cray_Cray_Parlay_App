@@ -244,7 +244,6 @@ export default function GeneratorPage() {
         <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">every graded pick · filter it your way</span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => navigate('/digest')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Digest</button>
-          <button onClick={() => navigate('/chat')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">De-Genny</button>
           <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
           <button onClick={signOut} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Sign out</button>
         </div>

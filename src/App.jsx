@@ -5,7 +5,6 @@ import Landing from './pages/Landing'
 import Auth from './components/Auth'
 import DailyDigest from './pages/DailyDigest'
 import GeneratorPage from './pages/GeneratorPage'
-import ChatPicks from './pages/ChatPicks'
 import AdminDashboard from './pages/AdminDashboard'
 import DialsDashboard from './pages/DialsDashboard'
 import HouseLedger from './pages/HouseLedger'
@@ -56,11 +55,19 @@ function DigestRoute() {
   return <DailyDigest onBack={() => navigate('/generator')} />
 }
 
+// De-Genny chat is off since 2026-09-21 (owner). The page and the API
+// stay in the repo; this route says so and sends people back to the
+// board. Restore by rendering ChatPicks here and setting DEGENNY_CHAT=on.
 function ChatRoute() {
   const navigate = useNavigate()
   return (
-    <div className="min-h-screen bg-ink-950">
-      <ChatPicks onBack={() => navigate('/digest')} />
+    <div className="min-h-screen bg-ink-950 flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-ink-900 rounded-sharp shadow-hairline p-8 text-center">
+        <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-ink-500 mb-3">De-Genny</p>
+        <h1 className="text-xl font-semibold text-ink-100 mb-2">Chat is off for now</h1>
+        <p className="text-sm text-ink-400 mb-6">The board and the ledger carry every pick and every grade. Chat comes back when there is something behind it worth the cost.</p>
+        <button onClick={() => navigate('/digest')} className="px-5 py-2.5 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-xs text-ink-950 transition-all active:scale-[0.98]">Back to the board</button>
+      </div>
     </div>
   )
 }

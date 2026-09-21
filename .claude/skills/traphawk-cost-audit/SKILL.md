@@ -20,7 +20,7 @@ Start by reading `agent_reports` for the last month (other workers may have alre
 | Golf notes | Sonnet | NOT logged, 1 call per tournament per run, 3 runs/day |
 | Enrich articles, news summarizer | Haiku | RETIRED 2026-09-14 (owner, build_queue 36): both jobs unscheduled and the code removed, so this line is zero from that date. Before it, count news_articles.betting_summary |
 | Learning analyzer | Opus 4.8 | RETIRED 2026-09-15 (owner): analyze-outcomes-daily unscheduled, the route stays but nothing calls it, so this line is zero from that date. Before it, five picks a day into ai_suggestions.post_analysis |
-| De-Genny chat | Sonnet | user-driven, usually zero |
+| De-Genny chat | Sonnet | OFF since 2026-09-21 (owner): /api/chat-picks answers 503 unless DEGENNY_CHAT=on, so this line is zero from that date. It had answered anonymous prompts behind only a per address rate limit |
 
 Weather costs zero (Open-Meteo API since Aug 2026). Pricing changes matter: Sonnet 5 intro pricing ($2/$10 per MTok) ends 2026-08-31, standard is $3/$15. Opus 4.8 is $5/$25, Haiku 4.5 $1/$5. The logged `cost` field always uses standard Sonnet rates, so billed narration cost is lower than logged until the intro window closes.
 

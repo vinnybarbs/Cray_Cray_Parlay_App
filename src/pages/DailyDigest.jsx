@@ -2052,14 +2052,8 @@ export default function DailyDigest({ onBack }) {
                 The board is never "thin", the window is just honest. */}
             <OnDeckRail onDeck={data.onDeck} />
 
-            {/* Bottom CTA. Primary action (Chat) gets the amber fill; secondary (Generator) stays ghost so the eye lands on the primary */}
+            {/* Bottom CTA. De-Genny chat is off since 2026-09-21 (owner), so the generator is the one action here. */}
             <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button
-                onClick={() => { window.location.hash = '#/chat' }}
-                className="w-full sm:w-auto px-6 py-3 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-sm text-ink-950 transition-all active:scale-[0.98]"
-              >
-                Chat with De-Genny
-              </button>
               <button
                 onClick={onBack}
                 className="w-full sm:w-auto px-6 py-3 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-mono font-medium uppercase tracking-[0.12em] text-sm text-ink-200 transition-all active:scale-[0.98]"

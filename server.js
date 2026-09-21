@@ -363,9 +363,18 @@ app.post('/api/generate-parlay',
   generateParlayHandler
 );
 
-// Chat-based AI pick generator
-const { chatPicksHandler } = require('./api/chat-picks');
-app.post('/api/chat-picks', generalRateLimiter.middleware(), chatPicksHandler);
+// Chat-based AI pick generator. OFF since 2026-09-21 (owner: "let's just
+// shut off De-Genny chat for now"): the endpoint answered anonymous
+// prompts on the Anthropic budget and nothing behind it is worth a
+// paywall yet. Set DEGENNY_CHAT=on to bring it back.
+if (process.env.DEGENNY_CHAT === 'on') {
+  const { chatPicksHandler } = require('./api/chat-picks');
+  app.post('/api/chat-picks', generalRateLimiter.middleware(), chatPicksHandler);
+} else {
+  app.post('/api/chat-picks', (req, res) => {
+    res.status(503).json({ error: 'De-Genny chat is off for now', disabled: true });
+  });
+}
 
 // Add suggest-picks endpoint for pick builder
 app.post('/api/suggest-picks',
