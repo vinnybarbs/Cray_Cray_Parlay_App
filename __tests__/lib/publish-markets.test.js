@@ -91,3 +91,30 @@ describe('shadow narration: a whole-sport shadow read needs no Claude call', () 
     expect(r.key_factors).toEqual([]);
   });
 });
+
+// 2026-09-21 leak: with the multiplier at 1 a muted total became the
+// headline read on eleven MLB games and blocked the moneyline. A muted
+// market's sides are skipped for the headline; a whole-sport shadow
+// keeps every side so its reads still show on the board.
+describe('mutedSides', () => {
+  const { mutedSides } = require('../../lib/services/publish-markets');
+
+  test('a muted total hides over and under only', () => {
+    const s = mutedSides({ ml: 1, spread: 1, total: 0 });
+    expect([...s].sort()).toEqual(['over', 'under']);
+  });
+
+  test('a muted spread hides both spread sides', () => {
+    const s = mutedSides({ ml: 1, spread: 0, total: 1 });
+    expect([...s].sort()).toEqual(['away_spread', 'home_spread']);
+  });
+
+  test('a whole-sport shadow hides nothing, its reads stay visible', () => {
+    expect(mutedSides({ ml: 0, spread: 0, total: 0 }).size).toBe(0);
+  });
+
+  test('every market open hides nothing', () => {
+    expect(mutedSides({ ml: 1, spread: 1, total: 1 }).size).toBe(0);
+    expect(mutedSides(null).size).toBe(0);
+  });
+});

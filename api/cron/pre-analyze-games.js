@@ -27,7 +27,7 @@ const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.j
 const { withSeasonFloor } = require('../../lib/services/season-floor.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
 const { tileRecords } = require('../../lib/services/tile-records.js');
-const { marketPublishOpen, sportIsShadow, shadowNarration } = require('../../lib/services/publish-markets.js');
+const { marketPublishOpen, sportIsShadow, shadowNarration, mutedSidesFor } = require('../../lib/services/publish-markets.js');
 const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/discord-alerts.js');
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
@@ -1500,18 +1500,28 @@ async function runPreAnalysis(sportSlugs) {
         // the auto-save below, and SHADOW_SPORTS never reach the record at
         // all. Three-way soccer results carry a draw side the core picker
         // does not know, so they use the 1X2 picker.
+        // A muted market (publish dial 0, directive 25 as amended) is
+        // skipped for the headline and for trap calls: its edge is real
+        // now that the multiplier is 1, but it cannot publish and must not
+        // become the read or block the market that can. The full edge map
+        // still goes to game_analysis for the shadow ledger. A whole-sport
+        // shadow keeps every side (its reads show on the board as shadow).
+        const mutedSet = edgeData ? await mutedSidesFor(supabase, sportDisplay) : new Set();
         const bestSide = edgeData
           ? (edgeData.edges && 'draw' in edgeData.edges
               ? soccer1x2.pickBest1x2Side(edgeData, { minEdgePp: -100 })
-              : edgeCalc.pickBestSide(edgeData, { minEdgePp: -100 }))
+              : edgeCalc.pickBestSide(edgeData, { minEdgePp: -100, excludeSides: mutedSet }))
           : null;
         // Trap detection runs independent of pick selection: a Trap is a
         // side the casual bettor is drawn to (lure score from chalk,
         // streaks, home lean, juicy-dog pricing, popular Overs) that the
         // model prices at -2pp or worse. The mere inverse of a pick is NOT
         // a trap and no longer gets a callout. See lib/services/trap-detector.js.
+        const trapEdgeData = edgeData && mutedSet.size && edgeData.edges
+          ? { ...edgeData, edges: Object.fromEntries(Object.entries(edgeData.edges).filter(([k]) => !mutedSet.has(k))) }
+          : edgeData;
         const trapCalls = trapDetector.detectTraps({
-          edgeData, oddsCtx, game, sport: sportDisplay, rankCtx
+          edgeData: trapEdgeData, oddsCtx, game, sport: sportDisplay, rankCtx
         });
         if (trapCalls.length > 0) {
           const t = trapCalls[0];
