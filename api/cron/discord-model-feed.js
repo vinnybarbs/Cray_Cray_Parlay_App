@@ -77,6 +77,27 @@ function formatDirective(row, isNew) {
   };
 }
 
+/**
+ * Pure: the newest timestamp among rows, returned as the row's OWN
+ * string, never re-serialized. Postgres carries microseconds and a JS
+ * Date keeps milliseconds, so a cursor rebuilt through Date lands just
+ * before the row it came from and that row re-posts every hour (the
+ * 2026-09-21 repeat: directives 17 and 25, thirteen times overnight).
+ */
+function maxStamp(rows, fields) {
+  let best = null;
+  let bestMs = -Infinity;
+  for (const r of rows || []) {
+    for (const f of fields) {
+      const v = r?.[f];
+      if (!v) continue;
+      const ms = new Date(v).getTime();
+      if (Number.isFinite(ms) && ms > bestMs) { bestMs = ms; best = v; }
+    }
+  }
+  return best;
+}
+
 function sportOfKey(key) {
   if (!key || key === '__global__') return null;
   return key.split(':')[0];
@@ -190,13 +211,10 @@ async function runModelFeed() {
   // Advance the cursor only after a real post, so a missing webhook or an
   // outage replays the rows next hour instead of losing them.
   if (embeds.length && result.sent) {
-    if (changes?.length) await writeCursor('weight_changes', changes[changes.length - 1].changed_at);
+    if (changes?.length) await writeCursor('weight_changes', maxStamp(changes, ['changed_at']) || changes[changes.length - 1].changed_at);
     if (directives?.length) {
-      const last = directives.reduce((m, d) => {
-        const t = Math.max(new Date(d.created_at).getTime(), d.updated_at ? new Date(d.updated_at).getTime() : 0);
-        return t > m ? t : m;
-      }, new Date(sinceDirectives).getTime());
-      await writeCursor('directives', new Date(last).toISOString());
+      const last = maxStamp(directives, ['created_at', 'updated_at']);
+      if (last) await writeCursor('directives', last);
     }
   }
 
@@ -256,6 +274,7 @@ function guarded(run, label) {
 }
 
 module.exports = {
+  maxStamp,
   discordModelFeed: guarded(runModelFeed, 'Model feed post'),
   discordDialBoard: guarded(runDialBoard, 'Dial board post'),
   formatWeightChange,
