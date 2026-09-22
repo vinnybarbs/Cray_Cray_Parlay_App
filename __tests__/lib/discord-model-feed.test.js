@@ -1,7 +1,7 @@
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy';
 
-const { formatWeightChange, formatDirective, formatDialBoard } = require('../../api/cron/discord-model-feed');
+const { formatWeightChange, formatDirective, formatDialBoard, maxStamp } = require('../../api/cron/discord-model-feed');
 const { embedText } = require('../../lib/services/discord-alerts');
 
 describe('formatWeightChange', () => {
@@ -101,5 +101,31 @@ describe('formatDialBoard', () => {
     const many = Array.from({ length: 60 }, (_, i) => ({ sport: 'MLB', component: `move ${i} ${'x'.repeat(100)}`, after: { v: i } }));
     const e = formatDialBoard({ multipliers, changes: many, bucketTargets, publishDials, weekLabel: 'w' });
     for (const f of e.fields) expect(f.value.length).toBeLessThanOrEqual(1024);
+  });
+});
+
+// The cursor keeps the row's own microsecond string. Rebuilding it through
+// a JS Date drops to milliseconds and lands just before the row, which
+// re-posted directives 17 and 25 every hour on 2026-09-21.
+describe('maxStamp', () => {
+  test('returns the newest stamp as the original string, microseconds intact', () => {
+    const rows = [
+      { created_at: '2026-09-21T22:35:12.295399+00:00', updated_at: '2026-09-21T23:20:14.349811+00:00' },
+      { created_at: '2026-09-21T17:19:36.464483+00:00', updated_at: '2026-09-21T23:20:14.349811+00:00' },
+      { created_at: '2026-09-21T22:35:12.295399+00:00', updated_at: null },
+    ];
+    expect(maxStamp(rows, ['created_at', 'updated_at'])).toBe('2026-09-21T23:20:14.349811+00:00');
+  });
+
+  test('a cursor rebuilt through Date loses the microseconds the row keeps', () => {
+    const row = '2026-09-21T23:20:14.349811+00:00';
+    const viaDate = new Date(row).toISOString();
+    expect(viaDate).toBe('2026-09-21T23:20:14.349Z');
+    expect(maxStamp([{ updated_at: row }], ['updated_at'])).toBe(row);
+  });
+
+  test('empty or stampless rows give null', () => {
+    expect(maxStamp([], ['changed_at'])).toBeNull();
+    expect(maxStamp([{ x: 1 }], ['changed_at'])).toBeNull();
   });
 });
