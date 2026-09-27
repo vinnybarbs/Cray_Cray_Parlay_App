@@ -87,7 +87,23 @@ export function priceAdjustedPp(edgePp, americanOdds) {
 export function finalPpFor(game) {
   const published = game?.published_pick?.edge_pp
   if (published != null && Number.isFinite(Number(published))) return Number(published)
+  return livePpFor(game)
+}
+
+// The live read on the recommended side with the price rails applied,
+// whatever the ledger holds. Reads keep moving after a pick publishes
+// (NFL publishes two to three days out), so a card with a published pick
+// shows this beside it when the two disagree instead of swapping the
+// pick or printing Skip.
+export function livePpFor(game) {
   return priceAdjustedPp(edgePpForSide(game?.edges, game?.recommended_side), lockOddsFor(game))
+}
+
+// The side a pick text names, price and line stripped, so a published
+// "Rays ML +109" still matches a live "Rays ML +106" read.
+export function pickSideKey(text) {
+  if (!text) return null
+  return String(text).replace(/\s[+-]?\d+(\.\d+)?$/, '').trim().toLowerCase()
 }
 
 // Break-even win percentage for an American price: risk / (risk + win).
