@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, breakEvenPct } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct } from '../lib/tiers'
 import { setPublishFlags, isShadowSport, isShadowMarket } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -217,7 +217,12 @@ function DeepResearchModal({ gameKey, game, onClose }) {
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  const analysis = data?.analysis || game
+  // The deep research row carries the published pick since 2026-09-27;
+  // the card's copy is the fallback so the modal never scores the live
+  // read alone and prints Skip on a published Lean.
+  const analysis = data?.analysis
+    ? { ...data.analysis, published_pick: data.analysis.published_pick ?? game.published_pick ?? null, published_alts: data.analysis.published_alts ?? game.published_alts ?? null }
+    : game
   const version = analysis.analysis_version
   const keyFactors = Array.isArray(analysis.key_factors)
     ? analysis.key_factors
@@ -293,6 +298,12 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                 </span>
               )}
             </div>
+            {analysis.published_pick?.pick && !SHADOW_DISPLAY.has(analysis.sport) && (
+              <div className="font-mono text-[11px] text-signal-pos mt-2 tabular-nums">
+                Published: {analysis.published_pick.pick}{analysis.published_pick.tier ? ` · ${analysis.published_pick.tier}` : ''}
+              </div>
+            )}
+            <LiveReadNote game={analysis} />
           </div>
 
           {/* Analysis snippet + key factors */}
@@ -863,6 +874,28 @@ function TierPathNote({ published }) {
   )
 }
 
+// A published pick is what the ledger grades, so the card and the modal
+// headline it as published: side, price, edge, tier. The live read keeps
+// moving after publication (NFL reads publish two to three days out) and
+// when it no longer agrees, it shows here as a labeled second line instead
+// of replacing the pick or printing Skip (owner 2026-09-27: the tile said
+// Lean, the Research modal said Skip, on the same Titans read).
+function LiveReadNote({ game }) {
+  const pub = game?.published_pick
+  if (!pub?.pick) return null
+  const live = livePpFor(game)
+  const sameSide = game.recommended_pick != null && pickSideKey(pub.pick) === pickSideKey(game.recommended_pick)
+  if (sameSide && (live == null || live >= 2)) return null
+  const liveText = game.recommended_pick
+    ? `${game.recommended_pick}${live != null ? ` ${formatPp(live)}` : ''}`
+    : 'no side clears the floor'
+  return (
+    <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">
+      Live read now: {liveText} · the published pick stands and is graded as published
+    </div>
+  )
+}
+
 function GameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -939,15 +972,19 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
-          if (game.recommended_pick && signedPp != null && signedPp >= 2) return (
+          // The published row names the pick. Before 2026-09-27 this line
+          // printed the LIVE recommended side under the PUBLISHED number,
+          // so a drifted read showed the Falcons at the Packers' 6.0pp.
+          const publishedText = game.published_pick?.pick || null
+          if ((publishedText || game.recommended_pick) && signedPp != null && signedPp >= 2) return (
             <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
-              <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick</div>
-              <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+              <div className="font-mono text-[9px] text-ink-400 uppercase tracking-[0.14em] mb-0.5">Model Pick{game.published_pick?.tier ? ` · ${game.published_pick.tier}` : ''}</div>
+              <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{publishedText || game.recommended_pick}</div>
               {(() => {
                 {/* Break-even = risk / (risk + win). Teaches the price: a
                     -180 pick must win 64.3% just to tread water, +122 only
                     45%. The number that explains why chalk is fenced. */}
-                const be = breakEvenPct(lockOddsFor(game))
+                const be = breakEvenPct(game.published_pick?.odds ?? lockOddsFor(game))
                 return be != null ? (
                   <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">
                     break-even {be.toFixed(1)}% at this price
@@ -955,6 +992,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
                 ) : null
               })()}
               <TierPathNote published={game.published_pick} />
+              <LiveReadNote game={game} />
             </div>
           )
           if (game.recommended_pick && isLegGame) {

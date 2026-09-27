@@ -9,7 +9,7 @@ function loadTiers() {
   const src = fs.readFileSync(path.join(__dirname, '..', '..', 'src', 'lib', 'tiers.js'), 'utf8')
     .replace(/^export /gm, '');
   const m = { exports: {} };
-  const fn = new Function('module', src + '\nmodule.exports = { edgeTier, pricePenaltyPp, priceAdjustedPp, finalPpFor, edgePpForSide, lockOddsFor };');
+  const fn = new Function('module', src + '\nmodule.exports = { edgeTier, pricePenaltyPp, priceAdjustedPp, finalPpFor, livePpFor, pickSideKey, edgePpForSide, lockOddsFor };');
   fn(m);
   return m.exports;
 }
@@ -34,5 +34,24 @@ describe('frontend price penalty mirror', () => {
     expect(ui.finalPpFor(game)).toBe(9.6);
     delete game.published_pick;
     expect(ui.finalPpFor(game)).toBe(9);
+  });
+
+  // Owner 2026-09-27: an NFL Lean published three days out drifted to a
+  // 0.0pp live read. The tile scored the published row, the Research modal
+  // scored the live row and said Skip. Both numbers exist on purpose and
+  // each has one name.
+  test('livePpFor is the drifted read, finalPpFor stays the published claim', () => {
+    const game = { edges: { away_ml: 0.0001 }, recommended_side: 'away_ml', recommended_odds: '+114', published_pick: { edge_pp: 3.1, pick: 'Tennessee Titans ML +114' } };
+    expect(ui.finalPpFor(game)).toBe(3.1);
+    expect(ui.livePpFor(game)).toBe(0);
+    expect(ui.edgeTier(ui.livePpFor(game)).label).toBe('Skip');
+    expect(ui.edgeTier(ui.finalPpFor(game)).label).toBe('Lean');
+  });
+
+  test('pickSideKey ignores the price and the line, keeps the market', () => {
+    expect(ui.pickSideKey('Tampa Bay Rays ML +109')).toBe(ui.pickSideKey('Tampa Bay Rays ML +106'));
+    expect(ui.pickSideKey('Cleveland Browns +2.5')).not.toBe(ui.pickSideKey('Cleveland Browns ML +120'));
+    expect(ui.pickSideKey('Green Bay Packers ML -290')).not.toBe(ui.pickSideKey('Atlanta Falcons ML +195'));
+    expect(ui.pickSideKey(null)).toBeNull();
   });
 });

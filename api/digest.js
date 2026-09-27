@@ -31,6 +31,58 @@ const SPORT_SLUG_TO_DISPLAY = {
   soccer_usa_mls: 'MLS',
 };
 
+// The published pick row (headline) and the spotlight (alt market) rows
+// for each game, keyed by matchup, so tiles can show the tier PATH. Tiers
+// legally revise all day (promotions included, owner call 2026-08-22), so
+// the card says "promoted from Strong Play at 3:45 PM" instead of the
+// board silently differing from a reader's last visit. The spotlight lane
+// publishes a spread or total that cleared the gate on its own, and the
+// tile renders it under the headline instead of leaving it buried in the
+// market tabs.
+//
+// Both /api/digest and /api/deep-research attach these. The Research
+// modal used to score the live analysis row alone: an NFL Lean published
+// three days out whose live read had drifted under 2pp showed Lean on the
+// tile and Skip in the modal (owner 2026-09-27, "we've been getting
+// roasted"). The published row is what the ledger grades, so every
+// surface headlines it.
+async function attachPublishedPicks(supabase, games) {
+  if (!Array.isArray(games) || games.length === 0) return games;
+  const pendingPicksResult = await safeQuery(async () => {
+    const { data, error } = await supabase
+      .from('ai_suggestions')
+      .select('home_team, away_team, game_date, pick, bet_type, odds, edge_pp, tier, tier_history, last_revised_at, session_id')
+      .like('session_id', 'auto_digest%')
+      .eq('actual_outcome', 'pending')
+      .is('voided_at', null)
+      .not('tier', 'in', '("Trap","Leg")')
+      .gt('game_date', new Date().toISOString());
+    if (error) throw error;
+    return data || [];
+  });
+  const pickByMatchup = new Map();
+  const altsByMatchup = new Map();
+  for (const p of pendingPicksResult || []) {
+    const key = `${p.home_team}|${p.away_team}`;
+    if (String(p.session_id).startsWith('auto_digest_alt_')) {
+      if (!altsByMatchup.has(key)) altsByMatchup.set(key, []);
+      altsByMatchup.get(key).push({ pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history });
+    } else {
+      pickByMatchup.set(key, p);
+    }
+  }
+  for (const game of games) {
+    if (!game) continue;
+    const key = `${game.home_team}|${game.away_team}`;
+    const p = pickByMatchup.get(key);
+    game.published_pick = p
+      ? { pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at }
+      : null;
+    game.published_alts = altsByMatchup.get(key) || null;
+  }
+  return games;
+}
+
 async function getDigest(req, res) {
   const supabase = getSupabase();
   if (!supabase) {
@@ -75,45 +127,7 @@ async function getDigest(req, res) {
       }
     }));
 
-    // Attach the published pick row so tiles can show the tier PATH.
-    // Tiers legally revise all day (promotions included, owner call
-    // 2026-08-22), so the card says "promoted from Strong Play at 3:45 PM"
-    // instead of the board silently differing from a reader's last visit.
-    const pendingPicksResult = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('ai_suggestions')
-        .select('home_team, away_team, game_date, pick, bet_type, odds, edge_pp, tier, tier_history, last_revised_at, session_id')
-        .like('session_id', 'auto_digest%')
-        .eq('actual_outcome', 'pending')
-        .is('voided_at', null)
-        .not('tier', 'in', '("Trap","Leg")')
-        .gt('game_date', new Date().toISOString());
-      if (error) throw error;
-      return data || [];
-    });
-    // Headline rows and spotlight (alt-market) rows attach separately:
-    // the spotlight lane publishes a spread or total that cleared the
-    // gate on its own, and the tile renders it under the headline
-    // instead of leaving it buried in the market tabs.
-    const pickByMatchup = new Map();
-    const altsByMatchup = new Map();
-    for (const p of pendingPicksResult || []) {
-      const key = `${p.home_team}|${p.away_team}`;
-      if (String(p.session_id).startsWith('auto_digest_alt_')) {
-        if (!altsByMatchup.has(key)) altsByMatchup.set(key, []);
-        altsByMatchup.get(key).push({ pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history });
-      } else {
-        pickByMatchup.set(key, p);
-      }
-    }
-    for (const game of games) {
-      const key = `${game.home_team}|${game.away_team}`;
-      const p = pickByMatchup.get(key);
-      game.published_pick = p
-        ? { pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at }
-        : null;
-      game.published_alts = altsByMatchup.get(key) || null;
-    }
+    await attachPublishedPicks(supabase, games);
 
     // Group games by sport
     const gamesBySport = {};
@@ -454,6 +468,9 @@ async function deepResearch(req, res) {
     if (!gameAnalysisResult) {
       return res.status(404).json({ error: 'Game not found', game_key });
     }
+    // The published pick rides along so the modal scores what the ledger
+    // grades, same as the tile.
+    await attachPublishedPicks(supabase, [gameAnalysisResult]);
 
     // Canonical fact sheet (same as /digest list view): structured matchup,
     // market, records, edge sections sourced from build_game_fact_sheet().
@@ -573,4 +590,4 @@ async function deepResearch(req, res) {
   }
 }
 
-module.exports = { getDigest, deepResearch };
+module.exports = { getDigest, deepResearch, attachPublishedPicks };
