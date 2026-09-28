@@ -1,5 +1,8 @@
 # TrapHawk (traphawk.io)
 
+Read AGENTS.md first: the compiled goals, skills index, never list and
+session checklists every session and routine consumes before working.
+
 Sports betting research model. Node/Express server.js on Railway (auto
 deploys from main in 2 to 4 minutes), Vite/React frontend in src/,
 Supabase Postgres project pcjhulzyqmhrhsrgvwvx (pg_cron fires Railway

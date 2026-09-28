@@ -7,7 +7,14 @@ description: Daily operational health check for TrapHawk production. Run this wh
 
 Read-only sweep of production (Supabase project `pcjhulzyqmhrhsrgvwvx`, use the `execute_sql` tool). Do not change code or data during the check, report findings and propose fixes separately (the one exception is filing your own report at the end). Lead the report with ALL CLEAR or the problems in severity order. The tier definitions and table shapes are in the traphawk-data-model skill.
 
-## 0. Read the blackboard first
+## 0. Read AGENTS.md, then the blackboard
+
+The top line for every session is the `AGENTS.md` row of the `skills` table (the repo file, synced on every deploy): goals, the four state tables, the never list, the session checklists. Read it before this skill:
+
+```sql
+select content from skills where name = 'AGENTS.md';
+```
+
 
 `agent_reports` is the shared memory of every digital worker (reviews, audits, build sessions, prior ops checks). Read it before anything else so you do not rediscover settled findings or miss context that changes what a number means:
 
