@@ -260,6 +260,12 @@ function UpcomingInspectorSection({ analyses }) {
 // rows before starting. This feed is the same shared memory the workers see.
 function AgentReportsSection({ reports }) {
   const [openId, setOpenId] = React.useState(null)
+  const [expandedId, setExpandedId] = React.useState(null)
+  // Ops checks file 5k to 12k character summaries with paragraph breaks.
+  // Rendered as one <p>, the breaks collapsed into a single wall of text
+  // (owner 2026-09-28: "parsing issues"). Paragraphs stay paragraphs and
+  // a long row shows its first 600 characters until tapped.
+  const CLAMP = 600
   const agentCls = {
     'ops-check': 'text-signal-pos bg-signal-pos-dim/30',
     'calibration-review': 'text-sky-400 bg-sky-950/50',
@@ -294,7 +300,25 @@ function AgentReportsSection({ reports }) {
                   </button>
                 )}
               </div>
-              <p className="text-ink-200 text-sm mt-1 leading-snug">{r.summary}</p>
+              {(() => {
+                const text = String(r.summary || '')
+                const long = text.length > CLAMP
+                const open = expandedId === i
+                const shown = long && !open ? text.slice(0, CLAMP).replace(/\s+\S*$/, '') + ' ...' : text
+                return (
+                  <>
+                    <p className="text-ink-200 text-sm mt-1 leading-snug whitespace-pre-line break-words">{shown}</p>
+                    {long && (
+                      <button
+                        onClick={() => setExpandedId(open ? null : i)}
+                        className="font-mono text-[10px] text-signal-pos/80 hover:text-signal-pos mt-1"
+                      >
+                        {open ? '- show less' : `+ read all (${text.length.toLocaleString()} chars)`}
+                      </button>
+                    )}
+                  </>
+                )
+              })()}
               {openId === i && r.findings && (
                 <pre className="mt-2 text-[10px] text-ink-300 whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-ink-950 rounded-sharp p-2">
                   {JSON.stringify(r.findings, null, 2)}
