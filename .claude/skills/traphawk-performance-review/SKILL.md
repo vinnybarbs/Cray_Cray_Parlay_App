@@ -7,7 +7,7 @@ description: The weekly TrapHawk model performance and calibration review. Use w
 
 Read-only against production (Supabase project `pcjhulzyqmhrhsrgvwvx`, `execute_sql` tool). Two rules prevent every historical reporting error: all public numbers come from `mv_public_record` only (never raw ai_suggestions math, never mv_model_accuracy), and trap rows grade the fade (a won trap means the named side lost, report it as "fading them went W-L"). Full schema context is in the traphawk-data-model skill.
 
-Before anything else, read the standing directives, then the blackboard, so the review builds on settled law and prior findings instead of rediscovering or contradicting them:
+Before anything else, read the `AGENTS.md` row of the `skills` table (`select content from skills where name = 'AGENTS.md'`), the top line every session consumes, then the standing directives, then the blackboard, so the review builds on settled law and prior findings instead of rediscovering or contradicting them:
 
 ```sql
 select id, directive, decided_on, enforcement from directives
