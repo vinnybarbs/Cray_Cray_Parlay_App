@@ -148,7 +148,16 @@ THE STAGING RULE, non-negotiable: this table changes no coefficients. A nudge pr
 
 ## 4. Traps and legs
 
-Trap record from the mv tier row (fade framing). If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Legs: hit rate versus the 65% floor. Legs hitting well below 65% over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
+Trap record from the mv tier row (fade framing). If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Since 2026-10-01 MLB run line traps and juicy dog traps are shadow (trap_publish_spread, trap_publish_juicy_dog 0): they sit in rule_gate_log as held fades, not in the Trap record. Legs: hit rate versus the leg_prob_floor dial per sport (UFC 1.01 since 2026-10-01, out of the pool). Legs hitting well below the floor over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
+
+## 4b. Rule gate scorecard (shadow rules, since 2026-10-01)
+
+```sql
+select * from rule_gate_scorecard order by rule_key, verdict;
+select rule_key, verdict, count(*) from rule_gate_log where logged_at > now() - interval '7 days' group by 1, 2 order by 1, 2;
+```
+
+Each MLB rule (starter_required, starter_gap_025, light_favorite_rail, rl_favorite_rule, rl_dog_prob_floor) shows its passed cohort next to its held cohort. Report both lines as is. A rule is a promotion candidate when the held cohort loses and the passed cohort holds on 100 graded picks per verdict and the line stayed positive in the weeks after proposal (sunset 2026-11-12 on rule_gates). The review proposes, the owner flips mode on rule_gates with a model_weight_changes row (directive 21). Never read a hold as a reason to void or regrade a published pick.
 
 ## 5. Shadow sports and CLV
 

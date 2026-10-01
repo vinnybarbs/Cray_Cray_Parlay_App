@@ -21,6 +21,7 @@ const bandCalibration = require('../../lib/services/band-calibration.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
+const { runRuleGates } = require('../../lib/services/rule-gates.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
 const { applyPricePenalties } = require('../../lib/services/price-penalties.js');
 const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.js');
@@ -1520,12 +1521,51 @@ async function runPreAnalysis(sportSlugs) {
         const trapEdgeData = edgeData && mutedSet.size && edgeData.edges
           ? { ...edgeData, edges: Object.fromEntries(Object.entries(edgeData.edges).filter(([k]) => !mutedSet.has(k))) }
           : edgeData;
-        const trapCalls = trapDetector.detectTraps({
+        const trapCallsAll = trapDetector.detectTraps({
           edgeData: trapEdgeData, oddsCtx, game, sport: sportDisplay, rankCtx
         });
+        // Shadow split (owner 2026-10-01): run line traps and juicy dog
+        // traps stop publishing where trap_publish_spread or
+        // trap_publish_juicy_dog is 0 on the dial board (MLB). They are
+        // logged to rule_gate_log as held fades so the lookback can grade
+        // them, and they never become the read, a Trap row or a leg block.
+        const trapDials = {
+          spread: await edgeCalc.dialValue(sportDisplay, 'trap_publish_spread'),
+          juicy_dog: await edgeCalc.dialValue(sportDisplay, 'trap_publish_juicy_dog'),
+        };
+        const { live: trapCalls, shadow: shadowTraps } = trapDetector.splitShadowTraps(trapCallsAll, trapDials);
         if (trapCalls.length > 0) {
           const t = trapCalls[0];
           console.log(`  🪤 Trap detected: ${t.side} lure ${t.lure_score} at ${t.edge_pp}pp (${t.signals.map(s => s.key).join(', ')})`);
+        }
+        if (shadowTraps.length > 0) {
+          console.log(`  🪤 Shadow trap (not published): ${shadowTraps.map(t => `${t.side} ${t.shadow_reason}`).join(', ')}`);
+          try {
+            const shadowRows = shadowTraps.map(t => ({
+              session_id: `auto_digest_trap_${siteDay()}`,
+              game_key: game.game_key,
+              sport: sportDisplay,
+              home_team: game.home_team,
+              away_team: game.away_team,
+              game_date: game.game_date || game.commence_time || null,
+              bet_type: deriveBetTypeAndPoint(t.side, oddsCtx).betType,
+              side: t.side,
+              pick: t.side === 'draw' ? buildDrawPickText(game) : buildPickText(t.side, oddsCtx, game),
+              odds: formatAmericanOdds(t.side === 'draw' ? drawPrice(game) : resolveOddsForPick(oddsCtx, t.side)),
+              tier: 'Trap',
+              edge_pp: t.edge_pp,
+              rule_key: t.shadow_reason.startsWith('trap_publish_spread') ? 'trap_shadow_spread' : 'trap_shadow_juicy_dog',
+              mode: 'shadow',
+              verdict: 'hold',
+              reason: `${t.shadow_reason}: lure ${t.lure_score} (${(t.signals || []).map(s => s.key).join(', ')})`,
+              inputs: { lure_score: t.lure_score, signals: t.signals, edge_pp: t.edge_pp },
+              logged_at: new Date().toISOString(),
+            }));
+            const { error: shadowErr } = await supabase.from('rule_gate_log').upsert(shadowRows, { onConflict: 'session_id,game_key,rule_key' });
+            if (shadowErr) console.warn(`  Shadow trap log failed for ${game.game_key}: ${shadowErr.message}`);
+          } catch (e) {
+            console.warn(`  Shadow trap log skipped for ${game.game_key}: ${e.message}`);
+          }
         }
 
         // Directional read selection. An actionable pick is the BEST side
@@ -1943,6 +1983,17 @@ async function runPreAnalysis(sportSlugs) {
                 };
 
                 const saved = await upsertDailySuggestion(game, pickPayload, sessionId, { domain: 'pick' });
+                if (saved.status !== 'settled' && !saved.error) {
+                  // Shadow rule gates (owner 2026-10-01, build_queue 68):
+                  // the lookback's selection rules score this pick and log
+                  // pass or hold with their inputs. Log only: nothing here
+                  // changes the row above until a rule is promoted to live
+                  // on the rule_gate_scorecard.
+                  await runRuleGates(supabase, {
+                    sport: sportDisplay, game, sessionId, pick: result.recommended_pick,
+                    betType, side, point, odds: pickOdds, edgeData, tier: pickTier, edgePp: publishedEdgePp,
+                  });
+                }
                 if (saved.status === 'settled') {
                   console.log(`  Pick already settled for ${game.game_key}, not revising`);
                 } else if (saved.error) {
