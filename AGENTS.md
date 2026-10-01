@@ -69,8 +69,10 @@ reads them before acting and writes them after:
   File a row after every significant change. No analysis that reports
   only to one person.
 
-Also: `bucket_targets` (the per tier floors), `skills` (the synced
-skill text), `mv_public_record` (the only source of any public record
+Also: `rule_gates`, `rule_gate_log` and `rule_gate_scorecard` (the
+lookback's selection rules, shadow until promoted, judged per verdict
+against the ledger), `bucket_targets` (the per tier floors), `skills`
+(the synced skill text), `mv_public_record` (the only source of any public record
 number), `pick_clv_all` and `closing_lines` (closing line value),
 `shadow_reads_graded` and `shadow_market_readiness()` (the shadow
 ledger every muted market is judged on).
