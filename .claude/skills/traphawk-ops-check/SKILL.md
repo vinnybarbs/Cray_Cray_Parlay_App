@@ -37,6 +37,8 @@ from directives where status = 'active' and check_sql is not null;
 
 Execute each `check_sql` exactly as stored. Any returned row is a FINDING named after its directive, reported at the top of the brief next to cron failures, never buried. An empty result on every check gets one line: "directive compliance clean, N checks". Also flag any active directive whose enforcement you know to be gone (a fence removed from code, a protocol nobody runs): a directive with dead enforcement is a finding even with no violating rows. Never edit the directives table during a check; propose changes to the owner.
 
+
+Directive 27 (no sportsbook affiliation) is enforced by `__tests__/no-sportsbook-affiliation.test.js`, which fails the suite on any sportsbook domain link or affiliate parameter in the shipped source, plus its check_sql on the queue. A cloud routine does not fetch traphawk.io; the test ran on the last deploy is the landing grep. Directive 21 is expired (the freeze ended 2026-09-27) and no longer runs.
 ## 1. Cron completions, last 24h
 
 ```sql
@@ -70,7 +72,7 @@ from game_analysis where sport = 'MLB' and analysis_version > 1
 order by generated_at desc limit 10;
 ```
 
-The key whose fingerprint changed between versions while nothing real changed is the culprit; report it by name. Healthy state after August 2026: a meaningful share of stale games skip in every sport.
+The key whose fingerprint changed between versions while nothing real changed is the culprit; report it by name. Healthy state after August 2026: a meaningful share of stale games skip in every sport. Two readings to get right (ops 2026-10-03): `news` is fingerprinted but OUT of the gate hash since 2026-10-03, so news in changed_keys is diagnosis, never the reason a game re-narrated; and a fire whose completed row shows games_found N, existing_fresh N, analyzed 0, skipped_unchanged 0 is a fire where every game sat inside its expires_at. existing_fresh is the hold witness there. skipped_unchanged counts only games past expiry whose inputs matched. The started and completed rows of one run land two minutes apart on a full narration (the :10 and :12 pairs), they are not two fires.
 
 ## 3. Integrity sweep findings
 
@@ -119,7 +121,7 @@ from odds_cache where commence_time > now()
 group by sport order by min(commence_time);
 ```
 
-An in-season sport with zero future rows, or a first game hundreds of hours out, means the refresher is failing regardless of what cron says. Cross-check edge gateway status codes in the Supabase function logs if it looks wrong. pre-analyze games_found 0 with no error on an in-season sport is the same failure seen from downstream.
+An in-season sport with zero future rows, or a first game hundreds of hours out, means the refresher is failing regardless of what cron says. Cross-check edge gateway status codes in the Supabase function logs if it looks wrong. pre-analyze games_found 0 with no error on an in-season sport is the same failure seen from downstream. Since 2026-10-03 refresh-odds-hourly logs partial on any non 2xx core request (details.failed_sports names them) or a run with no games at all, and directive 14 check_sql carries three new clauses: odds refresh starved 2h (no completed row with rows above 0), odds refresh partial 6h, and closing capture skipped stale quotes 24h (capture_closing_lines writes nothing from an odds_cache quote older than 90 minutes and logs stale_quotes_skipped). The 2026-09-26 to 09-30 quota outage logged completed on rows 0 for 97 hours before this; the closes it captured sit in closing_lines_suspect.
 
 ## 7. Silent-witness outputs
 

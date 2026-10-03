@@ -187,3 +187,63 @@ describe('injured reserve carries no weight (2026-09-12)', () => {
     expect(fi.positionImpact('QB', 'out')).toBeCloseTo(-0.06, 10);
   });
 });
+
+// Ops check 2026-10-02 and 10-03: 87 of 133 NFL injury entries carried
+// depth_rank null, all or nothing per side and alphabetical (ARI to GB
+// resolved, HOU onward not). One read of the view stops at PostgREST's
+// 1000 row cap. The loader pages.
+describe('loadDepthRanks pages past the 1000 row cap (2026-10-03)', () => {
+  const { loadDepthRanks, splitScratchesByCost } = require('../../lib/services/football-injuries');
+  function fakeView(rows, { failPage = null } = {}) {
+    const calls = [];
+    const chain = (from, to) => ({
+      then(resolve) {
+        calls.push([from, to]);
+        if (failPage != null && calls.length === failPage) return resolve({ data: null, error: { message: 'boom' } });
+        resolve({ data: rows.slice(from, to + 1), error: null });
+      },
+    });
+    const q = {
+      select: () => q, order: () => q,
+      range: (from, to) => chain(from, to),
+    };
+    return { client: { from: () => q }, calls };
+  }
+  const rows = [];
+  for (let t = 0; t < 32; t++) {
+    const team = `T${String(t).padStart(2, '0')}`;
+    for (let p = 0; p < 80; p++) rows.push({ team, espn_id: null, player_key: `player ${p}`, pos_abb: 'WR', best_rank: (p % 4) + 1 });
+  }
+
+  test('every club loads when the view spans three pages', async () => {
+    _resetCache();
+    const { client, calls } = fakeView(rows);
+    const byTeam = await loadDepthRanks(client);
+    expect(calls).toEqual([[0, 999], [1000, 1999], [2000, 2999]]);
+    expect(byTeam.size).toBe(32);
+    expect(lookupRank(byTeam, 'T31', { player: 'player 5', position: 'WR' })).toBe(2);
+    expect(lookupRank(byTeam, 'T00', { player: 'player 0', position: 'WR' })).toBe(1);
+  });
+
+  test('a page failure keeps nothing partial', async () => {
+    _resetCache();
+    const { client } = fakeView(rows, { failPage: 2 });
+    expect(await loadDepthRanks(client)).toBeNull();
+  });
+
+  test('splitScratchesByCost ignores a newly out player the chart prices at zero and keeps the rest', () => {
+    _resetCache();
+    const ranks = new Map([['PIT', new Map([['name:will howard|QB', 3], ['name:rico dowdle|RB', 2], ['name:aaron rodgers|QB', 1]])]]);
+    const scratches = [
+      { player: 'Will Howard', position: 'QB', from: 'not listed', to: 'out' },
+      { player: 'Rico Dowdle', position: 'RB', from: 'questionable', to: 'out' },
+      { player: 'Aaron Rodgers', position: 'QB', from: 'questionable', to: 'out' },
+      { player: 'Nobody Known', position: 'WR', from: 'not listed', to: 'out' },
+    ];
+    const { priced, ignored } = splitScratchesByCost(scratches, 'PIT', ranks);
+    expect(ignored.map(s => s.player)).toEqual(['Will Howard']);
+    expect(priced.map(s => [s.player, s.depth_rank, s.depth_weight])).toEqual([
+      ['Rico Dowdle', 2, 0.5], ['Aaron Rodgers', 1, 1], ['Nobody Known', null, 0.5],
+    ]);
+  });
+});

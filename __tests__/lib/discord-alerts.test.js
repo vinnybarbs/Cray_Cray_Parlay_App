@@ -172,3 +172,40 @@ describe('embedsFromLines', () => {
     expect(e.map(x => x.description).join('\n')).toBe(lines.join('\n'));
   });
 });
+
+// 2026-10-03: the 70 row morning board went out as one message and Discord
+// refused it (ten embeds can pass the per embed clips and still exceed the
+// 6000 character per message cap). The poster chunks by characters too and
+// a refused message is reported with the status and body.
+describe('chunkEmbeds and a refused post (2026-10-03)', () => {
+  const { chunkEmbeds, embedChars } = require('../../lib/services/discord-alerts');
+  afterEach(() => { delete process.env.DISCORD_WEBHOOK_URL; delete global.fetch; });
+
+  test('ten short embeds share a message, long ones split by characters', () => {
+    const short = Array.from({ length: 12 }, (_, i) => ({ title: `card ${i}`, description: 'x' }));
+    expect(chunkEmbeds(short).map(c => c.length)).toEqual([10, 2]);
+    const long = Array.from({ length: 4 }, (_, i) => ({ title: `tier ${i}`, description: 'p'.repeat(2500) }));
+    expect(embedChars(long[0])).toBe(2506);
+    expect(chunkEmbeds(long).map(c => c.length)).toEqual([2, 2]);
+    expect(chunkEmbeds([])).toEqual([]);
+  });
+
+  test('a big board goes out in several messages and a refusal is failed with the reason', async () => {
+    process.env.DISCORD_WEBHOOK_URL = 'https://discord.example/board';
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, status: 204 });
+    const board = Array.from({ length: 7 }, (_, i) => ({ title: `Leans ${i}`, description: 'line\n'.repeat(700) }));
+    const r = await sendDiscordEmbeds(board, 'board');
+    expect(r.sent).toBe(true);
+    expect(r.messages).toBeGreaterThan(1);
+    for (const call of global.fetch.mock.calls) {
+      const body = JSON.parse(call[1].body);
+      expect(body.embeds.reduce((n, e) => n + embedChars(e), 0)).toBeLessThanOrEqual(6000);
+    }
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 400, text: async () => '{"embeds": ["Embed size exceeds maximum size of 6000"]}' });
+    const bad = await sendDiscordEmbeds([{ title: 'x', description: 'y' }], 'board');
+    expect(bad.sent).toBe(false);
+    expect(bad.status).toBe(400);
+    expect(bad.reason).toContain('discord 400');
+    expect(bad.reason).toContain('6000');
+  });
+});

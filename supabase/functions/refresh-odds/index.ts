@@ -290,6 +290,11 @@ async function refreshOdds(req: Request): Promise<Response> {
     // Per sport witness for the cron_job_logs row (directive 14): games
     // fetched and rows written, so the ops check judges the feed by rows.
     const perSport: Record<string, { games: number; rows: number }> = {};
+    // Directive 14 (ops check 2026-09-28 to 10-03): a core request that
+    // comes back non 2xx, or a run that fetched no game for any sport,
+    // is partial. The 97 hour quota outage of 2026-09-26 logged
+    // completed on rows 0 the whole way through.
+    const failedSports: string[] = [];
     const resolved = await resolveSports(oddsApiKey);
     console.log(`🎾 Tennis keys this run (${resolved.discovered ? "discovered" : "fallback"}): ${resolved.tennis.join(", ") || "none"}`);
 
@@ -313,6 +318,7 @@ async function refreshOdds(req: Request): Promise<Response> {
         const response = await fetchWithRetry(url);
         if (!response.ok) {
           console.log(`⚠️ Core odds request failed for ${sport}: ${response.status}`);
+          failedSports.push(`${sport}:${response.status}`);
           continue;
         }
         await logRateLimit(response);
@@ -364,6 +370,7 @@ async function refreshOdds(req: Request): Promise<Response> {
         totalGames += games.length;
       } catch (err) {
         console.error(`❌ Error refreshing ${sport}:`, err);
+        failedSports.push(`${sport}:${(err as Error).message}`);
       }
       await delay(250);
     }
@@ -468,12 +475,13 @@ async function refreshOdds(req: Request): Promise<Response> {
     // Directive 14: a run that fetched games but wrote nothing is partial,
     // never completed. Cron status alone is not proof of ingestion.
     try {
-      const status = totalGames > 0 && totalOddsInserted === 0 ? "partial" : "completed";
+      const status = (totalGames > 0 && totalOddsInserted === 0) || totalGames === 0 || failedSports.length > 0
+        ? "partial" : "completed";
       await supabase.from("cron_job_logs").insert({
         job_name: "refresh-odds-hourly",
         status,
         details: JSON.stringify({
-          games: totalGames, rows: totalOddsInserted, per_sport: perSport,
+          games: totalGames, rows: totalOddsInserted, per_sport: perSport, failed_sports: failedSports,
           tennis_keys: resolved.tennis, tennis_discovered: resolved.discovered,
           skipped_for_time: skippedForTime, duration_ms: duration
         })

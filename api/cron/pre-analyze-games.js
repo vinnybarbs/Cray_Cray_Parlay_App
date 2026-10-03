@@ -1609,10 +1609,16 @@ async function runPreAnalysis(sportSlugs) {
         // half point, the edge to 1pp. Same day MLB boards tick a cent
         // every twenty minutes and the gate never skipped (sixteen ops
         // reports); a real line move still re-narrates.
+        // News is OUT of the gate hash since 2026-10-03: ESPN's feed turns
+        // over every few hours on a football weekend (changed_keys named
+        // news on 13 of 14 NFL games and 24 to 31 of 57 NCAAF games per
+        // fire, 9.27 and 8.19 dollars a day against the 6.00 ceiling) and
+        // the math never reads it. It is still fingerprinted in
+        // context_parts so a churn can be diagnosed, and the prompt still
+        // carries it whenever something real forces a narration.
         const contextInputs = {
           odds: quantizeOdds(oddsCtx),
           rank: rankCtx,
-          news: newsCtx,
           injuries: injuryCtx,
           trends: [homeTrend, awayTrend],
           stats: playerStatsCtx,
@@ -1634,7 +1640,7 @@ async function runPreAnalysis(sportSlugs) {
         // gate can be diagnosed from the table (which input churned between
         // two runs) instead of guessed at. MLB gated near zero for two weeks
         // of ops checks with the culprit unidentifiable from the outside.
-        const contextParts = Object.fromEntries(Object.entries(contextInputs).map(([k, v]) =>
+        const contextParts = Object.fromEntries(Object.entries({ ...contextInputs, news: newsCtx }).map(([k, v]) =>
           [k, crypto.createHash('sha256').update(JSON.stringify(v ?? null)).digest('hex').slice(0, 10)]));
 
         if (prior && prior.context_hash && prior.context_hash === contextHash && prior.prior_snippet) {

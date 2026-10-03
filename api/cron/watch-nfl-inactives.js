@@ -26,7 +26,8 @@ const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const {
   findEspnEventId, fetchGameInjuries, linesForTeam, diffScratches,
 } = require('../../lib/services/nfl-inactives.js');
-const { overrideTeams } = require('../../lib/services/football-injuries.js');
+const { overrideTeams, loadDepthRanks, splitScratchesByCost } = require('../../lib/services/football-injuries.js');
+const { teamAbbr } = require('../../lib/services/nfl-inactives.js');
 
 const WINDOW_HOURS = 3;
 const NFL_SLUGS = ['americanfootball_nfl'];
@@ -71,10 +72,13 @@ async function latestAnalysis(game) {
 
 async function runWatch({ reanalyze } = {}) {
   const startTime = Date.now();
-  const summary = { checked: 0, no_analysis: 0, no_event: 0, no_summary: 0, no_prior_report: 0, clean: 0, scratches: [], reanalyzed: false, errors: [] };
+  const summary = { checked: 0, no_analysis: 0, no_event: 0, no_summary: 0, no_prior_report: 0, clean: 0, scratches: [], ignored_zero_cost: [], reanalyzed: false, errors: [] };
   try {
     const games = await pendingNflGames();
     summary.checked = games.length;
+    // The depth chart decides whether a scratch costs anything. A newly
+    // out player the chart prices at zero never marks a read stale.
+    const depthRanks = games.length ? await loadDepthRanks(supabase) : null;
     const staleKeys = [];
     // Game summary lines for the clubs that scratched, overlaid on the
     // league feed cache before the re-analysis so the math sees the Out.
@@ -96,7 +100,11 @@ async function runWatch({ reanalyze } = {}) {
           const teamName = side === 'home' ? game.home_team : game.away_team;
           const diff = diffScratches(report ? report[side] : null, linesForTeam(byTeam, teamName) || []);
           if (diff === null) { summary.no_prior_report++; found = -1; break; }
-          for (const s of diff) {
+          const { priced, ignored } = splitScratchesByCost(diff, teamAbbr(teamName), depthRanks);
+          for (const s of ignored) {
+            summary.ignored_zero_cost.push({ game: label, team: teamName, player: s.player, position: s.position, depth_rank: s.depth_rank });
+          }
+          for (const s of priced) {
             found++;
             summary.scratches.push({ game: label, team: teamName, ...s, picks: game.picks.map(p => `${p.tier}: ${p.pick}`) });
           }
