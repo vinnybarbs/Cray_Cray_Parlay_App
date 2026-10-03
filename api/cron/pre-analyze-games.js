@@ -23,7 +23,7 @@ const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
 const { runRuleGates } = require('../../lib/services/rule-gates.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
-const { applyPricePenalties } = require('../../lib/services/price-penalties.js');
+const { applyPricePenalties, applyNoStarterPenalty } = require('../../lib/services/price-penalties.js');
 const { quantizeOdds, quantizeEdge } = require('../../lib/services/change-gate.js');
 const { withSeasonFloor } = require('../../lib/services/season-floor.js');
 const { withTierHistory, historyEntry } = require('../../lib/services/tier-history.js');
@@ -1932,6 +1932,16 @@ async function runPreAnalysis(sportSlugs) {
                   publishedEdgePp = priced.edgePp;
                   pickReasoning = pickReasoning ? `${pickReasoning} ${priced.reason}` : priced.reason;
                 }
+                // 1b. No starter rail (owner 2026-10-03): an MLB read with no
+                //     Probable starters factor deducts no_starter_penalty_pp
+                //     and still publishes. The shadow gate starter_required
+                //     keeps logging the same reads so the rail is scored.
+                const starterRail = await applyNoStarterPenalty(supabase, { sport: sportDisplay, edgePp: publishedEdgePp, edgeData });
+                if (starterRail.applied) {
+                  console.log(`  ⚾ ${starterRail.reason}`);
+                  publishedEdgePp = starterRail.edgePp;
+                  pickReasoning = pickReasoning ? `${pickReasoning} ${starterRail.reason}` : starterRail.reason;
+                }
                 if (betType === 'Moneyline' && (isHomeMl || isAwayMl)) {
                   const guard = await applyExposureGuard(supabase, {
                     sport: sportDisplay,
@@ -2099,7 +2109,8 @@ async function runPreAnalysis(sportSlugs) {
                   // The price rails deduct from spotlight claims too; the
                   // published edge_pp is the adjusted claim.
                   const altPriced = await applyPricePenalties(supabase, { sport: sportDisplay, edgePp: altPp, odds: altOdds });
-                  const altPublishedPp = altPriced.applied ? altPriced.edgePp : altPp;
+                  const altStarterRail = await applyNoStarterPenalty(supabase, { sport: sportDisplay, edgePp: altPriced.applied ? altPriced.edgePp : altPp, edgeData });
+                  const altPublishedPp = altStarterRail.applied ? altStarterRail.edgePp : (altPriced.applied ? altPriced.edgePp : altPp);
                   const altTier = (() => {
                     const t = pickGrader.edgeTier(altPublishedPp);
                     return t === 'Skip' ? 'Lean' : t;
@@ -2111,7 +2122,7 @@ async function runPreAnalysis(sportSlugs) {
                     point,
                     odds: altOdds,
                     confidence: Math.min(10, Math.max(1, Math.round(altPublishedPp))),
-                    reasoning: `${betType} spotlight: this market cleared the publish gate on its own, independent of the headline read. ${result.analysis_snippet || ''}${altPriced.applied ? ` ${altPriced.reason}` : ''}`.trim(),
+                    reasoning: `${betType} spotlight: this market cleared the publish gate on its own, independent of the headline read. ${result.analysis_snippet || ''}${altPriced.applied ? ` ${altPriced.reason}` : ''}${altStarterRail.applied ? ` ${altStarterRail.reason}` : ''}`.trim(),
                     risk_level: altPublishedPp >= 8 ? 'Low' : 'Medium',
                     generate_mode: 'auto_digest',
                     pipeline_version: 6,

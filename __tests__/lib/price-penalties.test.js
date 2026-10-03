@@ -108,3 +108,44 @@ describe('applyPricePenalties reads the dial board', () => {
     expect((await applyPricePenalties(supabase, { sport: 'MLB', edgePp: 12, odds: '-200' })).edgePp).toBe(9);
   });
 });
+
+// Owner 2026-10-03: "for post season if there isn't probable then we
+// should just cut pp and still publish." The no starter rail deducts
+// no_starter_penalty_pp from an MLB read that has no Probable starters
+// factor and never holds it.
+describe('noStarterPenaltyPp (2026-10-03)', () => {
+  const { noStarterPenaltyPp, hasStarterFactor, applyNoStarterPenalty, DEFAULT_NO_STARTER_PENALTY_PP } = require('../../lib/services/price-penalties');
+  const withStarters = { adjustments: [{ factor: 'Probable starters', impact: 0.02 }] };
+  const without = { adjustments: [{ factor: 'Home higher playoff seed', impact: 0.015 }] };
+
+  test('reads the factor off the edge result', () => {
+    expect(hasStarterFactor(withStarters)).toBe(true);
+    expect(hasStarterFactor(without)).toBe(false);
+    expect(hasStarterFactor(null)).toBe(false);
+  });
+
+  test('deducts the rail without the factor, floors at the Lean gate, leaves a read with the factor alone', () => {
+    const r = noStarterPenaltyPp(7.4, false, { pp: 3 });
+    expect(r).toMatchObject({ edgePp: 4.4, penaltyPp: 3, kind: 'no_starter', applied: true });
+    expect(r.reason).toContain('No starters');
+    expect(r.reason).toContain('7.4 to 4.4');
+    expect(noStarterPenaltyPp(3.5, false, { pp: 3 })).toMatchObject({ edgePp: 2, penaltyPp: 3, applied: true });
+    const floor = noStarterPenaltyPp(2, false, { pp: 3 });
+    expect(floor).toMatchObject({ edgePp: 2, penaltyPp: 0, applied: true });
+    expect(floor.reason).toContain('Lean floor');
+    expect(noStarterPenaltyPp(7.4, true, { pp: 3 })).toMatchObject({ edgePp: 7.4, applied: false, kind: null });
+    expect(noStarterPenaltyPp(7.4, false, { pp: 0 })).toMatchObject({ applied: false });
+    expect(noStarterPenaltyPp(1.5, false, { pp: 3 })).toMatchObject({ applied: false });
+  });
+
+  test('the dial board sizes it per sport, MLB 3 by default and every other sport 0', async () => {
+    expect(DEFAULT_NO_STARTER_PENALTY_PP).toEqual({ MLB: 3 });
+    const board = (rows) => ({ from: () => ({ select: () => ({ in: async () => ({ data: rows }) }) }) });
+    _resetDialCache();
+    expect(await applyNoStarterPenalty(board([]), { sport: 'MLB', edgePp: 6, edgeData: without })).toMatchObject({ edgePp: 3, applied: true });
+    expect(await applyNoStarterPenalty(board([]), { sport: 'NFL', edgePp: 6, edgeData: without })).toMatchObject({ applied: false });
+    _resetDialCache();
+    expect(await applyNoStarterPenalty(board([{ sport: 'MLB', dial: 'no_starter_penalty_pp', value: 1.5 }]), { sport: 'MLB', edgePp: 6, edgeData: without })).toMatchObject({ edgePp: 4.5, penaltyPp: 1.5 });
+    expect(await applyNoStarterPenalty(board([]), { sport: 'MLB', edgePp: 6, edgeData: withStarters })).toMatchObject({ applied: false });
+  });
+});
