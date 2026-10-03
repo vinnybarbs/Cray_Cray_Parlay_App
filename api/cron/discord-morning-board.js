@@ -192,13 +192,19 @@ async function runMorningBoard() {
   const gimmes = await fetchGimmes(rows, today, windowStart, windowEnd);
   const result = await sendDiscordEmbeds(formatMorningBoard(rows || [], dateLabel, gimmes), 'board');
 
+  // Directive 14 applies to posts too: a board that was composed and
+  // refused by Discord is failed, never skipped. Skipped is reserved for
+  // nothing to post and no webhook configured.
+  const SKIP_REASONS = new Set(['nothing to post', 'no webhook configured']);
   await supabase.from('cron_job_logs').insert({
     job_name: 'discord-morning-board',
-    status: result.sent ? 'completed' : 'skipped',
+    status: result.sent ? 'completed' : (SKIP_REASONS.has(result.reason) ? 'skipped' : 'failed'),
     details: JSON.stringify({
       board_rows: (rows || []).length,
       sent: result.sent,
       messages: result.messages || 0,
+      embeds: result.embeds || 0,
+      discord_status: result.status || null,
       reason: result.reason || null,
       duration_ms: Date.now() - startTime,
     }),
