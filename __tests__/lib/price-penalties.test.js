@@ -149,3 +149,31 @@ describe('noStarterPenaltyPp (2026-10-03)', () => {
     expect(await applyNoStarterPenalty(board([]), { sport: 'MLB', edgePp: 6, edgeData: withStarters })).toMatchObject({ applied: false });
   });
 });
+
+// NHL (2026-10-03): the same rail keyed on the Starting goalies row and
+// the no_goalie_penalty_pp dial, seeded 0 so nothing comes off until the
+// shadow gate has evidence.
+describe('the starter rail per sport (NHL goalies)', () => {
+  const { hasStarterFactor, applyNoStarterPenalty, STARTER_FACTOR_BY_SPORT, STARTER_DIAL_BY_SPORT } = require('../../lib/services/price-penalties');
+  const goalies = { adjustments: [{ factor: 'Starting goalies', impact: 0.01 }] };
+  const none = { adjustments: [] };
+  const board = (rows) => ({ from: () => ({ select: () => ({ in: async () => ({ data: rows }) }) }) });
+
+  test('the factor and the dial are keyed per sport', () => {
+    expect(STARTER_FACTOR_BY_SPORT).toEqual({ MLB: 'Probable starters', NHL: 'Starting goalies' });
+    expect(STARTER_DIAL_BY_SPORT.NHL).toBe('no_goalie_penalty_pp');
+    expect(hasStarterFactor(goalies, 'NHL')).toBe(true);
+    expect(hasStarterFactor(goalies, 'MLB')).toBe(false);
+  });
+
+  test('NHL deducts nothing at the seed, deducts the dial once set, other sports never', async () => {
+    _resetDialCache();
+    expect(await applyNoStarterPenalty(board([]), { sport: 'NHL', edgePp: 6, edgeData: none })).toMatchObject({ applied: false });
+    _resetDialCache();
+    const r = await applyNoStarterPenalty(board([{ sport: 'NHL', dial: 'no_goalie_penalty_pp', value: 2 }]), { sport: 'NHL', edgePp: 6, edgeData: none });
+    expect(r).toMatchObject({ edgePp: 4, penaltyPp: 2, applied: true });
+    expect(r.reason).toContain('No goalie');
+    expect(await applyNoStarterPenalty(board([]), { sport: 'NHL', edgePp: 6, edgeData: goalies })).toMatchObject({ applied: false });
+    expect(await applyNoStarterPenalty(board([]), { sport: 'NFL', edgePp: 6, edgeData: none })).toMatchObject({ applied: false });
+  });
+});

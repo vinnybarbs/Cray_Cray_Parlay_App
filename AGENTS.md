@@ -207,7 +207,7 @@ publish_total per sport) and `shadow_market_readiness()`. Snapshot:
 | MLB | moneyline, run line | totals (directive 10) | The lookback rules R1 to R4 run as shadow gates. The starter gap is the mechanism. A read with no probable starters deducts no_starter_penalty_pp (MLB 3) and still publishes (owner 2026-10-03) |
 | NFL | moneyline, spread | totals, props (v2 shadow) | 18 picks so far, no rule until 100 per cell |
 | NCAAF | totals (auto promoted 2026-09-27) | moneyline, spread | Ratings anchor, watch weekly |
-| NHL | moneyline, puck line, total (owner go 2026-10-03) | | Judged weekly against its shadow record per directive 10. Goalie and lineup inputs still to build |
+| NHL | moneyline, puck line, total (owner go 2026-10-03) | | Judged weekly against its shadow record per directive 10. Starting goalies factor live 2026-10-04 (goalie_anchor_damp 0.5, goalie_required shadow gate, no_goalie_penalty_pp 0). Skater absences ride the injury factor |
 | NBA, NCAAB | none | all, preseason | Flip at each regular season open, owner call |
 | Tennis | favorites | dogs fenced at +111 | Surface Elo before dogs return |
 | UFC | moneyline | | Out of the leg pool |

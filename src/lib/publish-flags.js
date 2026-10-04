@@ -7,8 +7,13 @@ import { SHADOW_SPORTS } from './tiers'
 
 let _flags = {}
 
+// A response that carries no block leaves the flags alone (2026-10-04:
+// the Research modal's deep research fetch passed undefined, wiped the
+// flags, and the code shadow list then dressed NCAAF totals as Shadow
+// while the digest tile next to it showed the published pick).
 export function setPublishFlags(flags) {
-  _flags = flags && typeof flags === 'object' ? flags : {}
+  if (!flags || typeof flags !== 'object') return
+  _flags = flags
 }
 
 export function publishFlagsFor(sport) {

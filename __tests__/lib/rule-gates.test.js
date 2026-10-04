@@ -133,3 +133,19 @@ describe('runRuleGates', () => {
     expect(down.calls.upserts).toHaveLength(1);
   });
 });
+
+describe('goalie_required (NHL, 2026-10-03)', () => {
+  const goalies = { factor: 'Starting goalies', impact: 0, detail: 'A (.905, Likely) at B (.912, Confirmed)', homeStatus: 'Confirmed', awayStatus: 'Likely' };
+  const edge = (adjs) => ({ edgesRaw: { home_ml: 0.03, away_ml: -0.03, home_spread: 0.01, away_spread: -0.01 }, coverProbs: { home_spread: 0.6, away_spread: 0.4 }, adjustments: adjs });
+
+  test('passes with both goalies named, holds without, never on totals, never for MLB', () => {
+    const ok = pickContext({ sport: 'NHL', side: 'home_ml', odds: '-130', edgeData: edge([goalies]) });
+    expect(verdicts(evaluateRuleGates(DEFAULT_RULES, ok))).toEqual({ goalie_required: 'pass' });
+    expect(evaluateRuleGates(DEFAULT_RULES, ok)[0].inputs.goalies).toEqual({ home_status: 'Confirmed', away_status: 'Likely' });
+    const bare = pickContext({ sport: 'NHL', side: 'away_spread', point: 1.5, odds: '-180', edgeData: edge([]) });
+    expect(verdicts(evaluateRuleGates(DEFAULT_RULES, bare))).toEqual({ goalie_required: 'hold' });
+    expect(pickContext({ sport: 'NHL', side: 'over', odds: '-110', edgeData: edge([]) })).toBeNull();
+    const mlb = pickContext({ sport: 'MLB', side: 'home_ml', odds: '-130', edgeData: edge([goalies]) });
+    expect(verdicts(evaluateRuleGates(DEFAULT_RULES, mlb)).goalie_required).toBeUndefined();
+  });
+});
