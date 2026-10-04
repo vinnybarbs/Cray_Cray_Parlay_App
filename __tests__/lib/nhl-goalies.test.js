@@ -20,14 +20,14 @@ const espnBoard = { events: [{ date: '2026-10-04T00:00Z', competitions: [{ compe
 describe('parsers', () => {
   test('DailyFaceoff page gives both starters with status and news', () => {
     const m = G.parseDailyFaceoff(dfoHtml([dfoGame]));
-    expect(m.get('buffalo sabres')).toMatchObject({ name: 'Ukko-Pekka Luukkonen', status: 'Confirmed', season_sv: 0.773, source: 'dailyfaceoff' });
+    expect(m.get('buffalo sabres')).toMatchObject({ name: 'Ukko-Pekka Luukkonen', status: 'Confirmed', season_sv: 0.773, source: 'dailyfaceoff', opponent: 'Chicago Blackhawks' });
     expect(m.get('chicago blackhawks')).toMatchObject({ name: 'Spencer Knight', status: 'Likely' });
     expect(G.parseDailyFaceoff('<html>nothing</html>')).toBeNull();
   });
 
   test('ESPN probables are the fallback with status Probable, team lookup is forgiving', () => {
     const m = G.parseEspnProbables(espnBoard);
-    expect(G.lookupTeam(m, 'Tampa Bay Lightning')).toMatchObject({ name: 'Andrei Vasilevskiy', status: 'Probable', source: 'espn' });
+    expect(G.lookupTeam(m, 'Tampa Bay Lightning')).toMatchObject({ name: 'Andrei Vasilevskiy', status: 'Probable', source: 'espn', opponent: 'Washington Capitals' });
     expect(G.lookupTeam(m, 'Capitals')).toMatchObject({ name: 'Charlie Lindgren' });
     expect(G.lookupTeam(m, 'Edmonton Oilers')).toBeNull();
   });
@@ -83,8 +83,17 @@ describe('getStartingGoalies end to end with injected fetch', () => {
     expect(text.replace(/\s*\([^)]*\)/g, '')).toBe('Spencer Knight at Ukko-Pekka Luukkonen');
   });
 
-  test('a game the page does not list is null, a dark page falls back to ESPN, a dead network is null', async () => {
+  test('a game the page does not list is null, even when both clubs play someone else tonight (2026-10-03 Calgary at Seattle)', async () => {
     expect(await G.getStartingGoalies('Edmonton Oilers', 'Calgary Flames', fetchFn)).toBeNull();
+    // Buffalo and Chicago are both listed, against each other, so the
+    // reversed orientation still resolves; Buffalo against Boston does not.
+    expect((await G.getStartingGoalies('Chicago Blackhawks', 'Buffalo Sabres', fetchFn)).home.name).toBe('Spencer Knight');
+    expect(await G.getStartingGoalies('Buffalo Sabres', 'Boston Bruins', fetchFn)).toBeNull();
+    expect(G.sameMatchup({ opponent: 'Chicago Blackhawks' }, 'Blackhawks')).toBe(true);
+    expect(G.sameMatchup({ opponent: 'Chicago Blackhawks' }, 'Boston Bruins')).toBe(false);
+  });
+
+  test('a dark page falls back to ESPN, a dead network is null', async () => {
     G._resetCache();
     const espnOnly = jest.fn(async (url) => url.includes('espn') ? ok(espnBoard, true) : { ok: false, text: async () => '' });
     const g = await G.getStartingGoalies('Tampa Bay Lightning', 'Washington Capitals', espnOnly);
