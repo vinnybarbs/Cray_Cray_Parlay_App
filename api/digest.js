@@ -571,9 +571,13 @@ async function deepResearch(req, res) {
       }),
     ]);
 
+    // The publish flags ride along so the Research modal reads the same
+    // dial board as the digest (it refreshes the client flags from this).
+    const publishMarkets = await safeQuery(() => publishFlagsAll(supabase));
     res.json({
       status: 'ok',
       game_key,
+      publishMarkets: publishMarkets || undefined,
       fact_sheet: factSheetResult,
       analysis: gameAnalysisResult,
       injuries: injuriesResult || [],

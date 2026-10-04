@@ -17,6 +17,7 @@ const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
 const { getUfcContext, formatUfcContext, isKnownUfcBout } = require('../../lib/services/ufc-data.js');
 const { getProbablePitchersText } = require('../../lib/services/probable-pitchers.js');
+const { getStartingGoaliesText } = require('../../lib/services/nhl-goalies.js');
 const bandCalibration = require('../../lib/services/band-calibration.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
@@ -936,7 +937,7 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
 
   // MLB: the probable starters are the single most game-specific fact on
   // the card. Without this line the narration fell back to team streaks.
-  if (pitcherCtx) contextParts.push(`Probable starting pitchers: ${pitcherCtx}`);
+  if (pitcherCtx) contextParts.push(`${String(game.sport || '').includes('nhl') ? 'Starting goalies' : 'Probable starting pitchers'}: ${pitcherCtx}`);
 
   if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
@@ -1389,7 +1390,11 @@ async function runPreAnalysis(sportSlugs) {
             : null,
           // MLB only: probable starters from ESPN's scoreboard. Fail-soft,
           // one cached fetch covers the whole slate.
-          sportDisplay === 'MLB' ? getProbablePitchersText(game.home_team, game.away_team) : null
+          // NHL: the starting goalies in the same slot, same hash rule
+          // (names in, parenthetical stats out).
+          sportDisplay === 'MLB' ? getProbablePitchersText(game.home_team, game.away_team)
+            : sportDisplay === 'NHL' ? getStartingGoaliesText(game.home_team, game.away_team)
+            : null
         ]);
         const newsCtx = `${newsCtxRaw || ''}${intelCtx || ''}` || null;
         const tennisCtx = isTennis ? formatTennisContext(tennisData)
