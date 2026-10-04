@@ -45,11 +45,23 @@ test('the cap ladder and the cost: IR in full, day to day at 0.4, slot beats cap
   expect(L.lineupImpact({ players: [] })).toEqual({ impact: 0, out: [], keyLoss: null, counted: 0 });
 });
 
-test('getNhlLineupImpact fetches the club page by slug, caches it, and is null when the page is dark', async () => {
-  const fetchFn = jest.fn(async (url) => url.includes('buffalo-sabres') ? { ok: true, text: async () => page([player('Jason Zucker', 'oi', 'ir', { status: 'ir', cap: 4750000 })]) } : { ok: false, text: async () => '' });
+test('getNhlLineupImpact fetches the club page by slug, caches it, keeps a goalie on IR out of the skater count (Demko 2026-10-03), and is null when the page is dark', async () => {
+  const fetchFn = jest.fn(async (url) => {
+    if (url.includes('buffalo-sabres')) return { ok: true, text: async () => page([
+      player('Jason Zucker', 'oi', 'ir', { pos: 'ir1', status: 'ir', cap: 4750000 }),
+      player('Thatcher Demko', 'oi', 'ir', { pos: 'ir2', status: 'out', cap: 8500000 }),
+    ]) };
+    if (url.includes('search/player')) {
+      const q = decodeURIComponent(url.split('q=')[1]);
+      return { ok: true, text: async () => JSON.stringify([{ name: q, positionCode: q.includes('Demko') ? 'G' : 'L' }]) };
+    }
+    return { ok: false, text: async () => '' };
+  });
   const r = await L.getNhlLineupImpact('Buffalo Sabres', {}, fetchFn);
   expect(r).toMatchObject({ slug: 'buffalo-sabres', counted: 1, source: 'dailyfaceoff' });
+  expect(r.out.map(o => o.player)).toEqual(['Jason Zucker']);
+  const calls = fetchFn.mock.calls.length;
   await L.getNhlLineupImpact('Buffalo Sabres', {}, fetchFn);
-  expect(fetchFn).toHaveBeenCalledTimes(1);
+  expect(fetchFn.mock.calls.length).toBe(calls);
   expect(await L.getNhlLineupImpact('Edmonton Oilers', {}, fetchFn)).toBeNull();
 });
