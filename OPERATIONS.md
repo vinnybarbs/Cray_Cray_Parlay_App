@@ -19,7 +19,6 @@ supabase/migrations/.
 |---|---|---|
 | CRON_SECRET | Railway env (also embedded in pg_cron job commands) | authenticates /cron/* endpoints |
 | ANTHROPIC_API_KEY | Railway env | ALL LLM calls: pick narration, De-Genny chat, parsing/extraction, learning analysis, data-integrity agent (migrated off OpenAI 2026-07-11) |
-| report_secret | app_config table | read-only auth for /api/review-bundle |
 | Supabase service role | Railway env | backend DB access (bypasses RLS) |
 
 The anon key ships in the frontend bundle by design. The 2026-07-11 RLS
@@ -58,11 +57,14 @@ calibration proves a signal. Cost roughly $1.50-2/day. Caps: 14 games/run,
 
 ## Weekly review routine
 
-A scheduled Claude routine (`parlay-weekly-model-review`, Mondays 08:00
-Denver, runs on the Max plan) fetches `/api/review-bundle?secret=<report_secret>`
-and writes a plain-English readout: calibration moves, tier report card
-against the Sharp Take baseline (63.5% win, +23% ROI all-time), CLV verdict,
-hygiene flags. Strictly read-only.
+The scheduled analysts are Claude Code Remote routines with briefs under
+agents/ (see agents/README.md): the daily ops check, the daily build, the
+Monday calibration review and the monthly cost audit. They read the
+database through the Supabase connector and every public number comes
+from mv_public_record. The older claude.ai scheduled tasks that fetched
+/api/review-bundle and /api/pipeline-health were retired on 2026-10-09
+with their endpoints and secrets, because the bundle served
+mv_model_accuracy and its readout disagreed with the site.
 
 ## Public API surface
 
@@ -71,7 +73,6 @@ hygiene flags. Strictly read-only.
 | /api/public-stats | overall + bySport + tiers + sharpTakeAllTime (landing + track record) |
 | /api/public-ticker | real edges for the ticker + in-season league list |
 | /api/public-pod | the free Pick of the Day (freshest digest generation only, >= 7pp, +300 ML fence, sanitized "show the work" payload) |
-| /api/review-bundle | analytics bundle for the weekly routine (secret) |
 
 ## House rules learned the hard way
 

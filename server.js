@@ -112,15 +112,11 @@ app.get('/api/public-ticker', publicTicker);
 const publicPod = require('./api/public-pod');
 app.get('/api/public-pod', publicPod);
 
-// Read-only analytics bundle for the weekly review routine (own secret,
-// stored in app_config, not CRON_SECRET).
-const reviewBundle = require('./api/review-bundle');
-app.get('/api/review-bundle', reviewBundle);
-
-// Read-only pipeline vitals for the daily 6am sanity-check routine (same
-// report_secret as review-bundle. It reads aggregates, can't trigger jobs).
-const pipelineHealth = require('./api/pipeline-health');
-app.get('/api/pipeline-health', pipelineHealth);
+// /api/review-bundle and /api/pipeline-health were retired 2026-10-09
+// (owner). They fed two claude.ai scheduled tasks from before the cloud
+// routines existed, and the bundle served mv_model_accuracy, which is
+// never a public record source. The four routines read the database
+// directly through the Supabase connector.
 
 // Yesterday's board: most recent published pick list with settled outcomes.
 // Public receipts, shown inside the dark-slate empty states.
