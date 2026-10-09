@@ -440,6 +440,10 @@ const discordMorningBoard = require('./api/cron/discord-morning-board');
 app.post('/cron/discord-morning-board', discordMorningBoard);
 const discordReceipts = require('./api/cron/discord-receipts');
 app.post('/cron/discord-receipts', discordReceipts);
+// The exec assistant's daily message, from its blackboard row to the
+// channel (owner 2026-10-09).
+const discordExecBrief = require('./api/cron/discord-exec-brief');
+app.post('/cron/discord-exec-brief', discordExecBrief);
 const { discordModelFeed, discordDialBoard } = require('./api/cron/discord-model-feed');
 app.post('/cron/discord-model-feed', discordModelFeed);
 app.post('/cron/discord-dial-board', discordDialBoard);
