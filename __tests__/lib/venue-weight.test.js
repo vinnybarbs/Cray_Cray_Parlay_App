@@ -3,7 +3,8 @@
 // (7.37 on n=129, then 4.54 on n=252), so MLB's delta weight moved one
 // max step, 0.25 to 0.3125. Every other sport stays at 0.25, and the
 // White Sox / Royals safety rails (±4pp cap, confidence taper) hold for
-// everyone.
+// everyone. 2026-10-09: sweep candidate 85 (owner approved) stepped MLB
+// back to 0.2344, one capped step toward the measured 0.15.
 
 const { EdgeCalculator } = require('../../lib/services/edge-calculator');
 
@@ -13,8 +14,8 @@ describe('_venueSplitImpact per-sport weight', () => {
   const delta = 0.10;
   const games = 25;
 
-  test('MLB carries the stage two up-weight', () => {
-    expect(calc._venueSplitImpact(delta, games, 'MLB')).toBeCloseTo(0.10 * 0.3125, 6);
+  test('MLB carries the sweep approved weight', () => {
+    expect(calc._venueSplitImpact(delta, games, 'MLB')).toBeCloseTo(0.10 * 0.2344, 6);
   });
 
   test('other sports keep the original weight', () => {
@@ -30,7 +31,7 @@ describe('_venueSplitImpact per-sport weight', () => {
 
   test('the confidence taper still applies under the up-weight', () => {
     // 10 games: confidence (10-5)/15 = 1/3.
-    expect(calc._venueSplitImpact(delta, 10, 'MLB')).toBeCloseTo(0.10 * 0.3125 / 3, 6);
+    expect(calc._venueSplitImpact(delta, 10, 'MLB')).toBeCloseTo(0.10 * 0.2344 / 3, 6);
     expect(calc._venueSplitImpact(delta, 4, 'MLB')).toBe(0);
   });
 });
@@ -64,7 +65,7 @@ describe('_venueSplitAdjustments centered on the league norm', () => {
     expect(adj.length).toBe(1);
     expect(adj[0].factor).toBe('H strong at home');
     expect(adj[0].detail).toContain('league norm +5.6pp removed');
-    expect(adj[0].impact).toBeCloseTo(((54 / 81 - 90 / 162) - 0.0556) * 0.3125, 4);
+    expect(adj[0].impact).toBeCloseTo(((54 / 81 - 90 / 162) - 0.0556) * 0.2344, 4);
   });
 
   test('the league bump is the mean over qualifying teams, zero under ten teams', () => {
