@@ -1,11 +1,14 @@
-# TrapHawk routine briefs
+# TrapHawk agent briefs
 
-One file per cloud routine, each holding that routine's complete brief.
-The routine itself (a Claude Code Remote Routine, managed by trigger id
-through the Claude Code Remote connector) carries a one line prompt
-that names its brief and says to read it first and follow it exactly.
-Everything the routine does, in what order, what it may write and how
-it reports is in the brief, so the brief is the only thing that ever
+The vocabulary (owner 2026-10-09). An agent is a worker. Its agent
+brief is the file here that holds its whole job: who it is, when it
+runs, what it reads, what it may write, how it reports. A routine is
+only the trigger (a Claude Code Remote Routine, managed by trigger id):
+the schedule, the model, the repository and the connectors, with a one
+line prompt that names the brief and says to read it first and follow
+it exactly. An agent report is the blackboard row (agent_reports) the
+agent files when it finishes. Brief in, report out. Everything the
+agent does is in its brief, so the brief is the only thing that ever
 needs editing. Arrangement borrowed from Aloe on 2026-10-09.
 
 ## How a brief reaches a routine
