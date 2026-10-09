@@ -1,5 +1,12 @@
 # Scheduled TrapHawk routines
 
+Superseded 2026-10-09. The current arrangement is agents/README.md in
+the repo root: one brief per routine under agents/, synced into the
+skills table on every deploy, with a one line prompt on each trigger.
+That table includes the fourth routine, the daily build. What follows
+is the history as of 2026-08-30 and stays for the overlap and daylight
+saving notes.
+
 Last verified 2026-08-30.
 
 Three scheduled tasks run TrapHawk ops work on their own. Each one fires a fresh Claude session with push notifications on, loads a project skill, and queries Supabase project `pcjhulzyqmhrhsrgvwvx`. Each run is read only apart from one insert into `agent_reports`.
