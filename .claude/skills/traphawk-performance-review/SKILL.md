@@ -157,7 +157,19 @@ select * from rule_gate_scorecard order by rule_key, verdict;
 select rule_key, verdict, count(*) from rule_gate_log where logged_at > now() - interval '7 days' group by 1, 2 order by 1, 2;
 ```
 
-Each MLB rule (starter_required, starter_gap_025, light_favorite_rail, rl_favorite_rule, rl_dog_prob_floor) shows its passed cohort next to its held cohort. Report both lines as is. A rule is a promotion candidate when the held cohort loses and the passed cohort holds on 100 graded picks per verdict and the line stayed positive in the weeks after proposal (sunset 2026-11-12 on rule_gates). The review proposes, the owner flips mode on rule_gates with a model_weight_changes row (directive 21). Never read a hold as a reason to void or regrade a published pick.
+Each MLB rule (starter_required, starter_gap_025, light_favorite_rail, rl_favorite_rule, rl_dog_prob_floor) and the NHL goalie_required gate shows its passed cohort next to its held cohort. Report both lines as is. A rule is a promotion candidate when the held cohort loses and the passed cohort holds on 100 graded picks per verdict and the line stayed positive in the weeks after proposal (sunset 2026-11-12 on rule_gates). The review proposes, the owner flips mode on rule_gates with a model_weight_changes row (directive 21). Never read a hold as a reason to void or regrade a published pick.
+
+Since 2026-10-09 (owner) every row gets a one line verdict in the report: promote, hold, or sunset, with the cohort numbers it rests on. Under the bar it is hold with the shortfall named (for example 9 of 100 held). Past the sunset date with no promotion it is sunset.
+
+## 4c. Sunday sweep candidate verdicts (owner 2026-10-09)
+
+```sql
+select id, status, created_at, title, detail from build_queue
+where title like 'Sunday sweep candidate%' and status in ('open', 'hold')
+order by created_at desc;
+```
+
+Every open or held candidate gets one line in the report: the variant, the dial and the exact number, the three test results carried in the row, the replay units against base, and the verdict, approve or discard, with the one number it rests on (a step is capped at 25 percent of the current weight unless the reading repeated on consecutive Sundays). The owner answers the verdict. An approved move ships through the code session as a sport_dials row with a model_weight_changes row whose source is sunday-sweep-approved. A discarded one has its build_queue row dismissed with the reason. A candidate nobody answered is repeated next Monday, never dropped.
 
 ## 5. Shadow sports and CLV
 
@@ -238,4 +250,4 @@ Every Tuesday 09:00 MT `run_football_lookback(8)` scores each settled anchored N
 
 ## 7. Output
 
-End with at most three recommendations, each one sentence, each tied to a number above. If the data says do nothing, say the model is behaving and skip invented action items. Plain punctuation, no em dashes, en dashes, semicolons, or arrows. Do not change code or data during a review.
+End with the two verdict lists (sweep candidates from 4c, rule gates from 4b), then at most three recommendations, each one sentence, each tied to a number above. If the data says do nothing, say the model is behaving and skip invented action items. Plain punctuation, no em dashes, en dashes, semicolons, or arrows. Do not change code or data during a review.
