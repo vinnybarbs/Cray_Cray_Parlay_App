@@ -22,9 +22,14 @@ is the sync: a merged brief change is live at the next firing with no
 UI edit and nothing for the owner to remember. Directive 15 covers it
 and the ops check verifies the table every morning.
 
-The daily build routine fires in the code environment with the
-repository checked out, so its prompt reads agents/daily-build.md from
-the checkout first and falls back to the same skills row.
+The daily build routine fires in the code environment. Its prompt
+reads agents/daily-build.md from the checkout first and falls back to
+the same skills row, and the brief attaches the repository itself with
+the Claude Code Remote add_repo tool when the session starts without
+one. It needs the Supabase and Claude Code Remote connectors on its
+trigger to apply migrations and file its blackboard row. Those are
+attached in the claude.ai routines UI, since create_trigger could not
+attach connectors in this organization on 2026-10-09.
 
 A routine whose brief row is missing, or whose Supabase tools are
 absent, stops and says so loudly instead of guessing. That line is in
