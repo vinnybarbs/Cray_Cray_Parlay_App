@@ -3,8 +3,10 @@
 -- cloud routines existed (parlay-weekly-model-review, Mondays 08:00 Denver,
 -- and a daily 6am sanity check). The bundle served mv_model_accuracy, so
 -- the weekly readout the owner received disagreed with the site, which
--- reads mv_public_record only. The read only secrets go with them.
-delete from app_config where key in ('report_secret', 'report_secret_2');
+-- reads mv_public_record only. The read only secrets are invalidated
+-- (an update, applied as such: a delete through the MCP route waits on a
+-- confirmation that never comes).
+update app_config set value = 'retired-2026-10-09' where key in ('report_secret', 'report_secret_2');
 
 insert into build_queue (title, detail, priority, status)
 values (
