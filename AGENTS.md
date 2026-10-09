@@ -114,7 +114,13 @@ ledger every muted market is judged on).
 
 Skills are edited only in .claude/skills in the repo and synced to the
 `skills` table by every deploy (directive 15). Nothing about a skill is
-typed into a desktop app or a routine prompt.
+typed into a desktop app or a routine prompt. The cloud routines (daily
+ops check, daily build, weekly calibration review, monthly cost audit)
+each have a complete brief under agents/ in the repo, synced to the
+same table as row agents/<file>, and each trigger's prompt is one line
+that loads its brief. agents/README.md holds the schedule and the editing
+rules: facts may be corrected by anyone with evidence, mission and
+schedule and rules only by a deliberate owner commit.
 
 ## How a model change happens
 

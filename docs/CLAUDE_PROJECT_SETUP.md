@@ -94,10 +94,13 @@ How the repo reaches them: the routines cannot attach a repository, but
 they all have Supabase, so every Railway deploy of main upserts each
 `.claude/skills/*/SKILL.md` into the `skills` table and each routine
 loads its skill from that table by name. The deploy is the sync
-(directive 15, verified by the ops check every morning). Nothing about
-a routine is created or edited in a UI; the code shipping session
-updates their prompts from docs/routines through the Claude Code
-Remote connector whenever a prompt file changes.
+(directive 15, verified by the ops check every morning). Since
+2026-10-09 each routine's full brief is a file under agents/ in the
+repo, synced into the same table as row agents/<file>, and the trigger
+prompt is one line that loads it. Nothing about a routine is created or
+edited in a UI; a brief changes by a pull request and is live at the
+next firing. The arrangement and the schedule table are in
+agents/README.md.
 
 ## 5b. Skills reach the desktop project through the folder
 
