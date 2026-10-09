@@ -58,7 +58,7 @@ calibration proves a signal. Cost roughly $1.50-2/day. Caps: 14 games/run,
 ## Weekly review routine
 
 The scheduled analysts are Claude Code Remote routines with briefs under
-agents/ (see agents/README.md): the daily ops check, the daily build, the
+agents/ (see agents/README.md): the daily ops check, the exec assistant, the
 Monday calibration review and the monthly cost audit. They read the
 database through the Supabase connector and every public number comes
 from mv_public_record. The older claude.ai scheduled tasks that fetched

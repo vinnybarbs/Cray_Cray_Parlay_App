@@ -22,14 +22,23 @@ is the sync: a merged brief change is live at the next firing with no
 UI edit and nothing for the owner to remember. Directive 15 covers it
 and the ops check verifies the table every morning.
 
-The daily build routine fires in the code environment. Its prompt
-reads agents/daily-build.md from the checkout first and falls back to
-the same skills row, and the brief attaches the repository itself with
-the Claude Code Remote add_repo tool when the session starts without
-one. It needs the Supabase and Claude Code Remote connectors on its
-trigger to apply migrations and file its blackboard row. Those are
-attached in the claude.ai routines UI, since create_trigger could not
-attach connectors in this organization on 2026-10-09.
+The exec assistant routine fires in the code environment with the
+repository and the Supabase connector attached to its trigger in the
+claude.ai routines UI (create_trigger could not attach either in this
+organization on 2026-10-09). Its prompt reads agents/exec-assistant.md
+from the checkout first and falls back to the same skills row.
+
+## One voice to the owner
+
+The exec assistant is the only routine that writes to the owner (owner
+2026-10-09). The ops check, the calibration review and the cost audit
+report to the blackboard and the exec assistant reads them there, ships
+what is code, and brings the owner one phone sized message a day: the
+record, what shipped, what the machine found, and the choices that are
+his, each with the number it rests on and a recommendation. A choice
+stays on that list every day until he answers it. Notifications on the
+three analysis routines are turned off in the routines UI so the one
+message is the only one.
 
 A routine whose brief row is missing, or whose Supabase tools are
 absent, stops and says so loudly instead of guessing. That line is in
@@ -40,23 +49,23 @@ every prompt and every brief.
 | Routine | Trigger id | Brief | Cron | Local (MDT) | Model | Writes |
 |---|---|---|---|---|---|---|
 | TrapHawk daily ops check | trig_015qoYxVhMJyekxCgUaV1atQ | daily-ops-check.md | `0 14 * * *` UTC | 08:00 daily | Opus | one agent_reports row |
-| TrapHawk daily build | trig_01XJzYU2KWVus6U9YWWz5zHb | daily-build.md | `57 8 * * *` America/Denver | 08:57 daily | session default | code through the ship pipeline, build_queue, one agent_reports row |
+| TrapHawk exec assistant | trig_01XJzYU2KWVus6U9YWWz5zHb | exec-assistant.md | `57 8 * * *` America/Denver | 08:57 daily | Opus | code through the ship pipeline, build_queue, one agent_reports row, the one daily message to the owner |
 | TrapHawk weekly calibration review | trig_01XdGMb6AvwbjCHJWNGJPTFn | weekly-calibration-review.md | `0 12 * * 1` UTC | 06:00 Mondays | Opus | one agent_reports row |
 | TrapHawk monthly API cost audit | trig_01LP5t3AcowYb1vXr7XSNdCW | monthly-cost-audit.md | `0 15 2 * *` UTC | 09:00 on the 2nd | Opus | one agent_reports row |
 
 The three analysis routines are read only apart from their one row
-(directive 13). The daily build is the code shipping session: it ships
+(directive 13). The exec assistant is the code shipping session: it ships
 the asks the analysis routines filed and never decides what is the
 owner's (dials, directives, regrades, sweep candidates, publish flags).
 
 Three of the four crons are UTC and do not follow Mountain time. After
 2026-11-01 (MST, UTC-7) shift the daily ops check, the weekly and the
 monthly one hour later (`0 15`, `0 13`, `0 16`) to hold the local
-times, and reverse it in March. The daily build carries its own time
+times, and reverse it in March. The exec assistant carries its own time
 zone and needs no shift.
 
 Nothing shares a window. The ops check finishes by about 08:15 MT and
-the daily build starts at 08:57 MT so it reads a finished ops row. Two
+the exec assistant starts at 08:57 MT so it reads a finished ops row. Two
 TrapHawk sessions in the same window read each other's half written
 agent_reports state, so check this table before adding a fifth.
 
@@ -85,7 +94,7 @@ the run history).
 
 - Facts about the stack (model names, tiers, file paths, table and
   column names, cron names and times, dial names, trigger ids, feature
-  claims) may be corrected by anyone, the daily build's fact sweep
+  claims) may be corrected by anyone, the exec assistant's fact sweep
   included, with the evidence in the pull request.
 - Mission, schedule, deliverable format, writing rules and safety rules
   change only by a deliberate commit from the owner. A routine that

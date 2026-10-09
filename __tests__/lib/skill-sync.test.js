@@ -46,7 +46,7 @@ describe('readSkills', () => {
   // by a deliberate owner commit, so the brief's shape is pinned here.
   test('every routine brief under agents/ syncs as its own row', () => {
     for (const expected of [
-      'agents/README.md', 'agents/daily-ops-check.md', 'agents/daily-build.md',
+      'agents/README.md', 'agents/daily-ops-check.md', 'agents/exec-assistant.md',
       'agents/weekly-calibration-review.md', 'agents/monthly-cost-audit.md',
     ]) {
       expect(names).toContain(expected);
