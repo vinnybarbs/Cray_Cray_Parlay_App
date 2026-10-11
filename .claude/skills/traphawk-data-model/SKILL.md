@@ -68,6 +68,11 @@ Skipping this silently zeroes every public stat on the site.
 
 ## Other tables you will need
 
+- `agent_registry`: every LLM worker (name, kind, brief row, trigger_id, model, schedule, write_table, scorecard_view, monthly_budget_usd, status shadow or live or retired, review_by). The ops check verifies each against its row. 2026-10-11.
+- `desk_verdicts`: a desk's verdict on a published pick (desk, run_label, sport, teams, game_date, market h2h or spreads or totals, model_side, model_pick, model_tier, model_edge_pp, suggestion_id, verdict agree or hold or shade, shade_pp at most 2, category from a fixed list, evidence jsonb array of {fact, source}, note). Append only by trigger, no probability column on purpose.
+- `desk_hypotheses`: pre registered desk hypotheses (desk, month, hypothesis, mechanism, direction, market, test_sql, then graded_at, result, status). Only the three grade columns ever update.
+- `desk_scorecard` (view): desk_verdicts graded through ai_suggestions and pick_clv_all per desk, sport, market, run_label, verdict, category: picks, won, lost, pushed, win_pct, units, desk_right_pct (an agree is right when the pick won, a hold or shade is right when it lost), clv_n, avg_clv_pp. Same shape as rule_gate_scorecard.
+
 - `game_analysis`: one row per game, upserted per re-analysis (`analysis_version` increments, token counts are the LAST version only, so cron logs are the source for total spend). `context_hash` gates re-narration: unchanged inputs extend `expires_at` with no model call. `stale` is set by intel updates.
 - `cron_job_logs`: `details` is TEXT, cast `details::jsonb` before extracting. Pre-analyze rows carry cost, analyzed, skipped_unchanged, games_found.
 - `agent_intel`: integrity sweep output. kind in record_mismatch, injury, weather, record_check_summary, agent_debug, agent_error. agent_debug payloads carry per-sub-agent input_tokens, cache_read_tokens, cache_write_tokens, output_tokens, web_searches. record_mismatch payload.source is a standings URL on ESPN, CBS Sports, Yahoo Sports, Fox Sports or a league site, never Wikipedia (directive 24, 2026-09-21), and record_check_summary carries checked, mismatches and dropped_unapproved_source.

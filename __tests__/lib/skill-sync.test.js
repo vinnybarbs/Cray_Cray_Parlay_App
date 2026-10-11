@@ -2,7 +2,7 @@
 // .claude/skills must be readable, hashed, and named so the sync can
 // upsert it and a routine can select it by name.
 
-const { readSkills, SKILLS_DIR, BRIEF_PREFIX } = require('../../lib/services/skill-sync');
+const { readSkills, SKILLS_DIR, BRIEF_PREFIX, DESK_PREFIX } = require('../../lib/services/skill-sync');
 
 describe('readSkills', () => {
   const skills = readSkills();
@@ -48,23 +48,55 @@ describe('readSkills', () => {
     for (const expected of [
       'agents/README.md', 'agents/daily-ops-check.md', 'agents/exec-assistant.md',
       'agents/weekly-calibration-review.md', 'agents/monthly-cost-audit.md',
+      'agents/football-desk.md', 'agents/desks/football.md',
     ]) {
       expect(names).toContain(expected);
     }
     const briefs = skills.filter(s => s.name.startsWith(BRIEF_PREFIX));
     for (const b of briefs) {
       expect(b.content).not.toMatch(/[—–;→]/);
-      if (b.name === 'agents/README.md') continue;
+      if (b.name === 'agents/README.md' || b.name.startsWith(DESK_PREFIX)) continue;
       expect(b.content.startsWith('You are the TrapHawk ')).toBe(true);
       expect(b.content).toContain('Supabase MCP');
       expect(b.content).toContain('say so loudly');
     }
     // The briefs name the skills table rows they load, and those exist.
     for (const b of briefs) {
-      if (b.name === 'agents/README.md') continue;
+      if (b.name === 'agents/README.md' || b.name.startsWith(DESK_PREFIX)) continue;
       for (const m of b.content.matchAll(/where name = '([^']+)'/g)) {
         expect(names).toContain(m[1]);
       }
     }
+  });
+});
+
+// Owner 2026-10-09 (workforce plan, football desk first): a desk book
+// under agents/desks/ is the market by market knowledge a desk brief
+// loads. It is not a brief (no routine fires on it) but it syncs as its
+// own row, keeps the house punctuation, and carries the sections the
+// desk brief tells the desk to read.
+describe('desk books', () => {
+  const skills = readSkills();
+  const football = skills.find(s => s.name === 'agents/desks/football.md');
+
+  test('agents/desks/football.md syncs as its own row with the required sections', () => {
+    expect(football).toBeDefined();
+    expect(football.content).not.toMatch(/[—–;→]/);
+    for (const heading of [
+      '## How this book is used', '## NFL moneyline', '## NFL spread', '## NFL totals',
+      '## NCAAF', '## The verdict categories', '## Dials and rules in force',
+      '## Narration vocabulary', '## Banned claims', '## The promotion bar',
+    ]) {
+      expect(football.content).toContain(heading);
+    }
+  });
+
+  test('the football desk brief loads its book and the data model skill', () => {
+    const brief = skills.find(s => s.name === 'agents/football-desk.md');
+    expect(brief.content).toContain("where name = 'agents/desks/football.md'");
+    expect(brief.content).toContain("where name = 'traphawk-data-model'");
+    expect(brief.content).toContain('desk_verdicts');
+    expect(brief.content).toContain('desk_hypotheses');
+    expect(brief.content).toContain('no win probability of your own');
   });
 });

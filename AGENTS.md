@@ -123,7 +123,12 @@ the trigger, with a one line prompt that loads the brief, and an agent
 report is the blackboard row the agent files when it finishes.
 agents/README.md holds the schedule and the editing rules: facts may be
 corrected by anyone with evidence, mission and schedule and rules only
-by a deliberate owner commit.
+by a deliberate owner commit. A sport desk (the football desk first,
+2026-10-11) is a brief under agents/ plus a desk book under
+agents/desks/ (synced as row agents/desks/<sport>.md) and writes only
+its own shadow tables (desk_verdicts, desk_hypotheses, graded by
+desk_scorecard). agent_registry names every worker, its brief, trigger,
+model, schedule and the one table it may write.
 
 ## How a model change happens
 
@@ -170,7 +175,9 @@ see, with every action logged and scored against the close.
   fit floor.
 - Never contradict an active directive silently. Amend it with a row.
 - Never let an analysis agent change code or data. Only the code
-  shipping session changes code or data (directive 13).
+  shipping session changes code or data. A registered worker may
+  append to its own shadow table named in agent_registry and file its
+  one blackboard row, nothing else (directive 13, amended 2026-10-11).
 - Never trust a cron status as proof of ingestion. Feeds are judged by
   rows written (directive 14).
 - Never use Wikipedia for anything. Records are verified against ESPN,
