@@ -55,9 +55,25 @@ every prompt and every brief.
 | TrapHawk exec assistant | trig_01XJzYU2KWVus6U9YWWz5zHb | exec-assistant.md | `57 8 * * *` America/Denver | 08:57 daily | Opus | code through the ship pipeline, build_queue, one agent_reports row, the one daily message to the owner |
 | TrapHawk weekly calibration review | trig_01XdGMb6AvwbjCHJWNGJPTFn | weekly-calibration-review.md | `0 12 * * 1` UTC | 06:00 Mondays | Opus | one agent_reports row |
 | TrapHawk monthly API cost audit | trig_01LP5t3AcowYb1vXr7XSNdCW | monthly-cost-audit.md | `0 15 2 * *` UTC | 09:00 on the 2nd | Opus | one agent_reports row |
+| TrapHawk football desk, Friday preview | owner creates | football-desk.md | `0 18 * * 5` America/Denver | 18:00 Fridays | Sonnet 5.5 | desk_verdicts rows, one agent_reports row |
+| TrapHawk football desk, Sunday inactives | owner creates | football-desk.md | `45 9 * * 0` America/Denver | 09:45 Sundays | Sonnet 5.5 | desk_verdicts rows, one agent_reports row |
+| TrapHawk football desk, Tuesday review | owner creates | football-desk.md | `30 6 * * 2` America/Denver | 06:30 Tuesdays | Sonnet 5.5 | desk_hypotheses rows and grades, one agent_reports row |
 
-The three analysis routines are read only apart from their one row
-(directive 13). The exec assistant is the code shipping session: it ships
+The football desk (shadow from 2026-10-11, workforce plan decision 6)
+is one brief fired by three triggers, because a trigger holds one cron
+expression and the desk runs at three different times. The brief reads
+the weekday to know which run it is. Its market knowledge is the desk
+book agents/desks/football.md, synced as row agents/desks/football.md.
+A desk book is not a brief: no routine fires on it, the desk brief loads
+it first. The desk writes only desk_verdicts and desk_hypotheses
+(directive 13 as amended 2026-10-11) and desk_scorecard grades it. The
+owner fills the three trigger ids into agent_registry after creating
+them.
+
+The three analysis routines are read only apart from their one row,
+and a desk is read only apart from its own shadow tables and its one
+row (directive 13, amended 2026-10-11). agent_registry lists every
+worker with the one table it may write. The exec assistant is the code shipping session: it ships
 the asks the analysis routines filed and never decides what is the
 owner's (dials, directives, regrades, sweep candidates, publish flags).
 
@@ -68,9 +84,12 @@ times, and reverse it in March. The exec assistant carries its own time
 zone and needs no shift.
 
 Nothing shares a window. The ops check finishes by about 08:15 MT and
-the exec assistant starts at 08:57 MT so it reads a finished ops row. Two
-TrapHawk sessions in the same window read each other's half written
-agent_reports state, so check this table before adding a fifth.
+the exec assistant starts at 08:57 MT so it reads a finished ops row. The
+football desk's Sunday run at 09:45 MT starts after the exec assistant
+has normally finished, and its Tuesday run at 06:30 MT finishes before
+the ops check at 08:00 MT. Two TrapHawk sessions in the same window read
+each other's half written agent_reports state, so check this table
+before adding another.
 
 ## The one line prompts
 

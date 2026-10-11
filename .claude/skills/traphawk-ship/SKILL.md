@@ -17,7 +17,7 @@ Merge to `main` triggers Railway auto-deploy of the Express backend (2 to 4 minu
 
 ## Migrations
 
-SQL files live in `supabase/migrations/` with `YYYYMMDDHHMMSS_name.sql` names. The file in the repo is documentation; production only changes when you apply it with the Supabase MCP `apply_migration` tool against project `pcjhulzyqmhrhsrgvwvx`. Do both, same content.
+SQL files live in `supabase/migrations/` with `YYYYMMDDHHMMSS_name.sql` names. The file in the repo is documentation; production only changes when you apply it with the Supabase MCP `apply_migration` tool against project `pcjhulzyqmhrhsrgvwvx`. Do both, same content. Two MCP quirks, found 2026-10-09 and 2026-10-11: a statement the MCP classes as destructive (DELETE, DROP, including a `drop trigger if exists` or `drop view if exists`) waits for a confirmation that never arrives in a cloud session and times out at 60 seconds with the whole batch rolled back, so write migrations without them (UPDATE instead of DELETE, create new objects without a preceding drop) or run the one destructive statement on its own. A large `apply_migration` can time out the same way, so apply it by statement with `execute_sql`, check what landed, and insert the `supabase_migrations.schema_migrations` row (version, name) yourself at the end so the history matches the repo file.
 
 The gotcha that has bitten before: any DROP plus CREATE of `mv_public_record` (or any view or MV the site reads) loses its grants and silently zeroes every public stat. Always finish with:
 
