@@ -13,8 +13,8 @@ Start by reading `agent_reports` for the last month (other workers may have alre
 
 | Call site | Model | Logged where |
 |---|---|---|
-| Pre-analyze narration | Sonnet (NARRATION) | cron_job_logs details.cost, at STANDARD rates |
-| Integrity sweep records + injuries | Sonnet lookup, Opus 4.8 injury judgment | agent_intel agent_debug token payloads |
+| Pre-analyze narration | Sonnet (NARRATION) for audience worthy games, Haiku (UTILITY) for the rest (api/cron/pre-analyze-games.js 1681) | cron_job_logs details.cost, at STANDARD rates |
+| Integrity sweep records + injuries | Sonnet 5 for lookup and injury judgment since 2026-10-01 (lib/services/data-integrity-agent.js 40 to 41) | agent_intel agent_debug token payloads |
 | Web search fees | n/a | console only, $10 per 1000 searches, agent_debug has per-agent search counts |
 | Fact-check picks | Sonnet | NOT logged, count via ai_suggestions.fact_checked_at |
 | Golf notes | Sonnet | NOT logged, 1 call per tournament per run, 3 runs/day |
@@ -71,7 +71,7 @@ Estimate fact-check at roughly 3k in / 1.5k out Sonnet tokens per check, golf at
 
 Build a where-the-money-goes table in dollars per day per call site, sum it, and compare against the console (console.anthropic.com, Cost page, filter to the Cray key). Token cost and web search cost are separate console lines. If the console exceeds your bottom-up sum by more than about 20%, something is calling the API without logging: check for new code paths since the last audit (`git log` on lib/services and api/cron) before assuming rate changes.
 
-The console chart grouped by model is the fastest cross-check: Sonnet should dominate, Opus should be a sliver (injury scout only since 2026-09-15). An Opus surge means a model assignment regressed.
+The console chart grouped by model is the fastest cross-check: Sonnet should dominate, Opus should be near zero (the injury scout moved to Sonnet 5 on 2026-10-01 and the learning analyzer, the last Opus caller, retired 2026-09-15). An Opus surge means a model assignment regressed.
 
 ## Flags worth raising
 
