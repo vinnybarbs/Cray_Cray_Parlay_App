@@ -171,6 +171,35 @@ order by created_at desc;
 
 Every open or held candidate gets one line in the report: the variant, the dial and the exact number, the three test results carried in the row, the replay units against base, and the verdict, approve or discard, with the one number it rests on (a step is capped at 25 percent of the current weight unless the reading repeated on consecutive Sundays). The owner answers the verdict. An approved move ships through the code session as a sport_dials row with a model_weight_changes row whose source is sunday-sweep-approved. A discarded one has its build_queue row dismissed with the reason. A candidate nobody answered is repeated next Monday, never dropped.
 
+## 4d. House parlays (owner 2026-10-11: "add a short section")
+
+The house parlays (build-house-parlays, table house_parlays) are the model's own slips: two to four legs from the day's published picks and the leg pool, with honest math (model_win_prob, fair_win_prob, ev_pct, combined_edge_pp). Legs live in the legs jsonb column (pick, tier, sport, odds, edge_pp, suggestion_id). The user parlays table and parlay_legs are user built slips and are not this section. One query, last 7 days and since 2026-07-12:
+
+```sql
+with slips as (
+  select h.id, h.parlay_date, h.status, h.legs_count, h.combined_odds, h.ev_pct,
+         case when h.status = 'won' and h.combined_odds > 0 then h.combined_odds / 100.0
+              when h.status = 'won' then 100.0 / abs(h.combined_odds)
+              when h.status = 'lost' then -1 else 0 end as units
+  from house_parlays h where h.status in ('won', 'lost')
+), legs as (
+  select h.parlay_date, l->>'tier' as tier, l->>'sport' as sport, s.actual_outcome
+  from house_parlays h cross join lateral jsonb_array_elements(h.legs) l
+  left join ai_suggestions s on s.id = (l->>'suggestion_id')::bigint
+  where h.status in ('won', 'lost')
+)
+select 'slips 7d' as k, count(*) as n, count(*) filter (where status = 'won') as won,
+       round(sum(units)::numeric, 2) as units, round(avg(ev_pct)::numeric, 1) as avg_claimed_ev_pct
+  from slips where parlay_date >= current_date - 7
+union all
+select 'slips all', count(*), count(*) filter (where status = 'won'), round(sum(units)::numeric, 2), round(avg(ev_pct)::numeric, 1) from slips
+union all
+select 'legs lost 7d ' || tier, count(*), count(*) filter (where actual_outcome = 'lost'), null, null
+  from legs where parlay_date >= current_date - 7 group by tier;
+```
+
+Report one line: slips won and lost, units at the combined price, average claimed EV, and which tier's legs broke the losing slips. On 2026-10-11 the all time line read 59-59 for -6.09 units with the last 7 days at 11-3 for +0.60 units and an average claimed EV of -0.9 percent, so a claimed EV below zero on a slip the builder still published is the first thing to look at, and a Leg tier leg (the -900 style favorites behind the leg_prob_floor) breaking a slip is the second. Units here are the slip's own, not the ledger's, and never enter the public record (mv_public_record is picks only).
+
 ## 5. Shadow sports and CLV
 
 CLV note (2026-10-03): the 654 closing rows captured during the 2026-09-26 to 09-30 Odds API outage were stale quotes, not closes. They live in `closing_lines_suspect` and every CLV view excludes them, so a week 4 CLV number that disagrees with one computed before 10-03 is the corrected one.
@@ -250,4 +279,4 @@ Every Tuesday 09:00 MT `run_football_lookback(8)` scores each settled anchored N
 
 ## 7. Output
 
-End with the two verdict lists (sweep candidates from 4c, rule gates from 4b), then at most three recommendations, each one sentence, each tied to a number above. If the data says do nothing, say the model is behaving and skip invented action items. Plain punctuation, no em dashes, en dashes, semicolons, or arrows. Do not change code or data during a review.
+End with the two verdict lists (sweep candidates from 4c, rule gates from 4b), the house parlay line from 4d, then at most three recommendations, each one sentence, each tied to a number above. If the data says do nothing, say the model is behaving and skip invented action items. Plain punctuation, no em dashes, en dashes, semicolons, or arrows. Do not change code or data during a review.
