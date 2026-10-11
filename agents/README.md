@@ -55,9 +55,9 @@ every prompt and every brief.
 | TrapHawk exec assistant | trig_01XJzYU2KWVus6U9YWWz5zHb | exec-assistant.md | `57 8 * * *` America/Denver | 08:57 daily | Opus | code through the ship pipeline, build_queue, one agent_reports row, the one daily message to the owner |
 | TrapHawk weekly calibration review | trig_01XdGMb6AvwbjCHJWNGJPTFn | weekly-calibration-review.md | `0 12 * * 1` UTC | 06:00 Mondays | Opus | one agent_reports row |
 | TrapHawk monthly API cost audit | trig_01LP5t3AcowYb1vXr7XSNdCW | monthly-cost-audit.md | `0 15 2 * *` UTC | 09:00 on the 2nd | Opus | one agent_reports row |
-| TrapHawk football desk, Friday preview | owner creates | football-desk.md | `0 18 * * 5` America/Denver | 18:00 Fridays | Sonnet 5.5 | desk_verdicts rows, one agent_reports row |
-| TrapHawk football desk, Sunday inactives | owner creates | football-desk.md | `45 9 * * 0` America/Denver | 09:45 Sundays | Sonnet 5.5 | desk_verdicts rows, one agent_reports row |
-| TrapHawk football desk, Tuesday review | owner creates | football-desk.md | `30 6 * * 2` America/Denver | 06:30 Tuesdays | Sonnet 5.5 | desk_hypotheses rows and grades, one agent_reports row |
+| TrapHawk football desk, Friday preview | trig_01VY9nSm7rASfnCvS7CUBZBa | football-desk.md | `0 18 * * 5` America/Denver | 18:00 Fridays | Sonnet 5.5 | desk_verdicts rows, one agent_reports row |
+| TrapHawk football desk, Sunday inactives | trig_01LUunjiERTfBDKfbZvSWgJt | football-desk.md | `45 9 * * 0` America/Denver | 09:45 Sundays | Sonnet 5.5 | desk_verdicts rows, one agent_reports row |
+| TrapHawk football desk, Tuesday review | trig_01Y53RNzaK46JnFdWVXpgQdk | football-desk.md | `30 6 * * 2` America/Denver | 06:30 Tuesdays | Sonnet 5.5 | desk_hypotheses rows and grades, one agent_reports row |
 
 The football desk (shadow from 2026-10-11, workforce plan decision 6)
 is one brief fired by three triggers, because a trigger holds one cron
@@ -67,8 +67,8 @@ book agents/desks/football.md, synced as row agents/desks/football.md.
 A desk book is not a brief: no routine fires on it, the desk brief loads
 it first. The desk writes only desk_verdicts and desk_hypotheses
 (directive 13 as amended 2026-10-11) and desk_scorecard grades it. The
-owner fills the three trigger ids into agent_registry after creating
-them.
+owner created the three triggers on 2026-10-11 and their ids are on
+the football-desk row of agent_registry.
 
 The three analysis routines are read only apart from their one row,
 and a desk is read only apart from its own shadow tables and its one
