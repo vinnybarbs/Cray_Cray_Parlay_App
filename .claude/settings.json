@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Supabase__execute_sql",
+      "mcp__Supabase__apply_migration",
+      "Edit(.claude/skills/**)",
+      "Edit(agents/**)",
+      "Edit(supabase/migrations/**)"
+    ]
+  }
+}
