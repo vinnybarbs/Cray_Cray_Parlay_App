@@ -1328,7 +1328,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                   <span className={`px-1.5 py-0.5 rounded-sharp text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
                     {SHADOW_DISPLAY.has(sport) ? 'Shadow' : (formatPp(pp) ?? '-')}
                   </span>
-                  <span className="text-ink-200 truncate">{game.away_team} @ {game.home_team}</span>
+                  <span className="text-ink-200 truncate">{game.away_team} at {game.home_team}</span>
                 </div>
                 <span className={` text-xs font-medium flex-shrink-0 truncate sm:max-w-[140px] tabular-nums pl-9 sm:pl-0 ${SHADOW_DISPLAY.has(sport) ? 'text-ink-500' : 'text-signal-pos'}`}>
                   {SHADOW_DISPLAY.has(sport) ? 'read withheld' : (game.recommended_pick || '-')}
@@ -1498,7 +1498,7 @@ function OnDeckRail({ onDeck }) {
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-ink-850 transition-colors text-left"
       >
-        <span className="text-sm font-semibold text-ink-100">On deck</span>
+        <span className="text-sm font-semibold text-ink-100 whitespace-nowrap flex-shrink-0">On deck</span>
         <span className="text-xs text-ink-400 truncate">
           {total} games with live lines · {sports.map(([s, g]) => `${s} ${g.length}`).join(' · ')}
         </span>
@@ -1511,7 +1511,7 @@ function OnDeckRail({ onDeck }) {
               <div className="px-4 py-1.5 bg-ink-950 text-xs text-ink-500">{sport}</div>
               {games.map((g, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-2 border-t border-ink-800/50">
-                  <span className="text-sm text-ink-100 truncate flex-1">{g.away_team} @ {g.home_team}</span>
+                  <span className="text-sm text-ink-100 truncate flex-1">{g.away_team} at {g.home_team}</span>
                   <span className=" text-xs text-ink-400 tabular-nums flex-shrink-0">{fmtMl(g.ml_away)} / {fmtMl(g.ml_home)}</span>
                   <span className="tabular-nums text-[10px] text-ink-500 flex-shrink-0 w-24 text-right">{fmtGameDay(g.commence_time)}</span>
                 </div>
@@ -1806,13 +1806,13 @@ export default function DailyDigest({ onBack }) {
         </button>
         <button
           onClick={onBack}
-          className="max-md:ml-auto whitespace-nowrap px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="max-md:ml-auto hidden sm:inline-block whitespace-nowrap px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           Pick builder
         </button>
         <button
           onClick={fetchDigest}
-          className="px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="max-sm:ml-auto px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
           aria-label="Refresh"
         >
           {loading ? '...' : <><span aria-hidden="true">↻</span><span className="hidden sm:inline"> Refresh</span></>}

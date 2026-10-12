@@ -106,7 +106,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                         {p.pick}
                         {p.odds && <span className="ml-2 tabular-nums text-xs text-ink-400">{p.odds}</span>}
                       </div>
-                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
+                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} at {p.home_team}</div>
                     </div>
                     <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${fade.cls}`}>{fade.label}</span>
                   </div>
@@ -138,7 +138,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                         {p.pick}
                         {p.odds && <span className="ml-2 tabular-nums text-xs text-ink-400">{p.odds}</span>}
                       </div>
-                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
+                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} at {p.home_team}</div>
                     </div>
                     <OutcomeChip outcome={p.actual_outcome} />
                   </button>

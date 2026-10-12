@@ -45,7 +45,7 @@ function OutcomeChip({ outcome, tier }) {
     void: { label: 'Void', cls: 'bg-ink-850 text-ink-400 shadow-hairline' },
   }
   const m = map[outcome] || map.pending
-  return <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider ${m.cls}`}>{m.label}</span>
+  return <span className={`flex-shrink-0 w-14 text-center px-2 py-0.5 rounded-full text-xs font-semibold ${m.cls}`}>{m.label}</span>
 }
 
 // The digest hero's little windowed record line, on the ledger too
@@ -132,7 +132,7 @@ function ParlayCard({ parlay }) {
             <span className="min-w-0">
               <span className="text-ink-100 font-medium truncate block">{leg.pick}</span>
               {leg.away_team && leg.home_team && (
-                <span className="text-ink-500 text-[11px] truncate block">{leg.away_team} @ {leg.home_team}</span>
+                <span className="text-ink-500 text-[11px] truncate block">{leg.away_team} at {leg.home_team}</span>
               )}
             </span>
             <span className="tabular-nums text-ink-400 flex-shrink-0">{fmtOdds(leg.odds)}</span>
@@ -169,6 +169,7 @@ export default function HouseLedger() {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [showAllOpen, setShowAllOpen] = useState(false)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -281,12 +282,12 @@ export default function HouseLedger() {
             {/* Per-tier record */}
             {tierOrder.length > 0 && (
               <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
-                <div className="px-4 pt-3 pb-1 bg-ink-950 text-xs text-ink-500">
+                <div className="px-4 pt-3 pb-1 text-xs text-ink-500">
                   Full record since May 10, 2026, every settled pick. The landing page shows the last 30 days only, so these totals run higher.
                 </div>
                 {/* Phones stack each tier with its four numbers under it, wider
                     screens get the table (owner 2026-10-12, no sideways scroll). */}
-                <div className="hidden sm:grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-2.5 bg-ink-950 text-xs text-ink-500">
+                <div className="hidden sm:grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-2.5 text-xs text-ink-500">
                   <span>Tier and edge range</span>
                   <span className="text-right">Settled</span>
                   <span className="text-right">Hit rate</span>
@@ -329,8 +330,8 @@ export default function HouseLedger() {
                 trap must never render as a lost bet. */}
             {trapReport && trapReport.called > 0 && (
               <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-l-2 border-signal-neg">
-                <span className="text-xs font-bold text-signal-neg">The Trap Record</span>
-                <span className=" text-sm tabular-nums text-ink-100">{trapReport.called} called</span>
+                <span className="text-sm font-bold text-signal-neg">The Trap Record</span>
+                <span className="text-sm tabular-nums text-ink-100">{trapReport.called} called</span>
                 {/* The money line, not the win rate: bait sides are chalk,
                     so even a near-even bait record bleeds units at the
                     price. A fade percentage near 50 undersold the
@@ -338,7 +339,7 @@ export default function HouseLedger() {
                 {trapReport.betRoiUnits != null && trapReport.betRoiUnits < 0 && (
                   <>
                     <span className="text-xs text-ink-500">Betting them cost</span>
-                    <span className=" text-sm font-bold tabular-nums text-signal-neg">
+                    <span className="text-sm font-bold tabular-nums text-signal-neg">
                       {trapReport.betRoiUnits}u
                     </span>
                     <span className="text-xs text-ink-500">At 1 unit stakes</span>
@@ -346,11 +347,11 @@ export default function HouseLedger() {
                 )}
                 {trapReport.lastGraded && (
                   <span className="text-xs text-ink-500">
-                    last graded {fmtDate(trapReport.lastGraded)}
+                    Last graded {fmtDate(trapReport.lastGraded)}
                   </span>
                 )}
-                <span className="text-xs text-ink-600 basis-full">
-                  a trap names the side the crowd wants at a price 2 points or more below fair. The bait went {trapReport.fadeLosses}-{trapReport.fadeWins} outright, and it still lost money, because the price is the trap. Graded on its own record, never mixed into the pick record above.
+                <span className="text-sm text-ink-400 basis-full mt-1">
+                  A trap names the side the crowd wants at a price 2 points or more below fair. The bait went {trapReport.fadeLosses}-{trapReport.fadeWins} outright, and it still lost money, because the price is the trap. Graded on its own record, never mixed into the pick record above.
                 </span>
               </div>
             )}
@@ -361,12 +362,12 @@ export default function HouseLedger() {
             {legReport && legReport.tracked > 0 && (
               <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-l-2 border-ink-500">
                 <span className="text-xs font-bold text-ink-200">The Leg Pool</span>
-                <span className=" text-sm tabular-nums text-ink-100">{legReport.tracked} tracked</span>
+                <span className="text-sm tabular-nums text-ink-100">{legReport.tracked} tracked</span>
                 <span className="text-xs text-ink-500">Hit</span>
                 <span className={` text-sm font-bold tabular-nums ${legReport.hitRate >= 70 ? 'text-signal-pos' : 'text-ink-100'}`}>
                   {legReport.hits}-{legReport.misses}{legReport.hitRate != null ? ` (${legReport.hitRate}%)` : ''}
                 </span>
-                <span className="text-xs text-ink-600 basis-full">
+                <span className="text-sm text-ink-400 basis-full mt-1">
                   a leg is a side the model grades 65% or better to win on a game with no betting edge. High chance to hit, bad payout, so it is never a pick. Tracked here because those hits calibrate the model and feed the machine parlays.
                 </span>
               </div>
@@ -379,7 +380,7 @@ export default function HouseLedger() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {[['By sport', bySport], ['By bet type', byBetType]].map(([title, groups]) => (
                   <div key={title} className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden self-start">
-                    <div className="grid grid-cols-[1fr_64px_64px_72px] gap-2 px-4 py-2.5 bg-ink-950 text-xs text-ink-500">
+                    <div className="grid grid-cols-[1fr_64px_64px_72px] gap-2 px-4 py-2.5 text-xs text-ink-500">
                       <span>{title}</span>
                       <span className="text-right">Settled</span>
                       <span className="text-right">Hit rate</span>
@@ -387,7 +388,7 @@ export default function HouseLedger() {
                     </div>
                     {Object.entries(groups).map(([label, s]) => (
                       <div key={label} className="grid grid-cols-[1fr_64px_64px_72px] gap-2 px-4 py-2.5 border-t border-ink-800 items-center">
-                        <span className="text-sm text-ink-100 font-medium truncate">{label}</span>
+                        <span className="text-sm text-ink-100 font-medium truncate">{label === 'Total' ? 'Over/under' : label}</span>
                         <span className="text-right text-sm tabular-nums text-ink-300">{s.settled}</span>
                         <span className={`text-right text-sm font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '-'}</span>
                         <span className={`text-right text-sm tabular-nums ${s.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(s.units)}</span>
@@ -404,20 +405,27 @@ export default function HouseLedger() {
                 <h2 className="text-lg font-semibold text-ink-100 mb-1">Open picks, published and not yet settled</h2>
                 <p className="text-sm text-ink-300 mb-4">On the record now, games not started. Timestamps are the receipt.</p>
                 <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
-                  {data.openPicks.map(p => (
-                    <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800 first:border-t-0 text-xs">
+                  {(showAllOpen ? data.openPicks : data.openPicks.slice(0, 10)).map(p => (
+                    <div key={p.id} className="flex items-start gap-3 px-4 py-3 border-t border-ink-800 first:border-t-0">
                       <OutcomeChip outcome="pending" />
-                      <span className="min-w-0">
-                        <span className="text-ink-100 font-medium truncate block">{p.pick}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="flex-1 min-w-0 text-sm text-ink-100 font-medium truncate">{String(p.pick || '').replace(/\s[+-]\d{3,}$/, '')}</span>
+                          <span className="text-sm tabular-nums text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
+                          {p.edge_pp != null && <span className="text-sm text-signal-pos tabular-nums flex-shrink-0">+{Number(p.edge_pp).toFixed(1)} pts</span>}
+                        </div>
                         {p.away_team && p.home_team && (
-                          <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</span>
+                          <div className="text-xs text-ink-500 truncate">{p.away_team} at {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</div>
                         )}
-                      </span>
-                      <span className="tabular-nums text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
-                      {p.edge_pp != null && <span className=" text-signal-pos/80 tabular-nums flex-shrink-0">+{Number(p.edge_pp).toFixed(1)} pts</span>}
-                      <span className="ml-auto tabular-nums text-[10px] text-ink-500 flex-shrink-0">published {fmtDateTime(p.created_at)}</span>
+                        <div className="text-xs tabular-nums text-ink-500">Published {fmtDateTime(p.created_at)}</div>
+                      </div>
                     </div>
                   ))}
+                  {data.openPicks.length > 10 && (
+                    <button onClick={() => setShowAllOpen(v => !v)} className="w-full px-4 py-3 border-t border-ink-800 text-sm font-semibold text-signal-pos hover:bg-ink-850">
+                      {showAllOpen ? 'Show fewer' : `Show all ${data.openPicks.length} open picks`}
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -434,10 +442,10 @@ export default function HouseLedger() {
                       <div key={p.id} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800 first:border-t-0 text-xs">
                         <OutcomeChip outcome={p.actual_outcome} />
                         <span className={`hidden sm:inline text-xs font-bold w-20 flex-shrink-0 ${t.color}`}>{p.tier || t.label}</span>
-                        <span className="min-w-0">
-                          <span className="text-ink-100 font-medium truncate block">{p.pick}</span>
+                        <span className="flex-1 min-w-0">
+                          <span className="text-sm text-ink-100 font-medium truncate block">{String(p.pick || '').replace(/\s[+-]\d{3,}$/, '')}</span>
                           {p.away_team && p.home_team && (
-                            <span className="text-ink-500 text-[11px] truncate block">{p.away_team} @ {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</span>
+                            <span className="text-ink-500 text-xs truncate block">{p.away_team} at {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</span>
                           )}
                         </span>
                         {/* Settlement date dropped from the row (owner call
