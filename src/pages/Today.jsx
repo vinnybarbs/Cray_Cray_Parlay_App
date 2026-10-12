@@ -5,6 +5,7 @@ import { edgeTier } from '../lib/tiers'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { API_BASE_URL as API_BASE } from '../config'
 import PropCard from '../components/PropCard'
+import InstallButton from '../components/InstallButton'
 
 // Today (build_queue 96, owner 2026-10-12): the one screen a first time
 // visitor or a home screen install opens on. The day's best plays in
@@ -111,6 +112,7 @@ export default function Today() {
         <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <BrandMark />
           <div className="flex items-center gap-1">
+            <InstallButton />
             <button onClick={() => navigate('/ledger')} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Ledger</button>
             <SignOutButton />
           </div>
