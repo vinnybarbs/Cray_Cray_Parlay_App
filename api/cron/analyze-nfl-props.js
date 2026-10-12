@@ -139,6 +139,48 @@ async function log(status, details, jobName = 'analyze-nfl-props') {
   } catch { /* best effort */ }
 }
 
+/**
+ * One anytime TD read as a prop_reads row (over 0.5 touchdowns is yes),
+ * or null with the reason counted in tally. The single usage model
+ * fills both the v1 and the v2 columns so the v2 scorecards see it.
+ */
+function tdRow(meta, rows, history, redzone, redzoneLoaded, dials, tally) {
+  if (!redzoneLoaded) { tally.no_usage_table++; return null; }
+  const cons = propEdge.yesConsensus(rows);
+  if (!cons || cons.books < Math.max(1, Number(dials.prop_min_books))) { tally.thin_books++; return null; }
+  const games = (history.get(meta.player_key) || [])
+    .filter(g => (Number(g.carries) || 0) + (Number(g.targets) || 0) > 0)
+    .map(g => ({ ...g, ...(redzone.get(`${g.game_id}|${g.player_id}`) || {}) }));
+  const baseline = propEdge.tdBaseline(games, dials);
+  if (!baseline) { tally.no_history++; return null; }
+  const read = propEdge.tdRead({ anchorYesProb: cons.prob, baseline }, dials);
+  if (!read) return null;
+  const wk = propEdge.nflWeekFor(meta.commence_time);
+  const r4 = (v) => Math.round(v * 10000) / 10000;
+  const factors = { model: 'usage', lambda: Math.round(baseline.lambda * 1000) / 1000,
+    recent_lambda: Math.round(baseline.recentLambda * 1000) / 1000, long_lambda: Math.round(baseline.longLambda * 1000) / 1000,
+    anchor: 'median yes price, vig in' };
+  return {
+    sport: SPORT, event_id: meta.event_id, commence_time: meta.commence_time,
+    home_team: meta.home_team, away_team: meta.away_team,
+    season: wk ? wk.season : null, week: wk ? wk.week : null,
+    market: meta.market, player_key: meta.player_key, player_name: meta.player_name,
+    line: propEdge.TD_LINE, side: read.side,
+    anchor_prob: r4(read.anchorProb), model_prob: r4(read.modelProb), damped_prob: r4(read.dampedProb),
+    model_mean: Math.round(baseline.lambda * 1000) / 1000, model_sigma: null,
+    games_used: baseline.games, confidence: Math.round(read.confidence * 1000) / 1000,
+    edge_pp: read.edgePp, tier: edgeTier(read.edgePp), books: cons.books,
+    consensus_over_price: cons.price, consensus_under_price: null,
+    best_book: read.side === 'over' ? cons.best.book : null,
+    best_line: propEdge.TD_LINE,
+    best_price: read.side === 'over' ? cons.best.price : null,
+    dials, factors,
+    v2_mean: Math.round(baseline.lambda * 1000) / 1000, v2_prob: r4(read.dampedProb), v2_edge_pp: read.edgePp,
+    v2_side: read.side, v2_tier: edgeTier(read.edgePp), v2_outcome: 'pending', v2_factors: factors,
+    status: 'shadow', updated_at: new Date().toISOString(),
+  };
+}
+
 async function runRead() {
   const started = Date.now();
   const summary = { props: 0, groups: 0, read: 0, no_history: 0, not_modeled: 0, no_consensus: 0, upserted: 0, errors: [] };
@@ -182,7 +224,7 @@ async function runRead() {
     const slice = playerKeys.slice(i, i + 100);
     const { data } = await supabase
       .from('nfl_player_game_stats')
-      .select('player_key, season, week, season_type, team, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions')
+      .select('player_key, player_id, game_id, season, week, season_type, team, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions, carries, targets, rushing_tds, receiving_tds')
       .in('player_key', slice)
       .order('season', { ascending: false })
       .order('week', { ascending: false });
@@ -191,6 +233,27 @@ async function runRead() {
       history.get(r.player_key).push(r);
     }
   }
+
+  // Anytime TD usage: red zone counts per game from nflverse play by
+  // play (nfl_player_redzone), merged onto the same history rows. A
+  // player with no red zone row for a game had no red zone usage, so
+  // the merge defaults to zero, but an empty table means the sync has
+  // not run and TD reads are skipped rather than priced on zeros.
+  const tdKeys = new Set([...groups.values()].filter(g => g.meta.market === propEdge.TD_MARKET).map(g => g.meta.player_key));
+  const redzone = new Map();
+  let redzoneLoaded = false;
+  if (tdKeys.size) {
+    const ids = [...new Set([...tdKeys].flatMap(k => (history.get(k) || []).map(g => g.player_id)).filter(Boolean))];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data } = await supabase.from('nfl_player_redzone')
+        .select('game_id, player_id, rz_carries, gl_carries, rz_targets, ez_targets')
+        .in('player_id', ids.slice(i, i + 100));
+      for (const r of data || []) redzone.set(`${r.game_id}|${r.player_id}`, r);
+    }
+    const { count } = await supabase.from('nfl_player_redzone').select('game_id', { count: 'exact', head: true });
+    redzoneLoaded = (count || 0) > 0;
+  }
+  summary.td = { groups: tdKeys.size ? [...groups.values()].filter(g => g.meta.market === propEdge.TD_MARKET).length : 0, read: 0, no_usage_table: 0, no_history: 0, thin_books: 0 };
 
   // v2 inputs, one load each for the whole slate.
   const events = [...new Map([...groups.values()].map(g => [g.meta.event_id, g.meta])).values()];
@@ -216,6 +279,11 @@ async function runRead() {
 
   const out = [];
   for (const { meta, rows } of groups.values()) {
+    if (meta.market === propEdge.TD_MARKET) {
+      const td = tdRow(meta, rows, history, redzone, redzoneLoaded, dials, summary.td);
+      if (td) { out.push(td); summary.td.read++; }
+      continue;
+    }
     if (!(meta.market in propEdge.STAT_COLUMN)) { summary.not_modeled++; continue; }
     const consensus = propEdge.consensusFromBooks(rows);
     if (!consensus) { summary.no_consensus++; continue; }
@@ -338,7 +406,7 @@ async function runGrade() {
   for (let i = 0; i < keys.length; i += 100) {
     const { data } = await supabase
       .from('nfl_player_game_stats')
-      .select('player_key, season, week, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions')
+      .select('player_key, season, week, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions, rushing_tds, receiving_tds')
       .in('player_key', keys.slice(i, i + 100))
       .in('season', seasons);
     for (const r of data || []) stats.set(`${r.player_key}|${r.season}|${r.week}`, r);
@@ -365,7 +433,9 @@ async function runGrade() {
       } else summary.no_stat++;
       continue;
     }
-    const actual = row[propEdge.STAT_COLUMN[p.market]];
+    const actual = p.market === propEdge.TD_MARKET
+      ? (Number(row.rushing_tds) || 0) + (Number(row.receiving_tds) || 0)
+      : row[propEdge.STAT_COLUMN[p.market]];
     const outcome = propEdge.gradeRead(p.side, p.line, actual);
     if (!outcome) { summary.no_stat++; continue; }
     const v2Outcome = p.v2_side ? propEdge.gradeRead(p.v2_side, p.line, actual) : null;
@@ -400,3 +470,4 @@ async function analyzeNflProps(req, res) {
 module.exports = analyzeNflProps;
 module.exports.runRead = runRead;
 module.exports.runGrade = runGrade;
+module.exports.tdRow = tdRow;

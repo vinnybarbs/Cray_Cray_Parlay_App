@@ -457,6 +457,8 @@ app.post('/cron/discord-dial-board', discordDialBoard);
 // a row in its life, nflverse is the settlement truth.
 const syncNflverseStats = require('./api/cron/sync-nflverse-player-stats');
 app.post('/cron/sync-nflverse-player-stats', syncNflverseStats);
+const syncNflverseRedzone = require('./api/cron/sync-nflverse-redzone');
+app.post('/cron/sync-nflverse-redzone', syncNflverseRedzone);
 
 // NFL availability the line prices earlier and later than the Friday
 // designation list (build_queue 11, 2026-09-14): the official practice
