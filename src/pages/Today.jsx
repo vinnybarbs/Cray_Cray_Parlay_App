@@ -47,7 +47,7 @@ function PickRow({ p, onOpen, id }) {
       </div>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-lg font-semibold text-ink-100 leading-snug min-w-0">{pickWithoutPrice(p.pick)}</span>
-        <span className="font-mono text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.odds)}</span>
+        <span className=" text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.odds)}</span>
       </div>
       <div className="text-xs text-ink-400">
         {p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}
@@ -64,7 +64,7 @@ function TrapRow({ p, id }) {
     <div id={id} className="bg-ink-900 rounded-2xl border border-signal-neg/40 px-4 py-4 flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-semibold text-ink-100 min-w-0">Don't bet {pickWithoutPrice(p.pick)}</span>
-        <span className="font-mono text-sm tabular-nums text-ink-300 flex-shrink-0">{fmtOdds(p.odds)}</span>
+        <span className=" text-sm tabular-nums text-ink-300 flex-shrink-0">{fmtOdds(p.odds)}</span>
       </div>
       <div className="text-xs text-ink-400">
         {p.sport} · {p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}
@@ -182,8 +182,8 @@ export default function Today() {
             review). The full breakdown lives on the ledger. */}
         {r30 && (
           <p className="text-xs text-ink-400 text-center">
-            Last 30 days <span className="font-mono tabular-nums text-ink-200">{r30.won}-{r30.lost}</span>{' '}
-            <span className={`font-mono tabular-nums ${r30.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(r30.units)}</span>
+            Last 30 days <span className=" tabular-nums text-ink-200">{r30.won}-{r30.lost}</span>{' '}
+            <span className={` tabular-nums ${r30.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(r30.units)}</span>
             {' · '}
             <button onClick={() => navigate('/ledger')} className="text-signal-pos hover:underline">See every pick</button>
           </p>

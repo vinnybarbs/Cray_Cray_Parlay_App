@@ -76,7 +76,7 @@ export default function Auth({ onClose }) {
           <p className="text-sm text-ink-300 leading-relaxed mb-2">
             We sent a confirmation link to
           </p>
-          <p className="font-mono text-sm text-signal-pos mb-4 break-all">{email}</p>
+          <p className="tabular-nums text-sm text-signal-pos mb-4 break-all">{email}</p>
           <p className="text-xs text-ink-400 leading-relaxed mb-6">
             Click the link to activate your account, then come back and sign
             in. If it isn't in your inbox within a minute, check spam.
@@ -102,7 +102,7 @@ export default function Auth({ onClose }) {
           {onClose && (
             <button
               onClick={onClose}
-              className="text-ink-400 hover:text-ink-100 font-mono"
+              className="text-ink-400 hover:text-ink-100 tabular-nums"
             >
               ✕
             </button>
@@ -112,7 +112,7 @@ export default function Auth({ onClose }) {
         {/* Google Sign In */}
         <button
           onClick={handleGoogleSignIn}
-          className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 font-mono font-medium text-sm flex items-center justify-center gap-2 mb-4 transition-colors"
+          className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 tabular-nums font-medium text-sm flex items-center justify-center gap-2 mb-4 transition-colors"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -142,7 +142,7 @@ export default function Auth({ onClose }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 font-mono text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
+              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 tabular-nums text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
               placeholder="you@example.com"
             />
           </div>
@@ -157,13 +157,13 @@ export default function Auth({ onClose }) {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 font-mono text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
+              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 tabular-nums text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <div className="text-signal-neg text-sm bg-signal-neg-dim/30 shadow-hairline-neg p-3 rounded-sharp font-mono">
+            <div className="text-signal-neg text-sm bg-signal-neg-dim/30 shadow-hairline-neg p-3 rounded-sharp tabular-nums">
               {error}
             </div>
           )}

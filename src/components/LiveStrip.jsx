@@ -22,7 +22,7 @@ export default function LiveStrip({ items }) {
       className="flex-shrink-0 inline-flex items-baseline gap-1.5 px-3 text-sm text-ink-200 hover:text-white"
     >
       <span className={it.tone === 'neg' ? 'text-signal-neg' : 'text-ink-100 font-medium'}>{it.label}</span>
-      {it.price && <span className="font-mono tabular-nums text-signal-pos">{it.price}</span>}
+      {it.price && <span className="font-semibold tabular-nums text-signal-pos">{it.price}</span>}
       <span className="text-ink-600 pl-1.5" aria-hidden="true">·</span>
     </button>
   ))

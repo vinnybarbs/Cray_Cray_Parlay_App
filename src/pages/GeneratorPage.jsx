@@ -79,14 +79,14 @@ function PickRow({ row, isOpen, onToggle }) {
       <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-xs font-bold ${isPreview ? 'text-ink-300 bg-ink-850 shadow-hairline' :`${tier.color} ${tier.bg}`}`}>
         {isPreview ? 'Preview' : tier.label}
       </span>
-      <span className={`flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
+      <span className={`flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
         {isPreview ? '-' : formatPp(effPp)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
           {row.game.recommended_pick
             || (showBestSide ? `best side: ${sideLabel(story.bestSide, row.game)}` : `${row.game.away_team} @ ${row.game.home_team}`)}
-          {odds && <span className="ml-2 font-mono text-xs text-ink-300">{odds}</span>}
+          {odds && <span className="ml-2 tabular-nums text-xs text-ink-300">{odds}</span>}
         </div>
         <div className="text-xs text-ink-400 truncate">
           {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} @ {row.game.home_team} · under 2 points, no pick</> : <> · analysis, no graded side</>}
@@ -126,7 +126,7 @@ function TrapRow({ row }) {
       <span className="flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-xs font-bold text-signal-neg bg-signal-neg-dim/30 shadow-hairline-neg">
         Trap
       </span>
-      <span className="flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums text-signal-neg">
+      <span className="flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums text-signal-neg">
         {formatPp(t.edge_pp)}
       </span>
       <div className="min-w-0 flex-1">
@@ -257,7 +257,7 @@ export default function GeneratorPage() {
             <span className="text-xs text-ink-400 w-14 flex-shrink-0">Sport</span>
             <button
               onClick={() => setSelectedSports([])}
-              className={`px-3 py-1 rounded-sharp text-xs font-mono font-medium transition-all ${selectedSports.length === 0 ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
+              className={`px-3 py-1 rounded-sharp text-sm font-medium transition-all ${selectedSports.length === 0 ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
             >
               All
             </button>
@@ -265,7 +265,7 @@ export default function GeneratorPage() {
               <button
                 key={s}
                 onClick={() => toggleSport(s)}
-                className={`px-3 py-1 rounded-sharp text-xs font-mono font-medium transition-all ${selectedSports.includes(s) ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
+                className={`px-3 py-1 rounded-sharp text-sm font-medium transition-all ${selectedSports.includes(s) ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
               >
                 {s}
               </button>
@@ -277,7 +277,7 @@ export default function GeneratorPage() {
               <button
                 key={o.key}
                 onClick={() => setMinTier(o.key)}
-                className={`px-3 py-1 rounded-sharp text-xs font-mono font-medium transition-all ${minTier === o.key ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
+                className={`px-3 py-1 rounded-sharp text-sm font-medium transition-all ${minTier === o.key ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
               >
                 {o.label}
               </button>
@@ -320,12 +320,12 @@ export default function GeneratorPage() {
               to grade until new games go up.
             </p>
             {data?.firstGameTime && (
-              <p className="mt-4 font-mono text-sm text-signal-pos">
+              <p className="mt-4 tabular-nums text-sm text-signal-pos">
                 Next slate: {fmtGameDateTime(data.firstGameTime)}
               </p>
             )}
             {Object.entries(data?.upcomingCounts || {}).filter(([, n]) => n > 0).length > 0 && (
-              <p className="mt-1 font-mono text-xs text-ink-400">
+              <p className="mt-1 tabular-nums text-xs text-ink-400">
                 On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
               </p>
             )}
@@ -348,7 +348,7 @@ export default function GeneratorPage() {
             {rows.length === 0 ? (
               <div className="px-4 py-10 text-center">
                 <p className="text-sm text-ink-300">Nothing clears that filter right now.</p>
-                <p className="text-xs text-ink-500 mt-1 font-mono">Loosen the edge floor or check back after the next analysis run.</p>
+                <p className="text-xs text-ink-500 mt-1 tabular-nums">Loosen the edge floor or check back after the next analysis run.</p>
               </div>
             ) : (
               rows.map(row => {

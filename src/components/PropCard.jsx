@@ -66,7 +66,7 @@ function Avatar({ name, team }) {
       </div>
       {team && (
         <span
-          className="absolute -right-1.5 -bottom-1 font-mono text-[8px] font-bold leading-none px-1 py-0.5 rounded border bg-ink-950"
+          className="absolute -right-1.5 -bottom-1 tabular-nums text-[8px] font-bold leading-none px-1 py-0.5 rounded border bg-ink-950"
           style={c ? { borderColor: c.accent, color: '#FFFFFF' } : undefined}
         >
           {team}
@@ -89,8 +89,8 @@ function ProbBar({ ours, book }) {
         <div className="absolute inset-y-0 w-0.5 bg-ink-100" style={{ left: `calc(${clamp(book)}% - 1px)` }} />
       </div>
       <div className="flex justify-between text-xs text-ink-400">
-        <span>Book says <span className="font-mono tabular-nums text-ink-300">{Math.round(book)}%</span></span>
-        <span>We say <span className="font-mono tabular-nums font-semibold text-signal-pos">{Math.round(ours)}%</span></span>
+        <span>Book says <span className=" tabular-nums text-ink-300">{Math.round(book)}%</span></span>
+        <span>We say <span className=" tabular-nums font-semibold text-signal-pos">{Math.round(ours)}%</span></span>
       </div>
     </div>
   )
@@ -123,7 +123,7 @@ function HistoryChart({ p }) {
       </div>
       <div className="flex justify-between text-xs text-ink-400">
         <span>{td ? `Scored a TD, last ${n} games` : `Last ${n} games vs ${p.line}`}</span>
-        <span className="font-mono tabular-nums text-ink-200">{h.hits} of {n}</span>
+        <span className=" tabular-nums text-ink-200">{h.hits} of {n}</span>
       </div>
     </div>
   )
@@ -216,7 +216,7 @@ export default function PropCard({ p, showOutcome = false }) {
 
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-lg font-semibold text-ink-100 leading-snug min-w-0 first-letter:uppercase">{p.player ? pickLine(p) : p.text}</span>
-        <span className="font-mono text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.price)}</span>
+        <span className=" text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.price)}</span>
       </div>
 
       {!showOutcome && (() => {

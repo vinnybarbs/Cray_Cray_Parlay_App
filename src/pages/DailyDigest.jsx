@@ -167,7 +167,7 @@ function Countdown({ targetIso }) {
   return (
     <div className="flex items-center gap-2 text-sm text-ink-300 mt-1">
       <span className="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-      <span>First game in <span className="font-mono text-green-400 font-semibold">{remaining}</span></span>
+      <span>First game in <span className="tabular-nums text-green-400 font-semibold">{remaining}</span></span>
     </div>
   )
 }
@@ -300,7 +300,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
               )}
             </div>
             {analysis.published_pick?.pick && !SHADOW_DISPLAY.has(analysis.sport) && (
-              <div className="font-mono text-[11px] text-signal-pos mt-2 tabular-nums">
+              <div className=" text-[11px] text-signal-pos mt-2 tabular-nums">
                 Published: {analysis.published_pick.pick}{analysis.published_pick.tier ? ` · ${analysis.published_pick.tier}` : ''}
               </div>
             )}
@@ -360,7 +360,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                           <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-ink-200 justify-end">
                             {(line.outcomes || []).map((o, j) => (
                               <span key={j} className="whitespace-nowrap">
-                                {o.name}{o.point != null ? ` ${o.point > 0 ? '+' : ''}${o.point}` : ''} <span className="font-mono">{fmtP(o.price)}</span>
+                                {o.name}{o.point != null ? ` ${o.point > 0 ? '+' : ''}${o.point}` : ''} <span className="tabular-nums">{fmtP(o.price)}</span>
                               </span>
                             ))}
                           </div>
@@ -536,11 +536,11 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs text-ink-200 font-medium truncate">{f.name}</span>
                         {f.record && (
-                          <span className="flex-shrink-0 text-[10px] font-mono bg-ink-800 text-ink-200 rounded px-1.5 py-0.5 tabular-nums">{f.record}</span>
+                          <span className="flex-shrink-0 text-[10px] bg-ink-800 text-ink-200 rounded px-1.5 py-0.5 tabular-nums">{f.record}</span>
                         )}
                       </div>
                       {f.layoffDays != null && (
-                        <div className={`text-[11px] font-mono tabular-nums mb-1.5 ${f.layoffDays >= 365 ? 'text-orange-400' : 'text-ink-400'}`}>
+                        <div className={`text-[11px] tabular-nums mb-1.5 ${f.layoffDays >= 365 ? 'text-orange-400' : 'text-ink-400'}`}>
                           last fought {f.layoffDays} days ago{f.layoffDays >= 365 ? ' · long layoff' : ''}
                         </div>
                       )}
@@ -589,13 +589,13 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xs text-ink-200 font-medium truncate">{p.name}</span>
                   {p.rank != null && (
-                    <span className="flex-shrink-0 text-[10px] font-mono bg-ink-800 text-ink-200 rounded px-1.5 py-0.5 tabular-nums">
+                    <span className="flex-shrink-0 text-[10px] bg-ink-800 text-ink-200 rounded px-1.5 py-0.5 tabular-nums">
                       {(p.tour || '').toUpperCase()} #{p.rank}
                     </span>
                   )}
                 </div>
                 {(p.record30d || p.matchesLast14 > 0) && (
-                  <div className="text-[11px] text-ink-400 font-mono tabular-nums mb-1.5">
+                  <div className="text-[11px] text-ink-400 tabular-nums mb-1.5">
                     {p.record30d && <span>Last 30d: {p.record30d}</span>}
                     {p.record30d && p.matchesLast14 > 0 && <span className="text-ink-600"> · </span>}
                     {p.matchesLast14 > 0 && (
@@ -697,7 +697,7 @@ function EdgeChip({ signedPp, leg = false, size = 'md', shadow = false }) {
       className={`rounded-sharp ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}
       title={ppTooltip}
     >
-      <div className={`font-mono font-semibold ${ppSize} ${tier.color} tabular-nums tracking-tight`}>
+      <div className={` font-semibold ${ppSize} ${tier.color} tabular-nums tracking-tight`}>
         <span className="mr-0.5">{arrow}</span>{pp ?? '-'}
       </div>
       <div className={`text-xs ${tier.color} mt-0.5`}>{tier.label}</div>
@@ -738,16 +738,16 @@ function MarketRow({ sides, recommendedSide, shadow = false }) {
           return (
             <div key={s.side} className="flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
-                {isPick && <span className="text-signal-pos font-mono text-[10px] leading-none" title="Model pick">►</span>}
+                {isPick && <span className="text-signal-pos tabular-nums text-[10px] leading-none" title="Model pick">►</span>}
                 <span className={`truncate ${isPick ? 'text-signal-pos font-medium' : 'text-ink-200'}`}>
                   {s.text}
                 </span>
               </div>
               {shadow ? (
-                <span className="flex-shrink-0 font-mono text-[11px] text-ink-600" title="Shadow read, the number shows at go-live">·</span>
+                <span className="flex-shrink-0 tabular-nums text-[11px] text-ink-600" title="Shadow read, the number shows at go-live">·</span>
               ) : !isLean ? (
                 <span
-                  className="flex-shrink-0 font-mono text-[11px] text-ink-600"
+                  className="flex-shrink-0 tabular-nums text-[11px] text-ink-600"
                   title="The mirror of the other side. A two way market has one edge, shown on the side the model leans to"
                 >
                   ·
@@ -765,7 +765,7 @@ function MarketRow({ sides, recommendedSide, shadow = false }) {
                 </span>
               ) : (
                 <span
-                  className={`flex-shrink-0 font-mono text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}
+                  className={`flex-shrink-0 text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}
                   title={s.signedPp != null ? `${formatPp(s.signedPp)} · ${tier.label}` : 'No model edge for this side'}
                 >
                   {hasAnyEdge ? (formatPp(s.signedPp) ?? '-') : '-'}
@@ -776,7 +776,7 @@ function MarketRow({ sides, recommendedSide, shadow = false }) {
         })}
       </div>
       {shadow && (
-        <div className="font-mono text-[10px] text-ink-500 mt-1.5 italic">
+        <div className="tabular-nums text-[10px] text-ink-500 mt-1.5 italic">
           Shadow read stored for the record. Numbers show at go-live.
         </div>
       )}
@@ -869,7 +869,7 @@ function TierPathNote({ published }) {
   const up = order.indexOf(curr.tier) > order.indexOf(prev.tier)
   const when = new Date(curr.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
   return (
-    <div className={`font-mono text-[10px] mt-0.5 ${up ? 'text-signal-pos' : 'text-ink-400'}`}>
+    <div className={`text-xs tabular-nums mt-0.5 ${up ? 'text-signal-pos' : 'text-ink-400'}`}>
       {up ? 'Promoted' : 'Demoted'} from {prev.tier} at {when}
     </div>
   )
@@ -891,7 +891,7 @@ function LiveReadNote({ game }) {
     ? `${game.recommended_pick}${live != null ? ` ${formatPp(live)}` : ''}`
     : 'no side clears the floor'
   return (
-    <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">
+    <div className=" text-[10px] text-ink-400 mt-0.5 tabular-nums">
       Live read now: {liveText} · the published pick stands and is graded as published
     </div>
   )
@@ -912,18 +912,18 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
         {/* Matchup header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
-            <div className="font-mono font-medium text-ink-100 text-sm leading-tight tracking-tight">
+            <div className="tabular-nums font-medium text-ink-100 text-sm leading-tight tracking-tight">
               {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
             </div>
             {(game.away_record || game.home_record) && (
-              <div className="font-mono text-[11px] text-ink-400 mt-0.5 tabular-nums">
+              <div className=" text-[11px] text-ink-400 mt-0.5 tabular-nums">
                 {game.away_record && <span>{game.away_record}</span>}
                 {game.away_record && game.home_record && <span className="text-ink-600"> vs </span>}
                 {game.home_record && <span>{game.home_record}</span>}
               </div>
             )}
             {game.game_date && (
-              <div className="font-mono text-[11px] text-ink-500 mt-0.5 tabular-nums flex items-center gap-1.5">
+              <div className=" text-[11px] text-ink-500 mt-0.5 tabular-nums flex items-center gap-1.5">
                 {/* The board is a rolling next-24h window, so an evening
                     visit sees tonight's late games NEXT TO tomorrow's
                     slate, and the owner bet them as one board
@@ -964,13 +964,13 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           if (SHADOW_DISPLAY.has(sport)) return (
             <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
               <div className="text-xs text-ink-500 mb-0.5">Shadow · read withheld until go-live</div>
-              <div className="font-mono text-[11px] text-ink-400">Graded into the shadow record, not shown, not bettable.</div>
+              <div className="tabular-nums text-[11px] text-ink-400">Graded into the shadow record, not shown, not bettable.</div>
             </div>
           )
           if (game.recommended_pick && signedPp != null && signedPp <= -2) return (
             <div className="bg-signal-neg-dim/30 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-signal-neg/40">
               <div className="text-xs text-signal-neg mb-0.5">Trap · don't bet this side</div>
-              <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+              <div className="text-signal-neg font-medium text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
           // The published row names the pick. Before 2026-09-27 this line
@@ -980,14 +980,14 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           if ((publishedText || game.recommended_pick) && signedPp != null && signedPp >= 2) return (
             <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
               <div className="text-xs text-ink-400 mb-0.5">Model Pick{game.published_pick?.tier ? ` · ${game.published_pick.tier}` : ''}</div>
-              <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">{publishedText || game.recommended_pick}</div>
+              <div className="text-signal-pos font-medium text-sm tabular-nums">{publishedText || game.recommended_pick}</div>
               {(() => {
                 {/* Break-even = risk / (risk + win). Teaches the price: a
                     -180 pick must win 64.3% just to tread water, +122 only
                     45%. The number that explains why chalk is fenced. */}
                 const be = breakEvenPct(game.published_pick?.odds ?? lockOddsFor(game))
                 return be != null ? (
-                  <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">
+                  <div className=" text-[10px] text-ink-400 mt-0.5 tabular-nums">
                     break-even {be.toFixed(1)}% at this price
                   </div>
                 ) : null
@@ -1010,19 +1010,19 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
             return (
               <div className="bg-ink-850/60 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-ink-500">
                 <div className="text-xs text-ink-300 mb-0.5">Leg · {Math.round(legProb * 100)}% to hit, thin payout</div>
-                <div className="text-ink-200 font-mono font-medium text-sm tabular-nums">{legText}</div>
+                <div className="text-ink-200 font-medium text-sm tabular-nums">{legText}</div>
               </div>
             )
           }
           if (game.recommended_pick) return (
             <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
               <div className="text-xs text-ink-400 mb-0.5">Skip. The best side is under 2 points</div>
-              <div className="text-ink-300 font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
+              <div className="text-ink-300 font-medium text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
           return (
             <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
-              <div className="font-mono text-[11px] text-ink-400">No edge. Every market is under 2 points</div>
+              <div className="tabular-nums text-[11px] text-ink-400">No edge. Every market is under 2 points</div>
             </div>
           )
         })()}
@@ -1036,7 +1036,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
             <div className="text-xs text-ink-400 mb-0.5">
               {alt.bet_type} spotlight{alt.tier ? ` · ${alt.tier}` : ''}
             </div>
-            <div className="text-signal-pos font-mono font-medium text-sm tabular-nums">
+            <div className="text-signal-pos font-medium text-sm tabular-nums">
               {alt.pick}
               {alt.odds != null && (() => {
                 const n = parseInt(alt.odds, 10)
@@ -1046,7 +1046,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               })()}
             </div>
             {alt.edge_pp != null && (
-              <div className="font-mono text-[10px] text-ink-400 mt-0.5 tabular-nums">{formatPp(Number(alt.edge_pp))} on this market alone</div>
+              <div className=" text-[10px] text-ink-400 mt-0.5 tabular-nums">{formatPp(Number(alt.edge_pp))} on this market alone</div>
             )}
             <TierPathNote published={alt} />
           </div>
@@ -1118,23 +1118,23 @@ function TrapCard({ game, trap, gameKey, onDeepResearch }) {
     <div className="bg-ink-900 rounded-sharp overflow-hidden flex flex-col border border-signal-neg/40 shadow-hairline">
       <div className="flex items-center justify-between px-3 py-1.5 bg-signal-neg-dim/30 border-b border-signal-neg/30">
         <span className="text-xs text-signal-neg font-semibold">🪤 Trap</span>
-        <span className="font-mono text-[11px] text-signal-neg tabular-nums font-semibold">{edgePp != null ? `${edgePp.toFixed(1)} pts` : ''}</span>
+        <span className=" text-[11px] text-signal-neg tabular-nums font-semibold">{edgePp != null ? `${edgePp.toFixed(1)} pts` : ''}</span>
       </div>
       <div className="p-4 flex-1">
-        <div className="font-mono font-medium text-ink-100 text-sm leading-tight tracking-tight mb-0.5">
+        <div className="tabular-nums font-medium text-ink-100 text-sm leading-tight tracking-tight mb-0.5">
           {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
         </div>
         {game.game_date && (
-          <div className="font-mono text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
+          <div className=" text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
         )}
         <div className="bg-signal-neg-dim/20 rounded-sharp px-3 py-2 mb-3 border border-signal-neg/30">
           <div className="text-xs text-signal-neg mb-0.5">The bait · don't bet it</div>
-          <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{baitText || side}</div>
+          <div className="text-signal-neg font-medium text-sm tabular-nums">{baitText || side}</div>
         </div>
         {signals.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {signals.map((s, i) => (
-              <span key={i} className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-ink-850 text-ink-300 shadow-hairline">
+              <span key={i} className="tabular-nums text-[10px] px-1.5 py-0.5 rounded bg-ink-850 text-ink-300 shadow-hairline">
                 {s.label || s.key}
               </span>
             ))}
@@ -1279,7 +1279,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
             <span className="text-2xl flex-shrink-0">{meta.emoji}</span>
             <div className="min-w-0">
               <h2 className="text-base font-semibold text-ink-100">{meta.label}</h2>
-              <p className="font-mono text-[11px] text-ink-400 tabular-nums">
+              <p className=" text-[11px] text-ink-400 tabular-nums">
                 {games.length} graded
                 {SHADOW_DISPLAY.has(sport) && <span className="text-ink-500"> · shadow, publishes at go-live</span>}
                 <span className="text-ink-500"> · {pickGames.length} pick{pickGames.length !== 1 ? 's' : ''}</span>
@@ -1296,7 +1296,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             {/* Chevron */}
-            <span className="font-mono text-ink-400 text-xs select-none">
+            <span className="tabular-nums text-ink-400 text-xs select-none">
               {expanded ? '▲' : '▼'}
             </span>
           </div>
@@ -1325,12 +1325,12 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                  audit). From sm: up the original single row returns. */
               <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-0.5 gap-x-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
+                  <span className={`px-1.5 py-0.5 rounded-sharp text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
                     {SHADOW_DISPLAY.has(sport) ? 'Shadow' : (formatPp(pp) ?? '-')}
                   </span>
                   <span className="text-ink-200 truncate">{game.away_team} @ {game.home_team}</span>
                 </div>
-                <span className={`font-mono text-xs font-medium flex-shrink-0 truncate sm:max-w-[140px] tabular-nums pl-9 sm:pl-0 ${SHADOW_DISPLAY.has(sport) ? 'text-ink-500' : 'text-signal-pos'}`}>
+                <span className={` text-xs font-medium flex-shrink-0 truncate sm:max-w-[140px] tabular-nums pl-9 sm:pl-0 ${SHADOW_DISPLAY.has(sport) ? 'text-ink-500' : 'text-signal-pos'}`}>
                   {SHADOW_DISPLAY.has(sport) ? 'read withheld' : (game.recommended_pick || '-')}
                 </span>
               </div>
@@ -1338,10 +1338,10 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
           })}
           {legGames.length > 0 && (
             <div className="flex items-center gap-2 text-xs pt-0.5">
-              <span className="px-1.5 py-0.5 rounded-sharp font-mono text-[10px] font-semibold flex-shrink-0 bg-ink-850 shadow-hairline text-ink-200">
+              <span className="px-1.5 py-0.5 rounded-sharp tabular-nums text-[10px] font-semibold flex-shrink-0 bg-ink-850 shadow-hairline text-ink-200">
                 Leg
               </span>
-              <span className="text-ink-400 font-mono text-[11px]">
+              <span className="text-ink-400 tabular-nums text-[11px]">
                 {legGames.length} parlay {legGames.length === 1 ? 'leg' : 'legs'} · 65%+ to hit, thin payout
               </span>
             </div>
@@ -1453,7 +1453,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                 <span className="text-xs text-ink-400 font-medium">
                   On the bubble
                 </span>
-                <span className="font-mono text-[10px] text-ink-500 tabular-nums">{bubbleGames.length} more graded game{bubbleGames.length !== 1 ? 's' : ''} · under 2 points, no pick</span>
+                <span className=" text-[10px] text-ink-500 tabular-nums">{bubbleGames.length} more graded game{bubbleGames.length !== 1 ? 's' : ''} · under 2 points, no pick</span>
                 <span className="ml-auto text-ink-400 text-xs group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1512,8 +1512,8 @@ function OnDeckRail({ onDeck }) {
               {games.map((g, i) => (
                 <div key={i} className="flex items-center gap-3 px-4 py-2 border-t border-ink-800/50">
                   <span className="text-sm text-ink-100 truncate flex-1">{g.away_team} @ {g.home_team}</span>
-                  <span className="font-mono text-xs text-ink-400 tabular-nums flex-shrink-0">{fmtMl(g.ml_away)} / {fmtMl(g.ml_home)}</span>
-                  <span className="font-mono text-[10px] text-ink-500 flex-shrink-0 w-24 text-right">{fmtGameDay(g.commence_time)}</span>
+                  <span className=" text-xs text-ink-400 tabular-nums flex-shrink-0">{fmtMl(g.ml_away)} / {fmtMl(g.ml_home)}</span>
+                  <span className="tabular-nums text-[10px] text-ink-500 flex-shrink-0 w-24 text-right">{fmtGameDay(g.commence_time)}</span>
                 </div>
               ))}
             </div>
@@ -1554,11 +1554,11 @@ function GolfFieldBoard({ field }) {
             >
               <span className="flex-1 min-w-0 text-sm text-ink-100 font-medium truncate">
                 {p.name}
-                {p.position && <span className="ml-2 font-mono text-[10px] text-signal-pos">P{p.position} {p.score}</span>}
+                {p.position && <span className="ml-2 tabular-nums text-[10px] text-signal-pos">P{p.position} {p.score}</span>}
               </span>
-              <span className="w-14 text-right font-mono text-xs text-ink-200 tabular-nums">{fmtGolfPrice(p.best_price)}</span>
-              <span className="w-14 text-right font-mono text-xs text-ink-400 tabular-nums">{p.consensus_prob != null ? `${(p.consensus_prob * 100).toFixed(1)}%` : '-'}</span>
-              <span className={`w-16 text-right font-mono text-xs tabular-nums ${p.value_pp > 0 ? 'text-signal-pos' : p.value_pp < 0 ? 'text-signal-neg' : 'text-ink-500'}`}>
+              <span className="w-14 text-right text-xs text-ink-200 tabular-nums">{fmtGolfPrice(p.best_price)}</span>
+              <span className="w-14 text-right text-xs text-ink-400 tabular-nums">{p.consensus_prob != null ? `${(p.consensus_prob * 100).toFixed(1)}%` : '-'}</span>
+              <span className={`w-16 text-right text-xs tabular-nums ${p.value_pp > 0 ? 'text-signal-pos' : p.value_pp < 0 ? 'text-signal-neg' : 'text-ink-500'}`}>
                 {p.value_pp != null ? `${p.value_pp > 0 ? '+' : ''}${p.value_pp.toFixed(1)} pts` : ''}
               </span>
             </button>
@@ -1574,7 +1574,7 @@ function GolfFieldBoard({ field }) {
       {players.length > 10 && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full mt-2 text-center text-xs font-mono text-signal-pos/80 hover:text-signal-pos"
+          className="w-full mt-2 text-center text-xs tabular-nums text-signal-pos/80 hover:text-signal-pos"
         >
           {expanded ? 'Show less' : `Show the full field (${players.length})`}
         </button>
@@ -1637,7 +1637,7 @@ function GolfLeaderboard({ golf }) {
               {full.length > 5 && (
                 <button
                   onClick={() => setShowFullBoard(!showFullBoard)}
-                  className="w-full mt-1 text-center text-xs font-mono text-signal-pos/80 hover:text-signal-pos"
+                  className="w-full mt-1 text-center text-xs tabular-nums text-signal-pos/80 hover:text-signal-pos"
                 >
                   {showFullBoard ? 'Show less' : `Show all ${full.length} players`}
                 </button>
@@ -1847,29 +1847,29 @@ export default function DailyDigest({ onBack }) {
             {/* Count-first headline, math-derived, instantly tells you what's actionable today */}
               {data ? (
                 tierCounts.sharpTakes > 0 ? (
-                  <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
+                  <h1 className=" text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
                     <span className="text-signal-pos">{tierCounts.sharpTakes}</span> Sharp Take{tierCounts.sharpTakes !== 1 ? 's' : ''}
                   </h1>
                 ) : tierCounts.strongPlays > 0 ? (
-                  <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
+                  <h1 className=" text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
                     <span className="text-signal-pos">{tierCounts.strongPlays}</span> Strong Play{tierCounts.strongPlays !== 1 ? 's' : ''}
                   </h1>
                 ) : tierCounts.plays > 0 ? (
-                  <h1 className="font-mono text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
+                  <h1 className=" text-3xl md:text-4xl font-bold tracking-tight tabular-nums text-ink-100 leading-tight">
                     <span className="text-signal-pos">{tierCounts.plays}</span> Play{tierCounts.plays !== 1 ? 's' : ''}
                   </h1>
                 ) : (
-                  <h1 className="font-mono text-2xl md:text-3xl font-bold tracking-tight text-ink-100 leading-tight">
+                  <h1 className="tabular-nums text-2xl md:text-3xl font-bold tracking-tight text-ink-100 leading-tight">
                     Quiet board. Nothing cleared 4 points today
                   </h1>
                 )
               ) : (
-                <h1 className="font-mono text-3xl md:text-4xl font-bold text-ink-300">…</h1>
+                <h1 className="tabular-nums text-3xl md:text-4xl font-bold text-ink-300">…</h1>
               )}
 
               {/* Secondary tier counts + traps to avoid */}
               {data && (
-                <p className="text-sm mt-2 font-mono tabular-nums text-ink-300">
+                <p className="text-sm mt-2 tabular-nums text-ink-300">
                   {tierCounts.strongPlays > 0 && <span><span className="text-signal-pos">{tierCounts.strongPlays}</span> Strong Play{tierCounts.strongPlays !== 1 ? 's' : ''}</span>}
                   {tierCounts.strongPlays > 0 && tierCounts.plays > 0 && <span className="text-ink-600"> · </span>}
                   {tierCounts.plays > 0 && <span><span className="text-signal-pos">{tierCounts.plays}</span> Play{tierCounts.plays !== 1 ? 's' : ''}</span>}
@@ -1884,7 +1884,7 @@ export default function DailyDigest({ onBack }) {
 
               {/* System explainer for first-time users */}
               {data && (
-                <p className="text-ink-400 text-xs mt-3 font-mono leading-relaxed">
+                <p className="text-ink-400 text-xs mt-3 tabular-nums leading-relaxed">
                   {totalGames} game{totalGames !== 1 ? 's' : ''} graded across {totalSports} sport{totalSports !== 1 ? 's' : ''}. Math picks the side. Tap any game for the why.
                   {' '}Tiers revise with prices until lock. A pick that moved says so on its card.
                 </p>
@@ -1937,12 +1937,12 @@ export default function DailyDigest({ onBack }) {
                   to grade until new games go up.
                 </p>
                 {data.firstGameTime && (
-                  <p className="mt-4 font-mono text-sm text-signal-pos">
+                  <p className="mt-4 tabular-nums text-sm text-signal-pos">
                     Next slate: {fmtGameDateTime(data.firstGameTime)}
                   </p>
                 )}
                 {Object.entries(data.upcomingCounts || {}).filter(([, n]) => n > 0).length > 0 && (
-                  <p className="mt-1 font-mono text-xs text-ink-400">
+                  <p className="mt-1 tabular-nums text-xs text-ink-400">
                     On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
                   </p>
                 )}
@@ -2010,8 +2010,8 @@ export default function DailyDigest({ onBack }) {
             {(heroHitRate.st || heroHitRate.overall) && (
               <p className="text-xs text-ink-400 text-center">
                 Last 30 days
-                {heroHitRate.st && <>{' · Sharp Take '}<span className="font-mono tabular-nums text-ink-200">{heroHitRate.st.won}-{heroHitRate.st.lost}</span></>}
-                {heroHitRate.overall && <>{' · every pick '}<span className="font-mono tabular-nums text-ink-200">{heroHitRate.overall.won}-{heroHitRate.overall.lost}</span></>}
+                {heroHitRate.st && <>{' · Sharp Take '}<span className=" tabular-nums text-ink-200">{heroHitRate.st.won}-{heroHitRate.st.lost}</span></>}
+                {heroHitRate.overall && <>{' · every pick '}<span className=" tabular-nums text-ink-200">{heroHitRate.overall.won}-{heroHitRate.overall.lost}</span></>}
                 {' · '}
                 <a href="#/ledger" className="text-signal-pos hover:underline">See every pick</a>
               </p>
@@ -2081,7 +2081,7 @@ function EdgeLegendModal({ open, onClose }) {
           </h2>
           <button
             onClick={onClose}
-            className="font-mono text-ink-400 hover:text-ink-100 transition-colors px-2"
+            className="tabular-nums text-ink-400 hover:text-ink-100 transition-colors px-2"
           >
             ✕
           </button>
@@ -2095,7 +2095,7 @@ function EdgeLegendModal({ open, onClose }) {
             <p className="text-ink-200 text-sm leading-relaxed">
               The signed gap between what our model thinks each side wins, and what the book is implying with its odds. Bigger gap = more disagreement with the book = the headline edge on the tile.
             </p>
-            <p className="text-ink-300 text-xs leading-relaxed mt-2 font-mono">
+            <p className="text-ink-300 text-xs leading-relaxed mt-2 tabular-nums">
               Example: <span className="tabular-nums text-signal-pos">+8.2 pts</span> on a Strong Play means we think that side wins 8.2 percentage points more often than the -110 price implies.
             </p>
           </div>
@@ -2104,7 +2104,7 @@ function EdgeLegendModal({ open, onClose }) {
             <div className="text-xs text-signal-pos mb-2">
               Tier ladder
             </div>
-            <div className="font-mono text-xs space-y-1.5 tabular-nums">
+            <div className=" text-xs space-y-1.5 tabular-nums">
               {tiers.map(t => (
                 <div key={t.label} className="grid grid-cols-[68px_1fr_110px] gap-3 items-baseline">
                   <span className={t.cls}>{t.range}</span>
@@ -2144,7 +2144,7 @@ function EdgeLegendModal({ open, onClose }) {
           </div>
 
           <div className="pt-3 border-t border-ink-700">
-            <p className="text-ink-300 text-xs leading-relaxed font-mono">
+            <p className="text-ink-300 text-xs leading-relaxed tabular-nums">
               Math picks the side, and De-Genny, our AI writer, explains it. A <span className="text-signal-neg">Trap</span> is a side the casual bettor wants, priced 2 points or more below fair. We name the bait so you don't take it.
             </p>
           </div>

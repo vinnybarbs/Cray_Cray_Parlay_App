@@ -10,12 +10,12 @@ import { fmtGameDateTime } from '../lib/gameTime'
 
 function StatusChip({ status }) {
   const map = {
-    won:  { label: 'WON',  cls: 'bg-signal-pos-dim/40 text-signal-pos' },
-    lost: { label: 'LOST', cls: 'bg-signal-neg-dim/40 text-signal-neg' },
-    push: { label: 'PUSH', cls: 'bg-ink-850 text-ink-300' },
+    won:  { label: 'Won',  cls: 'bg-signal-pos-dim/40 text-signal-pos' },
+    lost: { label: 'Lost', cls: 'bg-signal-neg-dim/40 text-signal-neg' },
+    push: { label: 'Push', cls: 'bg-ink-850 text-ink-300' },
   }
-  const m = map[status] || { label: 'OPEN', cls: 'bg-ink-850 text-ink-200' }
-  return <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
+  const m = map[status] || { label: 'Open', cls: 'bg-ink-850 text-ink-200' }
+  return <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
 }
 
 const fmtOdds = (n) => (n == null ? null : n > 0 ? `+${n}` : String(n))
@@ -90,11 +90,11 @@ export default function HouseParlays() {
               {data.parlays.map((p) => (
                 <div key={p.id} className="px-4 py-3">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-2">
-                    <span className="font-mono text-xs font-bold text-ink-100">
+                    <span className="tabular-nums text-xs font-bold text-ink-100">
                       {p.legs_count}-leg · {fmtOdds(p.combined_odds)}
                     </span>
                     {p.model_win_prob != null && (
-                      <span className="font-mono text-[10px] text-ink-400">
+                      <span className="tabular-nums text-[10px] text-ink-400">
                         model {Math.round(p.model_win_prob * 100)}% to hit
                       </span>
                     )}
@@ -102,22 +102,22 @@ export default function HouseParlays() {
                   </div>
                   {(p.legs || []).map((leg, i) => (
                     <div key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-1 text-sm">
-                      <span className="px-1.5 py-0.5 rounded-sharp font-mono text-[10px] bg-ink-850 shadow-hairline text-ink-300 flex-shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-sharp tabular-nums text-[10px] bg-ink-850 shadow-hairline text-ink-300 flex-shrink-0">
                         {leg.tier}
                       </span>
                       <span className="text-ink-200 min-w-0">{leg.pick}</span>
-                      <span className="font-mono text-[11px] text-ink-400 flex-shrink-0 ml-auto whitespace-nowrap">
+                      <span className="tabular-nums text-[11px] text-ink-400 flex-shrink-0 ml-auto whitespace-nowrap">
                         {leg.sport}{leg.game_date ? ` · ${fmtGameDateTime(leg.game_date)}` : ''}
                       </span>
                       {/* The ticket settles a leg at a time. */}
-                      <span className={`px-1.5 py-0.5 rounded-sharp font-mono text-[9px] font-bold tracking-wider flex-shrink-0 ${
+                      <span className={`px-1.5 py-0.5 rounded-sharp text-xs font-semibold flex-shrink-0 ${
                         leg.outcome === 'won' ? 'bg-signal-pos-dim/40 text-signal-pos'
                         : leg.outcome === 'lost' ? 'bg-signal-neg-dim/40 text-signal-neg'
                         : leg.outcome === 'push' || leg.outcome === 'void' ? 'bg-ink-850 text-ink-400'
                         : 'bg-ink-850 text-ink-300'
                       }`}>
                         {leg.outcome === 'won' ? 'W' : leg.outcome === 'lost' ? 'L'
-                          : leg.outcome === 'push' ? 'P' : leg.outcome === 'void' ? 'V' : 'OPEN'}
+                          : leg.outcome === 'push' ? 'P' : leg.outcome === 'void' ? 'V' : 'Open'}
                       </span>
                     </div>
                   ))}

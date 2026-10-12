@@ -121,7 +121,7 @@ export default function Props() {
           <details className="bg-ink-900 rounded-2xl border border-ink-700 px-4 py-3 flex flex-col gap-3" aria-label="Shadow record">
             <summary className="flex items-center justify-between cursor-pointer text-sm text-ink-300">
               <span>Shadow record by market, 4 points or more</span>
-              <span className="font-mono tabular-nums text-ink-100">
+              <span className=" tabular-nums text-ink-100">
                 {total.won}-{total.lost} <span className={total.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}>{fmtUnits(total.units)}</span>
               </span>
             </summary>
@@ -130,8 +130,8 @@ export default function Props() {
                 {rec.byMarket.map(m => (
                   <tr key={m.market} className="border-t border-ink-800">
                     <td className="py-1.5 text-ink-300 capitalize">{m.label}</td>
-                    <td className="py-1.5 text-right font-mono tabular-nums text-ink-200">{m.won}-{m.lost}</td>
-                    <td className={`py-1.5 text-right font-mono tabular-nums w-20 ${m.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(m.units)}</td>
+                    <td className="py-1.5 text-right tabular-nums text-ink-200">{m.won}-{m.lost}</td>
+                    <td className={`py-1.5 text-right tabular-nums w-20 ${m.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(m.units)}</td>
                   </tr>
                 ))}
               </tbody>

@@ -10,13 +10,13 @@ import { fmtGameDateTime } from '../lib/gameTime'
 
 function OutcomeChip({ outcome }) {
   const map = {
-    won:  { label: 'WON',  cls: 'bg-signal-pos-dim/40 text-signal-pos' },
-    lost: { label: 'LOST', cls: 'bg-signal-neg-dim/40 text-signal-neg' },
-    push: { label: 'PUSH', cls: 'bg-ink-850 text-ink-300' },
-    void: { label: 'VOID', cls: 'bg-ink-850 text-ink-400' },
+    won:  { label: 'Won',  cls: 'bg-signal-pos-dim/40 text-signal-pos' },
+    lost: { label: 'Lost', cls: 'bg-signal-neg-dim/40 text-signal-neg' },
+    push: { label: 'Push', cls: 'bg-ink-850 text-ink-300' },
+    void: { label: 'Void', cls: 'bg-ink-850 text-ink-400' },
   }
-  const m = map[outcome] || { label: 'OPEN', cls: 'bg-ink-850 text-ink-200' }
-  return <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
+  const m = map[outcome] || { label: 'Open', cls: 'bg-ink-850 text-ink-200' }
+  return <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
 }
 
 export default function YesterdayBoard({ alwaysOpen = false }) {
@@ -93,9 +93,9 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                 Traps called · the advice was not to bet these sides
               </div>
               {data.traps.map((p, i) => {
-                const fade = p.actual_outcome === 'lost' ? { label: 'WARNING HELD', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
-                  : p.actual_outcome === 'won' ? { label: 'BAIT CAME IN', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
-                  : { label: p.actual_outcome === 'push' || p.actual_outcome === 'void' ? 'PUSH' : 'OPEN', cls: 'bg-ink-850 text-ink-300' }
+                const fade = p.actual_outcome === 'lost' ? { label: 'Trap held', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
+                  : p.actual_outcome === 'won' ? { label: 'Bait came in', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
+                  : { label: p.actual_outcome === 'push' || p.actual_outcome === 'void' ? 'Push' : 'Open', cls: 'bg-ink-850 text-ink-300' }
                 return (
                   <div key={`trap-${i}`} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800">
                     <span className="flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-xs font-bold text-signal-neg bg-signal-neg-dim/30">
@@ -104,11 +104,11 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink-100 truncate">
                         {p.pick}
-                        {p.odds && <span className="ml-2 font-mono text-xs text-ink-400">{p.odds}</span>}
+                        {p.odds && <span className="ml-2 tabular-nums text-xs text-ink-400">{p.odds}</span>}
                       </div>
                       <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider flex-shrink-0 ${fade.cls}`}>{fade.label}</span>
+                    <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${fade.cls}`}>{fade.label}</span>
                   </div>
                 )
               })}
@@ -130,13 +130,13 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                     <span className={`flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-xs font-bold ${tier.color} ${tier.bg}`}>
                       {tier.label}
                     </span>
-                    <span className={`flex-shrink-0 w-14 text-right font-mono text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
+                    <span className={`flex-shrink-0 w-14 text-right text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
                       {p.edge_pp != null ? formatPp(p.edge_pp) : '-'}
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink-100 truncate">
                         {p.pick}
-                        {p.odds && <span className="ml-2 font-mono text-xs text-ink-400">{p.odds}</span>}
+                        {p.odds && <span className="ml-2 tabular-nums text-xs text-ink-400">{p.odds}</span>}
                       </div>
                       <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
                     </div>

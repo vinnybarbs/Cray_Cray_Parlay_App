@@ -1,1139 +1,269 @@
 import React, { useEffect, useState } from 'react'
-import { tierRange } from '../lib/tiers'
 
 // API_BASE matches the rest of the app. Railway in prod, env override locally.
 import { API_BASE_URL as API_BASE } from '../config'
-import { fmtGameDateTime } from '../lib/gameTime'
 import InstallButton from '../components/InstallButton'
-import { SkeletonBar } from '../components/Skeleton'
+import PropCard from '../components/PropCard'
+import LiveStrip from '../components/LiveStrip'
+import BrandMark from '../components/BrandMark'
+import { SkeletonCard } from '../components/Skeleton'
 
-// ─── Landing, the public marketing surface ────────────────────────────────────
-// Concept: "Trading terminal as marketing page." Bloomberg-severity layout
-// reframes every section as a terminal artifact. Ticker, scorecard, execution
-// flow, disclosure, term sheet, filings. Sharp-Quant tokens only; no new
-// colors or fonts. Hero copy is the locked villain frame (2026-05-12).
-
-const TERMINAL_CSS = `
-@keyframes ticker-scroll {
-  0% { transform: translate3d(0,0,0); }
-  100% { transform: translate3d(-50%,0,0); }
-}
-@keyframes hairline-draw {
-  0% { transform: scaleX(0); transform-origin: left; }
-  100% { transform: scaleX(1); transform-origin: left; }
-}
-@keyframes signal-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
-.ticker-track { animation: ticker-scroll 80s linear infinite; }
-.signal-dot { animation: signal-pulse 2.4s ease-in-out infinite; }
-.grid-bg {
-  background-image:
-    linear-gradient(to right, rgba(255,255,255,0.025) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255,255,255,0.025) 1px, transparent 1px);
-  background-size: 56px 56px;
-}
-.scanline-bg {
-  background-image: repeating-linear-gradient(
-    to bottom,
-    transparent 0px,
-    transparent 3px,
-    rgba(255,255,255,0.008) 3px,
-    rgba(255,255,255,0.008) 4px
-  );
-}
-`
+// ─── Landing, the public front door ──────────────────────────────────────────
+// Rewritten 2026-10-12 (owner design review, "lead with the play, prove it
+// with the record"). Six sections in the consumer look the app uses:
+// the live strip, one promise, a real prop card, three proofs with one
+// record line, how it works, then price and questions. The trading
+// terminal costume (term sheet, filings, scanlines, bracket buttons) is
+// gone. Record numbers come only from /api/public-stats, which reads
+// mv_public_record, the same rollup as the ledger.
 
 export default function Landing({ onStartTrial, onSignIn }) {
   const [stats, setStats] = useState(null)
-  const [tierStats, setTierStats] = useState(null)
-  const [sportStats, setSportStats] = useState(null)
   const [sharpTake, setSharpTake] = useState(null)
+  const [ticker, setTicker] = useState(null)
+  const [props, setProps] = useState(null)
 
-  // Fetch via /api/public-stats so anon visitors can see the Track Record.
-  // Direct supabase-js read was blocked by RLS on mv_model_accuracy (the
-  // backend uses the service-role key to bypass RLS while keeping the
-  // underlying table locked down). 2026-05-12 fix.
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/public-stats`)
-        if (!res.ok) return
-        const json = await res.json()
-        if (cancelled) return
-        if (json.overall) setStats(json.overall)
-        if (Array.isArray(json.tiers) && json.tiers.length > 0) setTierStats(json.tiers)
-        if (Array.isArray(json.bySport) && json.bySport.length > 0) setSportStats(json.bySport)
-        if (json.sharpTakeAllTime) setSharpTake(json.sharpTakeAllTime)
-      } catch (err) {
-        // Soft-fail: section renders its empty/loading state instead.
-        if (!cancelled) console.warn('public-stats fetch failed', err)
-      }
-    })()
+    const get = (path, set) => fetch(`${API_BASE}${path}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (!cancelled && j) set(j) })
+      .catch(() => { /* each section has its own empty state */ })
+    get('/api/public-stats', j => { if (j.overall) setStats(j.overall); if (j.sharpTakeAllTime) setSharpTake(j.sharpTakeAllTime) })
+    get('/api/public-ticker', setTicker)
+    get('/api/props', setProps)
     return () => { cancelled = true }
   }, [])
 
-  const scrollTo = (id) => () => {
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const scrollTo = (id) => () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  // The strip in plain words: a play with how far it beats the price, or
+  // the side not to bet. Strongest play first, then alternating.
+  const items = (ticker?.items || [])
+  const pos = items.filter(it => it.pp >= 0).sort((a, b) => b.pp - a.pp)
+  const neg = items.filter(it => it.pp < 0).sort((a, b) => a.pp - b.pp)
+  const strip = []
+  for (let i = 0; i < Math.max(pos.length, neg.length); i++) {
+    if (pos[i]) strip.push({ key: `p${i}`, label: `${pos[i].sport} ${pos[i].label}`, price: `+${Number(pos[i].pp).toFixed(1)} pts`, targetId: 'free-look' })
+    if (neg[i]) strip.push({ key: `n${i}`, label: `Don't bet ${neg[i].sport} ${neg[i].label}`, tone: 'neg', targetId: 'free-look' })
   }
 
   return (
-    <div className="min-h-screen bg-ink-950 text-ink-100 font-mono antialiased">
-      <style>{TERMINAL_CSS}</style>
-      <Ticker />
-      <Nav onStartTrial={onStartTrial} onSignIn={onSignIn} scrollTo={scrollTo} />
-      <Hero stats={stats} sharpTake={sharpTake} onStartTrial={onStartTrial} onSignIn={onSignIn} onSeePick={scrollTo('snapshot')} />
-      <EdgeScorecard />
-      <ExecutionFlow />
-      <SnapshotTerminal tierStats={tierStats} />
-      <TrackRecord sportStats={sportStats} tierStats={tierStats} />
-      <Disclosure />
-      <TermSheet onStartTrial={onStartTrial} />
-      <Filings />
+    <div className="min-h-screen bg-ink-950 text-ink-100 antialiased">
+      <Nav onStartTrial={onStartTrial} onSignIn={onSignIn} />
+      <div className="max-w-xl md:max-w-5xl mx-auto px-4">
+        <LiveStrip items={strip} />
+      </div>
+      <Hero onStartTrial={onStartTrial} onSignIn={onSignIn} onSeeFree={scrollTo('free-look')} />
+      <FreeLook props={props} onStartTrial={onStartTrial} />
+      <Proofs stats={stats} sharpTake={sharpTake} />
+      <HowItWorks />
+      <Pricing onStartTrial={onStartTrial} />
+      <Questions />
       <Footer />
     </div>
   )
 }
 
-// ─── Ticker, the top scrolling edge feed ──────────────────────────────────────
-// Real edges from /api/public-ticker (the old hardcoded demo array showed
-// NBA/NFL numbers in July, an instant credibility killer for anyone who knows
-// sports). Off-season leagues scroll as coverage entries instead: covering
-// every league is the differentiator when most edge tools do one or two.
-
-const COVERED_LEAGUES = [
-  { key: 'MLB',    returns: 'Mar' },
-  { key: 'NBA',    returns: 'Oct' },
-  { key: 'NFL',    returns: 'Sept' },
-  { key: 'NHL',    returns: 'Oct' },
-  { key: 'NCAAB',  returns: 'Nov' },
-  { key: 'NCAAF',  returns: 'Aug' },
-  { key: 'MLS',    returns: 'Feb' },
-  { key: 'EPL',    returns: 'Aug' },
-  { key: 'Tennis', returns: 'Jan' },
-  { key: 'UFC',    returns: 'Jan' },
-]
-
-function Ticker() {
-  const [feed, setFeed] = useState(null)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/public-ticker`)
-        if (!res.ok) return
-        const json = await res.json()
-        if (!cancelled) setFeed(json)
-      } catch { /* coverage-only fallback renders */ }
-    })()
-    return () => { cancelled = true }
-  }, [])
-
-  const rawItems = (feed?.items || []).map(it => ({
-    kind: 'edge',
-    ppVal: it.pp,
-    side: it.pp >= 0 ? '▲' : '▼',
-    pp: `${it.pp >= 0 ? '+' : '−'}${Math.abs(it.pp).toFixed(1)}`,
-    label: `${it.sport} · ${it.label}`,
-    tone: it.pp >= 0 ? 'pos' : 'neg',
-  }))
-
-  // Lead with the strongest positive edge and alternate signs from there.
-  // The API returns edges by magnitude, which on a Trap-heavy slate opened
-  // the reel with six consecutive red entries, a wall of losses as the
-  // very first thing a visitor scans (audit 40, medium 9).
-  const pos = rawItems.filter(it => it.ppVal >= 0).sort((a, b) => b.ppVal - a.ppVal)
-  const neg = rawItems.filter(it => it.ppVal < 0).sort((a, b) => a.ppVal - b.ppVal)
-  const liveItems = []
-  for (let i = 0; i < Math.max(pos.length, neg.length); i++) {
-    if (pos[i]) liveItems.push(pos[i])
-    if (neg[i]) liveItems.push(neg[i])
-  }
-
-  const inSeason = new Set(feed?.inSeason || [])
-  const coverageItems = COVERED_LEAGUES
-    .filter(l => !liveItems.some(it => it.label.startsWith(`${l.key} ·`)))
-    .map(l => ({
-      kind: 'coverage',
-      label: inSeason.has(l.key) ? `${l.key} · in season · on the board` : `${l.key} · covered · back ${l.returns}`,
-    }))
-
-  // Live edges first, coverage entries woven after. With no live data at all
-  // the reel is coverage-only, never invented numbers.
-  const items = [...liveItems, ...coverageItems]
-  const row = [...items, ...items] // doubled for seamless loop
-  const headline = liveItems.length > 0 ? 'Live edges · today' : `${COVERED_LEAGUES.length} leagues · one board`
-
+function Nav({ onStartTrial, onSignIn }) {
   return (
-    <div className="bg-ink-950 border-b border-ink-800 overflow-hidden relative">
-      <div className="absolute inset-y-0 left-0 w-32 bg-gradient-to-r from-ink-950 to-transparent z-10 pointer-events-none" />
-      <div className="absolute inset-y-0 right-0 w-32 bg-gradient-to-l from-ink-950 to-transparent z-10 pointer-events-none" />
-      <div className="absolute top-1.5 left-3 flex items-center gap-2 z-20 bg-ink-950 pr-3">
-        <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
-        <span className="text-[9px] uppercase tracking-[0.20em] text-ink-400">{headline}</span>
-      </div>
-      <div className="flex whitespace-nowrap py-1.5 pt-7 ticker-track">
-        {row.map((it, i) => (
-          it.kind === 'edge' ? (
-            <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px] tabular-nums">
-              <span className={it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}>{it.side}</span>
-              <span className={`font-semibold ${it.tone === 'pos' ? 'text-signal-pos' : 'text-signal-neg'}`}>{it.pp}pp</span>
-              <span className="text-ink-300">{it.label}</span>
-              <span className="text-ink-700">│</span>
-            </span>
-          ) : (
-            <span key={i} className="inline-flex items-center gap-2 px-6 text-[11px]">
-              <span className="text-ink-500 uppercase tracking-[0.08em]">{it.label}</span>
-              <span className="text-ink-700">│</span>
-            </span>
-          )
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ─── Nav ───────────────────────────────────────────────────────────────────
-
-function Nav({ onStartTrial, onSignIn, scrollTo }) {
-  return (
-    <header className="sticky top-0 z-30 bg-ink-950/90 backdrop-blur-md border-b border-ink-800">
-      <div className="max-w-6xl mx-auto px-5 py-3 flex items-center justify-between">
-        <button onClick={scrollTo('top')} className="flex items-center gap-2.5 group">
-          <img src="/traphawk-mark.png" alt="" className="h-7 w-7 object-contain" />
-          <span className="text-sm font-bold uppercase tracking-[0.18em] transition-colors">
-            <span className="text-signal-pos">Trap</span><span className="text-ink-100 group-hover:text-signal-pos">Hawk</span>
-          </span>
-          <span className="hidden sm:inline text-[9px] uppercase tracking-[0.24em] text-ink-500">
-            ▌ every pick on the house ledger
-          </span>
-        </button>
-        <nav className="flex items-center gap-1 md:gap-5">
-          <button onClick={scrollTo('flow')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
-            How
-          </button>
-          <button onClick={scrollTo('track')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
-            Track record
-          </button>
-          <button onClick={() => { window.location.hash = '#/ledger' }} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
-            The Ledger
-          </button>
-          <button onClick={scrollTo('terms')} className="hidden md:block text-[10px] uppercase tracking-[0.18em] text-ink-400 hover:text-ink-100 transition-colors">
-            Pricing
-          </button>
-          {/* Sign in is separate from Start trial so returning users don't have to
-              parse a trial CTA when they just want to log in. Both routes hit the
-              same Auth modal which handles signup + signin flows. */}
-          <button
-            onClick={onSignIn}
-            className="text-[10px] font-bold uppercase tracking-[0.18em] text-ink-100 hover:text-signal-pos transition-colors px-2 py-1.5"
-          >
-            Sign in
-          </button>
-          <button
-            onClick={onStartTrial}
-            className="text-[10px] font-bold uppercase tracking-[0.18em] bg-signal-pos text-ink-950 px-3 py-1.5 rounded-sharp hover:bg-signal-pos/90 transition-colors"
-          >
-            [ Start trial ]
-          </button>
-        </nav>
+    <header className="sticky top-0 z-30 bg-ink-950/95 backdrop-blur border-b border-ink-800" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
+      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <BrandMark />
+        <div className="flex items-center gap-2">
+          <a href="#/ledger" className="hidden md:inline px-3 py-2 text-sm text-ink-300 hover:text-white">The record</a>
+          <button onClick={onSignIn} className="px-3 py-2 text-sm text-ink-300 hover:text-white">Sign in</button>
+          <button onClick={onStartTrial} className="px-4 py-2 rounded-full bg-signal-pos text-ink-950 text-sm font-semibold hover:bg-signal-pos/90">Start free</button>
+        </div>
       </div>
     </header>
   )
 }
 
-// ─── Hero ──────────────────────────────────────────────────────────────────
-
-function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
-  // Until the ledger answers, show a grey placeholder, not a red dash
-  // (which read as a bad record) or a hardcoded count (UI plan item 4).
-  const loadingValue = <SkeletonBar className="inline-block align-middle h-6 w-16" />
-  const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : loadingValue
-  const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : loadingValue
-  // The claim almost nobody else can make with receipts: top-tier picks,
-  // all-time record with ROI, straight from the settlement ledger. The API
-  // only sends it once the sample passes 100 decided picks, and it renders
-  // whatever the ledger says, good or bad.
-  const sharpTakeDisplay = sharpTake
-    ? `${sharpTake.hitRate}%${sharpTake.roiPct != null ? ` · ${sharpTake.roiPct >= 0 ? '+' : ''}${sharpTake.roiPct}% ROI` : ''}`
-    : null
-
+function Hero({ onStartTrial, onSignIn, onSeeFree }) {
   return (
-    <section id="top" className="relative grid-bg border-b border-ink-800 overflow-hidden">
-      <div className="scanline-bg absolute inset-0 pointer-events-none" />
-      <div className="relative max-w-6xl mx-auto px-5 pt-16 pb-20 md:pt-24 md:pb-28 grid md:grid-cols-12 gap-10 md:gap-12 items-center">
+    <section className="max-w-5xl mx-auto px-4 pt-12 pb-14 md:pt-20 md:pb-20">
+      <p className="text-sm font-semibold text-signal-pos">NFL player props, priced by math</p>
+      <h1 className="mt-3 text-[2.5rem] md:text-6xl font-bold leading-[1.02] tracking-tight max-w-3xl">
+        Find the props worth betting. <span className="text-ink-400">And the ones that aren't.</span>
+      </h1>
+      <p className="mt-5 text-lg text-ink-300 max-w-xl leading-relaxed">
+        Every day we price every game and player prop against the books, show you the ones that beat the price, and name the popular sides that don't.
+      </p>
+      <div className="mt-8 flex flex-col sm:flex-row gap-3 max-w-md sm:max-w-none">
+        <button onClick={onStartTrial} className="px-6 py-4 rounded-xl bg-signal-pos text-ink-950 font-semibold hover:bg-signal-pos/90 active:scale-[0.98] transition">
+          Start your free week
+        </button>
+        <button onClick={onSeeFree} className="px-6 py-4 rounded-xl border border-ink-700 text-ink-100 font-semibold hover:bg-ink-900 transition">
+          See today's free look
+        </button>
+      </div>
+      <p className="mt-3 text-sm text-ink-400">7 days free, no card required.</p>
+      <div className="mt-5 max-w-md"><InstallButton variant="block" /></div>
+      <p className="mt-5 text-sm text-ink-400">
+        Already a member? <button onClick={onSignIn} className="text-signal-pos font-semibold hover:underline">Sign in</button>
+      </p>
+    </section>
+  )
+}
 
-        {/* LEFT: copy stack */}
-        <div className="md:col-span-7">
-          <SectionLabel>Today's edge</SectionLabel>
-
-          <h1 className="font-sans font-bold text-[2.5rem] md:text-[4.25rem] leading-[0.95] tracking-[-0.025em] text-ink-100 mt-5">
-            Your book won't tell you<br />
-            which side is <span className="italic text-ink-300">the trap.</span>
-            <span className="block mt-2 text-signal-pos">
-              <span className="text-ink-700">▌</span> We will.
-            </span>
-          </h1>
-
-          <p className="mt-8 text-ink-300 text-base leading-relaxed max-w-xl">
-            <span className="text-ink-100 font-medium">Math-graded picks</span> for every game.
-            Per-side edges in plus/minus points. <span className="text-signal-pos">Including the negative ones.</span>
+// A real card from today's board, the same component the app shows.
+function FreeLook({ props, onStartTrial }) {
+  const top = props?.upcoming?.[0]
+  return (
+    <section id="free-look" className="border-t border-ink-800 bg-ink-900/40">
+      <div className="max-w-5xl mx-auto px-4 py-14 md:py-20 grid md:grid-cols-2 gap-8 md:gap-12 items-start">
+        <div>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Today's free look</h2>
+          <p className="mt-3 text-ink-300 leading-relaxed">
+            This is the strongest prop on our board right now, exactly as members see it. Our number against the book's, the player's last ten games against the line, and the why behind it.
           </p>
-
-          <div className="mt-10 flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={onStartTrial}
-              className="group inline-flex items-center justify-center gap-3 bg-signal-pos text-ink-950 text-xs font-bold uppercase tracking-[0.18em] px-6 py-4 rounded-sharp hover:bg-signal-pos/90 transition-colors"
-            >
-              <span>[ Start free trial</span>
-              <span className="transition-transform group-hover:translate-x-0.5">→</span>
-              <span>]</span>
-            </button>
-            <button
-              onClick={onSeePick}
-              className="inline-flex items-center justify-center gap-2 text-ink-100 text-xs font-bold uppercase tracking-[0.18em] px-6 py-4 rounded-sharp shadow-hairline hover:shadow-hairline-bright transition-shadow"
-            >
-              See today's free pick →
-            </button>
-          </div>
-
-          {/* The single strongest friction-killer, directly under the CTA,
-              previously buried in the pricing section (audit 40, medium 10). */}
-          <p className="mt-3 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
-            7 days free · <span className="text-signal-pos">no card required</span>
+          <p className="mt-3 text-sm text-ink-400">
+            Props are in shadow while we build their record in public, so this one is tracked, not counted.
           </p>
-
-          {/* Installable since PR 214, invisible until now. Hides itself
-              when already running from the home screen. */}
-          <div className="mt-5">
-            <InstallButton variant="block" />
-          </div>
-
-          {/* Sign in affordance for returning users. Small but findable */}
-          <p className="mt-5 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
-            Already have an account?{' '}
-            <button
-              onClick={onSignIn}
-              className="text-signal-pos hover:underline transition-colors"
-            >
-              Sign in →
-            </button>
-          </p>
+          <button onClick={onStartTrial} className="mt-6 text-signal-pos font-semibold hover:underline">See every prop today</button>
         </div>
-
-        {/* RIGHT: stat-strip panel that looks like a terminal readout */}
-        <div className="md:col-span-5">
-          <div className="bg-ink-900 shadow-hairline rounded-sharp">
-            <div className="flex items-center justify-between px-4 py-2 border-b border-ink-800">
-              <span className="text-[9px] uppercase tracking-[0.20em] text-ink-400">
-                Status · last 30 days
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
-                <span className="text-[9px] uppercase tracking-[0.18em] text-signal-pos">LIVE</span>
-              </span>
+        <div className="max-w-xl">
+          {top ? <PropCard p={top} /> : props ? (
+            <div className="bg-ink-900 rounded-2xl border border-ink-700 p-5 text-sm text-ink-300">
+              No prop clears our bar right now. Reads refresh twice a day, and the board fills up before each slate.
             </div>
-            {/* Every row states its own window and population. This panel
-                mixes a 30-day all-tier rate with an all-time Sharp Take
-                rate, and unlabeled they read as one contradictory number
-                (57.5 vs 64.2). All rows come from the same rollup,
-                mv_public_record, just different buckets. */}
-            <dl className="divide-y divide-ink-800">
-              <StatRow label="Hit rate · all tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate == null ? 'neutral' : stats.hitRate >= 55 ? 'pos' : stats.hitRate >= 50 ? 'neutral' : 'neg'} big />
-              {sharpTakeDisplay && (
-                <StatRow
-                  label={`Sharp Take only · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
-                  value={sharpTakeDisplay}
-                  tone={sharpTake.hitRate >= 55 ? 'pos' : sharpTake.hitRate >= 50 ? 'neutral' : 'neg'}
-                />
-              )}
-              <StatRow label="Picks graded · last 30d" value={weeklyCount} tone="neutral" />
-              <StatRow label="Markets covered" value="ML · Spread · Total" tone="neutral" small />
-              <StatRow label="Affiliate parent" value="None" tone="pos" small />
-            </dl>
-          </div>
-          <div className="mt-3 flex justify-between text-[9px] uppercase tracking-[0.20em] text-ink-500 px-1">
-            <span>source: mv_public_record, same rollup as the ledger</span>
-            <span>refresh: hourly after settlements</span>
-          </div>
+          ) : <SkeletonCard />}
         </div>
       </div>
     </section>
   )
 }
 
-function StatRow({ label, value, tone = 'neutral', big = false, small = false }) {
-  const valueColor = tone === 'pos' ? 'text-signal-pos' : tone === 'neg' ? 'text-signal-neg' : 'text-ink-100'
-  const valueSize = big ? 'text-3xl md:text-4xl' : small ? 'text-sm' : 'text-xl'
-  // The LABEL wraps and the VALUE holds one line, not the reverse: with
-  // flex-shrink-0 on the label, "Sharp Take only · all-time (647 graded)"
-  // refused to shrink on phones and pushed "63.5% · +16.2% ROI" off the
-  // right edge as a four-line tower (2026-08-22 owner screenshot).
-  return (
-    <div className="flex items-center justify-between px-4 py-3 gap-3">
-      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400 min-w-0">{label}</dt>
-      <dd className={`font-bold tabular-nums ${valueColor} ${valueSize} tracking-tight text-right flex-shrink-0 whitespace-nowrap`}>{value}</dd>
-    </div>
-  )
-}
-
-// ─── EdgeScorecard, the receipts question asked of everyone ─────────────
-
-// One factual, checkable comparison instead of grades. The old version
-// assigned our tier vocabulary to competitors, which without numbers behind
-// it read as name-calling. This version asks the only question that sorts
-// the category, "show me every pick you published, graded, losses
-// included", and answers it with verifiable facts. Ours links to the proof.
-function EdgeScorecard() {
-  const rows = [
-    {
-      name: 'Action Network',
-      reason: 'Owned by a publicly-traded sportsbook affiliate (Better Collective). Structurally cannot warn you off a book without dismantling its parent\'s revenue model.',
-      price: '$24.99/mo',
-      record: 'None found',
-      recordSub: 'no graded house record published',
-    },
-    {
-      name: 'OddsJam',
-      reason: 'Owned by Gambling.com Group, another affiliate business. Flagship math tools now sit in the ~$498 tier, which locks out the recreational bettor entirely.',
-      price: '$99-498/mo',
-      record: 'None found',
-      recordSub: 'free daily picks, no graded record',
-    },
-    {
-      name: 'Pikkit',
-      reason: 'Grades you after the bet (CLV). Different shelf. They measure your history, we publish the decision. Complementary, not competitive.',
-      price: 'Free',
-      record: 'Yours, not theirs',
-      recordSub: 'tracks your bets, publishes no picks',
-    },
-    {
-      name: 'TrapHawk',
-      reason: 'No affiliate parent. Per-side edges including negative ones, every pick timestamped before the game and settled after, with losses, ROI, and units included.',
-      price: '$19.99/mo',
-      record: 'The House Ledger',
-      recordSub: 'every pick · graded · public',
-      link: true,
-    },
+// Three reasons to trust it, then one record line. The full record lives
+// on the ledger, one tap away.
+function Proofs({ stats, sharpTake }) {
+  const proofs = [
+    ['Every pick is public', 'Published before the game, graded after, losers included. Nothing gets deleted.'],
+    ['We name the traps', 'The popular side priced worse than fair gets a "Don\'t bet this" label. Nobody else shows you that.'],
+    ['No sportsbook owns us', 'No affiliate links, no revenue share, ever. We have no reason to push you toward a bet.'],
   ]
   return (
-    <section className="border-b border-ink-800">
-      <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>Receipts · us against the field</SectionLabel>
-        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          One question sorts this category: <span className="text-signal-pos">where's the graded record?</span>
-        </h2>
-        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          Every pick, published before the game, settled after, losers included. Ask everyone the same question. Here's how it answers as of July 2026.
-        </p>
-
-        <div className="mt-12">
-          {/* Header row */}
-          <div className="hidden md:grid grid-cols-[1fr_130px_210px] gap-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 pb-2 border-b border-ink-800">
-            <span>Vendor</span>
-            <span className="text-right">Price</span>
-            <span className="text-right">Graded public record</span>
-          </div>
-
-          {rows.map((r, i) => {
-            const isUs = r.name === 'TrapHawk'
-            return (
-              <div
-                key={i}
-                className={`relative py-6 md:py-7 pl-5 md:pl-6 border-b border-ink-800 ${isUs ? 'bg-signal-pos-dim/10' : ''}`}
-              >
-                {isUs && (
-                  <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-signal-pos" aria-hidden="true" />
-                )}
-                <div className="grid md:grid-cols-[1fr_130px_210px] gap-2 md:gap-4 items-baseline">
-                  <div className="min-w-0">
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="text-lg md:text-xl font-bold tracking-tight text-ink-100">
-                        {r.name}
-                      </span>
-                      {isUs && (
-                        <span className="text-[9px] uppercase tracking-[0.20em] text-signal-pos">
-                          ★ us
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-2 text-sm text-ink-300 leading-relaxed max-w-xl">{r.reason}</p>
-                  </div>
-                  <div className="md:text-right font-mono text-sm text-ink-200 tabular-nums">
-                    {r.price}
-                  </div>
-                  <div className="md:text-right">
-                    {r.link ? (
-                      <button
-                        onClick={() => { window.location.hash = '#/ledger' }}
-                        className="text-sm font-bold uppercase tracking-[0.14em] text-signal-pos hover:underline"
-                      >
-                        {r.record} →
-                      </button>
-                    ) : (
-                      <span className="text-sm font-bold uppercase tracking-[0.14em] text-ink-400">
-                        {r.record}
-                      </span>
-                    )}
-                    <span className="block text-[10px] text-ink-500 mt-0.5 normal-case tracking-normal">
-                      {r.recordSub}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500">
-          // Facts checkable as of July 2026: ownership from public filings, pricing from live subscribe pages. Corrections welcome. That's the point.
-        </p>
-      </div>
-    </section>
-  )
-}
-
-// ─── ExecutionFlow, How it works reframed as a trade flow ────────────────
-
-function ExecutionFlow() {
-  const steps = [
-    {
-      n: '01',
-      title: 'Math grades every game',
-      body: 'Per-side edge calculator runs against ML, spread, and total. Computes model probability, compares to the book\'s implied. Gap = signed pp.',
-      meta: [
-        ['// source', 'live market + league data from industry leaders'],
-        ['// math',   'deterministic · same formula every game'],
-        ['// output', 'signed_pp · tier'],
-      ],
-    },
-    {
-      n: '02',
-      title: 'De-Genny narrates',
-      body: 'Once math has picked the side, the LLM writes the rationale in plain English. The AI explains. It does not pick.',
-      meta: [
-        ['// engine',  'top-tier frontier models'],
-        ['// role',    'narration only'],
-        ['// guard',   'no hallucinated stats'],
-      ],
-    },
-    {
-      n: '03',
-      title: 'The machine builds the parlays',
-      body: 'Cross-game combos assembled from the highest-edge legs, published before the games and settled publicly after, win or lose. We never hold money or see your account.',
-      meta: [
-        ['// builds',  '2-leg + 3-leg daily · 4pp floor'],
-        ['// receipt', 'settled on The House Ledger'],
-        ['// holds',   'we hold nothing'],
-      ],
-    },
-  ]
-  return (
-    <section id="flow" className="border-b border-ink-800 bg-ink-950">
-      <div className="max-w-6xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>How it works</SectionLabel>
-        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          Three steps. <span className="text-ink-400">No vibes.</span>
-        </h2>
-
-        <div className="mt-14 grid md:grid-cols-3 gap-6 md:gap-4 relative">
-          {/* connector line on desktop */}
-          <div className="hidden md:block absolute top-[28px] left-[8.33%] right-[8.33%] h-px bg-ink-800" aria-hidden="true" />
-          {steps.map((s, i) => (
-            <div key={s.n} className="relative">
-              <div className="flex items-center gap-3 mb-5">
-                <span className="relative z-10 bg-ink-950 pr-3 text-3xl md:text-4xl font-bold tabular-nums text-signal-pos tracking-tight">
-                  {s.n}
-                </span>
-                <span className="text-[10px] uppercase tracking-[0.18em] text-ink-500">step</span>
-              </div>
-              <h3 className="font-sans font-semibold text-xl text-ink-100 mb-3 tracking-tight">
-                {s.title}
-              </h3>
-              <p className="text-sm text-ink-300 leading-relaxed mb-5">
-                {s.body}
-              </p>
-              <dl className="space-y-1.5 text-[10px] uppercase tracking-[0.14em]">
-                {s.meta.map(([k, v]) => (
-                  <div key={k} className="flex gap-3 items-baseline">
-                    <dt className="text-ink-500 flex-shrink-0">{k}</dt>
-                    <dd className="text-ink-200 normal-case tracking-normal text-[11px]">{v}</dd>
-                  </div>
-                ))}
-              </dl>
+    <section className="border-t border-ink-800">
+      <div className="max-w-5xl mx-auto px-4 py-14 md:py-20">
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight max-w-2xl">Why you can trust the number</h2>
+        <div className="mt-8 grid md:grid-cols-3 gap-4">
+          {proofs.map(([t, d]) => (
+            <div key={t} className="bg-ink-900 rounded-2xl border border-ink-700 p-5">
+              <h3 className="font-semibold text-ink-100">{t}</h3>
+              <p className="mt-2 text-sm text-ink-300 leading-relaxed">{d}</p>
             </div>
           ))}
         </div>
+        <RecordLine stats={stats} sharpTake={sharpTake} />
       </div>
     </section>
   )
 }
 
-// ─── SnapshotTerminal, the real free Pick of the Day ──────────────────────
-// Served by /api/public-pod (highest edge_pp >= 4pp on the upcoming board,
-// longshot MLs fenced at +300). The old version rendered a hardcoded NBA
-// example under a "SEE TODAY'S FREE PICK" CTA, a promise the tile broke.
-// One real pick is the free tease; the full board stays behind the trial.
-
-const TIER_SUBTITLES = {
-  'Trap': "don't bet it", 'Skip': 'pass on it', 'Lean': 'lean it',
-  'Play': 'play it', 'Strong Play': 'hammer it', 'Sharp Take': 'sharp take',
-}
-
-function SnapshotTerminal({ tierStats }) {
-  const [pod, setPod] = useState(null)
-  const [showWork, setShowWork] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    ;(async () => {
-      try {
-        const res = await fetch(`${API_BASE}/api/public-pod`)
-        if (!res.ok) return
-        const json = await res.json()
-        if (!cancelled) setPod(json)
-      } catch { /* loading state stays up */ }
-    })()
-    return () => { cancelled = true }
-  }, [])
-
-  const pick = pod?.pick || null
-  const quiet = pod?.quiet === true
-  const work = pod?.work || null
-
-  const sharpTake = tierStats?.find(t => t.tier === 'Sharp Take')
-  const decided = sharpTake ? sharpTake.wins + sharpTake.losses : 0
-  const tr = decided >= 10 ? sharpTake : null
-
-  const gameTime = pick?.gameDate ? fmtGameDateTime(pick.gameDate) : null
-  const pp = pick?.edgePp != null ? Number(pick.edgePp) : null
-  const ppText = pp != null ? `${pp >= 0 ? '+' : '−'}${Math.abs(pp).toFixed(1)}` : null
-
+function RecordLine({ stats, sharpTake }) {
+  const st = sharpTake && (sharpTake.wins + sharpTake.losses) > 0 ? sharpTake : null
+  if (!st && stats?.hitRate == null) return null
   return (
-    <section id="snapshot" className="border-b border-ink-800 bg-ink-950">
-      <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>Edge snapshot · today</SectionLabel>
-        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          Today's free pick,<br />
-          straight off the <span className="text-signal-pos">live board.</span>
-        </h2>
-        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          {quiet && pick
-            ? 'No Sharp Take on the board today. Here is the next-highest edge graded in full, the same math and research every pick gets. When a real one fires, it lands right here.'
-            : quiet
-            ? 'Fresh picks grade with the morning board.'
-            : 'Same tile, same math as every pick in the paid digest. Refreshes with the morning board.'}
-        </p>
-
-        <div className="mt-12 bg-ink-900 shadow-hairline-pos rounded-sharp">
-          {/* terminal title bar */}
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-signal-pos-dim/40 bg-ink-950">
-            <div className="flex items-center gap-2.5">
-              <span className="signal-dot inline-block w-1.5 h-1.5 rounded-full bg-signal-pos" />
-              <span className="text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
-                {pod?.podType === 'example' ? '★ example grade · no sharp take today' : '★ free pick of the day'}
-              </span>
-            </div>
-            <span className="text-[10px] uppercase tracking-[0.14em] text-ink-400 tabular-nums">
-              {pick ? `${pick.sport} · ${gameTime}` : quiet ? 'no qualifying edge today' : 'loading board…'}
-            </span>
-          </div>
-
-          {pick ? (
-            <>
-              <div className="grid md:grid-cols-[1fr_auto] gap-5 px-5 md:px-7 py-6">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 tabular-nums">
-                    {pick.awayTeam} @ {pick.homeTeam} · {pick.betType}
-                  </div>
-                  <h3 className="font-sans font-bold text-3xl md:text-4xl text-signal-pos tabular-nums tracking-tight mt-2">
-                    {pick.pick}
-                  </h3>
-                </div>
-                <div className="flex flex-col items-start md:items-end bg-signal-pos-dim/20 rounded-sharp px-4 py-3">
-                  <div className="text-3xl md:text-4xl font-bold tabular-nums text-signal-pos tracking-tight">
-                    ▲ {ppText}<span className="text-sm ml-0.5">pp</span>
-                  </div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-signal-pos mt-1">
-                    {pick.tier}
-                  </div>
-                  <div className="text-[10px] italic lowercase text-ink-400 mt-0.5">
-                    {TIER_SUBTITLES[pick.tier] || ''}
-                  </div>
-                </div>
-              </div>
-
-              {/* why this pick, in tabular form */}
-              <div className="border-t border-ink-800">
-                <div className="px-5 md:px-7 py-2 bg-ink-950 border-b border-ink-800">
-                  <span className="text-[9px] uppercase tracking-[0.20em] text-signal-pos">
-                    ▌ why this pick
-                  </span>
-                </div>
-                <dl className="divide-y divide-ink-800">
-                  {pick.modelProb != null && (
-                    <FactRow label="Model win prob" value={`${(pick.modelProb * 100).toFixed(1)}%`} tone="pos" />
-                  )}
-                  {pick.impliedProb != null && (
-                    <FactRow label="Book implied" value={`${(pick.impliedProb * 100).toFixed(1)}%`} tone="neutral" />
-                  )}
-                  <FactRow label="Gap" value={`${ppText}pp`} tone="pos" />
-                  <FactRow label="Full rationale" value="In the digest · free trial" tone="neutral" />
-                </dl>
-              </div>
-
-              {/* show the work. Inputs + fired signals; weights stay ours */}
-              {work && (
-                <div className="border-t border-ink-800">
-                  <button
-                    onClick={() => setShowWork(v => !v)}
-                    className="w-full flex items-center justify-between px-5 md:px-7 py-3 text-left hover:bg-ink-950 transition-colors"
-                  >
-                    <span className="text-[10px] uppercase tracking-[0.20em] text-ink-300 font-semibold">
-                      {showWork ? '▾' : '▸'} Show the work
-                    </span>
-                    <span className="text-[9px] uppercase tracking-[0.14em] text-ink-500">
-                      the data behind this grade
-                    </span>
-                  </button>
-
-                  {showWork && (
-                    <div className="px-5 md:px-7 pb-5">
-                      <div className="grid grid-cols-3 gap-x-3 text-[11px] tabular-nums">
-                        <span className="text-[9px] uppercase tracking-[0.18em] text-ink-500 py-1.5" />
-                        <span className="text-[9px] uppercase tracking-[0.18em] text-ink-400 py-1.5 text-right truncate">{pick.awayTeam}</span>
-                        <span className="text-[9px] uppercase tracking-[0.18em] text-ink-400 py-1.5 text-right truncate">{pick.homeTeam}</span>
-                        {[
-                          ['Season record', work.away.seasonRecord, work.home.seasonRecord],
-                          ['Last 20 · model window', work.away.windowRecord, work.home.windowRecord],
-                          ['Point diff / game · last 20', work.away.pointDiffPerGame, work.home.pointDiffPerGame],
-                          ['Last 10', work.away.last10, work.home.last10],
-                          ['Streak', work.away.streak, work.home.streak],
-                        ].filter(r => r[1] != null || r[2] != null).map(([label, a, h]) => (
-                          <React.Fragment key={label}>
-                            <span className="text-ink-400 py-1.5 border-t border-ink-800">{label}</span>
-                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{a ?? '-'}</span>
-                            <span className="text-ink-100 py-1.5 border-t border-ink-800 text-right">{h ?? '-'}</span>
-                          </React.Fragment>
-                        ))}
-                      </div>
-
-                      {work.signals?.length > 0 && (
-                        <div className="mt-4">
-                          <p className="text-[9px] uppercase tracking-[0.20em] text-ink-500 mb-2">
-                            Signals that fired
-                          </p>
-                          <ul className="space-y-1.5">
-                            {work.signals.map((s, i) => (
-                              <li key={i} className="flex items-baseline justify-between gap-3 text-[11px]">
-                                <span className="text-ink-200">{s.factor}</span>
-                                <span className="text-signal-pos flex-shrink-0">▲ {s.favors.split(' ').pop()}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      <p className="mt-4 text-[9px] uppercase tracking-[0.16em] text-ink-500">
-                        // These are the inputs and which signals fired. The weights and the blend are the product.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="px-5 md:px-7 py-10 text-center">
-              <p className="text-ink-300 text-sm">
-                {quiet
-                  ? 'Fresh picks grade with the morning board.'
-                  : 'Pulling today\'s board…'}
-              </p>
-            </div>
-          )}
-
-          {/* track record strip */}
-          {tr && (
-            <div className="border-t border-ink-800 px-5 md:px-7 py-3 flex items-center justify-between bg-ink-950 gap-3">
-              <span className="text-[10px] uppercase tracking-[0.18em] text-ink-400">
-                Sharp Take · last 30d
-              </span>
-              <span className="tabular-nums text-sm flex-shrink-0">
-                <span className="text-signal-pos font-bold">{tr.wins}W</span>
-                <span className="text-ink-700 mx-1.5">·</span>
-                <span className="text-ink-400">{tr.losses}L</span>
-                <span className="text-ink-700 mx-1.5">·</span>
-                <span className={parseFloat(tr.hitRate) >= 55 ? 'text-signal-pos font-bold' : 'text-ink-200'}>
-                  {tr.hitRate}%
-                </span>
-              </span>
-            </div>
-          )}
-        </div>
-
-        <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 text-center">
-          // The full board renders a tile like this for every game with live markets, in every in-season league.
-        </p>
-      </div>
-    </section>
+    <p className="mt-6 text-sm text-ink-400">
+      {st ? (
+        <>Sharp Takes since May 10: <span className="font-semibold tabular-nums text-ink-100">{st.wins}-{st.losses}</span>
+          {st.roiPct != null && <>, <span className={`font-semibold tabular-nums ${st.roiPct >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{st.roiPct >= 0 ? '+' : ''}{st.roiPct}% return</span></>}</>
+      ) : (
+        <>Every pick, last 30 days: <span className="font-semibold tabular-nums text-ink-100">{stats.hitRate}%</span> hit rate</>
+      )}
+      {' · '}
+      <a href="#/ledger" className="text-signal-pos font-semibold hover:underline">See every pick</a>
+    </p>
   )
 }
 
-function FactRow({ label, value, tone }) {
-  const valColor = tone === 'pos' ? 'text-signal-pos' : tone === 'neg' ? 'text-signal-neg' : 'text-ink-100'
-  return (
-    <div className="px-5 md:px-7 py-2.5 grid grid-cols-[1fr_auto] gap-3 items-baseline">
-      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400">{label}</dt>
-      <dd className={`text-sm tabular-nums font-medium ${valColor}`}>{value}</dd>
-    </div>
-  )
-}
-
-// ─── TrackRecord, proof with CSS-only sparkline bars ─────────────────────
-// Renders the most-populated dimension from mv_model_accuracy. The MV has
-// `sport` rows (NBA/NFL/MLB/etc.) but no `tier` rows yet, so sport is the
-// public-facing breakdown. Tier-level lands when the MV materializes it.
-
-function TrackRecord({ sportStats, tierStats }) {
-  // Minimum-sample floor: a 100% hit rate on 3 picks reads as noise, not
-  // receipts. Rows under the floor are held back, and we say so.
-  const MIN_SETTLED = 25
-  const aboveFloor = (rows) => (rows || []).filter(r => (r.wins + r.losses) >= MIN_SETTLED)
-  const heldBack = (rows) => (rows || []).length - aboveFloor(rows).length
-
-  // Prefer tier breakdown when populated; fall back to sport.
-  const order = ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Skip', 'Trap']
-  const sortedTiers = aboveFloor(tierStats).sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))
-  const sortedSports = aboveFloor(sportStats).sort((a, b) => parseFloat(b.hitRate || 0) - parseFloat(a.hitRate || 0))
-  const useTiers = sortedTiers.length > 0
-  const rows = useTiers ? sortedTiers : sortedSports
-  const heldBackCount = useTiers ? heldBack(tierStats) : heldBack(sportStats)
-  const dimensionLabel = useTiers ? 'Tier' : 'Sport'
-  const dimensionKey = useTiers ? 'tier' : 'sport'
-  const headlineKicker = useTiers ? 'Per tier.' : 'Per sport.'
-
-  return (
-    <section id="track" className="border-b border-ink-800 bg-ink-950">
-      <div className="max-w-5xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>Hit rate · last 30 days · from the settlement ledger</SectionLabel>
-        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05] max-w-3xl">
-          The receipts. <span className="text-ink-400">{headlineKicker} Updated after every settlement.</span>
-        </h2>
-        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          Most picks apps cherry-pick wins. We publish every {dimensionLabel.toLowerCase()}, including the losers. If a {dimensionLabel.toLowerCase()} dips below 50%, you see it.
-        </p>
-
-        {rows.length > 0 ? (
-          <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp">
-            <div className="px-5 pt-2.5 bg-ink-950 text-[10px] uppercase tracking-[0.18em] text-signal-pos">
-              Last 30 days only
-            </div>
-            {/* minmax(0,1fr) on the label column: a bare 1fr floors at
-                min-content, and on phones that pushed the table 16px past
-                the viewport (2026-08-22 mobile audit). Fixed columns also
-                shrink below sm so the label keeps a readable share. */}
-            <div className="grid grid-cols-[minmax(0,1fr)_52px_56px_52px] sm:grid-cols-[minmax(0,1fr)_80px_100px_80px] gap-2 sm:gap-3 px-4 sm:px-5 py-2.5 bg-ink-950 border-b border-ink-800 text-[10px] uppercase tracking-[0.18em] text-ink-400">
-              <span>{dimensionLabel}</span>
-              <span className="text-right">Settled<span className="hidden sm:inline"> · 30d</span></span>
-              <span>Hit<span className="hidden sm:inline"> rate</span></span>
-              <span className="text-right">%</span>
-            </div>
-            {rows.map((row, i) => {
-              const settled = row.wins + row.losses
-              const rate = parseFloat(row.hitRate)
-              const label = row[dimensionKey]
-              // A trap says do not bet the bait, so its stat is what betting
-              // the bait cost (owner 2026-10-12), not a hit rate. The bait is
-              // mostly chalk and wins more often than not while still losing
-              // money at the price, so a rate read either way misleads.
-              const isTrap = label === 'Trap'
-              const baitUnits = isTrap && row.baitUnits != null ? Number(row.baitUnits) : null
-              const isPos = isTrap ? baitUnits != null && baitUnits < 0 : rate >= 55
-              const isNeg = isTrap ? baitUnits != null && baitUnits > 0 : rate < 50
-              const color = isPos ? 'text-signal-pos' : isNeg ? 'text-signal-neg' : 'text-ink-100'
-              const barColor = isPos ? 'bg-signal-pos' : isNeg ? 'bg-signal-neg' : 'bg-ink-400'
-              return (
-                <div key={label} className={`grid grid-cols-[minmax(0,1fr)_52px_56px_52px] sm:grid-cols-[minmax(0,1fr)_80px_100px_80px] gap-2 sm:gap-3 px-4 sm:px-5 py-4 items-center ${i > 0 ? 'border-t border-ink-800' : ''}`}>
-                  <span className="text-ink-100 font-medium min-w-0">
-                    {label}
-                    {useTiers && tierRange(label) && (
-                      <span className="ml-2 font-mono text-[10px] text-ink-500 tabular-nums whitespace-nowrap">
-                        {tierRange(label) === '-2pp or worse' ? 'edge -2pp or worse' : `edge ${tierRange(label)}`}
-                      </span>
-                    )}
-                    {/* Hidden on phones: as a nowrap chip it overflowed the
-                        shrunken label cell into the settled column, and the
-                        full-width explainer row below already says the
-                        window. From sm: up there is room for the chip. */}
-                    {row.window === 'all-time' && (
-                      <span className="ml-2 font-mono text-[10px] uppercase text-signal-pos whitespace-nowrap hidden sm:inline">all-time</span>
-                    )}
-                  </span>
-                  <span className="text-right text-ink-400 tabular-nums text-sm">{settled.toLocaleString()}</span>
-                  {/* sparkline-bar */}
-                  <div className={`relative h-1.5 bg-ink-800 rounded-sharp overflow-hidden ${isTrap ? 'invisible' : ''}`}>
-                    <div className="absolute inset-y-0 left-1/2 w-px bg-ink-700" />
-                    <div
-                      className={`absolute top-0 bottom-0 ${barColor}`}
-                      style={{
-                        width: `${Math.min(100, Math.abs(rate))}%`,
-                        left: 0,
-                      }}
-                    />
-                  </div>
-                  <span className={`text-right text-base tabular-nums font-bold ${color}`}>
-                    {isTrap ? (baitUnits != null ? `${baitUnits > 0 ? '+' : ''}${baitUnits.toFixed(1)}u` : '-') : `${row.hitRate}%`}
-                  </span>
-                  {/* Full-width explainer row: inside the label cell this
-                      wrapped into a one-word-per-line tower on phones. */}
-                  {isTrap && (
-                    <span className="col-span-full text-[10px] font-normal text-ink-400 -mt-2">
-                      what betting the sides we told you not to bet would have cost at 1u stakes, full history since May 10. The bait went {row.baitWins}-{row.baitLosses} and still lost money, because the price is the trap
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp px-5 py-8 text-center">
-            <p className="text-ink-300 text-sm">Loading hit-rate data…</p>
-            <p className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mt-2">
-              // Refreshes after every settlement run
-            </p>
-          </div>
-        )}
-
-        {rows.length > 0 && heldBackCount > 0 && (
-          <p className="mt-4 text-[10px] uppercase tracking-[0.18em] text-ink-500 text-center">
-            // {heldBackCount} {dimensionLabel.toLowerCase()}{heldBackCount === 1 ? '' : 's'} under {25} settled picks held back until the sample is real.
-          </p>
-        )}
-
-        {rows.length > 0 && (
-          <p className="mt-4 text-xs text-ink-400 max-w-2xl leading-relaxed">
-            This table is a rolling 30-day window, except the Trap row, which
-            is the full record and labeled all-time. The House Ledger keeps
-            the complete history since May 10, 2026, so its totals run higher
-            than these. Same rollup, different windows.
-          </p>
-        )}
-
-        {useTiers && rows.length > 0 && (
-          <p className="mt-6 text-xs text-ink-400 max-w-2xl leading-relaxed">
-            How to read this: tiers are ranked by edge size, so the middle
-            tiers carry small edges by definition and hover near break-even, and
-            that's the honest shape of the market, not a bug. The money tier
-            is <span className="text-signal-pos">Sharp Take</span>, and Trap
-            is scored as the record of fading the picks it flagged, so a high
-            number means the warnings were right.
-          </p>
-        )}
-
-        <div className="mt-8">
-          <button
-            onClick={() => { window.location.hash = '#/ledger' }}
-            className="inline-flex items-center gap-2 text-signal-pos text-xs font-bold uppercase tracking-[0.18em] hover:underline"
-          >
-            Open The House Ledger, every pick timestamped →
-          </button>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ─── Disclosure, a regulatory-filing aesthetic for the credibility wedge ──
-
-function Disclosure() {
-  return (
-    <section className="border-b border-ink-800 bg-ink-950">
-      <div className="max-w-3xl mx-auto px-5 py-20 md:py-24">
-        <SectionLabel>§ disclosure · 2026.05</SectionLabel>
-        <div className="mt-8 bg-ink-900 shadow-hairline rounded-sharp px-6 py-8 md:px-10 md:py-10">
-          <h2 className="font-sans font-bold text-xl md:text-2xl text-ink-100 tracking-[-0.01em] leading-relaxed">
-            On affiliate revenue and conflict of interest
-          </h2>
-          <div className="mt-6 space-y-4 text-sm text-ink-200 leading-relaxed">
-            <p>
-              <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 1.</span>
-              TrapHawk receives <span className="text-signal-pos font-medium">no affiliate commissions</span> for sending users to sportsbooks. We are not owned by or financially affiliated with any sportsbook, sportsbook affiliate, or operator of betting markets.
-            </p>
-            <p>
-              <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 2.</span>
-              We do not place wagers on behalf of users. We do not hold money. We do not see your sportsbook account credentials.
-            </p>
-            <p>
-              <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 3.</span>
-              Our entire business is grading games against the public market and publishing the result, <span className="text-signal-pos font-medium">including the bets we believe you should NOT make.</span> The Trap label is the differentiator no affiliate-owned publication can adopt without dismantling its parent's revenue model.
-            </p>
-          </div>
-          <p className="mt-8 text-[10px] uppercase tracking-[0.18em] text-ink-500 pt-6 border-t border-ink-800">
-            // Every pick graded after the game. The record is the receipt.
-          </p>
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ─── TermSheet, pricing as signed-document layout ─────────────────────────
-
-function TermSheet({ onStartTrial }) {
-  const included = [
-    'Daily digest across every sport · ML / spread / total',
-    'Per-side edges, signed and tier-graded',
-    'Negative edges visible (Trap label)',
-    'Machine-built parlays · published and settled on The House Ledger',
-    'Settlement tracking · every pick graded after the game',
-    'Hit rate by tier and sport · refreshed after every settlement',
+function HowItWorks() {
+  const steps = [
+    ['We price every game and prop', 'Our model works out how likely each side really is, from the matchup, recent form, injuries and weather.'],
+    ['We compare it to the book', 'When our number beats the price by enough, it\'s a play. When the popular side is priced worse than fair, it\'s a trap.'],
+    ['You see the why', 'Every card shows our number against the book\'s and a short explanation. Tap it and it opens up.'],
   ]
   return (
-    <section id="terms" className="border-b border-ink-800 bg-ink-950">
-      <div className="max-w-3xl mx-auto px-5 py-20 md:py-28">
-        <SectionLabel>§ terms · pro_access</SectionLabel>
-        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05]">
-          Pricing.
-        </h2>
-        <p className="mt-5 text-ink-300 max-w-2xl leading-relaxed">
-          One tier. Trial first. Pay nothing until you've actually seen a Sharp Take hit.
-        </p>
+    <section className="border-t border-ink-800">
+      <div className="max-w-5xl mx-auto px-4 py-14 md:py-20">
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">How it works</h2>
+        <ol className="mt-8 grid md:grid-cols-3 gap-6">
+          {steps.map(([t, d], i) => (
+            <li key={t} className="flex gap-4">
+              <span className="flex-shrink-0 w-8 h-8 rounded-full bg-signal-pos/15 text-signal-pos font-semibold flex items-center justify-center">{i + 1}</span>
+              <div>
+                <h3 className="font-semibold text-ink-100">{t}</h3>
+                <p className="mt-1.5 text-sm text-ink-300 leading-relaxed">{d}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  )
+}
 
-        <div className="mt-12 bg-ink-900 shadow-hairline-pos rounded-sharp">
-          <div className="flex items-center justify-between px-5 py-2.5 border-b border-signal-pos-dim/40 bg-ink-950">
-            <span className="text-[10px] uppercase tracking-[0.20em] text-signal-pos font-semibold">
-              ▌ term sheet
-            </span>
-            <span className="text-[10px] uppercase tracking-[0.18em] text-ink-400">
-              effective immediately
-            </span>
-          </div>
-
-          <dl className="divide-y divide-ink-800">
-            <TermRow label="Plan"            value="PRO ACCESS" />
-            <TermRow label="Price"           value={<><span className="text-3xl text-ink-100">$19.99</span> <span className="text-ink-400 text-sm">/ month</span></>} big />
-            <TermRow label="Free trial"      value="7 days · no card required" tone="pos" />
-            <TermRow label="Billing"         value="Monthly · no annual commitment" />
-            <TermRow label="Cancellation"    value="Anytime · self-serve · no email needed" />
-          </dl>
-
-          <div className="border-t border-ink-800 px-5 md:px-7 py-5">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-ink-500 mb-3">
-              ▌ included
-            </div>
-            <ul className="space-y-2">
-              {included.map((f, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-sm text-ink-200">
-                  <span className="text-signal-pos flex-shrink-0 mt-0.5">▸</span>
-                  <span>{f}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="border-t border-ink-800 px-5 md:px-7 py-5 bg-ink-950">
-            <button
-              onClick={onStartTrial}
-              className="group w-full md:w-auto inline-flex items-center justify-center gap-3 bg-signal-pos text-ink-950 text-xs font-bold uppercase tracking-[0.18em] px-8 py-4 rounded-sharp hover:bg-signal-pos/90 transition-colors"
-            >
-              <span>[ Execute trial</span>
-              <span className="transition-transform group-hover:translate-x-0.5">→</span>
-              <span>]</span>
-            </button>
-            <p className="mt-3 text-[10px] uppercase tracking-[0.18em] text-ink-500">
-              // No credit card required to start. We send one email when the trial ends.
-            </p>
-          </div>
+function Pricing({ onStartTrial }) {
+  const included = [
+    'Every play and trap across the sports in season',
+    'NFL player props with the why on every card',
+    'Machine built parlays, settled in public',
+    'The full record, every pick graded',
+  ]
+  return (
+    <section className="border-t border-ink-800 bg-ink-900/40">
+      <div className="max-w-5xl mx-auto px-4 py-14 md:py-20 grid md:grid-cols-2 gap-8 items-center">
+        <div>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">One plan. Try it free.</h2>
+          <p className="mt-3 text-ink-300">Pay nothing for 7 days, no card needed. Cancel anytime yourself.</p>
+        </div>
+        <div className="bg-ink-900 rounded-2xl border border-ink-700 p-6">
+          <p className="text-ink-300">TrapHawk Pro</p>
+          <p className="mt-1"><span className="text-4xl font-bold tabular-nums">$19.99</span><span className="text-ink-400"> a month</span></p>
+          <ul className="mt-5 flex flex-col gap-2.5">
+            {included.map(f => (
+              <li key={f} className="flex gap-2.5 text-sm text-ink-200">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 mt-0.5 flex-shrink-0 text-signal-pos" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+                {f}
+              </li>
+            ))}
+          </ul>
+          <button onClick={onStartTrial} className="mt-6 w-full px-6 py-4 rounded-xl bg-signal-pos text-ink-950 font-semibold hover:bg-signal-pos/90 active:scale-[0.98] transition">
+            Start your free week
+          </button>
+          <p className="mt-3 text-xs text-ink-500 text-center">We send one email when the trial ends.</p>
         </div>
       </div>
     </section>
   )
 }
 
-function TermRow({ label, value, tone = 'neutral', big = false }) {
-  const valColor = tone === 'pos' ? 'text-signal-pos' : tone === 'neg' ? 'text-signal-neg' : 'text-ink-100'
-  return (
-    <div className="px-5 md:px-7 py-3.5 grid grid-cols-[140px_1fr] md:grid-cols-[200px_1fr] gap-3 items-baseline">
-      <dt className="text-[10px] uppercase tracking-[0.18em] text-ink-400">{label}</dt>
-      <dd className={`tabular-nums ${valColor} ${big ? 'text-2xl font-bold tracking-tight' : 'text-sm'}`}>
-        {value}
-      </dd>
-    </div>
-  )
-}
-
-// ─── Filings · Q&A, the FAQ as 10-K Q&A document ─────────────────────────────
-
-function Filings() {
+function Questions() {
   const items = [
-    {
-      q: 'What\'s a "Trap"?',
-      a: 'A side the average bettor is drawn to that the model prices at least 2 points below fair. We score the bait (hot streaks, heavy favorites, home teams, juicy plus-money lines, popular Overs) and only call Trap when a tempting side is also a bad price. A bad bet nobody wants isn\'t a trap. A bad bet everybody wants is the product.',
-    },
-    {
-      q: 'Why publish negative edges? Doesn\'t that scare people off?',
-      a: 'Negative edges are most of the betting universe. If we only published positive ones, we\'d be lying about the shape of the market. The Trap label is the differentiator. It\'s the one thing every other picks app structurally can\'t show you.',
-    },
-    {
-      q: 'How is this different from Action Network or OddsJam?',
-      a: 'Action Network is owned by Better Collective, a publicly-traded sportsbook affiliate, so they can\'t credibly warn you off a book. OddsJam targets $2K+ monthly bankroll arb bettors at $99-199/mo. We\'re built for the $50-500/mo bankroll that wants the math without the price tag, and we\'re the only picks app that shows you what NOT to bet.',
-    },
-    {
-      q: 'Is this gambling advice?',
-      a: 'No. It\'s information. We grade games using public data and publish the math. What you do with the picks is on you. We\'re not licensed as advice, we\'re not a sportsbook, we don\'t hold money. For entertainment and informational purposes only.',
-    },
-    {
-      q: 'Do I need to be 21?',
-      a: 'Yes. We\'re an info site about sports betting, which is a +21 activity in every US jurisdiction we know of. The +21 gate enforces it on first visit.',
-    },
-    {
-      q: 'Where does my data go?',
-      a: 'Email + (optionally) Google sign-in is all we collect to start. We don\'t share or sell. Locked picks live on your account so we can grade them later. Payment goes through Stripe directly, so we never see your card.',
-    },
+    ['What\'s a trap?', 'A side most bettors are drawn to, like a hot streak, a heavy favorite or a popular over, that we price at least 2 points worse than fair. A bad bet nobody wants isn\'t a trap. A bad bet everybody wants is.'],
+    ['Why show the sides not to bet?', 'Most of the betting market is bad prices. Showing only the good ones would hide the shape of it. Naming the traps is the thing a sportsbook partner can\'t do.'],
+    ['How is this different from Action Network or OddsJam?', 'Action Network is owned by Better Collective, a publicly traded sportsbook affiliate, so it can\'t credibly warn you off a book. OddsJam is built for high volume bettors at $99 to $199 a month. We\'re built for everyday bettors who want the math without the price tag, and we show you what not to bet.'],
+    ['Are props counted in the record?', 'Not yet. Props are in shadow: priced, published and graded in public, but kept out of the official record until their own record and the closing line clear our bar.'],
+    ['Is this gambling advice?', 'No. It\'s information. We grade games from public data and publish the math. We\'re not a sportsbook and we never hold money. For entertainment and information only.'],
+    ['Do I need to be 21?', 'Yes. Sports betting is 21 and over in every US state we know of.'],
+    ['Where does my data go?', 'We collect your email, and Google sign in if you choose it. We don\'t share or sell it. Payment goes through Stripe, so we never see your card.'],
   ]
   const [open, setOpen] = useState(null)
-
   return (
-    <section className="border-b border-ink-800 bg-ink-950">
-      <div className="max-w-3xl mx-auto px-5 py-20 md:py-24">
-        <SectionLabel>§ filings · q&amp;a</SectionLabel>
-        <h2 className="font-sans font-bold text-3xl md:text-5xl text-ink-100 tracking-[-0.02em] mt-5 leading-[1.05]">
-          Questions <span className="text-ink-400">on file.</span>
-        </h2>
-
-        <div className="mt-12 bg-ink-900 shadow-hairline rounded-sharp divide-y divide-ink-800">
-          {items.map((it, i) => {
+    <section className="border-t border-ink-800">
+      <div className="max-w-3xl mx-auto px-4 py-14 md:py-20">
+        <h2 className="text-3xl md:text-4xl font-bold tracking-tight">Questions</h2>
+        <div className="mt-8 bg-ink-900 rounded-2xl border border-ink-700 divide-y divide-ink-800">
+          {items.map(([q, a], i) => {
             const isOpen = open === i
-            const num = String(i + 1).padStart(2, '0')
             return (
-              <div key={i}>
-                <button
-                  onClick={() => setOpen(isOpen ? null : i)}
-                  className="w-full flex items-start gap-4 px-5 md:px-6 py-5 text-left hover:bg-ink-850/40 transition-colors"
-                >
-                  <span className="text-[10px] uppercase tracking-[0.18em] text-signal-pos tabular-nums flex-shrink-0 mt-1">
-                    Q.{num}
-                  </span>
-                  <span className="flex-1 font-sans text-base md:text-lg text-ink-100 font-medium tracking-tight">
-                    {it.q}
-                  </span>
-                  <span className="text-signal-pos text-lg flex-shrink-0 ml-2 leading-none">
-                    {isOpen ? '−' : '+'}
-                  </span>
+              <div key={q}>
+                <button onClick={() => setOpen(isOpen ? null : i)} aria-expanded={isOpen} className="w-full flex items-center gap-4 px-5 py-4 text-left">
+                  <span className="flex-1 font-medium text-ink-100">{q}</span>
+                  <svg viewBox="0 0 24 24" className={`w-4 h-4 text-ink-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
                 </button>
-                {isOpen && (
-                  <div className="px-5 md:px-6 pb-6 pl-[60px] md:pl-[64px]">
-                    <div className="flex gap-4">
-                      <span className="text-[10px] uppercase tracking-[0.18em] text-ink-500 flex-shrink-0 hidden">
-                        A.{num}
-                      </span>
-                      <p className="text-sm text-ink-300 leading-relaxed">{it.a}</p>
-                    </div>
-                  </div>
-                )}
+                {isOpen && <p className="px-5 pb-5 -mt-1 text-sm text-ink-300 leading-relaxed">{a}</p>}
               </div>
             )
           })}
@@ -1143,35 +273,13 @@ function Filings() {
   )
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────
-
 function Footer() {
   return (
-    <footer className="bg-ink-950">
-      <div className="max-w-6xl mx-auto px-5 py-10">
-        <div className="border-t border-ink-800 pt-8 grid md:grid-cols-[1fr_auto] gap-6 items-baseline">
-          <div className="space-y-2 text-[10px] uppercase tracking-[0.18em] text-ink-500 leading-relaxed">
-            <p>For entertainment and informational purposes only · not gambling advice · +21</p>
-            <p>
-              If you or someone you know has a gambling problem, call <span className="text-ink-300 normal-case tracking-normal">1-800-GAMBLER</span>
-            </p>
-          </div>
-          <div className="text-[10px] uppercase tracking-[0.18em] text-ink-700 md:text-right">
-            © 2026 TrapHawk
-          </div>
-        </div>
+    <footer className="border-t border-ink-800">
+      <div className="max-w-5xl mx-auto px-4 py-10 flex flex-col md:flex-row md:justify-between gap-3 text-xs text-ink-500">
+        <p>For entertainment and information only, not gambling advice. 21+. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</p>
+        <p>© 2026 TrapHawk</p>
       </div>
     </footer>
-  )
-}
-
-// ─── Shared: section label (looks like a terminal command) ────────────────
-
-function SectionLabel({ children }) {
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-signal-pos text-[10px] uppercase tracking-[0.20em]">▌</span>
-      <span className="text-[10px] uppercase tracking-[0.20em] text-ink-400">{children}</span>
-    </div>
   )
 }

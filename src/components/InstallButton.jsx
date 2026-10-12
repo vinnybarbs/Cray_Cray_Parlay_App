@@ -74,9 +74,9 @@ function InstallSheet({ onClose }) {
         </div>
         {ios ? (
           <ol className="font-sans text-sm text-ink-200 flex flex-col gap-3 mb-5">
-            <li className="flex gap-3"><span className="font-mono text-signal-pos">1</span><span>Tap <ShareIcon /> Share in Safari's toolbar.</span></li>
-            <li className="flex gap-3"><span className="font-mono text-signal-pos">2</span><span>Scroll down and tap <span className="font-semibold text-ink-100">Add to Home Screen</span>.</span></li>
-            <li className="flex gap-3"><span className="font-mono text-signal-pos">3</span><span>Tap <span className="font-semibold text-ink-100">Add</span>. TrapHawk opens like any other app.</span></li>
+            <li className="flex gap-3"><span className="tabular-nums text-signal-pos">1</span><span>Tap <ShareIcon /> Share in Safari's toolbar.</span></li>
+            <li className="flex gap-3"><span className="tabular-nums text-signal-pos">2</span><span>Scroll down and tap <span className="font-semibold text-ink-100">Add to Home Screen</span>.</span></li>
+            <li className="flex gap-3"><span className="tabular-nums text-signal-pos">3</span><span>Tap <span className="font-semibold text-ink-100">Add</span>. TrapHawk opens like any other app.</span></li>
           </ol>
         ) : (
           <p className="font-sans text-sm text-ink-200 mb-5">
