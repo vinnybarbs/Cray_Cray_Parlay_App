@@ -17,6 +17,12 @@
  * 08:57 Denver, which is 14:57 or 15:57 UTC by season, and a run can
  * take half an hour), so the first slot after the row lands posts it
  * and the later slots skip.
+ *
+ * The safety net (owner 2026-10-12: notifications on the analysis
+ * routines are off, so the exec assistant is the only voice). If the
+ * last slot of the day still finds no row, it posts a short alert
+ * saying the brief never landed, once per day, so a failed or stuck
+ * exec assistant run is never silent.
  */
 
 'use strict';
@@ -26,6 +32,35 @@ const { sendDiscordEmbeds, embedsFromLines, clip, BRAND_COLOR } = require('../..
 
 const SECTIONS = ['WHAT SHIPPED TODAY', 'WHAT THE MACHINE FOUND', 'YOUR CALLS'];
 const LOOKBACK_HOURS = 20;
+const LAST_SLOT_UTC_HOUR = 17;
+const MISSING_REASON = 'no exec-assistant row in the window';
+
+/** True on the last daily slot (17:45 UTC), when a missing row is final. */
+function isLastSlot(now = new Date()) {
+  return now.getUTCHours() >= LAST_SLOT_UTC_HOUR;
+}
+
+/** Pure formatter for the alert posted when no brief landed today. */
+function formatMissingBrief(dateLabel) {
+  return [{
+    title: `🦅 Exec assistant · ${dateLabel}`,
+    description: 'No brief today. The exec assistant routine did not file its blackboard row by 11:45 MT, so the ops check, the calibration review and the cost audit findings have not reached you. Open the TrapHawk exec assistant routine and check its last run.',
+    color: BRAND_COLOR,
+  }];
+}
+
+async function missingAlertSent() {
+  const since = new Date(Date.now() - LOOKBACK_HOURS * 3600 * 1000).toISOString();
+  const { data } = await supabase
+    .from('cron_job_logs')
+    .select('id')
+    .eq('job_name', 'discord-exec-brief')
+    .eq('status', 'completed')
+    .gte('created_at', since)
+    .like('details', '%"missing_alert":true%')
+    .limit(1);
+  return (data || []).length > 0;
+}
 
 /**
  * Pure formatter. Splits the summary into the lead and the three
@@ -81,15 +116,20 @@ async function runExecBrief() {
   if (error) throw error;
   const row = (rows || [])[0];
   let result;
-  if (!row) {
-    result = { sent: false, reason: 'no exec-assistant row in the window' };
+  let missingAlert = false;
+  const dateLabelFor = d => new Date(d).toLocaleDateString('en-US', {
+    weekday: 'long', month: 'short', day: 'numeric', timeZone: 'America/Denver',
+  });
+  if (!row && isLastSlot() && !(await missingAlertSent())) {
+    missingAlert = true;
+    result = await sendDiscordEmbeds(formatMissingBrief(dateLabelFor(Date.now())), 'board');
+    if (!result.sent && !result.reason) result.reason = MISSING_REASON;
+  } else if (!row) {
+    result = { sent: false, reason: MISSING_REASON };
   } else if (await alreadyPosted(row.id)) {
     result = { sent: false, reason: 'already posted', skipped_duplicate: true };
   } else {
-    const dateLabel = new Date(row.created_at).toLocaleDateString('en-US', {
-      weekday: 'long', month: 'short', day: 'numeric', timeZone: 'America/Denver',
-    });
-    result = await sendDiscordEmbeds(formatExecBrief(row, dateLabel), 'board');
+    result = await sendDiscordEmbeds(formatExecBrief(row, dateLabelFor(row.created_at)), 'board');
   }
   await supabase.from('cron_job_logs').insert({
     job_name: 'discord-exec-brief',
@@ -100,7 +140,8 @@ async function runExecBrief() {
       channel: result.channel || 'board',
       fallback: result.fallback || false,
       messages: result.messages || 0,
-      reason: result.reason || null,
+      reason: result.reason || (missingAlert ? MISSING_REASON : null),
+      missing_alert: missingAlert,
       duration_ms: Date.now() - startTime,
     }),
   });
@@ -118,4 +159,6 @@ async function discordExecBrief(req, res) {
 
 module.exports = discordExecBrief;
 module.exports.formatExecBrief = formatExecBrief;
+module.exports.formatMissingBrief = formatMissingBrief;
+module.exports.isLastSlot = isLastSlot;
 module.exports.runExecBrief = runExecBrief;

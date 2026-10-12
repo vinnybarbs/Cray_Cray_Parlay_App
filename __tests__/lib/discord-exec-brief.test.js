@@ -1,7 +1,7 @@
 process.env.SUPABASE_URL = process.env.SUPABASE_URL || 'https://example.supabase.co';
 process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy';
 
-const { formatExecBrief } = require('../../api/cron/discord-exec-brief');
+const { formatExecBrief, formatMissingBrief, isLastSlot } = require('../../api/cron/discord-exec-brief');
 const { embedText } = require('../../lib/services/discord-alerts');
 
 const row = {
@@ -38,5 +38,21 @@ describe('formatExecBrief', () => {
     expect(embeds).toHaveLength(1);
     expect(embeds[0].description).toBe('dry run. Nothing shipped.');
     expect(embeds[0].footer.text).toContain('row 7');
+  });
+});
+
+describe('missing brief safety net', () => {
+  test('only the 17:45 UTC slot counts as the last slot', () => {
+    expect(isLastSlot(new Date('2026-10-12T15:45:00Z'))).toBe(false);
+    expect(isLastSlot(new Date('2026-10-12T16:45:00Z'))).toBe(false);
+    expect(isLastSlot(new Date('2026-10-12T17:45:00Z'))).toBe(true);
+  });
+
+  test('the alert names the day and uses plain punctuation', () => {
+    const embeds = formatMissingBrief('Monday, Oct 12');
+    expect(embeds).toHaveLength(1);
+    expect(embeds[0].title).toBe('🦅 Exec assistant · Monday, Oct 12');
+    expect(embeds[0].description).toMatch(/^No brief today/);
+    expect(embedText(embeds)).not.toMatch(/[—–;→]/);
   });
 });
