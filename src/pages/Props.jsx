@@ -103,7 +103,7 @@ export default function Props() {
 
         {data && tab === 'upcoming' && (
           upcoming.length === 0
-            ? <p className="text-sm text-ink-400">No prop reads at 4 points or more for the next games yet. Reads refresh twice a day.</p>
+            ? <p className="text-sm text-ink-400">No prop reads with us 4% or more above the book for the next games yet. Reads refresh twice a day.</p>
             : games.map(k => (
               <section key={k} className="flex flex-col gap-2">
                 {byGame.get(k).map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} />)}
@@ -120,7 +120,7 @@ export default function Props() {
         {total && (total.won + total.lost) > 0 && (
           <details className="bg-ink-900 rounded-2xl border border-ink-700 px-4 py-3 flex flex-col gap-3" aria-label="Shadow record">
             <summary className="flex items-center justify-between cursor-pointer text-sm text-ink-300">
-              <span>Shadow record by market, 4 points or more</span>
+              <span>Shadow record by market, us 4% or more above the book</span>
               <span className=" tabular-nums text-ink-100">
                 {total.won}-{total.lost} <span className={total.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}>{fmtUnits(total.units)}</span>
               </span>

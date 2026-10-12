@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { edgeTier, formatPp } from '../lib/tiers'
+import PctStack from './PctStack'
 import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
 
@@ -131,7 +132,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                       {tier.label}
                     </span>
                     <span className={`flex-shrink-0 w-14 text-right text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-                      {p.edge_pp != null ? formatPp(p.edge_pp) : '-'}
+                      <PctStack edgePp={p.edge_pp} odds={p.odds} impliedProb={p.implied_prob} />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink-100 truncate">

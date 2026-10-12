@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import BrandMark from '../components/BrandMark'
 import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
+import PctStack from '../components/PctStack'
 import { isShadowSport } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -80,7 +81,7 @@ function PickRow({ row, isOpen, onToggle }) {
         {isPreview ? 'Preview' : tier.label}
       </span>
       <span className={`flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-        {isPreview ? '-' : formatPp(effPp)}
+        {isPreview ? '-' : <PctStack edgePp={effPp} odds={row.odds} impliedProb={row.implied_prob} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
@@ -89,7 +90,7 @@ function PickRow({ row, isOpen, onToggle }) {
           {odds && <span className="ml-2 tabular-nums text-xs text-ink-300">{odds}</span>}
         </div>
         <div className="text-xs text-ink-400 truncate">
-          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} @ {row.game.home_team} · under 2 points, no pick</> : <> · analysis, no graded side</>}
+          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} at {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} at {row.game.home_team} · under 2 points, no pick</> : <> · analysis, no graded side</>}
           {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
         </div>
       </div>
@@ -127,7 +128,7 @@ function TrapRow({ row }) {
         Trap
       </span>
       <span className="flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums text-signal-neg">
-        {formatPp(t.edge_pp)}
+        <PctStack edgePp={t.edge_pp} odds={row.odds ?? t.odds} impliedProb={t.implied_prob} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
@@ -139,7 +140,7 @@ function TrapRow({ row }) {
           </div>
         )}
         <div className="text-xs text-ink-400 truncate">
-          {row.sport} · {row.game.away_team} @ {row.game.home_team}
+          {row.sport} · {row.game.away_team} at {row.game.home_team}
           {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
         </div>
       </div>
@@ -386,7 +387,7 @@ export default function GeneratorPage() {
 
         {!loading && !error && allRows.length > 0 && (
           <p className="text-xs text-ink-500 text-center">
-            same math as the digest · picks under 2 points are shown so you know what to skip, not to bet
+            same math as the digest · picks within 2% of the book are shown so you know what to skip, not to bet
           </p>
         )}
       </div>

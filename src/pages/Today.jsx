@@ -55,7 +55,7 @@ function PickRow({ p, onOpen, id }) {
       <div className="text-sm text-ink-300">
         {p.book_pct != null
           ? <>Book says <span className="tabular-nums text-ink-100">{p.book_pct}%</span>, we say <span className={`font-semibold tabular-nums ${t.color}`}>{p.our_pct}%</span></>
-          : <>Wins about <span className={`font-semibold tabular-nums ${t.color}`}>{Math.round(Number(p.edge_pp))} more times in 100</span> than the price says.</>}
+          : <>We put this <span className={`font-semibold tabular-nums ${t.color}`}>{Math.round(Number(p.edge_pp))}%</span> above the book.</>}
       </div>
     </button>
   )
@@ -74,7 +74,7 @@ function TrapRow({ p, id }) {
       <div className="text-sm text-ink-300">
         {p.book_pct != null
           ? <>Book says <span className="tabular-nums text-ink-100">{p.book_pct}%</span>, we say <span className="font-semibold tabular-nums text-signal-neg">{p.our_pct}%</span></>
-          : <>Wins about <span className="font-semibold tabular-nums text-signal-neg">{Math.round(Math.abs(Number(p.edge_pp)))} fewer times in 100</span> than its price needs.</>}
+          : <>We put this <span className="font-semibold tabular-nums text-signal-neg">{Math.round(Math.abs(Number(p.edge_pp)))}%</span> below the book.</>}
       </div>
     </div>
   )
@@ -143,7 +143,7 @@ export default function Today() {
             {!data && !error ? 'Today' : plays > 0 ? `${plays} play${plays === 1 ? '' : 's'} today` : 'A quiet day'}
           </h1>
           {data && plays === 0 && (
-            <p className="text-sm text-ink-400">Nothing clears 4 points today. The best of the smaller reads is below, labeled Lean.</p>
+            <p className="text-sm text-ink-400">Nothing today has us 4% or more above the book. The best of the smaller reads is below, labeled Lean.</p>
           )}
         </section>
 

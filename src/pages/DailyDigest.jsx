@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import InstallButton from '../components/InstallButton'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct, sidePct, bookOurPct, pctPair, rawImplied } from '../lib/tiers'
 import { setPublishFlags, isShadowSport, isShadowMarket } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -291,7 +291,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                   legacy 0-10 edge_score. Showing both on one screen confused
                   users: "is it 12.3pp or 10/10?" The pp number is the truth;
                   edge_score is a saturated derivative of the same data. */}
-              <EdgeChip signedPp={finalPpFor(analysis)} shadow={SHADOW_DISPLAY.has(analysis.sport)} />
+              <EdgeChip signedPp={finalPpFor(analysis)} pct={sidePct(analysis, analysis.recommended_side, finalPpFor(analysis))} shadow={SHADOW_DISPLAY.has(analysis.sport)} />
               {analysis.edge_movement && (
                 <span className="text-sm flex items-center gap-1 text-ink-300">
                   Movement: {edgeMovementIcon(analysis.edge_movement)}
@@ -663,7 +663,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
 // signedPp is the FINAL claim (finalPpFor: the published edge_pp when the
 // row exists, else the raw read with the price rails applied), so the
 // number and the label always agree and nothing is penalized twice.
-function EdgeChip({ signedPp, leg = false, size = 'md', shadow = false }) {
+function EdgeChip({ signedPp, pct = null, leg = false, size = 'md', shadow = false }) {
   let tier = edgeTier(signedPp)
   // A 65%+ side below the 2pp floor is a Leg, not a Skip. The tile body
   // already said so, but the corner chip contradicted it (2026-08-12:
@@ -691,19 +691,19 @@ function EdgeChip({ signedPp, leg = false, size = 'md', shadow = false }) {
     ? 'Shadow read. The model grades this sport into its shadow record, and the numbers show on the board at go-live'
     : pp == null
       ? 'No model edge available for this side'
-      : `${pp} · ${tier.label}. The gap between the model's win-probability and the book's implied probability, in percentage points`
+      : pct
+        ? `${pctPair(pct, true)} · ${tier.label}`
+        : `${pp} · ${tier.label}. How far our win chance sits from the book's`
   return (
     <div
       className={`rounded-sharp ${tier.bg} ${padding} flex flex-col items-end leading-tight flex-shrink-0`}
       title={ppTooltip}
     >
       <div className={` font-semibold ${ppSize} ${tier.color} tabular-nums tracking-tight`}>
-        <span className="mr-0.5">{arrow}</span>{pp ?? '-'}
+        {!shadow && pct ? <>We say {pct.ours}%</> : <><span className="mr-0.5">{arrow}</span>{pp ?? '-'}</>}
       </div>
+      {!shadow && pct && <div className="text-xs text-ink-400 tabular-nums">Book {pct.book}%</div>}
       <div className={`text-xs ${tier.color} mt-0.5`}>{tier.label}</div>
-      {tier.subtitle && (
-        <div className="text-[9px] text-ink-400 lowercase tracking-wide italic leading-none">{tier.subtitle}</div>
-      )}
     </div>
   )
 }
@@ -766,9 +766,9 @@ function MarketRow({ sides, recommendedSide, shadow = false }) {
               ) : (
                 <span
                   className={`flex-shrink-0 text-[11px] tabular-nums ${muted ? 'text-ink-500' : tier.color}`}
-                  title={s.signedPp != null ? `${formatPp(s.signedPp)} · ${tier.label}` : 'No model edge for this side'}
+                  title={s.signedPp != null ? `${s.pct ? pctPair(s.pct, true) : formatPp(s.signedPp)} · ${tier.label}` : 'No model edge for this side'}
                 >
-                  {hasAnyEdge ? (formatPp(s.signedPp) ?? '-') : '-'}
+                  {hasAnyEdge ? ((s.pct ? pctPair(s.pct) : formatPp(s.signedPp)) ?? '-') : '-'}
                 </span>
               )}
             </div>
@@ -798,6 +798,7 @@ function MarketTabs({ game, shadow = false }) {
     side,
     text: sidePickText(game, side),
     signedPp: edgePpForSide(edges, side),
+    pct: sidePct(game, side, edgePpForSide(edges, side)),
     calMuted: calMutedFor(side),
   })
   const defaultTab = recommended_side?.startsWith('over') || recommended_side?.startsWith('under')
@@ -888,7 +889,7 @@ function LiveReadNote({ game }) {
   const sameSide = game.recommended_pick != null && pickSideKey(pub.pick) === pickSideKey(game.recommended_pick)
   if (sameSide && (live == null || live >= 2)) return null
   const liveText = game.recommended_pick
-    ? `${game.recommended_pick}${live != null ? ` ${formatPp(live)}` : ''}`
+    ? `${game.recommended_pick}${live != null ? `, ${pctPair(sidePct(game, game.recommended_side, live)) ?? formatPp(live)}` : ''}`
     : 'no side clears the floor'
   return (
     <div className=" text-[10px] text-ink-400 mt-0.5 tabular-nums">
@@ -913,7 +914,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <div className="tabular-nums font-medium text-ink-100 text-sm leading-tight tracking-tight">
-              {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
+              {game.away_team} <span className="text-ink-500">at</span> {game.home_team}
             </div>
             {(game.away_record || game.home_record) && (
               <div className=" text-[11px] text-ink-400 mt-0.5 tabular-nums">
@@ -942,6 +943,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           </div>
           <EdgeChip
             signedPp={signedPp}
+            pct={sidePct(game, game.recommended_side, signedPp)}
             shadow={SHADOW_DISPLAY.has(sport)}
             leg={signedPp != null && signedPp < 2 && signedPp > -2
               && Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0) >= 0.65}
@@ -981,15 +983,12 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
             <div className="bg-ink-850 rounded-sharp shadow-hairline px-3 py-2 mb-3">
               <div className="text-xs text-ink-400 mb-0.5">Model Pick{game.published_pick?.tier ? ` · ${game.published_pick.tier}` : ''}</div>
               <div className="text-signal-pos font-medium text-sm tabular-nums">{publishedText || game.recommended_pick}</div>
+              {/* One pair of numbers everywhere (owner 2026-10-12). The
+                  break-even line read as a third percentage and is gone. */}
               {(() => {
-                {/* Break-even = risk / (risk + win). Teaches the price: a
-                    -180 pick must win 64.3% just to tread water, +122 only
-                    45%. The number that explains why chalk is fenced. */}
-                const be = breakEvenPct(game.published_pick?.odds ?? lockOddsFor(game))
-                return be != null ? (
-                  <div className=" text-[10px] text-ink-400 mt-0.5 tabular-nums">
-                    break-even {be.toFixed(1)}% at this price
-                  </div>
+                const pct = sidePct(game, game.recommended_side, signedPp)
+                return pct ? (
+                  <div className="text-xs text-ink-400 mt-0.5 tabular-nums">{pctPair(pct, true)}</div>
                 ) : null
               })()}
               <TierPathNote published={game.published_pick} />
@@ -1016,13 +1015,13 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           }
           if (game.recommended_pick) return (
             <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
-              <div className="text-xs text-ink-400 mb-0.5">Skip. The best side is under 2 points</div>
+              <div className="text-xs text-ink-400 mb-0.5">Skip. No side is more than 2% above the book</div>
               <div className="text-ink-300 font-medium text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
           return (
             <div className="bg-ink-850/40 rounded-sharp px-3 py-2 mb-3 border border-dashed border-ink-600">
-              <div className="tabular-nums text-[11px] text-ink-400">No edge. Every market is under 2 points</div>
+              <div className="tabular-nums text-[11px] text-ink-400">No edge. Every market is within 2% of the book</div>
             </div>
           )
         })()}
@@ -1046,7 +1045,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               })()}
             </div>
             {alt.edge_pp != null && (
-              <div className=" text-[10px] text-ink-400 mt-0.5 tabular-nums">{formatPp(Number(alt.edge_pp))} on this market alone</div>
+              <div className="text-xs text-ink-400 mt-0.5 tabular-nums">{pctPair(bookOurPct(Number(alt.edge_pp), alt.odds, null, alt.implied_prob), true) ?? formatPp(Number(alt.edge_pp))} on this market alone</div>
             )}
             <TierPathNote published={alt} />
           </div>
@@ -1118,11 +1117,11 @@ function TrapCard({ game, trap, gameKey, onDeepResearch }) {
     <div className="bg-ink-900 rounded-sharp overflow-hidden flex flex-col border border-signal-neg/40 shadow-hairline">
       <div className="flex items-center justify-between px-3 py-1.5 bg-signal-neg-dim/30 border-b border-signal-neg/30">
         <span className="text-xs text-signal-neg font-semibold">🪤 Trap</span>
-        <span className=" text-[11px] text-signal-neg tabular-nums font-semibold">{edgePp != null ? `${edgePp.toFixed(1)} pts` : ''}</span>
+        <span className="text-xs text-signal-neg tabular-nums font-semibold">{edgePp != null ? (pctPair(sidePct(game, side, edgePp)) ?? formatPp(edgePp)) : ''}</span>
       </div>
       <div className="p-4 flex-1">
         <div className="tabular-nums font-medium text-ink-100 text-sm leading-tight tracking-tight mb-0.5">
-          {game.away_team} <span className="text-ink-500">@</span> {game.home_team}
+          {game.away_team} <span className="text-ink-500">at</span> {game.home_team}
         </div>
         {game.game_date && (
           <div className=" text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
@@ -1288,7 +1287,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                 {upcomingCount > 0 && <span className="text-ink-500"> · {upcomingCount} next 24h</span>}
                 {!expanded && topSignedPp != null && !SHADOW_DISPLAY.has(sport) && (
                   <span className="ml-2 text-ink-500">
-                    · Top: <span className={`font-semibold ${topTier.color}`}>{formatPp(topSignedPp)} {topTier.label}</span>
+                    · Top: <span className={`font-semibold ${topTier.color}`}>{topTier.label}, {pctPair(sidePct(pickGames[0], pickGames[0].recommended_side, topSignedPp)) ?? formatPp(topSignedPp)}</span>
                   </span>
                 )}
               </p>
@@ -1326,7 +1325,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-0.5 gap-x-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`px-1.5 py-0.5 rounded-sharp text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
-                    {SHADOW_DISPLAY.has(sport) ? 'Shadow' : (formatPp(pp) ?? '-')}
+                    {SHADOW_DISPLAY.has(sport) ? 'Shadow' : ((pctPair(sidePct(game, game.recommended_side, pp)) ?? formatPp(pp)) ?? '-')}
                   </span>
                   <span className="text-ink-200 truncate">{game.away_team} at {game.home_team}</span>
                 </div>
@@ -1453,7 +1452,7 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                 <span className="text-xs text-ink-400 font-medium">
                   On the bubble
                 </span>
-                <span className=" text-[10px] text-ink-500 tabular-nums">{bubbleGames.length} more graded game{bubbleGames.length !== 1 ? 's' : ''} · under 2 points, no pick</span>
+                <span className=" text-[10px] text-ink-500 tabular-nums">{bubbleGames.length} more graded game{bubbleGames.length !== 1 ? 's' : ''} · within 2% of the book, no pick</span>
                 <span className="ml-auto text-ink-400 text-xs group-open:rotate-180 transition-transform">▼</span>
               </summary>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1542,8 +1541,8 @@ function GolfFieldBoard({ field }) {
       <div className="flex items-center gap-3 px-2 py-1.5 text-xs text-ink-500">
         <span className="flex-1">Player</span>
         <span className="w-14 text-right">Best</span>
-        <span className="w-14 text-right">Win %</span>
-        <span className="w-16 text-right">vs fair</span>
+        <span className="w-14 text-right">Book %</span>
+        <span className="w-16 text-right">Price %</span>
       </div>
       <div className="space-y-0.5">
         {shown.map((p, i) => (
@@ -1559,7 +1558,7 @@ function GolfFieldBoard({ field }) {
               <span className="w-14 text-right text-xs text-ink-200 tabular-nums">{fmtGolfPrice(p.best_price)}</span>
               <span className="w-14 text-right text-xs text-ink-400 tabular-nums">{p.consensus_prob != null ? `${(p.consensus_prob * 100).toFixed(1)}%` : '-'}</span>
               <span className={`w-16 text-right text-xs tabular-nums ${p.value_pp > 0 ? 'text-signal-pos' : p.value_pp < 0 ? 'text-signal-neg' : 'text-ink-500'}`}>
-                {p.value_pp != null ? `${p.value_pp > 0 ? '+' : ''}${p.value_pp.toFixed(1)} pts` : ''}
+                {rawImplied(p.best_price) != null ? `${(rawImplied(p.best_price) * 100).toFixed(1)}%` : ''}
               </span>
             </button>
             {openNote === i && p.note && (
@@ -1860,7 +1859,7 @@ export default function DailyDigest({ onBack }) {
                   </h1>
                 ) : (
                   <h1 className="tabular-nums text-2xl md:text-3xl font-bold tracking-tight text-ink-100 leading-tight">
-                    Quiet board. Nothing cleared 4 points today
+                    Quiet board. Nothing today has us 4% or more above the book
                   </h1>
                 )
               ) : (
@@ -2058,11 +2057,11 @@ function EdgeLegendModal({ open, onClose }) {
   if (!open) return null
 
   const tiers = [
-    { range: '10+ pts', label: 'Sharp Take',  sub: 'sharp take',  cls: 'text-signal-pos font-semibold' },
-    { range: '7 to 10 pts', label: 'Strong Play', sub: 'strong play', cls: 'text-signal-pos font-semibold' },
-    { range: '4 to 7 pts',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
-    { range: '2 to 4 pts',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
-    { range: '-2 to 2 pts', label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
+    { range: 'us 10+ above the book', label: 'Sharp Take',  sub: 'sharp take',  cls: 'text-signal-pos font-semibold' },
+    { range: 'us 7 to 10 above', label: 'Strong Play', sub: 'strong play', cls: 'text-signal-pos font-semibold' },
+    { range: 'us 4 to 7 above',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
+    { range: 'us 2 to 4 above',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
+    { range: 'within 2 of the book', label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
     { range: 'baited', label: 'Trap',        sub: "don't bet it", cls: 'text-signal-neg font-semibold' },
   ]
 
@@ -2090,13 +2089,13 @@ function EdgeLegendModal({ open, onClose }) {
         <div className="p-5 space-y-5">
           <div>
             <div className="text-xs text-signal-pos mb-1.5">
-              pp = percentage points
+              Book says, we say
             </div>
             <p className="text-ink-200 text-sm leading-relaxed">
-              How much more often we think a side wins than its price says, counted in wins per 100 bets. The bigger the gap, the stronger the play.
+              Every side shows two numbers: the book's chance it wins, with the book's cut taken out, and ours. The further ours sits above the book's, the stronger the play.
             </p>
             <p className="text-ink-300 text-xs leading-relaxed mt-2 tabular-nums">
-              Example: <span className="tabular-nums text-signal-pos">+8.2 pts</span> on a Strong Play means a -110 price says the side wins about 50 times in 100 once the book's cut is taken out, and we say about 58.
+              Example: a Strong Play at -110 reads <span className="tabular-nums text-signal-pos">Book says 50%, we say 58%</span>. The book's number has its cut taken out, so the two are a fair comparison.
             </p>
           </div>
 
@@ -2145,7 +2144,7 @@ function EdgeLegendModal({ open, onClose }) {
 
           <div className="pt-3 border-t border-ink-700">
             <p className="text-ink-300 text-xs leading-relaxed tabular-nums">
-              Math picks the side, and De-Genny, our AI writer, explains it. A <span className="text-signal-neg">Trap</span> is a side the casual bettor wants, priced 2 points or more below fair. We name the bait so you don't take it.
+              Math picks the side, and De-Genny, our AI writer, explains it. A <span className="text-signal-neg">Trap</span> is a side the casual bettor wants, where we put its chance 2% or more below the book's. We name the bait so you don't take it.
             </p>
           </div>
         </div>

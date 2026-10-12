@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
-import { edgeTier, tierRange, TIERS } from '../lib/tiers'
+import { edgeTier, tierRange, TIERS, bookOurPct, pctPair, formatPp } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
 
@@ -136,7 +136,7 @@ function ParlayCard({ parlay }) {
               )}
             </span>
             <span className="tabular-nums text-ink-400 flex-shrink-0">{fmtOdds(leg.odds)}</span>
-            <span className=" text-signal-pos/80 flex-shrink-0 tabular-nums">{Number(leg.edge_pp) >= 0 ? '+' : ''}{Number(leg.edge_pp).toFixed(1)} pts</span>
+            <span className="text-signal-pos/80 flex-shrink-0 tabular-nums">{pctPair(bookOurPct(Number(leg.edge_pp), leg.odds, null, leg.implied_prob)) ?? formatPp(leg.edge_pp)}</span>
             <span className="ml-auto text-ink-500 flex-shrink-0">{leg.sport}</span>
             {/* Live per-leg outcome: the ticket settles one leg at a
                 time, and a pending parlay with a dead leg says so. */}
@@ -154,9 +154,9 @@ function ParlayCard({ parlay }) {
       </div>
       <div className="mt-3 pt-2 border-t border-ink-800 text-xs text-ink-500">
         {parlay.model_win_prob != null ? (
-          <>model {(Number(parlay.model_win_prob) * 100).toFixed(1)}% to hit · fair {(Number(parlay.fair_win_prob) * 100).toFixed(1)}% · edge +{Number(parlay.combined_edge_pp).toFixed(1)} pts</>
+          <>To hit: book says {Math.round(Number(parlay.fair_win_prob) * 100)}%, we say {Math.round(Number(parlay.model_win_prob) * 100)}%</>
         ) : (
-          <>combined edge +{Number(parlay.combined_edge_pp).toFixed(1)} pts</>
+          <>We rate the ticket {formatPp(parlay.combined_edge_pp)}</>
         )}
         {' '}· published {fmtDateTime(parlay.created_at)}
         {parlay.settled_at && <> · settled {fmtDateTime(parlay.settled_at)}</>}
@@ -351,7 +351,7 @@ export default function HouseLedger() {
                   </span>
                 )}
                 <span className="text-sm text-ink-400 basis-full mt-1">
-                  A trap names the side the crowd wants at a price 2 points or more below fair. The bait went {trapReport.fadeLosses}-{trapReport.fadeWins} outright, and it still lost money, because the price is the trap. Graded on its own record, never mixed into the pick record above.
+                  A trap names the side the crowd wants where we put its chance 2% or more below the book's. The bait went {trapReport.fadeLosses}-{trapReport.fadeWins} outright, and it still lost money, because the price is the trap. Graded on its own record, never mixed into the pick record above.
                 </span>
               </div>
             )}
@@ -412,8 +412,8 @@ export default function HouseLedger() {
                         <div className="flex items-baseline gap-2">
                           <span className="flex-1 min-w-0 text-sm text-ink-100 font-medium truncate">{String(p.pick || '').replace(/\s[+-]\d{3,}$/, '')}</span>
                           <span className="text-sm tabular-nums text-ink-400 flex-shrink-0">{fmtOdds(p.odds)}</span>
-                          {p.edge_pp != null && <span className="text-sm text-signal-pos tabular-nums flex-shrink-0">+{Number(p.edge_pp).toFixed(1)} pts</span>}
                         </div>
+                        {p.edge_pp != null && <div className="text-sm text-signal-pos tabular-nums">{pctPair(bookOurPct(Number(p.edge_pp), p.odds, null, p.implied_prob), true) ?? formatPp(p.edge_pp)}</div>}
                         {p.away_team && p.home_team && (
                           <div className="text-xs text-ink-500 truncate">{p.away_team} at {p.home_team}{p.game_date ? ` \u00b7 ${fmtDate(p.game_date)}` : ''}</div>
                         )}

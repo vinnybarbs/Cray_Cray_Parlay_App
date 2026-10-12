@@ -23,12 +23,12 @@ export const SHADOW_SPORTS = new Set(['NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cu
 // Play from 2026-08-10 to 2026-08-16, rows stamped in that window may
 // carry 7-10pp edges under the 'Play' label, the record is append only.
 export const TIERS = [
-  { label: 'Sharp Take',  subtitle: 'sharp take',  range: '10+ pts',   min: 10,        max: Infinity },
-  { label: 'Strong Play', subtitle: 'strong play', range: '7 to 10 pts',  min: 7,         max: 10 },
-  { label: 'Play',        subtitle: 'play it',     range: '4 to 7 pts',   min: 4,         max: 7 },
-  { label: 'Lean',        subtitle: 'lean it',     range: '2 to 4 pts',   min: 2,         max: 4 },
-  { label: 'Skip',        subtitle: 'pass on it',  range: '-2 to 2 pts',  min: -2,        max: 2 },
-  { label: 'Trap',        subtitle: "don't bet it", range: '-2 pts or worse', min: -Infinity, max: -2 },
+  { label: 'Sharp Take',  subtitle: 'sharp take',  range: 'us 10+ above the book',   min: 10,        max: Infinity },
+  { label: 'Strong Play', subtitle: 'strong play', range: 'us 7 to 10 above',  min: 7,         max: 10 },
+  { label: 'Play',        subtitle: 'play it',     range: 'us 4 to 7 above',   min: 4,         max: 7 },
+  { label: 'Lean',        subtitle: 'lean it',     range: 'us 2 to 4 above',   min: 2,         max: 4 },
+  { label: 'Skip',        subtitle: 'pass on it',  range: 'within 2 of the book',  min: -2,        max: 2 },
+  { label: 'Trap',        subtitle: "don't bet it", range: 'us 2+ below the book', min: -Infinity, max: -2 },
 ]
 
 export function tierRange(label) {
@@ -158,7 +158,7 @@ export function formatPp(signedPp) {
   if (signedPp == null) return null
   const v = Number(signedPp)
   if (Number.isNaN(v)) return null
-  return `${v >= 0 ? '+' : ''}${v.toFixed(1)} pts`
+  return `${v >= 0 ? '+' : ''}${Math.round(v)} vs book`
 }
 
 // Convert the game.edges dict (signed fractions) into pp for a given side key.
@@ -198,4 +198,57 @@ export function buildLockedPayload(game, sport) {
     reasoning: game.analysis_snippet || '',
     gameDate: game.game_date,
   }
+}
+
+// ─── Book vs us percentages (owner 2026-10-12) ──────────────────────────────
+// Every edge on the site reads as "Book says 50%, we say 61%". The book
+// number is the no-vig market probability the edge was measured against,
+// our number is that plus the edge, so the gap always equals the claim.
+// Mirrors api/today.js bookAndOurPct.
+export const TYPICAL_OVERROUND = 1.045
+
+export function rawImplied(americanOdds) {
+  const n = parseInt(americanOdds, 10)
+  if (!Number.isFinite(n) || n === 0) return null
+  return n < 0 ? -n / (-n + 100) : 100 / (n + 100)
+}
+
+// No-vig probability of one side. With the other side's price the vig is
+// removed exactly, without it a typical two way margin is taken out.
+export function bookProb(odds, otherOdds) {
+  const a = rawImplied(odds)
+  if (a == null) return null
+  const b = rawImplied(otherOdds)
+  return b != null ? a / (a + b) : a / TYPICAL_OVERROUND
+}
+
+// { book, ours } as whole percents, or null when the price or edge is unknown.
+export function bookOurPct(signedPp, odds, otherOdds, impliedProb) {
+  if (signedPp == null || Number.isNaN(Number(signedPp))) return null
+  const p = impliedProb != null ? Number(impliedProb) : bookProb(odds, otherOdds)
+  if (p == null) return null
+  return { book: Math.round(p * 100), ours: Math.round(p * 100 + Number(signedPp)) }
+}
+
+const SIDE_PRICES = {
+  home_ml: ['moneyline_home', 'moneyline_away'],
+  away_ml: ['moneyline_away', 'moneyline_home'],
+  home_spread: ['spread_home_price', 'spread_away_price'],
+  away_spread: ['spread_away_price', 'spread_home_price'],
+  over: ['over_price', 'under_price'],
+  under: ['under_price', 'over_price'],
+}
+
+// Book vs us for one side of a digest game.
+export function sidePct(game, side, signedPp) {
+  const keys = SIDE_PRICES[side]
+  if (!game || !keys) return null
+  const odds = game[keys[0]] ?? (side === game.recommended_side ? game.recommended_odds : null)
+  return bookOurPct(signedPp, odds, game[keys[1]])
+}
+
+// "Book 50%, us 61%" for tight spots, "Book says 50%, we say 61%" in prose.
+export function pctPair(p, long = false) {
+  if (!p) return null
+  return long ? `Book says ${p.book}%, we say ${p.ours}%` : `Book ${p.book}%, us ${p.ours}%`
 }

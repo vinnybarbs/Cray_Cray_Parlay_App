@@ -7,6 +7,7 @@ import PropCard from '../components/PropCard'
 import LiveStrip from '../components/LiveStrip'
 import BrandMark from '../components/BrandMark'
 import { SkeletonCard } from '../components/Skeleton'
+import { formatPp } from '../lib/tiers'
 
 // ─── Landing, the public front door ──────────────────────────────────────────
 // Rewritten 2026-10-12 (owner design review, "lead with the play, prove it
@@ -44,7 +45,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
   const neg = items.filter(it => it.pp < 0).sort((a, b) => a.pp - b.pp)
   const strip = []
   for (let i = 0; i < Math.max(pos.length, neg.length); i++) {
-    if (pos[i]) strip.push({ key: `p${i}`, label: `${pos[i].sport} ${pos[i].label}`, price: `+${Number(pos[i].pp).toFixed(1)} pts`, targetId: 'free-look' })
+    if (pos[i]) strip.push({ key: `p${i}`, label: `${pos[i].sport} ${pos[i].label}`, price: pos[i].book_pct != null ? `Book ${pos[i].book_pct}%, us ${pos[i].our_pct}%` : formatPp(pos[i].pp), targetId: 'free-look' })
     if (neg[i]) strip.push({ key: `n${i}`, label: `Don't bet ${neg[i].sport} ${neg[i].label}`, tone: 'neg', targetId: 'free-look' })
   }
 
@@ -140,7 +141,7 @@ function FreeLook({ props, onStartTrial }) {
 function Proofs({ stats, sharpTake }) {
   const proofs = [
     ['Every pick is public', 'Published before the game, graded after, losers included. Nothing gets deleted.'],
-    ['We name the traps', 'The popular side priced worse than fair gets a "Don\'t bet this" label. Nobody else shows you that.'],
+    ['We name the traps', 'The popular side we rate below the book gets a "Don\'t bet this" label. Nobody else shows you that.'],
     ['No sportsbook owns us', 'No affiliate links, no revenue share, ever. We have no reason to push you toward a bet.'],
   ]
   return (
@@ -181,7 +182,7 @@ function RecordLine({ stats, sharpTake }) {
 function HowItWorks() {
   const steps = [
     ['We price every game and prop', 'Our model works out how likely each side really is, from the matchup, recent form, injuries and weather.'],
-    ['We compare it to the book', 'When our number beats the price by enough, it\'s a play. When the popular side is priced worse than fair, it\'s a trap.'],
+    ['We compare it to the book', 'Book says one chance, we say another. When ours is well above the book\'s, it\'s a play. When the popular side\'s is below, it\'s a trap.'],
     ['You see the why', 'Every card shows our number against the book\'s and a short explanation. Tap it and it opens up.'],
   ]
   return (
@@ -241,7 +242,7 @@ function Pricing({ onStartTrial }) {
 
 function Questions() {
   const items = [
-    ['What\'s a trap?', 'A side most bettors are drawn to, like a hot streak, a heavy favorite or a popular over, that we think wins at least 2 fewer times in 100 than its price needs. A bad bet nobody wants isn\'t a trap. A bad bet everybody wants is.'],
+    ['What\'s a trap?', 'A side most bettors are drawn to, like a hot streak, a heavy favorite or a popular over, where we put its chance at least 2% below the book\'s. A bad bet nobody wants isn\'t a trap. A bad bet everybody wants is.'],
     ['Why show the sides not to bet?', 'Most of the betting market is bad prices. Showing only the good ones would hide the shape of it. Naming the traps is the thing a sportsbook partner can\'t do.'],
     ['How is this different from Action Network or OddsJam?', 'Action Network is owned by Better Collective, a publicly traded sportsbook affiliate, so it can\'t credibly warn you off a book. OddsJam is built for high volume bettors at $99 to $199 a month. We\'re built for everyday bettors who want the math without the price tag, and we show you what not to bet.'],
     ['Are props counted in the record?', 'Not yet. Props are in shadow: priced, published and graded in public, but kept out of the official record until their own record and the closing line clear our bar.'],
