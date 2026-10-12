@@ -223,7 +223,7 @@ export default function HouseLedger() {
           </h1>
           <RecordWindowsLine windows={data?.recordWindows} />
           <p className="mt-3 text-ink-300 max-w-2xl leading-relaxed text-sm">
-            This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice to bet against a side, so they're scored separately as fades. The headline is the Sharp Take record, the tier this product exists to find. The full tier table shows where the rest of the edges live.
+            This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice not to bet a side, so they're scored separately by what betting that side cost. The headline is the Sharp Take record, the tier this product exists to find. The full tier table shows where the rest of the edges live.
           </p>
         </div>
 

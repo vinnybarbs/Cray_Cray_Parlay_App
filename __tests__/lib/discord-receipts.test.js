@@ -31,7 +31,8 @@ describe('formatReceipts', () => {
     expect(titles.some(t => t.startsWith('Sharp Take · 1-0'))).toBe(true);
     expect(titles.some(t => t.startsWith('Strong Play · 0-1'))).toBe(true);
     expect(titles.some(t => t.startsWith('Leans · 1-0'))).toBe(true);
-    expect(titles.some(t => t.startsWith('Traps · fades that held 1'))).toBe(true);
+    // The trap row stores the bait's own result: the Mets won, so the warning missed.
+    expect(titles.some(t => t.startsWith('Traps · warning held 0, bait came in 1'))).toBe(true);
     expect(titles.some(t => t.startsWith('Legs · 1 hit'))).toBe(true);
     expect(embeds[embeds.length - 1].title).toContain('Record');
   });
@@ -41,7 +42,7 @@ describe('formatReceipts', () => {
     expect(msg).toContain('✅ 🦅 Atlanta Braves -1.5 · Cincinnati Reds @ Atlanta Braves · MLB · 10.6pp');
     expect(msg).toContain('❌ Texas Rangers -1.5 · New York Mets @ Texas Rangers · MLB · 9.8pp');
     expect(msg).toContain('➖ New York Yankees ML -102');
-    expect(msg).toContain('✅ Fade New York Mets ML -150');
+    expect(msg).toContain("❌ Don't bet New York Mets ML -150");
     expect(msg).toContain('✅ Dallas Cowboys ML -205 · Washington Commanders @ Dallas Cowboys · NFL');
   });
 

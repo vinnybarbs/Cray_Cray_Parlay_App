@@ -968,7 +968,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
           )
           if (game.recommended_pick && signedPp != null && signedPp <= -2) return (
             <div className="bg-signal-neg-dim/30 rounded-sharp shadow-hairline px-3 py-2 mb-3 border border-signal-neg/40">
-              <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">Trap · fade this side</div>
+              <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">Trap · don't bet this side</div>
               <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{game.recommended_pick}</div>
             </div>
           )
@@ -1127,7 +1127,7 @@ function TrapCard({ game, trap, gameKey, onDeepResearch }) {
           <div className="font-mono text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
         )}
         <div className="bg-signal-neg-dim/20 rounded-sharp px-3 py-2 mb-3 border border-signal-neg/30">
-          <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">The bait · fade it</div>
+          <div className="font-mono text-[9px] text-signal-neg uppercase tracking-[0.14em] mb-0.5">The bait · don't bet it</div>
           <div className="text-signal-neg font-mono font-medium text-sm tabular-nums">{baitText || side}</div>
         </div>
         {signals.length > 0 && (
@@ -1920,20 +1920,28 @@ export default function DailyDigest({ onBack }) {
           {bandsOpen && heroBands.length > 0 && (
             <div
               className="mb-4 -mt-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-400"
-              title="Record, hit rate and units per band for the selected window. Same rollup as the ledger. Traps are graded as the fade, Legs need no edge."
+              title="Record, hit rate and units per band for the selected window. Same rollup as the ledger. Trap bait is the record of the sides we said not to bet, so negative units mean the warning saved money. Legs need no edge."
             >
-              {heroBands.map(b => (
-                <div key={b.label} className="min-w-0 flex flex-wrap items-baseline gap-x-1.5">
-                  <span className="text-ink-300 truncate">{b.label}</span>
-                  <span className="tabular-nums text-ink-200">{b.won ?? 0}-{b.lost ?? 0}{b.push ? `-${b.push}` : ''}</span>
-                  {b.winRate != null && <span className={`tabular-nums ${winRateColor(b.winRate)}`}>{b.winRate}%</span>}
-                  {b.units != null && (
-                    <span className={`tabular-nums ${b.units > 0 ? 'text-signal-pos' : b.units < 0 ? 'text-signal-neg' : 'text-ink-400'}`}>
-                      {b.units > 0 ? '+' : ''}{b.units.toFixed(1)}u
-                    </span>
-                  )}
-                </div>
-              ))}
+              {heroBands.map(b => {
+                // A trap row is the bait's own record (owner 2026-10-12:
+                // trap means don't bet it), so its units read inverted:
+                // the bait losing money is the warning working.
+                const isTrap = b.label === 'Trap'
+                const good = b.units != null && (isTrap ? b.units < 0 : b.units > 0)
+                const bad = b.units != null && (isTrap ? b.units > 0 : b.units < 0)
+                return (
+                  <div key={b.label} className="min-w-0 flex flex-wrap items-baseline gap-x-1.5">
+                    <span className="text-ink-300 truncate">{isTrap ? 'Trap bait' : b.label}</span>
+                    <span className="tabular-nums text-ink-200">{b.won ?? 0}-{b.lost ?? 0}{b.push ? `-${b.push}` : ''}</span>
+                    {!isTrap && b.winRate != null && <span className={`tabular-nums ${winRateColor(b.winRate)}`}>{b.winRate}%</span>}
+                    {b.units != null && (
+                      <span className={`tabular-nums ${good ? 'text-signal-pos' : bad ? 'text-signal-neg' : 'text-ink-400'}`}>
+                        {b.units > 0 ? '+' : ''}{b.units.toFixed(1)}u
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 
@@ -1961,7 +1969,7 @@ export default function DailyDigest({ onBack }) {
                 <h1 className="font-mono text-3xl md:text-4xl font-bold text-ink-300">…</h1>
               )}
 
-              {/* Secondary tier counts + traps to fade */}
+              {/* Secondary tier counts + traps to avoid */}
               {data && (
                 <p className="text-sm mt-2 font-mono tabular-nums text-ink-300">
                   {tierCounts.strongPlays > 0 && <span><span className="text-signal-pos">{tierCounts.strongPlays}</span> Strong Play{tierCounts.strongPlays !== 1 ? 's' : ''}</span>}
@@ -1972,7 +1980,7 @@ export default function DailyDigest({ onBack }) {
                   {(tierCounts.strongPlays > 0 || tierCounts.plays > 0 || tierCounts.leans > 0) && tierCounts.legs > 0 && <span className="text-ink-600"> · </span>}
                   {tierCounts.legs > 0 && <span><span className="text-ink-200">{tierCounts.legs}</span> Leg{tierCounts.legs !== 1 ? 's' : ''}</span>}
                   {(tierCounts.strongPlays > 0 || tierCounts.plays > 0 || tierCounts.leans > 0 || tierCounts.legs > 0) && tierCounts.traps > 0 && <span className="text-ink-600"> · </span>}
-                  {tierCounts.traps > 0 && <span><span className="text-signal-neg">{tierCounts.traps}</span> Trap{tierCounts.traps !== 1 ? 's' : ''} to fade</span>}
+                  {tierCounts.traps > 0 && <span><span className="text-signal-neg">{tierCounts.traps}</span> Trap{tierCounts.traps !== 1 ? 's' : ''} to avoid</span>}
                 </p>
               )}
 
@@ -2146,7 +2154,7 @@ function EdgeLegendModal({ open, onClose }) {
     { range: '4-7pp',  label: 'Play',        sub: 'play it',     cls: 'text-signal-pos' },
     { range: '2-4pp',  label: 'Lean',        sub: 'lean it',     cls: 'text-signal-pos/70' },
     { range: '-2-2pp', label: 'Skip',        sub: 'pass on it',  cls: 'text-ink-300' },
-    { range: 'baited', label: 'Trap',        sub: 'fade it',     cls: 'text-signal-neg font-semibold' },
+    { range: 'baited', label: 'Trap',        sub: "don't bet it", cls: 'text-signal-neg font-semibold' },
   ]
 
   return (
