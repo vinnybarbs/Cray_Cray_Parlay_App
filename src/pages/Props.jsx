@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 import PropCard, { fmtUnits } from '../components/PropCard'
 import { API_BASE_URL as API_BASE } from '../config'
+import { SkeletonList } from '../components/Skeleton'
 
 // Props (shadow), owner 2026-10-12. Every NFL player prop read at 4
 // points or more, the recent results and the shadow record by market.
@@ -45,7 +46,7 @@ export default function Props() {
         <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <button onClick={() => navigate('/today')} className="focus:outline-none"><BrandMark /></button>
           <div className="flex items-center gap-1">
-            <button onClick={() => navigate('/today')} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Today</button>
+            <button onClick={() => navigate('/today')} className="hidden md:inline-block px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Today</button>
             <SignOutButton />
           </div>
         </div>
@@ -93,7 +94,7 @@ export default function Props() {
         </div>
 
         {error && <p className="text-sm text-ink-400">Props did not load. Try again in a minute.</p>}
-        {!data && !error && <p className="text-sm text-ink-500">Loading props</p>}
+        {!data && !error && <SkeletonList count={4} label="Loading props" />}
 
         {data && tab === 'upcoming' && (
           upcoming.length === 0

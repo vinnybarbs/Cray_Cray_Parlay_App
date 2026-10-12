@@ -6,6 +6,7 @@ import { fmtGameDateTime } from '../lib/gameTime'
 import { API_BASE_URL as API_BASE } from '../config'
 import PropCard from '../components/PropCard'
 import InstallButton from '../components/InstallButton'
+import { SkeletonList } from '../components/Skeleton'
 
 // Today (build_queue 96, owner 2026-10-12): the one screen a first time
 // visitor or a home screen install opens on. The day's best plays in
@@ -113,7 +114,7 @@ export default function Today() {
           <BrandMark />
           <div className="flex items-center gap-1">
             <InstallButton />
-            <button onClick={() => navigate('/ledger')} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Ledger</button>
+            <button onClick={() => navigate('/ledger')} className="hidden md:inline-block px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Ledger</button>
             <SignOutButton />
           </div>
         </div>
@@ -125,7 +126,7 @@ export default function Today() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           </p>
           <h1 className="text-2xl font-bold tracking-tight">
-            {!data && !error ? 'Loading today' : plays > 0 ? `${plays} play${plays === 1 ? '' : 's'} today` : 'A quiet day'}
+            {!data && !error ? 'Today' : plays > 0 ? `${plays} play${plays === 1 ? '' : 's'} today` : 'A quiet day'}
           </h1>
           {data && plays === 0 && (
             <p className="text-sm text-ink-400">Nothing clears 4 points today. The best of the smaller reads is below, labeled Lean.</p>
@@ -135,6 +136,8 @@ export default function Today() {
         {error && (
           <p className="text-sm text-ink-400">Today's board did not load. Try again in a minute, or open the full board.</p>
         )}
+
+        {!data && !error && <SkeletonList count={3} label="Loading today's picks" />}
 
         {picks.length > 0 && (
           <section className="flex flex-col gap-3" aria-label="Today's picks">

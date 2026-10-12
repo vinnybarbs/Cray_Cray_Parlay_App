@@ -5,6 +5,7 @@ import { tierRange } from '../lib/tiers'
 import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
 import InstallButton from '../components/InstallButton'
+import { SkeletonBar } from '../components/Skeleton'
 
 // ─── Landing, the public marketing surface ────────────────────────────────────
 // Concept: "Trading terminal as marketing page." Bloomberg-severity layout
@@ -247,8 +248,11 @@ function Nav({ onStartTrial, onSignIn, scrollTo }) {
 // ─── Hero ──────────────────────────────────────────────────────────────────
 
 function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
-  const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : '-'
-  const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : '1,000+'
+  // Until the ledger answers, show a grey placeholder, not a red dash
+  // (which read as a bad record) or a hardcoded count (UI plan item 4).
+  const loadingValue = <SkeletonBar className="inline-block align-middle h-6 w-16" />
+  const hitRateDisplay = stats?.hitRate != null ? `${stats.hitRate}%` : loadingValue
+  const weeklyCount = stats?.total != null ? stats.total.toLocaleString() : loadingValue
   // The claim almost nobody else can make with receipts: top-tier picks,
   // all-time record with ROI, straight from the settlement ledger. The API
   // only sends it once the sample passes 100 decided picks, and it renders
@@ -338,7 +342,7 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
                 (57.5 vs 64.2). All rows come from the same rollup,
                 mv_public_record, just different buckets. */}
             <dl className="divide-y divide-ink-800">
-              <StatRow label="Hit rate · all tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate >= 55 ? 'pos' : stats?.hitRate >= 50 ? 'neutral' : 'neg'} big />
+              <StatRow label="Hit rate · all tiers · last 30d" value={hitRateDisplay} tone={stats?.hitRate == null ? 'neutral' : stats.hitRate >= 55 ? 'pos' : stats.hitRate >= 50 ? 'neutral' : 'neg'} big />
               {sharpTakeDisplay && (
                 <StatRow
                   label={`Sharp Take only · all-time (${(sharpTake.wins + sharpTake.losses).toLocaleString()} graded)`}
