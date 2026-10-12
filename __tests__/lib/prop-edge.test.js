@@ -211,3 +211,30 @@ describe('closeColumns', () => {
     expect(closeColumns({ line: 5.5, side: 'over', anchor_prob: 0.5 }, undefined, 'x')).toBeNull();
   });
 });
+
+describe('skewed yards markets (prop_skew_shape)', () => {
+  it('lognormal puts less than half the mass above a line at the mean', () => {
+    expect(pe.lognormalOverProb(60, 60, 30)).toBeLessThan(0.5);
+    expect(pe.lognormalOverProb(0, 60, 30)).toBe(1);
+    expect(pe.lognormalOverProb(10, 0, 30)).toBe(0);
+  });
+
+  it('a rushing line at the mean reads under on the lognormal and flat on the normal', () => {
+    const args = { line: 60.5, anchorOverProb: 0.5, mean: 60.5, sigma: 30, games: 17 };
+    const skew = pe.propRead({ ...args, market: 'player_rush_yds' });
+    expect(skew.side).toBe('under');
+    expect(skew.edgePp).toBeGreaterThan(0);
+    expect(pe.propRead(args).edgePp).toBe(0);
+    expect(pe.propRead({ ...args, market: 'player_rush_yds' }, { prop_skew_shape: 0 }).edgePp).toBe(0);
+  });
+
+  it('passing yards and counts stay normal', () => {
+    const r = pe.propRead({ line: 220.5, anchorOverProb: 0.5, mean: 220.5, sigma: 50, games: 17, market: 'player_pass_yds' });
+    expect(r.edgePp).toBe(0);
+  });
+
+  it('propReadV2 passes the market through', () => {
+    const v2 = pe.propReadV2({ market: 'player_reception_yds', line: 50.5, anchorOverProb: 0.5, mean: 50.5, sigma: 25, games: 17 });
+    expect(v2.side).toBe('under');
+  });
+});
