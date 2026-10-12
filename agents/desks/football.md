@@ -225,7 +225,7 @@ against ESPN, CBS Sports, Yahoo Sports, Fox Sports or the league site).
 The football lookback (football-lookback-weekly, Tuesdays 09:00 MT)
 grades every football read in lookback_reads: anchor right, net move
 right, close right, upsets. The desk's Tuesday run reads that row.
-There are no football rule gates yet (rule_gates holds MLB only).
+There are no football rule gates yet (rule_gates holds five MLB gates and the NHL goalie_required gate).
 
 ## Narration vocabulary
 

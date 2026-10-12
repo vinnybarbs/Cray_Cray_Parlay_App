@@ -130,10 +130,6 @@ app.get('/api/board-history', boardHistory);
 const houseParlaysApi = require('./api/house-parlays');
 app.get('/api/house-parlays', houseParlaysApi);
 
-// Golf field analysis: devig outrights + research notes into golf_field.
-const analyzeGolf = require('./api/cron/analyze-golf');
-app.post('/cron/analyze-golf', analyzeGolf);
-
 // Serve static frontend in production and development (Vite build output)
 const distPath = path.join(__dirname, 'dist');
 app.use(express.static(distPath, {
@@ -407,12 +403,6 @@ app.get('/api/parlays/pending', ...getPendingParlays);
 // Cron endpoints
 const cronCheckParlays = require('./api/cron-check-parlays');
 app.post('/api/cron/check-parlays', cronCheckParlays);
-
-// Add learning analysis endpoints
-const { analyzeOutcomes, getLessons, getPerformanceSummary } = require('./api/analyze-outcomes');
-app.post('/api/analyze-outcomes', analyzeOutcomes);
-app.get('/api/lessons', getLessons);
-app.get('/api/performance-summary', getPerformanceSummary);
 
 // Add user parlay management endpoints
 const { getUserParlays, getUserStats, getParlayById, updateParlayOutcome } = require('./api/user-parlays');
