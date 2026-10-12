@@ -29,7 +29,7 @@
   --color-signal-neg-dim: #5d1f1f;
   --color-signal-neutral: #9ea1a8;
 
-  --radius-sharp: 2px;
+  --radius-sharp: 12px;
 
   /* Hairline insets. Terminal-panel borders that don't affect layout. */
   --shadow-hairline:        inset 0 0 0 1px var(--color-ink-600);

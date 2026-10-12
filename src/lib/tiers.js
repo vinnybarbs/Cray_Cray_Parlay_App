@@ -23,12 +23,12 @@ export const SHADOW_SPORTS = new Set(['NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cu
 // Play from 2026-08-10 to 2026-08-16, rows stamped in that window may
 // carry 7-10pp edges under the 'Play' label, the record is append only.
 export const TIERS = [
-  { label: 'Sharp Take',  subtitle: 'sharp take',  range: '10pp+',   min: 10,        max: Infinity },
-  { label: 'Strong Play', subtitle: 'strong play', range: '7-10pp',  min: 7,         max: 10 },
-  { label: 'Play',        subtitle: 'play it',     range: '4-7pp',   min: 4,         max: 7 },
-  { label: 'Lean',        subtitle: 'lean it',     range: '2-4pp',   min: 2,         max: 4 },
-  { label: 'Skip',        subtitle: 'pass on it',  range: '-2-2pp',  min: -2,        max: 2 },
-  { label: 'Trap',        subtitle: "don't bet it", range: '-2pp or worse', min: -Infinity, max: -2 },
+  { label: 'Sharp Take',  subtitle: 'sharp take',  range: '10+ pts',   min: 10,        max: Infinity },
+  { label: 'Strong Play', subtitle: 'strong play', range: '7 to 10 pts',  min: 7,         max: 10 },
+  { label: 'Play',        subtitle: 'play it',     range: '4 to 7 pts',   min: 4,         max: 7 },
+  { label: 'Lean',        subtitle: 'lean it',     range: '2 to 4 pts',   min: 2,         max: 4 },
+  { label: 'Skip',        subtitle: 'pass on it',  range: '-2 to 2 pts',  min: -2,        max: 2 },
+  { label: 'Trap',        subtitle: "don't bet it", range: '-2 pts or worse', min: -Infinity, max: -2 },
 ]
 
 export function tierRange(label) {
@@ -158,7 +158,7 @@ export function formatPp(signedPp) {
   if (signedPp == null) return null
   const v = Number(signedPp)
   if (Number.isNaN(v)) return null
-  return `${v >= 0 ? '+' : ''}${v.toFixed(1)}pp`
+  return `${v >= 0 ? '+' : ''}${v.toFixed(1)} pts`
 }
 
 // Convert the game.edges dict (signed fractions) into pp for a given side key.

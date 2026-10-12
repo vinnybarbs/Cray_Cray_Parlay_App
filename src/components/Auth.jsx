@@ -70,7 +70,7 @@ export default function Auth({ onClose }) {
       <div className="fixed inset-0 bg-ink-950/80 backdrop-blur-sm flex items-center justify-center z-50">
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-8 max-w-md w-full mx-4 text-center">
           <div className="text-3xl mb-4">📬</div>
-          <h2 className="font-mono text-xl font-semibold uppercase tracking-[0.08em] text-ink-100 mb-3">
+          <h2 className="text-xl font-semibold text-ink-100 mb-3">
             Check your email
           </h2>
           <p className="text-sm text-ink-300 leading-relaxed mb-2">
@@ -83,7 +83,7 @@ export default function Auth({ onClose }) {
           </p>
           <button
             onClick={onClose}
-            className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 font-mono font-medium uppercase tracking-[0.12em] text-sm transition-colors"
+            className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 font-medium text-sm transition-colors"
           >
             Got it
           </button>
@@ -96,7 +96,7 @@ export default function Auth({ onClose }) {
     <div className="fixed inset-0 bg-ink-950/80 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-ink-900 rounded-sharp shadow-hairline p-8 max-w-md w-full mx-4">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="font-mono text-xl font-semibold uppercase tracking-[0.08em] text-ink-100">
+          <h2 className="text-xl font-semibold text-ink-100">
             {isSignUp ? 'Create Account' : 'Sign In'}
           </h2>
           {onClose && (
@@ -134,7 +134,7 @@ export default function Auth({ onClose }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-300 mb-1.5">
+            <label className="block text-xs font-medium text-ink-300 mb-1.5">
               Email
             </label>
             <input
@@ -148,7 +148,7 @@ export default function Auth({ onClose }) {
           </div>
 
           <div>
-            <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-300 mb-1.5">
+            <label className="block text-xs font-medium text-ink-300 mb-1.5">
               Password
             </label>
             <input
@@ -171,7 +171,7 @@ export default function Auth({ onClose }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-signal-pos text-ink-950 py-2 px-4 rounded-sharp hover:bg-signal-pos/90 disabled:opacity-50 disabled:cursor-not-allowed font-mono font-bold uppercase tracking-[0.12em] text-sm"
+            className="w-full bg-signal-pos text-ink-950 py-2 px-4 rounded-sharp hover:bg-signal-pos/90 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm"
           >
             {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
           </button>
@@ -183,7 +183,7 @@ export default function Auth({ onClose }) {
               setIsSignUp(!isSignUp)
               setError('')
             }}
-            className="font-mono text-[11px] uppercase tracking-[0.12em] text-signal-pos/80 hover:text-signal-pos"
+            className="text-[11px] text-signal-pos/80 hover:text-signal-pos"
           >
             {isSignUp 
               ? 'Already have an account? Sign in' 

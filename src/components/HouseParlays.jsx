@@ -67,7 +67,7 @@ export default function HouseParlays() {
       {error && <p className="text-signal-neg text-sm">Couldn't load house parlays: {error}</p>}
       {data && (
         <div className="bg-ink-950/60 rounded-sharp shadow-hairline overflow-hidden">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-ink-950 text-xs text-ink-400">
             <span className="text-ink-200">House parlays · {dateLabel}</span>
             {rec && rec.hitRate != null && (
               <span className="ml-auto">

@@ -94,7 +94,7 @@ function InstallSheet({ onClose }) {
 
 const VARIANTS = {
   // Full width secondary button, for heroes and page footers.
-  block: 'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-sharp shadow-hairline hover:shadow-hairline-bright text-ink-100 text-xs font-mono font-bold uppercase tracking-[0.18em] transition-shadow',
+  block: 'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-sharp shadow-hairline hover:shadow-hairline-bright text-ink-100 text-sm font-semibold transition-shadow',
   // Small pill for page headers.
   header: 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-signal-pos/10 text-signal-pos text-xs font-semibold hover:bg-signal-pos/20 transition-colors flex-shrink-0',
 }
