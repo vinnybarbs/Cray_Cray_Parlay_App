@@ -2,7 +2,7 @@
   "name": "TrapHawk",
   "short_name": "TrapHawk",
   "description": "Math-graded picks with a public ledger, including the sides not to bet.",
-  "start_url": "/#/digest",
+  "start_url": "/#/today",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

@@ -111,6 +111,8 @@ const publicTicker = require('./api/public-ticker');
 app.get('/api/public-ticker', publicTicker);
 const publicPod = require('./api/public-pod');
 app.get('/api/public-pod', publicPod);
+const today = require('./api/today');
+app.get('/api/today', today);
 
 // /api/review-bundle and /api/pipeline-health were retired 2026-10-09
 // (owner). They fed two claude.ai scheduled tasks from before the cloud
