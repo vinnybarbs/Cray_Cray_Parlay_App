@@ -53,7 +53,9 @@ function PickRow({ p, onOpen, id }) {
         {p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}
       </div>
       <div className="text-sm text-ink-300">
-        Wins about <span className={`font-semibold tabular-nums ${t.color}`}>{Math.round(Number(p.edge_pp))} more times in 100</span> than the price says.
+        {p.book_pct != null
+          ? <>Book says <span className="tabular-nums text-ink-100">{p.book_pct}%</span>, we say <span className={`font-semibold tabular-nums ${t.color}`}>{p.our_pct}%</span></>
+          : <>Wins about <span className={`font-semibold tabular-nums ${t.color}`}>{Math.round(Number(p.edge_pp))} more times in 100</span> than the price says.</>}
       </div>
     </button>
   )
@@ -70,7 +72,9 @@ function TrapRow({ p, id }) {
         {p.sport} · {p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}
       </div>
       <div className="text-sm text-ink-300">
-        Wins about <span className="font-semibold tabular-nums text-signal-neg">{Math.round(Math.abs(Number(p.edge_pp)))} fewer times in 100</span> than its price needs.
+        {p.book_pct != null
+          ? <>Book says <span className="tabular-nums text-ink-100">{p.book_pct}%</span>, we say <span className="font-semibold tabular-nums text-signal-neg">{p.our_pct}%</span></>
+          : <>Wins about <span className="font-semibold tabular-nums text-signal-neg">{Math.round(Math.abs(Number(p.edge_pp)))} fewer times in 100</span> than its price needs.</>}
       </div>
     </div>
   )
