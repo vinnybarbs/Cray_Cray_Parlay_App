@@ -1,5 +1,6 @@
 import React from 'react'
 import { fmtGameDateTime } from '../lib/gameTime'
+import { teamColors } from '../lib/teamColors'
 
 // One shadow prop read (owner 2026-10-12: show props as shadow so the
 // site can be envisioned before they publish). Always carries the SHADOW
@@ -50,14 +51,24 @@ function initials(name) {
   return String(name || '').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()
 }
 
+// Team colors instead of a headshot or logo (owner 2026-10-12): photos
+// and logos need a license, plain colors and our own initials do not.
+// Falls back to neutral ink when the team is unknown.
 function Avatar({ name, team }) {
+  const c = teamColors(team)
   return (
     <div className="relative w-11 h-11 flex-shrink-0" aria-hidden="true">
-      <div className="w-11 h-11 rounded-full bg-ink-750 border border-ink-600 flex items-center justify-center text-sm font-semibold text-ink-200">
+      <div
+        className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold ${c ? 'border-2' : 'bg-ink-750 border border-ink-600 text-ink-200'}`}
+        style={c ? { backgroundColor: c.bg, borderColor: c.accent, color: c.fg } : undefined}
+      >
         {initials(name)}
       </div>
       {team && (
-        <span className="absolute -right-1.5 -bottom-1 font-mono text-[8px] font-bold leading-none px-1 py-0.5 rounded bg-ink-950 border border-ink-600 text-ink-200">
+        <span
+          className="absolute -right-1.5 -bottom-1 font-mono text-[8px] font-bold leading-none px-1 py-0.5 rounded border bg-ink-950"
+          style={c ? { borderColor: c.accent, color: '#FFFFFF' } : undefined}
+        >
           {team}
         </span>
       )}

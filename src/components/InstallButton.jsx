@@ -38,6 +38,14 @@ export function isIOS() {
   return /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
 }
 
+// Desktop Firefox has no install support at all, so say so instead of
+// leaving the visitor hunting through the menu.
+function isDesktopFirefox() {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  return /Firefox\//.test(ua) && !/Android|Mobile/.test(ua)
+}
+
 function ShareIcon() {
   return (
     <svg viewBox="0 0 24 24" className="inline-block w-4 h-4 -mt-0.5 text-signal-pos" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -72,6 +80,7 @@ function InstallSheet({ onClose }) {
           </ol>
         ) : (
           <p className="font-sans text-sm text-ink-200 mb-5">
+            {isDesktopFirefox() && <>Firefox on a computer can't install web apps. </>}
             Open <span className="font-semibold text-ink-100">traphawk.io</span> on your iPhone or iPad in Safari, then tap Share and Add to Home Screen. On Android, open it in Chrome and choose Install app from the menu.
           </p>
         )}

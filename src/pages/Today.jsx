@@ -103,8 +103,6 @@ export default function Today() {
   const picks = data?.picks || []
   const traps = data?.traps || []
   const r30 = data?.record?.last30
-  const rAll = data?.record?.allTime
-  const bait = data?.record?.trapBait
   const plays = picks.filter(p => Number(p.edge_pp) >= 4).length
 
   return (
@@ -168,37 +166,15 @@ export default function Today() {
           </section>
         )}
 
-        {(r30 || rAll) && (
-          <section className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-4 flex flex-col gap-3" aria-label="Record">
-            <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-400">The record, every pick graded</h2>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {r30 && (
-                <div className="min-w-0">
-                  <dt className="text-xs text-ink-500">Last 30 days</dt>
-                  <dd className="font-mono tabular-nums text-ink-100">
-                    {r30.won}-{r30.lost} <span className={r30.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}>{fmtUnits(r30.units)}</span>
-                  </dd>
-                </div>
-              )}
-              {rAll && (
-                <div className="min-w-0">
-                  <dt className="text-xs text-ink-500">Since May 10</dt>
-                  <dd className="font-mono tabular-nums text-ink-100">
-                    {rAll.won}-{rAll.lost} <span className={rAll.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}>{fmtUnits(rAll.units)}</span>
-                  </dd>
-                </div>
-              )}
-              {bait && bait.units != null && (
-                <div className="col-span-2 min-w-0">
-                  <dt className="text-xs text-ink-500">Betting the sides we said not to bet</dt>
-                  <dd className="font-mono tabular-nums text-ink-100">
-                    <span className={bait.units < 0 ? 'text-signal-pos' : 'text-signal-neg'}>{fmtUnits(bait.units)}</span>
-                  </dd>
-                </div>
-              )}
-            </dl>
-            <p className="text-xs text-ink-500">1 unit stakes at the published price. Losers stay on the ledger.</p>
-          </section>
+        {/* The record closes the page as one line (owner 2026-10-12 design
+            review). The full breakdown lives on the ledger. */}
+        {r30 && (
+          <p className="text-xs text-ink-400 text-center">
+            Last 30 days <span className="font-mono tabular-nums text-ink-200">{r30.won}-{r30.lost}</span>{' '}
+            <span className={`font-mono tabular-nums ${r30.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(r30.units)}</span>
+            {' · '}
+            <button onClick={() => navigate('/ledger')} className="text-signal-pos hover:underline">See every pick</button>
+          </p>
         )}
 
         <div className="flex flex-col sm:flex-row gap-3">
@@ -207,12 +183,6 @@ export default function Today() {
             className="flex-1 px-5 py-3 bg-signal-pos hover:bg-signal-pos/90 rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-xs text-ink-950 transition-all active:scale-[0.98]"
           >
             Full board and the why
-          </button>
-          <button
-            onClick={() => navigate('/ledger')}
-            className="flex-1 px-5 py-3 bg-ink-900 shadow-hairline rounded-sharp font-mono font-bold uppercase tracking-[0.12em] text-xs text-ink-200 transition-all active:scale-[0.98]"
-          >
-            Every graded pick
           </button>
         </div>
 

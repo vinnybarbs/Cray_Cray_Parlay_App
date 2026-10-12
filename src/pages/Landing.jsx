@@ -964,7 +964,7 @@ function Disclosure() {
             </p>
             <p>
               <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 2.</span>
-              We do not place wagers on behalf of users. We do not hold money. We do not see your sportsbook account credentials. Deep links open the user's own sportsbook session.
+              We do not place wagers on behalf of users. We do not hold money. We do not see your sportsbook account credentials.
             </p>
             <p>
               <span className="text-ink-500 text-[10px] uppercase tracking-[0.18em] block mb-1">§ 3.</span>

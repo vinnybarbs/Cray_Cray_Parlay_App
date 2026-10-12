@@ -38,7 +38,9 @@ function Home() {
   const { isAuthenticated } = useAuth()
   const [showAuth, setShowAuth] = useState(false)
 
-  if (isAuthenticated) return <Navigate to="/digest" replace />
+  // Signed in home is Today, plays first (owner 2026-10-12 design review).
+  // The full board is one tab away.
+  if (isAuthenticated) return <Navigate to="/today" replace />
 
   return (
     <>

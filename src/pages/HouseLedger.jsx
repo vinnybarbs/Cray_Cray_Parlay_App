@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 import { edgeTier, tierRange, TIERS } from '../lib/tiers'
@@ -205,11 +206,12 @@ export default function HouseLedger() {
         <span className="text-sm font-semibold text-ink-200 hidden sm:inline">The House Ledger</span>
         <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">append-only · losers included</span>
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/today')}
           className="ml-auto px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
-          Home
+          Today
         </button>
+        <InstallButton />
         <SignOutButton />
       </div>
 
@@ -225,6 +227,9 @@ export default function HouseLedger() {
           <p className="mt-3 text-ink-300 max-w-2xl leading-relaxed text-sm">
             This is the house record, written by the settlement pipeline and never edited. It begins May 10, 2026, the day edge grading went live, and covers every actionable pick published since, across all sports. Traps are advice not to bet a side, so they're scored separately by what betting that side cost. The headline is the Sharp Take record, the tier this product exists to find. The full tier table shows where the rest of the edges live.
           </p>
+          <button onClick={() => navigate('/today')} className="mt-3 text-sm font-semibold text-signal-pos hover:underline">
+            See today's plays
+          </button>
         </div>
 
         {loading && (
@@ -489,6 +494,14 @@ export default function HouseLedger() {
             )}
           </>
         )}
+
+        {/* No dead end: proof leads back to the plays (owner 2026-10-12). */}
+        <button
+          onClick={() => navigate('/today')}
+          className="w-full sm:w-auto px-6 py-3 bg-signal-pos hover:bg-signal-pos/90 rounded-xl font-semibold text-sm text-ink-950 transition-all active:scale-[0.98]"
+        >
+          See today's plays
+        </button>
       </div>
     </div>
   )

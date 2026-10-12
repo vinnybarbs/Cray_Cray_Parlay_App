@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 // accent) so the brand reads identically on every page.
 export default function BrandMark() {
   return (
-    <a href="#/digest" className="flex items-center gap-2.5 flex-shrink-0 group">
+    <a href="#/today" className="flex items-center gap-2.5 flex-shrink-0 group">
       <img src="/traphawk-mark.png" alt="" className="h-7 w-7 object-contain" />
       <span className="text-sm font-bold uppercase tracking-[0.18em] transition-colors">
         <span className="text-signal-pos">Trap</span>

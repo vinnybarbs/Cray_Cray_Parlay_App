@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 import PropCard, { fmtUnits } from '../components/PropCard'
@@ -57,6 +58,7 @@ export default function Props() {
           <button onClick={() => navigate('/today')} className="focus:outline-none"><BrandMark /></button>
           <div className="flex items-center gap-1">
             <button onClick={() => navigate('/today')} className="hidden md:inline-block px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Today</button>
+            <InstallButton />
             <SignOutButton />
           </div>
         </div>
@@ -66,11 +68,6 @@ export default function Props() {
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
             <h1 className="text-3xl font-bold tracking-tight">Props</h1>
-            {total && (total.won + total.lost) > 0 && (
-              <span className="font-mono tabular-nums text-sm font-semibold text-signal-pos bg-signal-pos/10 rounded-full px-3 py-1.5 flex-shrink-0">
-                {total.won}-{total.lost} · {fmtUnits(total.units)}
-              </span>
-            )}
           </div>
           <p className="text-sm text-ink-400">
             NFL player prop reads, tracked in the open before they go live. Not picks yet and not in the official record. They publish once this shadow record and the closing line both clear the bar.
