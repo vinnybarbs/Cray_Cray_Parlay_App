@@ -10,6 +10,7 @@ import DialsDashboard from './pages/DialsDashboard'
 import HouseLedger from './pages/HouseLedger'
 import Today from './pages/Today'
 import Props from './pages/Props'
+import TabBar from './components/TabBar'
 
 // App-level router. HashRouter (mounted in main.jsx) keeps every pre-existing
 // #/digest-style URL working unchanged. The old MainApp flag-and-overlay
@@ -92,6 +93,7 @@ export default function App() {
 // one banner, not two.
 function AppRoutes() {
   return (
+    <>
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/today" element={<Today />} />
@@ -108,5 +110,9 @@ function AppRoutes() {
       <Route path="/admin/dials" element={<DialsDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    {/* Bottom tabs on phones for Today, Props, Board and Ledger. Renders
+        nothing on every other route. */}
+    <TabBar />
+    </>
   )
 }
