@@ -7,6 +7,7 @@ import { API_BASE_URL as API_BASE } from '../config'
 import PropCard from '../components/PropCard'
 import InstallButton from '../components/InstallButton'
 import { SkeletonList } from '../components/Skeleton'
+import LiveStrip from '../components/LiveStrip'
 
 // Today (build_queue 96, owner 2026-10-12): the one screen a first time
 // visitor or a home screen install opens on. The day's best plays in
@@ -32,10 +33,11 @@ function pickWithoutPrice(pick) {
   return String(pick || '').replace(/\s[+-]\d{3,}$/, '')
 }
 
-function PickRow({ p, onOpen }) {
+function PickRow({ p, onOpen, id }) {
   const t = edgeTier(p.edge_pp)
   return (
     <button
+      id={id}
       onClick={onOpen}
       className="w-full text-left bg-ink-900 rounded-2xl border border-ink-700 px-4 py-4 flex flex-col gap-2 active:scale-[0.99] transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-pos"
     >
@@ -57,9 +59,9 @@ function PickRow({ p, onOpen }) {
   )
 }
 
-function TrapRow({ p }) {
+function TrapRow({ p, id }) {
   return (
-    <div className="bg-ink-900 rounded-2xl border border-signal-neg/40 px-4 py-4 flex flex-col gap-1.5">
+    <div id={id} className="bg-ink-900 rounded-2xl border border-signal-neg/40 px-4 py-4 flex flex-col gap-1.5">
       <div className="flex items-baseline justify-between gap-3">
         <span className="font-semibold text-ink-100 min-w-0">Don't bet {pickWithoutPrice(p.pick)}</span>
         <span className="font-mono text-sm tabular-nums text-ink-300 flex-shrink-0">{fmtOdds(p.odds)}</span>
@@ -104,6 +106,15 @@ export default function Today() {
   const traps = data?.traps || []
   const r30 = data?.record?.last30
   const plays = picks.filter(p => Number(p.edge_pp) >= 4).length
+  const shownProps = (props?.upcoming || []).slice(0, 3)
+  const cardId = (kind, i) => `today-${kind}-${i}`
+  // The live strip lists exactly what the page shows, each item taps to
+  // its card (owner 2026-10-12).
+  const stripItems = [
+    ...picks.map((p, i) => ({ key: cardId('pick', i), label: pickWithoutPrice(p.pick), price: fmtOdds(p.odds), targetId: cardId('pick', i) })),
+    ...shownProps.map((p, i) => ({ key: cardId('prop', i), label: p.text, price: fmtOdds(p.price), targetId: cardId('prop', i) })),
+    ...traps.map((p, i) => ({ key: cardId('trap', i), label: `Don't bet ${pickWithoutPrice(p.pick)}`, tone: 'neg', targetId: cardId('trap', i) })),
+  ]
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
@@ -118,7 +129,8 @@ export default function Today() {
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 pt-6 pb-16 flex flex-col gap-8">
+      <main className="max-w-xl mx-auto px-4 pt-0 pb-16 flex flex-col gap-8">
+        {stripItems.length > 0 ? <LiveStrip items={stripItems} /> : <div aria-hidden="true" />}
         <section className="flex flex-col gap-1">
           <p className="text-sm text-ink-400">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -139,8 +151,8 @@ export default function Today() {
 
         {picks.length > 0 && (
           <section className="flex flex-col gap-3" aria-label="Today's picks">
-            {picks.map(p => (
-              <PickRow key={`${p.home_team}|${p.away_team}`} p={p} onOpen={() => navigate('/digest')} />
+            {picks.map((p, i) => (
+              <PickRow key={`${p.home_team}|${p.away_team}|${i}`} id={cardId('pick', i)} p={p} onOpen={() => navigate('/digest')} />
             ))}
           </section>
         )}
@@ -155,14 +167,14 @@ export default function Today() {
               <button onClick={() => navigate('/props')} className="text-sm font-semibold text-signal-pos hover:underline">All props</button>
             </div>
             <p className="text-sm text-ink-400 -mt-2">In shadow. Tracked in the open, not picks yet and not in the record.</p>
-            {props.upcoming.slice(0, 3).map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} />)}
+            {shownProps.map((p, i) => <div key={`${p.text}|${i}`} id={cardId('prop', i)}><PropCard p={p} /></div>)}
           </section>
         )}
 
         {traps.length > 0 && (
           <section className="flex flex-col gap-3" aria-label="Traps">
             <h2 className="text-lg font-semibold text-signal-neg">Stay off these</h2>
-            {traps.map(p => <TrapRow key={`${p.home_team}|${p.away_team}`} p={p} />)}
+            {traps.map((p, i) => <TrapRow key={`${p.home_team}|${p.away_team}|${i}`} id={cardId('trap', i)} p={p} />)}
           </section>
         )}
 
