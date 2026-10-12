@@ -25,11 +25,15 @@ ALTER TABLE public.prop_reads
 
 -- The scorecard the props flip is judged on: v2 reads at 2pp or more by
 -- market and claim band, with record, units at the consensus price for
--- the v2 side, and CLV where a close was captured.
+-- the v2 side, and CLV where a close was captured. consensus prices are
+-- an average of American odds, which breaks when books straddle even
+-- money (-105 and +105 average to 0), so a price under 100 in size
+-- prices no units and is counted in unpriced instead.
 CREATE OR REPLACE VIEW public.prop_clv_scorecard AS
 WITH r AS (
   SELECT market, v2_edge_pp, v2_outcome, v2_clv_pp, v2_beat_close, close_captured_at,
-    CASE WHEN lower(v2_side) = 'over' THEN consensus_over_price ELSE consensus_under_price END AS price,
+    CASE WHEN abs(CASE WHEN lower(v2_side) = 'over' THEN consensus_over_price ELSE consensus_under_price END) >= 100
+      THEN CASE WHEN lower(v2_side) = 'over' THEN consensus_over_price ELSE consensus_under_price END END AS price,
     CASE WHEN v2_edge_pp >= 7 THEN '7+' WHEN v2_edge_pp >= 4 THEN '4-7' ELSE '2-4' END AS band
   FROM public.prop_reads
   WHERE v2_edge_pp >= 2 AND v2_side IS NOT NULL
@@ -40,10 +44,11 @@ SELECT market, band,
   round(sum(CASE
     WHEN v2_outcome = 'won' AND price > 0 THEN price / 100.0
     WHEN v2_outcome = 'won' AND price < 0 THEN 100.0 / abs(price)
-    WHEN v2_outcome = 'lost' THEN -1 ELSE 0 END), 2) AS units,
+    WHEN v2_outcome = 'lost' AND price IS NOT NULL THEN -1 ELSE 0 END), 2) AS units,
   count(*) FILTER (WHERE close_captured_at IS NOT NULL) AS closed,
   round(avg(v2_clv_pp), 2) AS avg_clv_pp,
-  round(100.0 * avg(v2_beat_close::int) FILTER (WHERE v2_beat_close IS NOT NULL), 1) AS beat_close_pct
+  round(100.0 * avg(v2_beat_close::int) FILTER (WHERE v2_beat_close IS NOT NULL), 1) AS beat_close_pct,
+  count(*) FILTER (WHERE v2_outcome IN ('won','lost') AND price IS NULL) AS unpriced
 FROM r
 GROUP BY GROUPING SETS ((market, band), (band), ());
 
