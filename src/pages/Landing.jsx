@@ -4,6 +4,7 @@ import { tierRange } from '../lib/tiers'
 // API_BASE matches the rest of the app. Railway in prod, env override locally.
 import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
+import InstallButton from '../components/InstallButton'
 
 // ─── Landing, the public marketing surface ────────────────────────────────────
 // Concept: "Trading terminal as marketing page." Bloomberg-severity layout
@@ -300,6 +301,12 @@ function Hero({ stats, sharpTake, onStartTrial, onSignIn, onSeePick }) {
           <p className="mt-3 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
             7 days free · <span className="text-signal-pos">no card required</span>
           </p>
+
+          {/* Installable since PR 214, invisible until now. Hides itself
+              when already running from the home screen. */}
+          <div className="mt-5">
+            <InstallButton variant="block" />
+          </div>
 
           {/* Sign in affordance for returning users. Small but findable */}
           <p className="mt-5 text-[11px] font-mono uppercase tracking-[0.14em] text-ink-400">
