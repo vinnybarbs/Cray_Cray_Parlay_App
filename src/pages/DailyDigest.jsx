@@ -2096,7 +2096,7 @@ function EdgeLegendModal({ open, onClose }) {
               How much more often we think a side wins than its price says, counted in wins per 100 bets. The bigger the gap, the stronger the play.
             </p>
             <p className="text-ink-300 text-xs leading-relaxed mt-2 tabular-nums">
-              Example: <span className="tabular-nums text-signal-pos">+8.2 pts</span> on a Strong Play means the -110 price says the side wins about 52 times in 100, and we say about 60.
+              Example: <span className="tabular-nums text-signal-pos">+8.2 pts</span> on a Strong Play means a -110 price says the side wins about 50 times in 100 once the book's cut is taken out, and we say about 58.
             </p>
           </div>
 
