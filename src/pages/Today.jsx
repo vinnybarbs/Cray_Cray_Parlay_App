@@ -4,6 +4,7 @@ import BrandMark, { SignOutButton } from '../components/BrandMark'
 import { edgeTier } from '../lib/tiers'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { API_BASE_URL as API_BASE } from '../config'
+import PropCard from '../components/PropCard'
 
 // Today (build_queue 96, owner 2026-10-12): the one screen a first time
 // visitor or a home screen install opens on. The day's best plays in
@@ -75,6 +76,18 @@ export default function Today() {
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [error, setError] = useState(null)
+  const [props, setProps] = useState(null)
+
+  // Shadow props ride below the picks (owner 2026-10-12). A props
+  // failure never blocks the page.
+  useEffect(() => {
+    let cancelled = false
+    fetch(`${API_BASE}/api/props`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (!cancelled && d) setProps(d) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -130,6 +143,17 @@ export default function Today() {
         )}
         {data && picks.length === 0 && (
           <p className="text-sm text-ink-400">No published picks in the next 30 hours yet. The board refreshes through the day.</p>
+        )}
+
+        {props?.upcoming?.length > 0 && (
+          <section className="flex flex-col gap-3" aria-label="Props in shadow">
+            <div className="flex items-baseline justify-between gap-3">
+              <h2 className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-400">Props, in shadow</h2>
+              <button onClick={() => navigate('/props')} className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-300 hover:text-white">All props</button>
+            </div>
+            <p className="text-xs text-ink-500 -mt-1">Tracked in the open, not picks yet, not in the record.</p>
+            {props.upcoming.slice(0, 3).map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} />)}
+          </section>
         )}
 
         {traps.length > 0 && (
