@@ -1,0 +1,16 @@
+{
+  "name": "TrapHawk",
+  "short_name": "TrapHawk",
+  "description": "Math-graded picks with a public ledger, including the sides not to bet.",
+  "start_url": "/#/digest",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d0f",
+  "theme_color": "#0d0d0f",
+  "icons": [
+    { "src": "/traphawk-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/traphawk-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/traphawk-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
