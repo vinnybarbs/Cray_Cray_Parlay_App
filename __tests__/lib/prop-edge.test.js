@@ -168,3 +168,46 @@ describe('v2 shadow read', () => {
     expect(pe.isUnavailable(null)).toBe(false);
   });
 });
+
+// Prop closing line value (2026-10-12, build_queue 94): the CLV half of
+// the props promotion bar.
+describe('propClv', () => {
+  test('same line: devigged pp the side gained, positive beats the close', () => {
+    const over = pe.propClv('over', 45.5, 0.50, { line: 45.5, overProb: 0.53 });
+    expect(over.clvPp).toBeCloseTo(3, 6);
+    expect(over.beatClose).toBe(true);
+    const under = pe.propClv('under', 45.5, 0.50, { line: 45.5, overProb: 0.53 });
+    expect(under.clvPp).toBeCloseTo(-3, 6);
+    expect(under.beatClose).toBe(false);
+  });
+  test('moved line: no like for like price, the move decides', () => {
+    expect(pe.propClv('over', 45.5, 0.5, { line: 47.5, overProb: 0.5 })).toEqual({ clvPp: null, lineMove: 2, beatClose: true });
+    expect(pe.propClv('under', 45.5, 0.5, { line: 47.5, overProb: 0.5 })).toEqual({ clvPp: null, lineMove: 2, beatClose: false });
+    expect(pe.propClv('under', 4.5, 0.5, { line: 3.5, overProb: 0.5 }).beatClose).toBe(true);
+  });
+  test('missing inputs return null', () => {
+    expect(pe.propClv('over', 45.5, 0.5, null)).toBeNull();
+    expect(pe.propClv(null, 45.5, 0.5, { line: 45.5, overProb: 0.5 })).toBeNull();
+  });
+});
+
+describe('closeColumns', () => {
+  const { closeColumns } = require('../../api/cron/sync-nfl-props');
+  const books = [
+    { bookmaker: 'draftkings', line: 5.5, over_price: -130, under_price: 100 },
+    { bookmaker: 'fanduel', line: 5.5, over_price: -125, under_price: -105 },
+  ];
+  test('closing consensus and CLV for both the v1 and v2 sides', () => {
+    const c = closeColumns({ line: 5.5, side: 'over', v2_side: 'under', anchor_prob: 0.5 }, books, '2026-10-12T17:00:00Z');
+    expect(c.close_line).toBe(5.5);
+    expect(c.close_books).toBe(2);
+    expect(c.close_over_prob).toBeGreaterThan(0.5);
+    expect(c.beat_close).toBe(true);
+    expect(c.v2_beat_close).toBe(false);
+    expect(c.clv_pp).toBeCloseTo(-c.v2_clv_pp, 6);
+    expect(c.close_captured_at).toBe('2026-10-12T17:00:00Z');
+  });
+  test('no books, no close', () => {
+    expect(closeColumns({ line: 5.5, side: 'over', anchor_prob: 0.5 }, undefined, 'x')).toBeNull();
+  });
+});
