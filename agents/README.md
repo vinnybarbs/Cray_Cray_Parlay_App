@@ -77,11 +77,11 @@ worker with the one table it may write. The exec assistant is the code shipping 
 the asks the analysis routines filed and never decides what is the
 owner's (dials, directives, regrades, sweep candidates, publish flags).
 
-Three of the four crons are UTC and do not follow Mountain time. After
+Three of the seven triggers are UTC and do not follow Mountain time. After
 2026-11-01 (MST, UTC-7) shift the daily ops check, the weekly and the
 monthly one hour later (`0 15`, `0 13`, `0 16`) to hold the local
-times, and reverse it in March. The exec assistant carries its own time
-zone and needs no shift.
+times, and reverse it in March. The exec assistant and the three football desk
+triggers carry their own time zone and need no shift.
 
 Nothing shares a window. The ops check finishes by about 08:15 MT and
 the exec assistant starts at 08:57 MT so it reads a finished ops row. The
