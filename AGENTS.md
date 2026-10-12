@@ -141,6 +141,11 @@ model, schedule and the one table it may write.
 3. The change lands as a `sport_dials` row keyed sport:market with a
    `model_weight_changes` row carrying the evidence, and where the
    lookback proposed it, a six week sunset it must re survive.
+   The weekly dial search (cron weekly-dial-search, owner 2026-10-11)
+   is the one automatic path: per sport per week it applies the single
+   best move that passed the three tests out of sample, one 25 percent
+   step, source dial-search-auto, with a six week sunset re-test that
+   reverts it if the old value did at least as well.
 4. Everything the change touches moves with it (directive 22): the
    dial board, the review skill, the ops check, the code default, the
    UI copy, the data model skill.

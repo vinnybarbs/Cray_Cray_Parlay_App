@@ -501,6 +501,8 @@ app.post('/cron/analyze-nfl-props', analyzeNflProps);
 // analyzed, as-of data, graded at stored prices, into replay_picks.
 const replayFormula = require('./api/cron/replay-formula');
 app.post('/cron/replay-formula', replayFormula);
+const dialSearch = require('./api/cron/dial-search');
+app.post('/cron/dial-search', dialSearch);
 const repricePendingPicks = require('./api/cron/reprice-pending-picks');
 app.post('/cron/reprice-pending-picks', repricePendingPicks);
 
