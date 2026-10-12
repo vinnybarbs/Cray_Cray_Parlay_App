@@ -40,8 +40,15 @@ what is code, and brings the owner one phone sized message a day: the
 record, what shipped, what the machine found, and the choices that are
 his, each with the number it rests on and a recommendation. A choice
 stays on that list every day until he answers it. Notifications on the
-three analysis routines are turned off in the routines UI so the one
-message is the only one.
+three analysis routines and the three football desk triggers are off
+in the routines UI so the one message is the only one (owner confirmed
+2026-10-12). The exec assistant keeps push and email on. Two safety
+nets cover a silent failure: the exec assistant names any registered
+worker whose report is missing in its lead line, and if the exec
+assistant itself files nothing, discord-exec-brief posts a "No brief
+today" alert at its 17:45 UTC slot. The Monday LinkedIn post ideas
+routine is not TrapHawk work and is not read by the exec assistant, so
+it keeps its own notification.
 
 A routine whose brief row is missing, or whose Supabase tools are
 absent, stops and says so loudly instead of guessing. That line is in
