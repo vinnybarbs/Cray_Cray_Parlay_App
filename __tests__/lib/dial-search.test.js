@@ -83,37 +83,128 @@ describe('stageOneWinners', () => {
   });
 });
 
-describe('runDialSearch', () => {
-  const rpc = jest.fn(async () => ({ data: { filed: 1 }, error: null }));
-  const supabase = {
-    from: () => ({ select: () => ({ in: async () => ({ data: [{ sport: '__all__', dial: 'venue_weight', value: 0.25 }], error: null }) }) }),
-    rpc,
+// A small fake of the supabase client: per table rows for selects, and a
+// log of every write.
+function fakeDb({ dials = [], moves = [] } = {}) {
+  const writes = [];
+  const rpc = jest.fn(async () => ({ data: { filed: 1, passed: [] }, error: null }));
+  const from = (table) => {
+    const rowsFor = () => (table === 'sport_dials' ? dials : table === 'dial_search_moves' ? moves : []);
+    const filters = [];
+    const q = {
+      select: () => q,
+      in: (col, vals) => { filters.push(r => vals.includes(r[col])); return q; },
+      eq: (col, v) => { filters.push(r => r[col] === v); return q; },
+      lte: (col, v) => { filters.push(r => r[col] <= v); return q; },
+      then: (res, rej) => Promise.resolve({ data: rowsFor().filter(r => filters.every(f => f(r))), error: null }).then(res, rej),
+      insert: async (row) => { writes.push(['insert', table, row]); return { error: null }; },
+      upsert: async (row) => { writes.push(['upsert', table, row]); return { error: null }; },
+      update: (row) => ({ eq: async (col, v) => { writes.push(['update', table, row, v]); return { error: null }; } }),
+    };
+    return q;
   };
-  beforeEach(() => { runReplay.mockReset(); rpc.mockClear(); });
+  return { from, rpc, writes };
+}
 
-  test('searches the recent week, confirms the winners on the weeks before, files the confirm run', async () => {
-    runReplay
-      .mockImplementationOnce(async (_s, opts) => {
-        const formulas = Object.fromEntries(opts.variants.map(v => [v.name, { picks: 5, won: 2, lost: 3, units: -1 }]));
-        formulas.venue_weight_dn = { picks: 5, won: 4, lost: 1, units: 2 };
-        return { formulas, picks_written: 10 };
-      })
-      .mockImplementationOnce(async () => ({ formulas: { base: { picks: 40, units: 1 }, venue_weight_dn: { picks: 38, units: 5 } }, picks_written: 78 }));
-    const out = await ds.runDialSearch(supabase, { sport: 'NFL', recentDays: 7, confirmDays: 60, stamp: '20261012' });
+const searchWeek = async (_s, opts) => {
+  const formulas = Object.fromEntries(opts.variants.map(v => [v.name, { picks: 5, won: 2, lost: 3, units: -1 }]));
+  formulas.venue_weight_dn = { picks: 5, won: 4, lost: 1, units: 2 };
+  return { formulas, picks_written: 10 };
+};
+const confirmWindow = async () => ({ formulas: { base: { picks: 40, won: 20, lost: 20, units: 1 }, venue_weight_dn: { picks: 38, won: 22, lost: 16, units: 5 } }, picks_written: 78 });
+
+describe('runDialSearch', () => {
+  beforeEach(() => { runReplay.mockReset(); });
+  const board = [{ sport: '__all__', dial: 'venue_weight', value: 0.25 }];
+
+  test('searches the recent week, confirms the winners on the weeks before, files the confirm run, writes no dial without apply', async () => {
+    const db = fakeDb({ dials: board });
+    runReplay.mockImplementationOnce(searchWeek).mockImplementationOnce(confirmWindow);
+    const out = await ds.runDialSearch(db, { sport: 'NFL', recentDays: 7, confirmDays: 60, stamp: '20261012' });
     expect(runReplay.mock.calls[0][1]).toMatchObject({ sport: 'NFL', days: 7, runId: 'dial_search_nfl_20261012_recent' });
     expect(runReplay.mock.calls[1][1]).toMatchObject({ days: 60, offsetDays: 7, runId: 'dial_search_nfl_20261012_confirm' });
     expect(runReplay.mock.calls[1][1].variants.map(v => v.name)).toEqual(['base', 'venue_weight_dn']);
-    expect(rpc).toHaveBeenCalledWith('file_replay_candidates', expect.objectContaining({ p_run_id: 'dial_search_nfl_20261012_confirm' }));
+    expect(db.rpc).toHaveBeenCalledWith('file_replay_candidates', expect.objectContaining({ p_run_id: 'dial_search_nfl_20261012_confirm' }));
     expect(out.winners[0]).toMatchObject({ name: 'venue_weight_dn', delta: 3 });
-    expect(out.candidates_filed).toEqual({ filed: 1 });
+    expect(db.writes).toEqual([]);
+  });
+
+  test('with apply, the best passing move lands on the board with its evidence and sunset', async () => {
+    const db = fakeDb({ dials: board });
+    db.rpc.mockResolvedValueOnce({ data: { filed: 1, passed: [{ name: 'venue_weight_dn', delta_units: 4, won: 22, lost: 16, units: 5 }] }, error: null });
+    runReplay.mockImplementationOnce(searchWeek).mockImplementationOnce(confirmWindow);
+    const out = await ds.runDialSearch(db, { sport: 'NFL', apply: true, stamp: 'x' });
+    expect(out.applied).toMatchObject({ dial: 'venue_weight', before: 0.25, after: 0.1875 });
+    const kinds = db.writes.map(w => `${w[0]} ${w[1]}`);
+    expect(kinds).toEqual(['upsert sport_dials', 'insert model_weight_changes', 'insert dial_search_moves']);
+    expect(db.writes[0][2]).toMatchObject({ sport: 'NFL', dial: 'venue_weight', value: 0.1875 });
+    expect(db.writes[1][2]).toMatchObject({ source: 'dial-search-auto', before: { venue_weight: 0.25 }, after: { venue_weight: 0.1875 } });
+    expect(db.writes[2][2].sunset_on).toBe(ds.addDays(out.applied.sunset_on, 0));
+  });
+
+  test('with apply but nothing passed, no dial moves', async () => {
+    const db = fakeDb({ dials: board });
+    runReplay.mockImplementationOnce(searchWeek).mockImplementationOnce(confirmWindow);
+    const out = await ds.runDialSearch(db, { sport: 'NFL', apply: true, stamp: 'x' });
+    expect(out.applied).toBeNull();
+    expect(db.writes).toEqual([]);
+  });
+
+  test('a dial with an open move is not searched', async () => {
+    const db = fakeDb({ dials: board, moves: [{ id: 1, sport: 'NFL', dial: 'venue_weight', status: 'applied', sunset_on: '2099-01-01' }] });
+    runReplay.mockImplementationOnce(async (_s, opts) => ({ formulas: Object.fromEntries(opts.variants.map(v => [v.name, { picks: 5, units: -1 }])), picks_written: 10 }));
+    const out = await ds.runDialSearch(db, { sport: 'NFL', stamp: 'x' });
+    expect(runReplay.mock.calls[0][1].variants.some(v => v.name.startsWith('venue_weight'))).toBe(false);
+    expect(out.skipped_open_moves).toEqual(['venue_weight']);
   });
 
   test('a week where nothing beats base stops after the search', async () => {
+    const db = fakeDb({ dials: board });
     runReplay.mockImplementationOnce(async (_s, opts) => ({ formulas: Object.fromEntries(opts.variants.map(v => [v.name, { picks: 5, units: -1 }])), picks_written: 10 }));
-    const out = await ds.runDialSearch(supabase, { sport: 'NHL', stamp: 'x' });
+    const out = await ds.runDialSearch(db, { sport: 'NHL', stamp: 'x' });
     expect(runReplay).toHaveBeenCalledTimes(1);
-    expect(rpc).not.toHaveBeenCalled();
+    expect(db.rpc).not.toHaveBeenCalled();
     expect(out.note).toMatch(/no dial beat base/);
+  });
+});
+
+describe('resolveSunsets', () => {
+  beforeEach(() => { runReplay.mockReset(); });
+  const due = { id: 7, sport: 'NFL', dial: 'venue_weight', before_value: 0.25, after_value: 0.1875, status: 'applied', sunset_on: '2026-11-23', applied_at: '2026-10-12T06:30:00Z' };
+
+  test('reverts when the old value did at least as well', async () => {
+    const db = fakeDb({ moves: [due] });
+    runReplay.mockResolvedValueOnce({ formulas: { base: { picks: 30, won: 14, lost: 16, units: -3 }, revert: { picks: 31, won: 16, lost: 15, units: 0.5 } } });
+    const out = await ds.resolveSunsets(db, { sport: 'NFL', today: '2026-11-23', apply: true, tag: 't', log: () => {} });
+    expect(runReplay.mock.calls[0][1]).toMatchObject({ days: 42, runId: 'dial_search_nfl_t_sunset_7' });
+    expect(out[0].decision).toBe('revert');
+    expect(db.writes[0]).toEqual(['upsert', 'sport_dials', expect.objectContaining({ dial: 'venue_weight', value: 0.25 })]);
+    expect(db.writes[2]).toEqual(['update', 'dial_search_moves', expect.objectContaining({ status: 'reverted' }), 7]);
+  });
+
+  test('keeps when the move held up', async () => {
+    const db = fakeDb({ moves: [due] });
+    runReplay.mockResolvedValueOnce({ formulas: { base: { picks: 30, won: 18, lost: 12, units: 4 }, revert: { picks: 31, won: 16, lost: 15, units: 0.5 } } });
+    const out = await ds.resolveSunsets(db, { sport: 'NFL', today: '2026-11-23', apply: true, tag: 't', log: () => {} });
+    expect(out[0].decision).toBe('keep');
+    expect(db.writes).toEqual([['update', 'dial_search_moves', expect.objectContaining({ status: 'kept' }), 7]]);
+  });
+
+  test('not due yet, nothing runs', async () => {
+    const db = fakeDb({ moves: [due] });
+    const out = await ds.resolveSunsets(db, { sport: 'NFL', today: '2026-11-01', apply: true, tag: 't', log: () => {} });
+    expect(out).toEqual([]);
+    expect(runReplay).not.toHaveBeenCalled();
+  });
+});
+
+describe('bestPassedMove', () => {
+  test('largest out of sample gain among this week winners', () => {
+    const winners = [{ name: 'a_up', dials: { a: 1 }, delta: 1 }, { name: 'b_dn', dials: { b: 2 }, delta: 3 }];
+    const m = ds.bestPassedMove({ passed: [{ name: 'b_dn', delta_units: 2 }, { name: 'a_up', delta_units: 5 }, { name: 'zz', delta_units: 9 }] }, winners);
+    expect(m).toMatchObject({ name: 'a_up', dial: 'a', value: 1 });
+    expect(ds.bestPassedMove({ passed: [] }, winners)).toBeNull();
+    expect(ds.bestPassedMove(null, winners)).toBeNull();
   });
 });
 

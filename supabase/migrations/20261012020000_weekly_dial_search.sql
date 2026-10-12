@@ -1,7 +1,9 @@
 -- The weekly dial search (owner 2026-10-11): every live team sport, last
 -- week searched for the dial moves that would have made it more
 -- profitable, the winners replayed on the 60 days before that week, and
--- the ones that pass the three tests filed to build_queue.
+-- the ones that pass the three tests filed to build_queue. apply=1: the
+-- best passing move per sport lands on the board (directive 8 as amended
+-- 2026-10-11, see 20261012015000_dial_search_auto_apply.sql).
 -- Mondays 06:30 UTC (00:30 MDT), after the MLB Sunday sweep at 05:00 and
 -- before the bucket scorecard at 06:50. The secret is read from an
 -- existing job, never written here.
@@ -18,7 +20,7 @@ begin
 
   perform cron.schedule('weekly-dial-search', '30 6 * * 1', format($j$
     SELECT net.http_post(
-      url := 'https://craycrayparlayapp-production.up.railway.app/cron/dial-search?secret=%s&sports=NFL,NHL,NCAAF,MLB&recent_days=7&confirm_days=60',
+      url := 'https://craycrayparlayapp-production.up.railway.app/cron/dial-search?secret=%s&sports=NFL,NHL,NCAAF,MLB&recent_days=7&confirm_days=60&apply=1',
       headers := jsonb_build_object('Content-Type', 'application/json'),
       body := '{}'::jsonb, timeout_milliseconds := 300000);
   $j$, v_secret));
