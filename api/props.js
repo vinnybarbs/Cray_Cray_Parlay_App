@@ -9,6 +9,7 @@
 // history, the player's last games against the line (UI plan item 6).
 
 const { createClient } = require('@supabase/supabase-js');
+const { teamAbbr } = require('../lib/services/nfl-inactives');
 
 // Play and above, the same floor the props flip is judged at.
 const MIN_PP = 4;
@@ -86,9 +87,18 @@ function sideProbs(r) {
   return { ourProb: pct(flip(r.v2_prob)), bookProb: pct(flip(r.anchor_prob)) };
 }
 
+// A real American price or null. Pure.
+function cleanPrice(p) {
+  return Number.isFinite(Number(p)) && Math.abs(Number(p)) >= 100 ? Number(p) : null;
+}
+
 function slim(r) {
   return {
     ...sideProbs(r),
+    overPrice: cleanPrice(r.consensus_over_price),
+    underPrice: cleanPrice(r.consensus_under_price),
+    homeAbbr: teamAbbr(r.home_team) || null,
+    awayAbbr: teamAbbr(r.away_team) || null,
     playerKey: r.player_key,
     market: r.market,
     marketLabel: MARKET_LABEL[r.market],

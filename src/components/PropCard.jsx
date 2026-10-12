@@ -118,6 +118,34 @@ function HistoryChart({ p }) {
   )
 }
 
+// Both prices with our side lit (owner mockup 2026-10-12). These are
+// labels, not buttons: TrapHawk takes no bets and links to no book
+// (directive 27). An anytime TD shows only the yes, books sell no no.
+function SideChips({ p }) {
+  if (!p.side) return null
+  const td = isTd(p)
+  const sides = [
+    { key: 'over', label: td ? 'Yes' : 'Over', price: p.overPrice },
+    { key: 'under', label: td ? 'No' : 'Under', price: p.underPrice },
+  ].filter(s => s.key === p.side || s.price != null)
+  return (
+    <div className="flex gap-2">
+      {sides.map(s => {
+        const ours = s.key === p.side
+        return (
+          <div
+            key={s.key}
+            className={`flex-1 text-center py-2.5 rounded-xl text-sm font-semibold ${ours ? 'bg-signal-pos text-ink-950' : 'bg-ink-800 text-ink-300'}`}
+            aria-label={ours ? `Our side, ${s.label} ${fmtOdds(s.price)}` : `${s.label} ${fmtOdds(s.price)}`}
+          >
+            {s.label} {fmtOdds(s.price)}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function PropCard({ p, showOutcome = false }) {
   const o = showOutcome ? OUTCOME[p.outcome] : null
   const hasEvidence = !showOutcome && p.ourProb != null && p.bookProb != null
@@ -127,8 +155,9 @@ export default function PropCard({ p, showOutcome = false }) {
         <Avatar name={p.player} team={p.team} />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-ink-100 leading-tight truncate">{p.player || p.text}</div>
-          <div className="text-xs text-ink-400 truncate">{p.away_team} at {p.home_team}</div>
-          <div className="text-xs text-ink-500">{fmtGameDateTime(p.commence_time)}</div>
+          <div className="text-xs text-ink-400 truncate">
+            {p.awayAbbr && p.homeAbbr ? `${p.awayAbbr} at ${p.homeAbbr}` : `${p.away_team} at ${p.home_team}`} · {fmtGameDateTime(p.commence_time)}
+          </div>
         </div>
         {o
           ? <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{o.label}{p.actual != null ? ` · ${p.actual}` : ''}</span>
@@ -149,6 +178,8 @@ export default function PropCard({ p, showOutcome = false }) {
         )}
 
       {!showOutcome && <HistoryChart p={p} />}
+
+      {!showOutcome && <SideChips p={p} />}
     </div>
   )
 }

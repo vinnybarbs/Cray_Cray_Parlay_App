@@ -77,3 +77,12 @@ describe('attachHistory', () => {
     expect(p.history).toBeNull();
   });
 });
+
+describe('slim fields for the card', () => {
+  it('carries both prices and short team codes', () => {
+    const [p] = shapeProps([row({ consensus_over_price: 111, consensus_under_price: -146 })], [], []).upcoming;
+    expect(p).toMatchObject({ overPrice: 111, underPrice: -146, awayAbbr: 'LA', homeAbbr: 'BUF' });
+    const [td] = shapeProps([row({ market: 'player_anytime_td', consensus_over_price: 662, consensus_under_price: null })], [], []).upcoming;
+    expect(td.underPrice).toBeNull();
+  });
+});
