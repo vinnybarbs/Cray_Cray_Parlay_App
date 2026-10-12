@@ -28,7 +28,7 @@ export const TIERS = [
   { label: 'Play',        subtitle: 'play it',     range: '4-7pp',   min: 4,         max: 7 },
   { label: 'Lean',        subtitle: 'lean it',     range: '2-4pp',   min: 2,         max: 4 },
   { label: 'Skip',        subtitle: 'pass on it',  range: '-2-2pp',  min: -2,        max: 2 },
-  { label: 'Trap',        subtitle: 'fade it',     range: '-2pp or worse', min: -Infinity, max: -2 },
+  { label: 'Trap',        subtitle: "don't bet it", range: '-2pp or worse', min: -Infinity, max: -2 },
 ]
 
 export function tierRange(label) {
@@ -124,10 +124,10 @@ export function edgeTier(signedPp) {
     return { label: '-', subtitle: '', color: 'text-ink-400', bg: 'bg-ink-850 shadow-hairline' }
   }
   // Trap is a directional call: this side is at least 2pp below fair, so
-  // fading it is honest advice. The -2 to +2 band is noise and reads Skip.
+  // not betting it is honest advice. The -2 to +2 band is noise and reads Skip.
   // Mirror of the +2pp Lean gate.
   if (signedPp <= -2) {
-    return { label: 'Trap', subtitle: 'fade it', color: 'text-signal-neg', bg: 'bg-signal-neg-dim/30 shadow-hairline-neg' }
+    return { label: 'Trap', subtitle: "don't bet it", color: 'text-signal-neg', bg: 'bg-signal-neg-dim/30 shadow-hairline-neg' }
   }
   if (signedPp < 2) {
     return { label: 'Skip', subtitle: 'pass on it', color: 'text-ink-300', bg: 'bg-ink-850 shadow-hairline' }
