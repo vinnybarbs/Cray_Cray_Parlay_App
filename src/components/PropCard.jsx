@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { teamColors } from '../lib/teamColors'
 
@@ -26,7 +26,7 @@ export function fmtUnits(u) {
 
 export function ShadowBadge() {
   return (
-    <span className="font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-ink-400 border border-ink-700 rounded-full px-2 py-0.5 flex-shrink-0">
+    <span className="text-[11px] font-medium text-ink-400 border border-ink-700 rounded-full px-2.5 py-0.5 flex-shrink-0">
       Shadow
     </span>
   )
@@ -157,7 +157,46 @@ function SideChips({ p }) {
   )
 }
 
+// The expanding explanation (owner 2026-10-12): tap the evidence area
+// and it opens in place to a few sentences in the same voice as the game
+// research, with the numbers behind the read. Nothing opens when there
+// is nothing to say.
+function whyFacts(p) {
+  const w = p.why || {}
+  const out = []
+  if (w.projection != null && p.line != null) out.push(['Projection', `${w.projection} vs a line of ${p.line}`])
+  if (w.recentAvg != null && w.longAvg != null) out.push(['Recent form', `${w.recentAvg} a game lately, ${w.longAvg} over a longer stretch`])
+  if (w.opponent && w.oppPct != null && Math.abs(w.oppPct) >= 3) out.push(['Matchup', `${w.opponent} allows ${Math.abs(w.oppPct)}% ${w.oppPct > 0 ? 'more' : 'fewer'} ${p.marketLabel} than average`])
+  if (w.teamImplied != null) out.push(['Game script', `Team expected to score about ${w.teamImplied}`])
+  if (w.windMph != null) out.push(['Weather', `Wind around ${w.windMph} mph`])
+  if (w.status) out.push(['Status', w.status])
+  return out
+}
+
+function Why({ p }) {
+  const narration = p.why?.narration
+  const facts = whyFacts(p)
+  if (!narration && facts.length === 0) return null
+  return (
+    <div className="flex flex-col gap-3 pt-1">
+      {narration && <p className="text-sm text-ink-200 leading-relaxed">{narration}</p>}
+      {facts.length > 0 && (
+        <dl className="flex flex-col gap-1.5">
+          {facts.map(([k, v]) => (
+            <div key={k} className="flex gap-3 text-xs">
+              <dt className="w-24 flex-shrink-0 text-ink-500">{k}</dt>
+              <dd className="text-ink-300 min-w-0">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  )
+}
+
 export default function PropCard({ p, showOutcome = false }) {
+  const [open, setOpen] = useState(false)
+  const canExplain = !showOutcome && (p.why?.narration || whyFacts(p).length > 0)
   const o = showOutcome ? OUTCOME[p.outcome] : null
   const hasEvidence = !showOutcome && p.ourProb != null && p.bookProb != null
   return (
@@ -180,13 +219,33 @@ export default function PropCard({ p, showOutcome = false }) {
         <span className="font-mono text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.price)}</span>
       </div>
 
-      {hasEvidence
-        ? <ProbBar ours={p.ourProb} book={p.bookProb} />
-        : !showOutcome && (
-          <div className="text-sm text-ink-300">
-            We make this <span className="font-semibold tabular-nums text-ink-100">{Number(p.edgePp).toFixed(1)} points</span> more likely than the price says.
+      {!showOutcome && (() => {
+        const evidence = hasEvidence
+          ? <ProbBar ours={p.ourProb} book={p.bookProb} />
+          : (
+            <div className="text-sm text-ink-300">
+              We make this <span className="font-semibold tabular-nums text-ink-100">{Number(p.edgePp).toFixed(1)} points</span> more likely than the price says.
+            </div>
+          )
+        if (!canExplain) return evidence
+        return (
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setOpen(o => !o)}
+              aria-expanded={open}
+              className="text-left flex flex-col gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-pos"
+            >
+              {evidence}
+              <span className="flex items-center gap-1 text-xs font-semibold text-signal-pos">
+                {open ? 'Hide the why' : 'Why we like it'}
+                <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+              </span>
+            </button>
+            {open && <Why p={p} />}
           </div>
-        )}
+        )
+      })()}
 
       {!showOutcome && <HistoryChart p={p} />}
 

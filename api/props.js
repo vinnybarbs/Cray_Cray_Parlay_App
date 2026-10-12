@@ -114,7 +114,33 @@ function slim(r) {
     away_team: r.away_team,
     outcome: r.v2_outcome,
     actual: r.actual_value != null ? Number(r.actual_value) : null,
+    why: whyFor(r),
   };
+}
+
+/**
+ * What the card's expanding explanation shows: the short narration, but
+ * only while it still argues this read's side at this line, and the
+ * numbers behind the read. Null when there is nothing to show. Pure.
+ */
+function whyFor(r) {
+  const f = r.v2_factors || {};
+  const base = r.factors || {};
+  const num = (x, d = 1) => (x == null || !Number.isFinite(Number(x)) ? null : Math.round(Number(x) * 10 ** d) / 10 ** d);
+  const fresh = r.narration && r.narration_side === r.v2_side && Number(r.narration_line) === Number(r.line);
+  const oppPct = f.opp_ratio != null && Number(f.opp_games) >= 4 ? Math.round((Number(f.opp_ratio) - 1) * 100) : null;
+  const why = {
+    narration: fresh ? r.narration : null,
+    projection: r.market === TD_MARKET ? null : num(r.v2_mean),
+    recentAvg: num(base.recent_mean),
+    longAvg: num(base.long_mean),
+    opponent: f.opponent || null,
+    oppPct,
+    teamImplied: num(f.team_implied),
+    windMph: f.wind_mph != null && Number(f.wind_mph) >= 12 ? Math.round(Number(f.wind_mph)) : null,
+    status: f.status || null,
+  };
+  return Object.values(why).some(v => v != null) ? why : null;
 }
 
 /**
@@ -173,6 +199,8 @@ function shapeProps(upcomingRows, recentRows, gradedRows) {
   return { upcoming, recent, record: { byMarket, total: { ...total, units: round(total.units) }, since: RECORD_SINCE, minPp: MIN_PP } };
 }
 
+// The upcoming board also carries what the expanding explanation needs.
+const WHY_COLS = 'v2_mean, v2_factors, factors, narration, narration_side, narration_line';
 const COLS = 'market, player_key, player_name, v2_prob, anchor_prob, line, v2_side, v2_edge_pp, v2_outcome, consensus_over_price, consensus_under_price, books, commence_time, home_team, away_team, actual_value';
 
 async function props(req, res) {
@@ -188,7 +216,7 @@ async function props(req, res) {
     const now = new Date();
     const recentFrom = new Date(now.getTime() - RECENT_DAYS * 24 * 3600 * 1000).toISOString();
     const [upRes, recentRes] = await Promise.all([
-      supabase.from('prop_reads').select(COLS).gt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
+      supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
       supabase.from('prop_reads').select(COLS).gte('commence_time', recentFrom).lt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(1000),
     ]);
     const graded = [];
@@ -229,3 +257,4 @@ module.exports.showable = showable;
 module.exports.describe = describe;
 module.exports.attachHistory = attachHistory;
 module.exports.sideProbs = sideProbs;
+module.exports.whyFor = whyFor;

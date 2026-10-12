@@ -14,6 +14,7 @@ Start by reading `agent_reports` for the last month (other workers may have alre
 | Call site | Model | Logged where |
 |---|---|---|
 | Pre-analyze narration | Sonnet (NARRATION) for audience worthy games, Haiku (UTILITY) for the rest (api/cron/pre-analyze-games.js 1681) | cron_job_logs details.cost, at STANDARD rates |
+| NFL prop narration (since 2026-10-12) | Sonnet (NARRATION), one short call per shown prop read with v2_edge_pp 4 or more, re-run only when the read's side or line moves, at most 120 a run (api/cron/narrate-nfl-props.js, run after every analyze-nfl-props read) | cron_job_logs job narrate-nfl-props, details.input_tokens, output_tokens and est_cost_usd at standard Sonnet rates. Expect about $2 a week in season |
 | Integrity sweep records + injuries | Sonnet 5 for lookup and injury judgment since 2026-10-01 (lib/services/data-integrity-agent.js 40 to 41) | agent_intel agent_debug token payloads |
 | Web search fees | n/a | console only, $10 per 1000 searches, agent_debug has per-agent search counts |
 | Fact-check picks | Sonnet | NOT logged, count via ai_suggestions.fact_checked_at |

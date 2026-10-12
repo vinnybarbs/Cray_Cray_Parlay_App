@@ -10,7 +10,7 @@ export function SkeletonBar({ className = '' }) {
 
 export function SkeletonCard() {
   return (
-    <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-4 flex flex-col gap-3" aria-hidden="true">
+    <div className="bg-ink-900 rounded-2xl border border-ink-700 px-4 py-4 flex flex-col gap-3" aria-hidden="true">
       <div className="flex justify-between">
         <SkeletonBar className="h-2.5 w-16" />
         <SkeletonBar className="h-2.5 w-10" />
