@@ -160,12 +160,8 @@ function SideChips({ p }) {
 export default function PropCard({ p, showOutcome = false }) {
   const o = showOutcome ? OUTCOME[p.outcome] : null
   const hasEvidence = !showOutcome && p.ourProb != null && p.bookProb != null
-  const tc = teamColors(p.team)
   return (
-    <div
-      className="relative overflow-hidden bg-ink-900 rounded-2xl border border-ink-700 px-4 py-4 flex flex-col gap-3"
-    >
-      {tc && <div aria-hidden="true" className="absolute inset-y-0 left-0 w-1" style={{ backgroundColor: tc.accent }} />}
+    <div className="bg-ink-900 rounded-2xl border border-ink-700 px-4 py-4 flex flex-col gap-3">
       <div className="flex items-center gap-3">
         <Avatar name={p.player} team={p.team} />
         <div className="min-w-0 flex-1">

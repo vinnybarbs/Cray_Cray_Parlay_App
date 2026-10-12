@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 import PropCard, { fmtUnits } from '../components/PropCard'
@@ -57,6 +58,7 @@ export default function Props() {
           <button onClick={() => navigate('/today')} className="focus:outline-none"><BrandMark /></button>
           <div className="flex items-center gap-1">
             <button onClick={() => navigate('/today')} className="hidden md:inline-block px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Today</button>
+            <InstallButton />
             <SignOutButton />
           </div>
         </div>

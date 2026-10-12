@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import InstallButton from '../components/InstallButton'
 import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct } from '../lib/tiers'
 import { setPublishFlags, isShadowSport, isShadowMarket } from '../lib/publish-flags'
 
@@ -1826,7 +1827,7 @@ export default function DailyDigest({ onBack }) {
         </button>
         <button
           onClick={onBack}
-          className="max-md:ml-auto px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="max-md:ml-auto whitespace-nowrap px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           The Board
         </button>
@@ -1837,6 +1838,7 @@ export default function DailyDigest({ onBack }) {
         >
           {loading ? '...' : <><span aria-hidden="true">↻</span><span className="hidden sm:inline"> Refresh</span></>}
         </button>
+        <InstallButton />
         <SignOutButton />
       </div>
 

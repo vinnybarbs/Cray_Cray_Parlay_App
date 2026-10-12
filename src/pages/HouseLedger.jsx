@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 import { edgeTier, tierRange, TIERS } from '../lib/tiers'
@@ -210,6 +211,7 @@ export default function HouseLedger() {
         >
           Home
         </button>
+        <InstallButton />
         <SignOutButton />
       </div>
 

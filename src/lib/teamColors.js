@@ -1,7 +1,7 @@
 // NFL team colors keyed by nflverse code (Rams are LA), for the prop card
-// avatar and stripe (owner 2026-10-12). No logos or photos: those are
+// avatar (owner 2026-10-12). No logos or photos: those are
 // licensed, plain colors with our own initials are not. `bg` fills the
-// avatar, `accent` is the ring and stripe, picked to stay visible on the
+// avatar, `accent` is the ring, picked to stay visible on the
 // near black card where a team's main color is navy or black. `fg` is the
 // initials color that reads on `bg`.
 
