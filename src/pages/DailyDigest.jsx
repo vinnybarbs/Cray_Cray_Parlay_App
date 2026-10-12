@@ -1753,34 +1753,13 @@ export default function DailyDigest({ onBack }) {
   // board. Removing it also killed a class of digest-vs-landing
   // disagreements about which pick headlines.
 
-  // Hero trust anchor reads Sharp Take, the ticket, and is CLICKABLE:
-  // tapping cycles 3d, 7d, 30d, all-time so a heater is visible at a
-  // glance. Every number comes from mv_public_record via /api/digest, the
-  // SAME rollup the ledger shows, so the page can never disagree with
-  // itself. Falls back to the overall record only if tier data is absent.
-  const HERO_PERIODS = [['last_3d', '3d'], ['last_7d', '7d'], ['last_30d', '30d'], ['all', 'all-time']]
-  const [heroPeriodIdx, setHeroPeriodIdx] = useState(2) // default 30d
-  // The band ladder: every tier's record and units for the selected
-  // window, from the same mv_public_record rollup. Owner's quick sanity
-  // check (2026-09-12: "show all bands now too"), collapsed by default so
-  // the hero stays a two number trust anchor for everyone else. The
-  // toggle is remembered per browser.
-  const [bandsOpen, setBandsOpen] = useState(() => {
-    try { return window.localStorage.getItem('th_hero_bands') === '1' } catch { return false }
-  })
-  const toggleBands = () => {
-    setBandsOpen(v => {
-      try { window.localStorage.setItem('th_hero_bands', v ? '0' : '1') } catch { /* per-browser convenience only */ }
-      return !v
-    })
-  }
-  const HERO_BANDS = ['Sharp Take', 'Strong Play', 'Play', 'Lean', 'Leg', 'Trap']
-  const heroBands = (() => {
-    const [period] = HERO_PERIODS[heroPeriodIdx]
-    const byTier = data?.modelAccuracy?.[period]?.byTier
-    if (!byTier) return []
-    return HERO_BANDS.map(label => ({ label, ...(byTier[label] || {}) })).filter(b => b.won != null || b.lost != null)
-  })()
+  // The record sits under the board as one line, not in the hero (owner
+  // 2026-10-12 design review: lead with the play, prove it with the
+  // record). Last 30 days, from mv_public_record via /api/digest, the
+  // same rollup the ledger shows. Period pills and the band ladder live
+  // on the ledger now.
+  const HERO_PERIODS = [['last_30d', '30d']]
+  const heroPeriodIdx = 0
   const heroHitRate = (() => {
     const [period, label] = HERO_PERIODS[heroPeriodIdx]
     const st = data?.modelAccuracy?.[period]?.byTier?.['Sharp Take']
@@ -1829,7 +1808,7 @@ export default function DailyDigest({ onBack }) {
           onClick={onBack}
           className="max-md:ml-auto whitespace-nowrap px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
-          The Board
+          Pick builder
         </button>
         <button
           onClick={fetchDigest}
@@ -1854,61 +1833,6 @@ export default function DailyDigest({ onBack }) {
           <div className="flex flex-wrap items-center justify-between font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3 gap-x-3 gap-y-1.5">
             <span className="truncate">{data ? formatFullDate(null) : 'Loading...'}</span>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 min-w-0">
-              {heroHitRate && (
-                <span
-                  className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0"
-                  title="Sharp Take record and the all-tiers Model record for the selected window. Same numbers as The House Ledger."
-                >
-                  <span>
-                    {'Sharp '}
-                    {heroHitRate.st ? (
-                      <>
-                        <span className="tabular-nums text-ink-300">{heroHitRate.st.won}-{heroHitRate.st.lost}</span>
-                        {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.st.rate)}`}>{heroHitRate.st.rate}%</span>
-                      </>
-                    ) : (
-                      <span className="text-ink-500">none</span>
-                    )}
-                    <span className="text-ink-600">{' · '}</span>
-                    {'All '}
-                    {heroHitRate.overall ? (
-                      <>
-                        <span className="tabular-nums text-ink-300">{heroHitRate.overall.won}-{heroHitRate.overall.lost}</span>
-                        {' '}<span className={`tabular-nums ${winRateColor(heroHitRate.overall.rate)}`}>{heroHitRate.overall.rate}%</span>
-                      </>
-                    ) : (
-                      <span className="text-ink-500">none</span>
-                    )}
-                  </span>
-                  {/* Period bubbles: each window is its own visible pill so
-                      switching is obvious and a heater is one tap away. */}
-                  <span className="flex items-center gap-1">
-                    {HERO_PERIODS.map(([period, label], i) => (
-                      <button
-                        key={period}
-                        onClick={() => setHeroPeriodIdx(i)}
-                        className={`px-1.5 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-[0.08em] transition-colors ${
-                          i === heroPeriodIdx
-                            ? 'bg-signal-pos-dim/60 text-signal-pos font-semibold'
-                            : 'bg-ink-850 text-ink-400 hover:text-ink-200'
-                        }`}
-                      >
-                        {label === 'all-time' ? 'all' : label}
-                      </button>
-                    ))}
-                    <button
-                      onClick={toggleBands}
-                      aria-expanded={bandsOpen}
-                      className={`px-1.5 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-[0.08em] transition-colors ${
-                        bandsOpen ? 'bg-ink-700 text-ink-100 font-semibold' : 'bg-ink-850 text-ink-400 hover:text-ink-200'
-                      }`}
-                      title="Every band's record and units for this window"
-                    >
-                      bands
-                    </button>
-                  </span>
-                </span>
-              )}
               <button
                 onClick={() => setLegendOpen(true)}
                 className="text-ink-400 hover:text-signal-pos transition-colors flex items-center gap-1"
@@ -1918,34 +1842,6 @@ export default function DailyDigest({ onBack }) {
               </button>
             </div>
           </div>
-
-          {bandsOpen && heroBands.length > 0 && (
-            <div
-              className="mb-4 -mt-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-x-4 gap-y-1.5 font-mono text-[10px] uppercase tracking-[0.1em] text-ink-400"
-              title="Record, hit rate and units per band for the selected window. Same rollup as the ledger. Trap bait is the record of the sides we said not to bet, so negative units mean the warning saved money. Legs need no edge."
-            >
-              {heroBands.map(b => {
-                // A trap row is the bait's own record (owner 2026-10-12:
-                // trap means don't bet it), so its units read inverted:
-                // the bait losing money is the warning working.
-                const isTrap = b.label === 'Trap'
-                const good = b.units != null && (isTrap ? b.units < 0 : b.units > 0)
-                const bad = b.units != null && (isTrap ? b.units > 0 : b.units < 0)
-                return (
-                  <div key={b.label} className="min-w-0 flex flex-wrap items-baseline gap-x-1.5">
-                    <span className="text-ink-300 truncate">{isTrap ? 'Trap bait' : b.label}</span>
-                    <span className="tabular-nums text-ink-200">{b.won ?? 0}-{b.lost ?? 0}{b.push ? `-${b.push}` : ''}</span>
-                    {!isTrap && b.winRate != null && <span className={`tabular-nums ${winRateColor(b.winRate)}`}>{b.winRate}%</span>}
-                    {b.units != null && (
-                      <span className={`tabular-nums ${good ? 'text-signal-pos' : bad ? 'text-signal-neg' : 'text-ink-400'}`}>
-                        {b.units > 0 ? '+' : ''}{b.units.toFixed(1)}u
-                      </span>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
 
           <div className="min-w-0">
             {/* Count-first headline, math-derived, instantly tells you what's actionable today */}
@@ -2106,9 +2002,20 @@ export default function DailyDigest({ onBack }) {
                 onClick={onBack}
                 className="w-full sm:w-auto px-6 py-3 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-mono font-medium uppercase tracking-[0.12em] text-sm text-ink-200 transition-all active:scale-[0.98]"
               >
-                The Board, filter every pick
+                Pick builder, filter every pick
               </button>
             </div>
+
+            {/* The record, one line, under the plays. */}
+            {(heroHitRate.st || heroHitRate.overall) && (
+              <p className="text-xs text-ink-400 text-center">
+                Last 30 days
+                {heroHitRate.st && <>{' · Sharp Take '}<span className="font-mono tabular-nums text-ink-200">{heroHitRate.st.won}-{heroHitRate.st.lost}</span></>}
+                {heroHitRate.overall && <>{' · every pick '}<span className="font-mono tabular-nums text-ink-200">{heroHitRate.overall.won}-{heroHitRate.overall.lost}</span></>}
+                {' · '}
+                <a href="#/ledger" className="text-signal-pos hover:underline">See every pick</a>
+              </p>
+            )}
           </>
         )}
       </div>
