@@ -9,6 +9,7 @@ import AdminDashboard from './pages/AdminDashboard'
 import DialsDashboard from './pages/DialsDashboard'
 import HouseLedger from './pages/HouseLedger'
 import Today from './pages/Today'
+import Props from './pages/Props'
 
 // App-level router. HashRouter (mounted in main.jsx) keeps every pre-existing
 // #/digest-style URL working unchanged. The old MainApp flag-and-overlay
@@ -94,6 +95,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/today" element={<Today />} />
+      <Route path="/props" element={<Props />} />
       <Route path="/digest" element={<DigestRoute />} />
       <Route path="/generator" element={<GeneratorPage />} />
       <Route path="/chat" element={<ChatRoute />} />
