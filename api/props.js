@@ -5,6 +5,8 @@
 // anon pattern as /api/today.
 //
 // Response: { upcoming: [...], recent: [...], record: { byMarket: [...], total }, asOf }
+// Each upcoming read also carries ourProb and bookProb for its side and
+// history, the player's last games against the line (UI plan item 6).
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -62,8 +64,32 @@ function unitsFor(r) {
   return p > 0 ? p / 100 : 100 / -p;
 }
 
+// The stat a market is graded on, from one nfl_player_game_stats row.
+// Anytime TD counts rushing plus receiving scores. Pure.
+const STAT_FOR = {
+  player_receptions: g => g.receptions,
+  player_reception_yds: g => g.receiving_yards,
+  player_rush_yds: g => g.rushing_yards,
+  player_pass_yds: g => g.passing_yards,
+  player_pass_tds: g => g.passing_tds,
+  [TD_MARKET]: g => (Number(g.rushing_tds) || 0) + (Number(g.receiving_tds) || 0),
+};
+const HISTORY_GAMES = 10;
+
+/**
+ * Probability of the read's own side, ours (v2) and the book's no-vig
+ * anchor, both stored as the over probability. Pure.
+ */
+function sideProbs(r) {
+  const flip = (x) => (x == null || !Number.isFinite(Number(x)) ? null : (r.v2_side === 'over' ? Number(x) : 1 - Number(x)));
+  const pct = (x) => (x == null ? null : Math.round(x * 1000) / 10);
+  return { ourProb: pct(flip(r.v2_prob)), bookProb: pct(flip(r.anchor_prob)) };
+}
+
 function slim(r) {
   return {
+    ...sideProbs(r),
+    playerKey: r.player_key,
     market: r.market,
     marketLabel: MARKET_LABEL[r.market],
     player: r.player_name,
@@ -79,6 +105,35 @@ function slim(r) {
     outcome: r.v2_outcome,
     actual: r.actual_value != null ? Number(r.actual_value) : null,
   };
+}
+
+/**
+ * Attach the last HISTORY_GAMES games for each upcoming read, oldest
+ * first, with whether each one cleared the line on the read's side.
+ * statRows come from nfl_player_game_stats for the reads' player keys,
+ * any order. A push (value exactly on the line) counts as no hit. Pure.
+ */
+function attachHistory(upcoming, statRows) {
+  const byPlayer = new Map();
+  for (const g of statRows || []) {
+    if (!byPlayer.has(g.player_key)) byPlayer.set(g.player_key, []);
+    byPlayer.get(g.player_key).push(g);
+  }
+  for (const games of byPlayer.values()) {
+    games.sort((a, b) => (a.season - b.season) || (a.week - b.week));
+  }
+  return upcoming.map(p => {
+    const stat = STAT_FOR[p.market];
+    const games = (byPlayer.get(p.playerKey) || []).slice(-HISTORY_GAMES);
+    if (!stat || p.line == null || games.length === 0) return { ...p, history: null };
+    const rows = games.map(g => {
+      const value = Number(stat(g)) || 0;
+      const hit = p.side === 'over' ? value > p.line : value < p.line;
+      return { season: g.season, week: g.week, opponent: g.opponent || null, value, hit };
+    });
+    const last = games[games.length - 1];
+    return { ...p, team: last.team || null, history: { games: rows, hits: rows.filter(x => x.hit).length } };
+  });
 }
 
 /** Pure shaping of upcoming, recent and graded rows into the response. */
@@ -108,7 +163,7 @@ function shapeProps(upcomingRows, recentRows, gradedRows) {
   return { upcoming, recent, record: { byMarket, total: { ...total, units: round(total.units) }, since: RECORD_SINCE, minPp: MIN_PP } };
 }
 
-const COLS = 'market, player_name, line, v2_side, v2_edge_pp, v2_outcome, consensus_over_price, consensus_under_price, books, commence_time, home_team, away_team, actual_value';
+const COLS = 'market, player_key, player_name, v2_prob, anchor_prob, line, v2_side, v2_edge_pp, v2_outcome, consensus_over_price, consensus_under_price, books, commence_time, home_team, away_team, actual_value';
 
 async function props(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -137,8 +192,22 @@ async function props(req, res) {
     }
     const err = upRes.error || recentRes.error;
     if (err) { res.status(500).json({ error: err.message }); return; }
+    const shaped = shapeProps(upRes.data, recentRes.data, graded);
+    // Last games for the upcoming reads. A failure here only drops the
+    // chart, never the board.
+    const keys = [...new Set(shaped.upcoming.map(p => p.playerKey).filter(Boolean))];
+    let statRows = [];
+    if (keys.length > 0) {
+      const { data, error } = await supabase.from('nfl_player_game_stats')
+        .select('player_key, season, week, team, opponent, receptions, receiving_yards, rushing_yards, passing_yards, passing_tds, rushing_tds, receiving_tds')
+        .in('player_key', keys)
+        .order('season', { ascending: false }).order('week', { ascending: false })
+        .limit(keys.length * 25);
+      if (!error) statRows = data || [];
+    }
+    shaped.upcoming = attachHistory(shaped.upcoming, statRows);
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
-    res.json({ ...shapeProps(upRes.data, recentRes.data, graded), asOf: now.toISOString() });
+    res.json({ ...shaped, asOf: now.toISOString() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -148,3 +217,5 @@ module.exports = props;
 module.exports.shapeProps = shapeProps;
 module.exports.showable = showable;
 module.exports.describe = describe;
+module.exports.attachHistory = attachHistory;
+module.exports.sideProbs = sideProbs;

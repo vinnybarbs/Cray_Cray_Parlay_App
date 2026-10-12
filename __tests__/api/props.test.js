@@ -45,3 +45,35 @@ describe('shapeProps', () => {
     expect(out.recent[0]).toMatchObject({ outcome: 'won', actual: 7 });
   });
 });
+
+const { attachHistory, sideProbs } = require('../../api/props');
+
+describe('sideProbs', () => {
+  it('turns stored over probabilities into the read side', () => {
+    expect(sideProbs({ v2_side: 'over', v2_prob: 0.5452, anchor_prob: 0.4445 })).toEqual({ ourProb: 54.5, bookProb: 44.5 });
+    expect(sideProbs({ v2_side: 'under', v2_prob: 0.4054, anchor_prob: 0.4993 })).toEqual({ ourProb: 59.5, bookProb: 50.1 });
+    expect(sideProbs({ v2_side: 'over', v2_prob: null, anchor_prob: undefined })).toEqual({ ourProb: null, bookProb: null });
+  });
+});
+
+describe('attachHistory', () => {
+  const game = (week, o) => ({ player_key: 'dawson knox', season: 2026, week, team: 'BUF', opponent: 'NYJ', receptions: 2, ...o });
+  it('keeps the last 10 games oldest first and counts hits on the read side', () => {
+    const rows = Array.from({ length: 12 }, (_, i) => game(i + 1, { receptions: i % 3 }));
+    const [p] = attachHistory([{ playerKey: 'dawson knox', market: 'player_receptions', side: 'over', line: 1.5 }], rows.reverse());
+    expect(p.history.games.map(g => g.week)).toEqual([3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    expect(p.history.hits).toBe(4);
+    expect(p.team).toBe('BUF');
+  });
+  it('reads unders and anytime TDs, and pushes are not hits', () => {
+    const [u] = attachHistory([{ playerKey: 'dawson knox', market: 'player_receptions', side: 'under', line: 2 }], [game(1, { receptions: 2 }), game(2, { receptions: 1 })]);
+    expect(u.history.games.map(g => g.hit)).toEqual([false, true]);
+    const [td] = attachHistory([{ playerKey: 'dawson knox', market: 'player_anytime_td', side: 'over', line: 0.5 }], [game(1, { rushing_tds: 0, receiving_tds: 1 }), game(2, { rushing_tds: null, receiving_tds: 0 })]);
+    expect(td.history.games.map(g => g.value)).toEqual([1, 0]);
+    expect(td.history.hits).toBe(1);
+  });
+  it('leaves history null when the player has no games', () => {
+    const [p] = attachHistory([{ playerKey: 'nobody', market: 'player_receptions', side: 'over', line: 1.5 }], [game(1)]);
+    expect(p.history).toBeNull();
+  });
+});
