@@ -241,7 +241,7 @@ function Pricing({ onStartTrial }) {
 
 function Questions() {
   const items = [
-    ['What\'s a trap?', 'A side most bettors are drawn to, like a hot streak, a heavy favorite or a popular over, that we price at least 2 points worse than fair. A bad bet nobody wants isn\'t a trap. A bad bet everybody wants is.'],
+    ['What\'s a trap?', 'A side most bettors are drawn to, like a hot streak, a heavy favorite or a popular over, that we think wins at least 2 fewer times in 100 than its price needs. A bad bet nobody wants isn\'t a trap. A bad bet everybody wants is.'],
     ['Why show the sides not to bet?', 'Most of the betting market is bad prices. Showing only the good ones would hide the shape of it. Naming the traps is the thing a sportsbook partner can\'t do.'],
     ['How is this different from Action Network or OddsJam?', 'Action Network is owned by Better Collective, a publicly traded sportsbook affiliate, so it can\'t credibly warn you off a book. OddsJam is built for high volume bettors at $99 to $199 a month. We\'re built for everyday bettors who want the math without the price tag, and we show you what not to bet.'],
     ['Are props counted in the record?', 'Not yet. Props are in shadow: priced, published and graded in public, but kept out of the official record until their own record and the closing line clear our bar.'],

@@ -53,7 +53,7 @@ function PickRow({ p, onOpen, id }) {
         {p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}
       </div>
       <div className="text-sm text-ink-300">
-        We make this <span className={`font-semibold tabular-nums ${t.color}`}>{Number(p.edge_pp).toFixed(1)} points</span> more likely than the price says.
+        Wins about <span className={`font-semibold tabular-nums ${t.color}`}>{Math.round(Number(p.edge_pp))} more times in 100</span> than the price says.
       </div>
     </button>
   )
@@ -70,7 +70,7 @@ function TrapRow({ p, id }) {
         {p.sport} · {p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}
       </div>
       <div className="text-sm text-ink-300">
-        The price is <span className="font-semibold tabular-nums text-signal-neg">{Math.abs(Number(p.edge_pp)).toFixed(1)} points</span> worse than fair.
+        Wins about <span className="font-semibold tabular-nums text-signal-neg">{Math.round(Math.abs(Number(p.edge_pp)))} fewer times in 100</span> than its price needs.
       </div>
     </div>
   )

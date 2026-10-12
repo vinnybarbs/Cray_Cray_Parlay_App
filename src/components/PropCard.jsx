@@ -224,7 +224,7 @@ export default function PropCard({ p, showOutcome = false }) {
           ? <ProbBar ours={p.ourProb} book={p.bookProb} />
           : (
             <div className="text-sm text-ink-300">
-              We make this <span className="font-semibold tabular-nums text-ink-100">{Number(p.edgePp).toFixed(1)} points</span> more likely than the price says.
+              Wins about <span className="font-semibold tabular-nums text-ink-100">{Math.round(Number(p.edgePp))} more times in 100</span> than the price says.
             </div>
           )
         if (!canExplain) return evidence

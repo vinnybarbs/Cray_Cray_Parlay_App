@@ -2093,10 +2093,10 @@ function EdgeLegendModal({ open, onClose }) {
               pp = percentage points
             </div>
             <p className="text-ink-200 text-sm leading-relaxed">
-              The signed gap between what our model thinks each side wins, and what the book is implying with its odds. Bigger gap = more disagreement with the book = the headline edge on the tile.
+              How much more often we think a side wins than its price says, counted in wins per 100 bets. The bigger the gap, the stronger the play.
             </p>
             <p className="text-ink-300 text-xs leading-relaxed mt-2 tabular-nums">
-              Example: <span className="tabular-nums text-signal-pos">+8.2 pts</span> on a Strong Play means we think that side wins 8.2 percentage points more often than the -110 price implies.
+              Example: <span className="tabular-nums text-signal-pos">+8.2 pts</span> on a Strong Play means the -110 price says the side wins about 52 times in 100, and we say about 60.
             </p>
           </div>
 
