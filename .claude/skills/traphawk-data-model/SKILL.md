@@ -34,7 +34,7 @@ Edges are scaled by `edge_calibration` multipliers (keys `<Sport>:<market>`, `<S
 Rows are namespaced by `session_id` prefix, one row per game per domain per day:
 
 - `auto_digest_YYYY-MM-DD` = published picks
-- `auto_digest_trap_YYYY-MM-DD` = trap calls. Graded as the FADE: a won trap row means the named trap side lost
+- `auto_digest_trap_YYYY-MM-DD` = trap calls. actual_outcome is the TRAPPED side's own result: a won trap row means the bait side won (verified 2026-10-12, 116 of 116 moneyline trap rows match the final score; this line said the opposite before and the landing page, the digest band and Discord receipts read it backwards until build_queue 95). So the Trap row of mv_public_record is the bait's record and its roi_units is what betting the bait cost. A trap says do not bet it (owner 2026-10-12), so the headline stat is that cost: negative units mean the warning worked
 - `auto_digest_leg_YYYY-MM-DD` = legs (sides at or above leg_prob_floor), outcomes read straight
 - `auto_digest_alt_spread_YYYY-MM-DD` and `auto_digest_alt_total_YYYY-MM-DD` = the spotlight alternates (lib/services/alt-markets.js): a second graded market on a game whose headline pick is another market. They ARE in mv_public_record (session_id like auto_digest%) and compete with the headline row for the (home, away, game_date, bet_type) slot, the later revision winning. Directive 17's raw claim check covers them since 2026-10-03.
 

@@ -90,11 +90,11 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
           {data.traps?.length > 0 && (
             <>
               <div className="px-4 py-2 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500 border-t border-ink-800">
-                Traps called · the advice was to fade these sides
+                Traps called · the advice was not to bet these sides
               </div>
               {data.traps.map((p, i) => {
-                const fade = p.actual_outcome === 'lost' ? { label: 'FADE WON', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
-                  : p.actual_outcome === 'won' ? { label: 'FADE LOST', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
+                const fade = p.actual_outcome === 'lost' ? { label: 'WARNING HELD', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
+                  : p.actual_outcome === 'won' ? { label: 'BAIT CAME IN', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
                   : { label: p.actual_outcome === 'push' || p.actual_outcome === 'void' ? 'PUSH' : 'OPEN', cls: 'bg-ink-850 text-ink-300' }
                 return (
                   <div key={`trap-${i}`} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800">

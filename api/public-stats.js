@@ -89,15 +89,21 @@ module.exports = async (req, res) => {
     // UI can label the wider window.
     const tiers = shape(tierRows.filter(r => r.dimension_value !== 'Trap'), 'tier');
     const trapAll = allRows.find(r => r.dimension_type === 'tier' && r.dimension_value === 'Trap');
+    // The MV's Trap row is the trapped side's own record (won means the
+    // bait won, verified 2026-10-12 against 116 of 116 final scores), and
+    // its roi_units is what betting the bait cost. A trap says do not bet
+    // it, so the stat is that cost, not a hit rate (owner 2026-10-12).
     if (trapAll) {
-      const wins = trapAll.won || 0;
-      const losses = trapAll.lost || 0;
-      const decided = wins + losses;
+      const baitWins = trapAll.won || 0;
+      const baitLosses = trapAll.lost || 0;
       tiers.push({
         tier: 'Trap',
-        wins,
-        losses,
-        hitRate: decided > 0 ? ((wins / decided) * 100).toFixed(1) : null,
+        wins: baitLosses,
+        losses: baitWins,
+        baitWins,
+        baitLosses,
+        hitRate: null,
+        baitUnits: trapAll.roi_units != null ? Math.round(Number(trapAll.roi_units) * 10) / 10 : null,
         window: 'all-time',
       });
     }

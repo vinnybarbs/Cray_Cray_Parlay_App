@@ -144,7 +144,7 @@ function TrapRow({ row }) {
         </div>
       </div>
       <span className="flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-signal-neg">
-        fade it
+        don't bet it
       </span>
     </div>
   )

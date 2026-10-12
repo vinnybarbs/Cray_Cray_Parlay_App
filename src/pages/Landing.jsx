@@ -568,7 +568,7 @@ function ExecutionFlow() {
 // One real pick is the free tease; the full board stays behind the trial.
 
 const TIER_SUBTITLES = {
-  'Trap': 'fade it', 'Skip': 'pass on it', 'Lean': 'lean it',
+  'Trap': "don't bet it", 'Skip': 'pass on it', 'Lean': 'lean it',
   'Play': 'play it', 'Strong Play': 'hammer it', 'Sharp Take': 'sharp take',
 }
 
@@ -834,14 +834,14 @@ function TrackRecord({ sportStats, tierStats }) {
               const settled = row.wins + row.losses
               const rate = parseFloat(row.hitRate)
               const label = row[dimensionKey]
-              // Trap is scored in FADE framing since the trap-domain
-              // restructure: the rollup's wins are fades that landed, so a
-              // HIGH number is the detector working. Same coloring as every
-              // other tier. (The old inverted styling dated from the era
-              // when the row showed the trap pick's own win rate.)
+              // A trap says do not bet the bait, so its stat is what betting
+              // the bait cost (owner 2026-10-12), not a hit rate. The bait is
+              // mostly chalk and wins more often than not while still losing
+              // money at the price, so a rate read either way misleads.
               const isTrap = label === 'Trap'
-              const isPos = rate >= 55
-              const isNeg = rate < 50
+              const baitUnits = isTrap && row.baitUnits != null ? Number(row.baitUnits) : null
+              const isPos = isTrap ? baitUnits != null && baitUnits < 0 : rate >= 55
+              const isNeg = isTrap ? baitUnits != null && baitUnits > 0 : rate < 50
               const color = isPos ? 'text-signal-pos' : isNeg ? 'text-signal-neg' : 'text-ink-100'
               const barColor = isPos ? 'bg-signal-pos' : isNeg ? 'bg-signal-neg' : 'bg-ink-400'
               return (
@@ -863,7 +863,7 @@ function TrackRecord({ sportStats, tierStats }) {
                   </span>
                   <span className="text-right text-ink-400 tabular-nums text-sm">{settled.toLocaleString()}</span>
                   {/* sparkline-bar */}
-                  <div className="relative h-1.5 bg-ink-800 rounded-sharp overflow-hidden">
+                  <div className={`relative h-1.5 bg-ink-800 rounded-sharp overflow-hidden ${isTrap ? 'invisible' : ''}`}>
                     <div className="absolute inset-y-0 left-1/2 w-px bg-ink-700" />
                     <div
                       className={`absolute top-0 bottom-0 ${barColor}`}
@@ -874,13 +874,13 @@ function TrackRecord({ sportStats, tierStats }) {
                     />
                   </div>
                   <span className={`text-right text-base tabular-nums font-bold ${color}`}>
-                    {row.hitRate}%
+                    {isTrap ? (baitUnits != null ? `${baitUnits > 0 ? '+' : ''}${baitUnits.toFixed(1)}u` : '-') : `${row.hitRate}%`}
                   </span>
                   {/* Full-width explainer row: inside the label cell this
                       wrapped into a one-word-per-line tower on phones. */}
                   {isTrap && (
                     <span className="col-span-full text-[10px] font-normal text-ink-400 -mt-2">
-                      the record of fading the picks we flagged, full history since May 10. High means the warnings landed
+                      what betting the sides we told you not to bet would have cost at 1u stakes, full history since May 10. The bait went {row.baitWins}-{row.baitLosses} and still lost money, because the price is the trap
                     </span>
                   )}
                 </div>

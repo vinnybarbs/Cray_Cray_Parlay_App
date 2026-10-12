@@ -638,7 +638,7 @@ async function executeTool(name, args) {
           if (r.dimension_type === 'tier') byTier[r.dimension_value] = entry;
           if (r.dimension_type === 'sport') bySport[r.dimension_value] = entry;
         }
-        if (byTier['Trap']) byTier['Trap'].note = 'graded as the fade: won means the named bait side lost';
+        if (byTier['Trap']) byTier['Trap'].note = 'the bait side\'s own record: won means the side we said not to bet won. A trap is judged by the money betting the bait lost, not this rate';
 
         const requested = args.sport && bySport[args.sport] ? { [args.sport]: bySport[args.sport] } : bySport;
         return {

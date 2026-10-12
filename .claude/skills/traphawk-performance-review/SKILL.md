@@ -5,7 +5,7 @@ description: The weekly TrapHawk model performance and calibration review. Use w
 
 # TrapHawk performance review
 
-Read-only against production (Supabase project `pcjhulzyqmhrhsrgvwvx`, `execute_sql` tool). Two rules prevent every historical reporting error: all public numbers come from `mv_public_record` only (never raw ai_suggestions math, never mv_model_accuracy), and trap rows grade the fade (a won trap means the named side lost, report it as "fading them went W-L"). Full schema context is in the traphawk-data-model skill.
+Read-only against production (Supabase project `pcjhulzyqmhrhsrgvwvx`, `execute_sql` tool). Two rules prevent every historical reporting error: all public numbers come from `mv_public_record` only (never raw ai_suggestions math, never mv_model_accuracy), and trap rows store the bait side's own result (a won trap means the side we said not to bet won, verified 2026-10-12 on 116 of 116 moneyline rows), so report traps as what betting the bait cost: "the bait went W-L for X units", where negative units mean the warning worked. Full schema context is in the traphawk-data-model skill.
 
 Before anything else, read the `AGENTS.md` row of the `skills` table (`select content from skills where name = 'AGENTS.md'`), the top line every session consumes, then the standing directives, then the blackboard, so the review builds on settled law and prior findings instead of rediscovering or contradicting them:
 
@@ -150,7 +150,7 @@ THE STAGING RULE, non-negotiable: this table changes no coefficients. A nudge pr
 
 ## 4. Traps and legs
 
-Trap record from the mv tier row (fade framing). If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Since 2026-10-01 MLB run line traps and juicy dog traps are shadow (trap_publish_spread, trap_publish_juicy_dog 0): they sit in rule_gate_log as held fades, not in the Trap record. Legs: hit rate versus the leg_prob_floor dial per sport (UFC 1.01 since 2026-10-01, out of the pool). Legs hitting well below the floor over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
+Trap record from the mv tier row, read as the bait's record (won is the bait winning) with roi_units as what betting the bait cost. If trap_signals is populated, group the week's trap outcomes by signal to spot a dragging lure. Since 2026-10-01 MLB run line traps and juicy dog traps are shadow (trap_publish_spread, trap_publish_juicy_dog 0): they sit in rule_gate_log as held fades, not in the Trap record. Legs: hit rate versus the leg_prob_floor dial per sport (UFC 1.01 since 2026-10-01, out of the pool). Legs hitting well below the floor over a real sample means the model probabilities are optimistic exactly where the parlay builder trusts them most.
 
 ## 4b. Rule gate scorecard (shadow rules, since 2026-10-01)
 

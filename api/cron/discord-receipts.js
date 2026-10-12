@@ -42,10 +42,15 @@ function recordLine(r) {
   return `${r.won}-${r.lost}${Number(r.push) > 0 ? `-${r.push}` : ''}${u ? ` · ${u}` : ''}`;
 }
 
+// A trap row stores the trapped side's own result, and a trap says do not
+// bet that side, so the warning held when the bait lost (owner 2026-10-12:
+// trap means don't bet it). The mark follows the warning, not the bait.
+const TRAP_MARK = { won: '❌', lost: '✅', push: '➖' };
+
 function receiptLine(row) {
-  const mark = MARK[row.actual_outcome] || '•';
+  const mark = (row.tier === 'Trap' ? TRAP_MARK : MARK)[row.actual_outcome] || '•';
   const parts = [];
-  if (row.tier === 'Trap') parts.push(`Fade ${row.pick}`);
+  if (row.tier === 'Trap') parts.push(`Don't bet ${row.pick}`);
   else parts.push(row.pick);
   parts.push(matchupOf(row), row.sport);
   if (row.edge_pp != null && row.tier !== 'Leg' && row.tier !== 'Trap') parts.push(`${row.edge_pp}pp`);
@@ -82,7 +87,7 @@ function formatReceipts(rows, record, dateLabel) {
     const sorted = tier === 'Leg'
       ? group.sort((a, b) => (b.model_prob ?? 0) - (a.model_prob ?? 0))
       : group.sort((a, b) => (b.edge_pp ?? 0) - (a.edge_pp ?? 0));
-    const title = tier === 'Trap' ? `Traps · fades that held ${won}, fades that broke ${lost}`
+    const title = tier === 'Trap' ? `Traps · warning held ${lost}, bait came in ${won}`
       : tier === 'Leg' ? `Legs · ${won} hit, ${lost} missed`
         : `${tier}${group.length > 1 ? 's' : ''} · ${won}-${lost}`;
     embeds.push(...embedsFromLines(title, sorted.map(receiptLine), { color: TIER_COLOR[tier] }));
