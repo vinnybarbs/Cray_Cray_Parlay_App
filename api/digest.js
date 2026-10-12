@@ -310,11 +310,15 @@ async function getDigest(req, res) {
           };
         });
 
-        // Researched field boards (devigged odds + notes) from analyze-golf.
-        // One entry per tournament that currently has outright odds.
+        // Researched field boards from golf_field. analyze-golf was retired
+        // 2026-10-12 (owner, build_queue 92), so nothing writes these rows any
+        // more. Only rows from the last 4 days show, which leaves the board
+        // empty once the last run ages out instead of showing stale notes.
+        const fieldSince = new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString();
         const { data: fieldRows } = await supabase
           .from('golf_field')
           .select('tournament_key, tournament_name, player_name, prices, best_price, best_book, consensus_prob, value_pp, espn_position, espn_score, research_note, generated_at')
+          .gte('generated_at', fieldSince)
           .order('consensus_prob', { ascending: false });
 
         const fieldsByKey = {};

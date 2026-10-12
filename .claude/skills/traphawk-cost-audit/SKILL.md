@@ -17,9 +17,9 @@ Start by reading `agent_reports` for the last month (other workers may have alre
 | Integrity sweep records + injuries | Sonnet 5 for lookup and injury judgment since 2026-10-01 (lib/services/data-integrity-agent.js 40 to 41) | agent_intel agent_debug token payloads |
 | Web search fees | n/a | console only, $10 per 1000 searches, agent_debug has per-agent search counts |
 | Fact-check picks | Sonnet | NOT logged, count via ai_suggestions.fact_checked_at |
-| Golf notes | Sonnet | NOT logged, 1 call per tournament per run, 3 runs/day |
+| Golf notes | Sonnet | RETIRED 2026-10-12 (owner, build_queue 92): analyze-golf unscheduled and its route removed, so this line is zero from that date. Before it, NOT logged, 1 call per tournament per run, 3 runs/day |
 | Enrich articles, news summarizer | Haiku | RETIRED 2026-09-14 (owner, build_queue 36): both jobs unscheduled and the code removed, so this line is zero from that date. Before it, count news_articles.betting_summary |
-| Learning analyzer | Opus 4.8 | RETIRED 2026-09-15 (owner): analyze-outcomes-daily unscheduled, the route stays but nothing calls it, so this line is zero from that date. Before it, five picks a day into ai_suggestions.post_analysis |
+| Learning analyzer | Opus 4.8 | RETIRED 2026-09-15 (owner): analyze-outcomes-daily unscheduled, so this line is zero from that date. Its routes and the parlay coordinator lessons read were removed 2026-10-12 (build_queue 92). Before it, five picks a day into ai_suggestions.post_analysis |
 | De-Genny chat | Sonnet | OFF since 2026-09-21 (owner): /api/chat-picks answers 503 unless DEGENNY_CHAT=on, so this line is zero from that date. It had answered anonymous prompts behind only a per address rate limit |
 
 Weather costs zero (Open-Meteo API since Aug 2026). Pricing changes matter: Sonnet 5 intro pricing ($2/$10 per MTok) ends 2026-08-31, standard is $3/$15. Opus 4.8 is $5/$25, Haiku 4.5 $1/$5. The logged `cost` field always uses standard Sonnet rates, so billed narration cost is lower than logged until the intro window closes.
@@ -65,7 +65,7 @@ select
      and published_at >= date_trunc('month', now())) as articles_enriched;
 ```
 
-Estimate fact-check at roughly 3k in / 1.5k out Sonnet tokens per check, golf at 2k in / 3k out per tournament call, enrichment at about 1.5k Haiku tokens per article (only for months before 2026-09-14; the news path has no model call since then).
+Estimate fact-check at roughly 3k in / 1.5k out Sonnet tokens per check, golf at 2k in / 3k out per tournament call (only for months before 2026-10-12), enrichment at about 1.5k Haiku tokens per article (only for months before 2026-09-14; the news path has no model call since then).
 
 ## Reconciliation
 
