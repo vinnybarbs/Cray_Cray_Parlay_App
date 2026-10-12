@@ -280,12 +280,14 @@ export default function HouseLedger() {
 
             {/* Per-tier record */}
             {tierOrder.length > 0 && (
-              <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-x-auto">
-                <div className="px-4 pt-2.5 bg-ink-950 text-xs text-ink-500 min-w-[480px]">
-                  Full record · since May 10, 2026 · every settled pick. The landing page table is the last 30 days only, so these totals run higher.
+              <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+                <div className="px-4 pt-3 pb-1 bg-ink-950 text-xs text-ink-500">
+                  Full record since May 10, 2026, every settled pick. The landing page shows the last 30 days only, so these totals run higher.
                 </div>
-                <div className="grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-2.5 bg-ink-950 text-xs text-ink-500 min-w-[480px]">
-                  <span>Tier · edge range</span>
+                {/* Phones stack each tier with its four numbers under it, wider
+                    screens get the table (owner 2026-10-12, no sideways scroll). */}
+                <div className="hidden sm:grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-2.5 bg-ink-950 text-xs text-ink-500">
+                  <span>Tier and edge range</span>
                   <span className="text-right">Settled</span>
                   <span className="text-right">Hit rate</span>
                   <span className="text-right">ROI</span>
@@ -294,16 +296,26 @@ export default function HouseLedger() {
                 {tierOrder.map(label => {
                   const s = byTier[label]
                   const t = edgeTier(label === 'Sharp Take' ? 11 : label === 'Strong Play' ? 8 : label === 'Play' ? 5 : label === 'Lean' ? 3 : label === 'Skip' ? 1 : -3)
+                  const cells = [
+                    ['Settled', <span className="tabular-nums text-ink-300">{s.settled}</span>],
+                    ['Hit rate', <span className={`font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '-'}</span>],
+                    ['ROI', <span className={`tabular-nums ${s.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.roi != null ? `${s.roi >= 0 ? '+' : ''}${s.roi}%` : '-'}</span>],
+                    ['Units', <span className={`tabular-nums ${s.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(s.units)}</span>],
+                  ]
                   return (
-                    <div key={label} className="grid grid-cols-[1fr_70px_70px_70px_80px] gap-3 px-4 py-3 border-t border-ink-800 items-center min-w-[480px]">
+                    <div key={label} className="flex flex-col gap-2 sm:grid sm:grid-cols-[1fr_70px_70px_70px_80px] sm:gap-3 px-4 py-3 border-t border-ink-800 sm:items-center">
                       <span>
-                        <span className={`text-xs font-bold ${t.color}`}>{label}</span>
-                        <span className="ml-2 tabular-nums text-[10px] text-ink-500">{tierRange(label)}</span>
+                        <span className={`text-sm font-bold ${t.color}`}>{label}</span>
+                        <span className="ml-2 tabular-nums text-xs text-ink-500">{tierRange(label)}</span>
                       </span>
-                      <span className="text-right text-sm tabular-nums text-ink-300">{s.settled}</span>
-                      <span className={`text-right text-sm font-bold tabular-nums ${s.winRate >= 55 ? 'text-signal-pos' : s.winRate >= 50 ? 'text-ink-100' : 'text-signal-neg'}`}>{s.winRate != null ? `${s.winRate}%` : '-'}</span>
-                      <span className={`text-right text-sm tabular-nums ${s.roi > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.roi != null ? `${s.roi >= 0 ? '+' : ''}${s.roi}%` : '-'}</span>
-                      <span className={`text-right text-sm tabular-nums ${s.units > 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(s.units)}</span>
+                      <div className="grid grid-cols-4 gap-2 sm:contents">
+                        {cells.map(([name, val]) => (
+                          <div key={name} className="flex flex-col sm:block sm:text-right text-sm">
+                            <span className="text-xs text-ink-500 sm:hidden">{name}</span>
+                            {val}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )
                 })}
