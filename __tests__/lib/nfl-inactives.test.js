@@ -3,7 +3,7 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ||
 
 const {
   teamAbbr, normalizeAbbr, mapInjuryRow, latestDepthChartRows, depthChartRows,
-  parseSummaryInjuries, diffScratches, matchEvent, linesForTeam, practiceReportText,
+  parseSummaryInjuries, diffScratches, matchEvent, linesForTeam, practiceReportText, pricedInjuryText,
 } = require('../../lib/services/nfl-inactives');
 const { mapInjuryItem, ACTIVE_SPORTS } = require('../../api/cron/fetch-espn-intelligence');
 const { getFootballInjuryImpact, overrideTeams, _setTeams, _resetCache } = require('../../lib/services/football-injuries');
@@ -224,5 +224,21 @@ describe('practiceReportText (narration context only)', () => {
   test('no rows for the week returns null so the caller falls back', async () => {
     expect(await practiceReportText(stub([]), 'Kansas City Chiefs', 'Denver Broncos', '2026-09-15T00:15:00Z', weekFor)).toBeNull();
     expect(await practiceReportText(stub([]), 'Kansas City Chiefs', 'Denver Broncos', '2026-09-15T00:15:00Z', () => null)).toBeNull();
+  });
+});
+
+describe('pricedInjuryText (narration context only)', () => {
+  test('lists the priced statuses so a later Out beats a Friday Questionable', () => {
+    const text = pricedInjuryText({
+      home: [{ player: 'Ty Simpson', position: 'QB', status: 'out' }],
+      away: [{ player: 'Dee Alford', position: 'CB', status: 'out' }],
+    }, 'Los Angeles Rams', 'Buffalo Bills');
+    expect(text).toMatch(/wins over the practice report/);
+    expect(text).toContain('Los Angeles Rams: Ty Simpson (QB) out');
+    expect(text).toContain('Buffalo Bills: Dee Alford (CB) out');
+  });
+  test('nothing priced gives no line', () => {
+    expect(pricedInjuryText(undefined, 'A', 'B')).toBeNull();
+    expect(pricedInjuryText({ home: [], away: [] }, 'A', 'B')).toBeNull();
   });
 });
