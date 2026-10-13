@@ -7,7 +7,6 @@ import { API_BASE_URL as API_BASE } from '../config'
 import PropCard from '../components/PropCard'
 import InstallButton from '../components/InstallButton'
 import { SkeletonList } from '../components/Skeleton'
-import LiveStrip from '../components/LiveStrip'
 
 // Today (build_queue 96, owner 2026-10-12): the one screen a first time
 // visitor or a home screen install opens on. The day's best plays in
@@ -133,13 +132,6 @@ export default function Today() {
   const plays = picks.filter(p => Number(p.edge_pp) >= 4).length
   const shownProps = (props?.upcoming || []).slice(0, 3)
   const cardId = (kind, i) => `today-${kind}-${i}`
-  // The live strip lists exactly what the page shows, each item taps to
-  // its card (owner 2026-10-12).
-  const stripItems = [
-    ...picks.map((p, i) => ({ key: cardId('pick', i), label: pickWithoutPrice(p.pick), price: fmtOdds(p.odds), targetId: cardId('pick', i) })),
-    ...shownProps.map((p, i) => ({ key: cardId('prop', i), label: p.text, price: fmtOdds(p.price), targetId: cardId('prop', i) })),
-    ...traps.map((p, i) => ({ key: cardId('trap', i), label: `Don't bet ${pickWithoutPrice(p.pick)}`, tone: 'neg', targetId: cardId('trap', i) })),
-  ]
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
@@ -154,8 +146,9 @@ export default function Today() {
         </div>
       </header>
 
-      <main className="max-w-xl mx-auto px-4 pt-0 pb-16 flex flex-col gap-8">
-        {stripItems.length > 0 ? <LiveStrip items={stripItems} /> : <div aria-hidden="true" />}
+      {/* No live strip here (owner 2026-10-13: "the ticker stinks"). It
+          repeated the cards right below it. The landing keeps its own. */}
+      <main className="max-w-xl mx-auto px-4 pt-6 pb-16 flex flex-col gap-8">
         <section className="flex flex-col gap-1">
           <p className="text-sm text-ink-400">
             {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
