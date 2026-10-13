@@ -5,9 +5,11 @@ const { attachPublishedPicks } = require('../../api/digest');
 
 // A thenable query builder: every filter returns itself, awaiting it
 // yields the rows.
-function fakeSupabase(rows) {
+function fakeSupabase(rows, calls = []) {
   const chain = { then(resolve) { resolve({ data: rows, error: null }); } };
-  for (const m of ['select', 'like', 'eq', 'is', 'not', 'gt', 'order', 'limit']) chain[m] = () => chain;
+  for (const m of ['select', 'like', 'eq', 'is', 'not', 'gt', 'gte', 'lte', 'order', 'limit']) {
+    chain[m] = (...args) => { calls.push([m, ...args]); return chain; };
+  }
   return { from: () => chain };
 }
 
@@ -48,5 +50,24 @@ describe('attachPublishedPicks', () => {
     const game = { home_team: 'A', away_team: 'B' };
     await attachPublishedPicks(down, [game]);
     expect(game.published_pick).toBeNull();
+  });
+
+  // Owner 2026-10-13: started games keep their tile, so a graded pick
+  // must still attach, with its outcome, and the pending filter must be off.
+  it('started mode attaches graded picks with their outcome', async () => {
+    const calls = [];
+    const graded = pending.map(p => ({ ...p, actual_outcome: 'won' }));
+    const game = { home_team: 'Los Angeles Rams', away_team: 'Tennessee Titans' };
+    await attachPublishedPicks(fakeSupabase(graded, calls), [game], { started: true });
+    expect(game.published_pick.outcome).toBe('won');
+    expect(game.published_alts[0].outcome).toBe('won');
+    expect(calls.some(c => c[0] === 'eq' && c[1] === 'actual_outcome')).toBe(false);
+    expect(calls.some(c => c[0] === 'gte' && c[1] === 'game_date')).toBe(true);
+  });
+
+  it('upcoming mode keeps the pending filter', async () => {
+    const calls = [];
+    await attachPublishedPicks(fakeSupabase(pending, calls), [{ home_team: 'x', away_team: 'y' }]);
+    expect(calls).toContainEqual(['eq', 'actual_outcome', 'pending']);
   });
 });

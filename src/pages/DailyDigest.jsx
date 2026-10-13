@@ -898,6 +898,46 @@ function LiveReadNote({ game }) {
   )
 }
 
+// Started games keep their tile (owner 2026-10-13: "leave those awesome
+// tiles on the board as game in progress and locked at so if I went back
+// in I could remember why and what influenced my bet"). The chip says
+// where the game stands, the note says what the pick locked at.
+const OUTCOME_TEXT = { won: 'Final, won', lost: 'Final, lost', push: 'Final, push', void: 'Void' }
+
+function StartedChip({ game }) {
+  const outcome = game.published_pick?.outcome
+  // Without a graded pick there is no final score here, so past the
+  // length of any game the chip stops claiming the game is live.
+  const elapsedH = (Date.now() - new Date(game.game_date).getTime()) / 3600e3
+  const done = outcome && outcome !== 'pending' ? OUTCOME_TEXT[outcome]
+    : elapsedH > 4 ? 'Locked' : null
+  const tone = outcome === 'won' ? 'bg-signal-pos-dim/40 text-signal-pos'
+    : outcome === 'lost' ? 'bg-signal-neg-dim/40 text-signal-neg'
+    : 'bg-ink-800 text-ink-200'
+  return (
+    <div className="text-[11px] text-ink-500 mt-1 tabular-nums flex flex-wrap items-center gap-x-1.5 gap-y-1">
+      <span className={`px-2 py-0.5 rounded-full font-semibold text-xs whitespace-nowrap flex items-center gap-1 ${tone}`}>
+        {!done && <span className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />}
+        {done || 'Game in progress'}
+      </span>
+      <span className="whitespace-nowrap">Started {new Date(game.game_date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+    </div>
+  )
+}
+
+function LockedNote({ game }) {
+  const pub = game?.published_pick
+  if (!pub?.pick) return null
+  const n = parseInt(pub.odds, 10)
+  const price = Number.isFinite(n) ? (n > 0 ? `+${n}` : `${n}`) : null
+  const when = new Date(game.game_date).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return (
+    <div className="text-xs text-ink-300 mt-1 tabular-nums">
+      Locked at {when}{price ? `, ${price}` : ''}
+    </div>
+  )
+}
+
 function GameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
 
@@ -923,7 +963,8 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
                 {game.home_record && <span>{game.home_record}</span>}
               </div>
             )}
-            {game.game_date && (
+            {game.in_progress && <StartedChip game={game} />}
+            {game.game_date && !game.in_progress && (
               <div className=" text-[11px] text-ink-500 mt-0.5 tabular-nums flex items-center gap-1.5">
                 {/* The board is a rolling next-24h window, so an evening
                     visit sees tonight's late games NEXT TO tomorrow's
@@ -992,7 +1033,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
                 ) : null
               })()}
               <TierPathNote published={game.published_pick} />
-              <LiveReadNote game={game} />
+              {game.in_progress ? <LockedNote game={game} /> : <LiveReadNote game={game} />}
             </div>
           )
           if (game.recommended_pick && isLegGame) {
@@ -1123,9 +1164,9 @@ function TrapCard({ game, trap, gameKey, onDeepResearch }) {
         <div className="tabular-nums font-medium text-ink-100 text-sm leading-tight tracking-tight mb-0.5">
           {game.away_team} <span className="text-ink-500">at</span> {game.home_team}
         </div>
-        {game.game_date && (
-          <div className=" text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>
-        )}
+        {game.game_date && (game.in_progress
+          ? <div className="mb-3"><StartedChip game={{ ...game, published_pick: null }} /></div>
+          : <div className=" text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>)}
         <div className="bg-signal-neg-dim/20 rounded-sharp px-3 py-2 mb-3 border border-signal-neg/30">
           <div className="text-xs text-signal-neg mb-0.5">The bait · don't bet it</div>
           <div className="text-signal-neg font-medium text-sm tabular-nums">{baitText || side}</div>
@@ -1483,6 +1524,55 @@ function fmtGolfPrice(price) {
   if (price == null) return '-'
   const n = Number(price)
   return n > 0 ? `+${n}` : String(n)
+}
+
+// The games that already kicked off, newest first. Tiles with a read
+// (a pick, a leg or a trap) show by default, the rest sit behind a tap so
+// a slate of no-edge games does not bury tonight's plays.
+function StartedSection({ games, onDeepResearch }) {
+  const [showAll, setShowAll] = useState(false)
+  if (!Array.isArray(games) || games.length === 0) return null
+  const visible = games.filter(g => !SHADOW_DISPLAY.has(g.sport))
+  const hasRead = (g) => {
+    if (g.published_pick?.pick) return true
+    if (Array.isArray(g.trap_calls) && g.trap_calls.length > 0) return true
+    const pp = finalPpFor(g)
+    return pp != null && pp >= 2 && !!g.recommended_pick
+  }
+  const withRead = visible.filter(hasRead)
+  const rest = visible.filter(g => !hasRead(g))
+  const shown = showAll ? [...withRead, ...rest] : withRead
+  if (visible.length === 0) return null
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+      <div className="bg-ink-850 px-6 py-4 border-b border-ink-700">
+        <h2 className="text-base font-semibold text-ink-100">Started</h2>
+        <p className="text-[11px] text-ink-400 tabular-nums">
+          {withRead.length} with a read{rest.length > 0 ? `, ${rest.length} more` : ''}. Locked when each game started, kept here so you can see why.
+        </p>
+      </div>
+      <div className="p-4 sm:p-6">
+        {shown.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {shown.map(g => (
+              <GameCard key={g.game_key} game={g} gameKey={g.game_key} sport={g.sport} onDeepResearch={onDeepResearch} />
+            ))}
+            {shown.flatMap(g => (Array.isArray(g.trap_calls) ? g.trap_calls : []).map((trap, i) => (
+              <TrapCard key={`${g.game_key}-trap-${i}`} game={g} trap={trap} gameKey={g.game_key} onDeepResearch={onDeepResearch} />
+            )))}
+          </div>
+        )}
+        {!showAll && rest.length > 0 && (
+          <button
+            onClick={() => setShowAll(true)}
+            className={`${shown.length > 0 ? 'mt-4' : ''} w-full py-2 text-xs text-ink-300 hover:text-ink-100 bg-ink-850 rounded-sharp shadow-hairline`}
+          >
+            Show {rest.length} more started game{rest.length !== 1 ? 's' : ''}
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 function OnDeckRail({ onDeck }) {
@@ -1985,6 +2075,10 @@ export default function DailyDigest({ onBack }) {
                   />
                 ))}
               </>
+            )}
+
+            {boardFilter === 'All' && (
+              <StartedSection games={data.startedGames} onDeepResearch={handleOpenDeepResearch} />
             )}
 
             {/* Golf is a side dish, not the main course. One collapsed line at

@@ -38,6 +38,19 @@ describe('shapeToday', () => {
     expect(out.picks[0].edge_pp).toBe(9);
   });
 
+  // Owner 2026-10-13: started picks stay on Today, locked, with outcome.
+  it('lists started picks newest kickoff first with their outcome', () => {
+    const started = [
+      row({ home_team: 'S1', edge_pp: 5, game_date: '2026-10-12T17:00:00Z', actual_outcome: 'won' }),
+      row({ home_team: 'S2', edge_pp: 3, game_date: '2026-10-12T20:00:00Z', actual_outcome: 'pending' }),
+      row({ home_team: 'S3', edge_pp: 1, game_date: '2026-10-12T20:00:00Z' }),
+    ];
+    const out = shapeToday([], [], [], started);
+    expect(out.started.map(p => p.home_team)).toEqual(['S2', 'S1']);
+    expect(out.started[1].outcome).toBe('won');
+    expect(shapeToday([], [], []).started).toEqual([]);
+  });
+
   it('sorts traps most overpriced first and caps at three', () => {
     const traps = [-3, -8, -5, -4].map((e, i) => row({ home_team: `X${i}`, edge_pp: e, tier: 'Trap', session_id: 'auto_digest_trap_2026-10-12' }));
     const out = shapeToday([], traps, []);

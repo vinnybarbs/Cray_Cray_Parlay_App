@@ -10,6 +10,8 @@ const { createClient } = require('@supabase/supabase-js');
 
 const HORIZON_HOURS = 30;
 const MAX_PICKS = 5;
+// How long a started pick stays on Today, same window as the board.
+const STARTED_WINDOW_HOURS = 8;
 const MAX_TRAPS = 3;
 // Play and above. A Lean is a publishable read, not a play to lead with.
 const MIN_PP = 4;
@@ -82,7 +84,7 @@ function bookAndOurPct(r) {
   return { book_pct: bookPct, our_pct: Math.round(book * 100 + edge) };
 }
 
-function shapeToday(pickRows, trapRows, recordRows) {
+function shapeToday(pickRows, trapRows, recordRows, startedRows = []) {
   const slim = r => ({
     sport: r.sport,
     home_team: r.home_team,
@@ -93,6 +95,7 @@ function shapeToday(pickRows, trapRows, recordRows) {
     odds: r.odds,
     edge_pp: r.edge_pp != null ? Number(r.edge_pp) : null,
     tier: r.tier,
+    outcome: r.actual_outcome || null,
     ...bookAndOurPct(r),
   });
   const ranked = latestPerGame((pickRows || []).filter(r => HEADLINE_SESSION.test(String(r.session_id))))
@@ -108,10 +111,18 @@ function shapeToday(pickRows, trapRows, recordRows) {
     .sort((a, b) => Number(a.edge_pp) - Number(b.edge_pp))
     .slice(0, MAX_TRAPS)
     .map(slim);
+  // Picks whose game already started stay on Today, locked, newest
+  // kickoff first (owner 2026-10-13: "game in progress" and "locked at").
+  const started = latestPerGame((startedRows || []).filter(r => HEADLINE_SESSION.test(String(r.session_id))))
+    .filter(r => Number(r.edge_pp) >= 2)
+    .sort((a, b) => String(b.game_date).localeCompare(String(a.game_date)) || Number(b.edge_pp) - Number(a.edge_pp))
+    .slice(0, MAX_PICKS)
+    .map(slim);
   const find = (bucket, type, value) => (recordRows || []).find(r =>
     r.period_bucket === bucket && r.dimension_type === type && (value == null || r.dimension_value === value));
   return {
     picks,
+    started,
     traps,
     record: {
       last30: recordOf(find('last_30d', 'overall')),
@@ -143,19 +154,29 @@ async function today(req, res) {
       .is('voided_at', null)
       .gt('game_date', now.toISOString())
       .lt('game_date', horizon);
-    const [picksRes, trapsRes, recordRes] = await Promise.all([
+    const startedFrom = new Date(now.getTime() - STARTED_WINDOW_HOURS * 3600 * 1000).toISOString();
+    const [picksRes, trapsRes, recordRes, startedRes] = await Promise.all([
       base().like('session_id', 'auto_digest%').not('tier', 'in', '("Trap","Leg","Skip")').limit(300),
       base().like('session_id', 'auto_digest_trap_%').limit(100),
       supabase.from('mv_public_record')
         .select('period_bucket, dimension_type, dimension_value, won, lost, push, roi_units')
         .in('period_bucket', ['last_30d', 'all'])
         .in('dimension_type', ['overall', 'tier']),
+      supabase.from('ai_suggestions')
+        .select(`${cols}, actual_outcome`)
+        .is('voided_at', null)
+        .gte('game_date', startedFrom)
+        .lte('game_date', now.toISOString())
+        .like('session_id', 'auto_digest%')
+        .not('tier', 'in', '("Trap","Leg","Skip")')
+        .limit(300),
     ]);
     const err = picksRes.error || trapsRes.error || recordRes.error;
     if (err) { res.status(500).json({ error: err.message }); return; }
 
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
-    res.json({ ...shapeToday(picksRes.data, trapsRes.data, recordRes.data), asOf: now.toISOString() });
+    // A failed started query drops that list, never the picks.
+    res.json({ ...shapeToday(picksRes.data, trapsRes.data, recordRes.data, startedRes.error ? [] : startedRes.data), asOf: now.toISOString() });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

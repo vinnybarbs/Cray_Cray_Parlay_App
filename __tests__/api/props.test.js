@@ -44,6 +44,17 @@ describe('shapeProps', () => {
     expect(out.recent).toHaveLength(1);
     expect(out.recent[0]).toMatchObject({ outcome: 'won', actual: 7 });
   });
+
+  // Owner 2026-10-13: a read whose game started stays up, locked, with
+  // its why, graded or not.
+  it('keeps started reads in live with their why and outcome', () => {
+    const live = [row({ v2_edge_pp: 5, narration: 'Volume is up.', narration_side: 'over', narration_line: 5.5 }), row({ v2_edge_pp: 3 })];
+    const out = shapeProps([], [], [], live);
+    expect(out.live).toHaveLength(1);
+    expect(out.live[0]).toMatchObject({ started: true, outcome: 'pending' });
+    expect(out.live[0].why.narration).toBe('Volume is up.');
+    expect(shapeProps([], [], []).live).toEqual([]);
+  });
 });
 
 const { attachHistory, sideProbs } = require('../../api/props');

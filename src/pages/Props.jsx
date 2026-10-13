@@ -31,14 +31,16 @@ export default function Props() {
 
   const allUpcoming = data?.upcoming || []
   const allRecent = data?.recent || []
+  const allLive = data?.live || []
   // Chips for the markets on the board right now, in board order.
   const markets = []
-  for (const p of [...allUpcoming, ...allRecent]) {
+  for (const p of [...allUpcoming, ...allLive, ...allRecent]) {
     if (!markets.some(m => m.key === p.market)) markets.push({ key: p.market, label: p.marketLabel })
   }
   const pick = (list) => (market === 'all' ? list : list.filter(p => p.market === market))
   const upcoming = pick(allUpcoming)
   const recent = pick(allRecent)
+  const live = pick(allLive)
   const rec = data?.record
   const total = rec?.total
 
@@ -109,6 +111,15 @@ export default function Props() {
                 {byGame.get(k).map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} />)}
               </section>
             ))
+        )}
+
+        {/* Reads whose game already started stay up, locked, with their
+            why (owner 2026-10-13). */}
+        {data && tab === 'upcoming' && live.length > 0 && (
+          <section className="flex flex-col gap-2" aria-label="Started">
+            <h2 className="text-sm font-semibold text-ink-300 mt-2">Started</h2>
+            {live.map((p, i) => <PropCard key={`live|${p.text}|${i}`} p={p} />)}
+          </section>
         )}
 
         {data && tab === 'recent' && (

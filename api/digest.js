@@ -46,17 +46,33 @@ const SPORT_SLUG_TO_DISPLAY = {
 // tile and Skip in the modal (owner 2026-09-27, "we've been getting
 // roasted"). The published row is what the ledger grades, so every
 // surface headlines it.
-async function attachPublishedPicks(supabase, games) {
+//
+// started: true attaches the picks for games that already kicked off
+// (owner 2026-10-13: tiles stay up as "Game in progress" so a bettor can
+// come back and see why they bet it). Those picks may already be graded,
+// so the pending filter is off and the outcome rides along.
+const GAME_COLS = 'game_key, home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, recommended_odds, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, spread_home_price, spread_away_price, over_price, under_price, home_record, away_record, home_ranking, away_ranking, sport, analysis_version, edge_movement, what_changed, edges, edges_raw, trap_calls, calc_home_prob, calc_away_prob, model_used';
+
+// How long a started game keeps its tile. Long enough to cover any game
+// plus the grading lag, short enough that last night is gone by morning.
+const STARTED_WINDOW_HOURS = 8;
+function startedSince() {
+  return new Date(Date.now() - STARTED_WINDOW_HOURS * 3600e3).toISOString();
+}
+
+async function attachPublishedPicks(supabase, games, { started = false } = {}) {
   if (!Array.isArray(games) || games.length === 0) return games;
   const pendingPicksResult = await safeQuery(async () => {
-    const { data, error } = await supabase
+    let q = supabase
       .from('ai_suggestions')
-      .select('home_team, away_team, game_date, pick, bet_type, odds, edge_pp, tier, tier_history, last_revised_at, session_id')
+      .select('home_team, away_team, game_date, pick, bet_type, odds, edge_pp, tier, tier_history, last_revised_at, session_id, actual_outcome')
       .like('session_id', 'auto_digest%')
-      .eq('actual_outcome', 'pending')
       .is('voided_at', null)
-      .not('tier', 'in', '("Trap","Leg")')
-      .gt('game_date', new Date().toISOString());
+      .not('tier', 'in', '("Trap","Leg")');
+    q = started
+      ? q.gte('game_date', startedSince()).lte('game_date', new Date().toISOString())
+      : q.eq('actual_outcome', 'pending').gt('game_date', new Date().toISOString());
+    const { data, error } = await q;
     if (error) throw error;
     return data || [];
   });
@@ -66,7 +82,7 @@ async function attachPublishedPicks(supabase, games) {
     const key = `${p.home_team}|${p.away_team}`;
     if (String(p.session_id).startsWith('auto_digest_alt_')) {
       if (!altsByMatchup.has(key)) altsByMatchup.set(key, []);
-      altsByMatchup.get(key).push({ pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history });
+      altsByMatchup.get(key).push({ pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, outcome: p.actual_outcome });
     } else {
       pickByMatchup.set(key, p);
     }
@@ -76,7 +92,7 @@ async function attachPublishedPicks(supabase, games) {
     const key = `${game.home_team}|${game.away_team}`;
     const p = pickByMatchup.get(key);
     game.published_pick = p
-      ? { pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at }
+      ? { pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at, outcome: p.actual_outcome }
       : null;
     game.published_alts = altsByMatchup.get(key) || null;
   }
@@ -94,9 +110,7 @@ async function getDigest(req, res) {
     const todaysGamesResult = await safeQuery(async () => {
       const { data, error } = await supabase
         .from('game_analysis')
-        .select(
-          'game_key, home_team, away_team, game_date, edge_score, recommended_pick, recommended_side, recommended_odds, analysis_snippet, key_factors, spread, total, moneyline_home, moneyline_away, spread_home_price, spread_away_price, over_price, under_price, home_record, away_record, home_ranking, away_ranking, sport, analysis_version, edge_movement, what_changed, edges, edges_raw, trap_calls, calc_home_prob, calc_away_prob, model_used'
-        )
+        .select(GAME_COLS)
         .eq('stale', false)
         .gt('expires_at', new Date().toISOString())
         .gt('game_date', new Date().toISOString())
@@ -128,6 +142,23 @@ async function getDigest(req, res) {
     }));
 
     await attachPublishedPicks(supabase, games);
+
+    // 1b. Games that already started. The upcoming query above drops them
+    // at kickoff, which took the reasoning away exactly when a bettor wants
+    // to look back at it. The last analysis row stays as it was at lock,
+    // stale or expired included, since nothing refreshes a started game.
+    const startedGames = (await safeQuery(async () => {
+      const { data, error } = await supabase
+        .from('game_analysis')
+        .select(GAME_COLS)
+        .gte('game_date', startedSince())
+        .lte('game_date', new Date().toISOString())
+        .order('game_date', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    })) || [];
+    await attachPublishedPicks(supabase, startedGames, { started: true });
+    for (const g of startedGames) g.in_progress = true;
 
     // Group games by sport
     const gamesBySport = {};
@@ -430,6 +461,7 @@ async function getDigest(req, res) {
       timestamp: new Date().toISOString(),
       publishMarkets: publishMarkets || {},
       gamesBySport: gamesBySport || {},
+      startedGames,
       injuries: injuriesBySport || {},
       yesterdayResults: yesterdayResultsResult || {},
       modelAccuracy: modelAccuracyResult || { last_3d: null, last_7d: null, last_30d: null, all: null },
@@ -474,7 +506,8 @@ async function deepResearch(req, res) {
     }
     // The published pick rides along so the modal scores what the ledger
     // grades, same as the tile.
-    await attachPublishedPicks(supabase, [gameAnalysisResult]);
+    const startedAlready = gameAnalysisResult.game_date && new Date(gameAnalysisResult.game_date) <= new Date();
+    await attachPublishedPicks(supabase, [gameAnalysisResult], { started: startedAlready });
 
     // Canonical fact sheet (same as /digest list view): structured matchup,
     // market, records, edge sections sourced from build_game_fact_sheet().
