@@ -4,6 +4,7 @@ import BrandMark, { SignOutButton } from '../components/BrandMark'
 import { edgeTier } from '../lib/tiers'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { API_BASE_URL as API_BASE } from '../config'
+import { prefetchDigest } from './DailyDigest'
 import PropCard from '../components/PropCard'
 import LineShop from '../components/LineShop'
 import InstallButton from '../components/InstallButton'
@@ -123,6 +124,8 @@ export default function Today() {
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
       .then(d => { if (!cancelled) setData(d) })
       .catch(e => { if (!cancelled) setError(e.message) })
+      // Warm the board after Today's own cards, never ahead of them.
+      .finally(() => prefetchDigest())
     return () => { cancelled = true }
   }, [])
 

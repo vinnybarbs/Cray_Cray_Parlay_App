@@ -1771,26 +1771,55 @@ function GolfLeaderboard({ golf }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────────────
 
+// The last board this tab loaded. Switching to Today and back unmounts
+// the page, which used to mean a blank skeleton until /api/digest came
+// back every time. The kept copy paints at once and refreshes underneath.
+let lastDigest = null
+let digestInFlight = null
+
+// One request at a time. Today warms the board through prefetchDigest
+// once its own cards are up, so the tap that follows usually lands on
+// data that is already here.
+function loadDigest() {
+  if (!digestInFlight) {
+    digestInFlight = fetch(`${API_BASE}/api/digest`)
+      .then(res => {
+        if (!res.ok) throw new Error(`Server error ${res.status}`)
+        return res.json()
+      })
+      .then(json => { lastDigest = json; return json })
+      .finally(() => { digestInFlight = null })
+  }
+  return digestInFlight
+}
+
+export function prefetchDigest() {
+  if (!lastDigest) loadDigest().catch(() => {})
+}
+
 export default function DailyDigest({ onBack }) {
-  const [data, setData] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [data, setData] = useState(lastDigest)
+  const [loading, setLoading] = useState(!lastDigest)
   const [error, setError] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
   const [deepResearchTarget, setDeepResearchTarget] = useState(null) // { game, gameKey }
   const [legendOpen, setLegendOpen] = useState(false)
 
   const fetchDigest = useCallback(async () => {
-    setLoading(true)
+    if (!lastDigest) setLoading(true)
     setError(null)
+    setRefreshing(true)
+    if (lastDigest) setPublishFlags(lastDigest.publishMarkets)
     try {
-      const res = await fetch(`${API_BASE}/api/digest`)
-      if (!res.ok) throw new Error(`Server error ${res.status}`)
-      const json = await res.json()
+      const json = await loadDigest()
       setPublishFlags(json?.publishMarkets)
       setData(json)
     } catch (err) {
-      setError(err.message)
+      // A failed refresh keeps the board already on screen.
+      if (!lastDigest) setError(err.message)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [])
 
@@ -1931,7 +1960,7 @@ export default function DailyDigest({ onBack }) {
           className="max-sm:ml-auto px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
           aria-label="Refresh"
         >
-          {loading ? '...' : <><span aria-hidden="true">↻</span><span className="hidden sm:inline"> Refresh</span></>}
+          {refreshing ? '...' : <><span aria-hidden="true">↻</span><span className="hidden sm:inline"> Refresh</span></>}
         </button>
         <InstallButton />
         <SignOutButton />
