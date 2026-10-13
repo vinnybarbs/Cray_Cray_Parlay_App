@@ -5,6 +5,7 @@ import { edgeTier } from '../lib/tiers'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { API_BASE_URL as API_BASE } from '../config'
 import PropCard from '../components/PropCard'
+import LineShop from '../components/LineShop'
 import InstallButton from '../components/InstallButton'
 import { SkeletonList } from '../components/Skeleton'
 
@@ -75,6 +76,7 @@ function PickRow({ p, onOpen, id, started = false }) {
           ? <>Book says <span className="tabular-nums text-ink-100">{p.book_pct}%</span>, we say <span className={`font-semibold tabular-nums ${t.color}`}>{p.our_pct}%</span></>
           : <>We put this <span className={`font-semibold tabular-nums ${t.color}`}>{Math.round(Number(p.edge_pp))}%</span> above the book.</>}
       </div>
+      {!started && <LineShop shop={p.shop} bookPct={p.book_pct} compact />}
     </button>
   )
 }

@@ -11,6 +11,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { teamAbbr } = require('../lib/services/nfl-inactives');
+const { SHOP_BOOKS, shopProp } = require('../lib/services/line-shop.js');
 
 // Play and above, the same floor the props flip is judged at.
 const MIN_PP = 4;
@@ -258,6 +259,17 @@ async function props(req, res) {
         .order('season', { ascending: false }).order('week', { ascending: false })
         .limit(keys.length * 25);
       if (!error) statRows = data || [];
+    }
+    // Line shopping at the read's own line (build_queue 105). Only the
+    // upcoming board, and a failure only drops the chips.
+    if (shaped.upcoming.length > 0) {
+      const { data, error } = await supabase.from('player_props')
+        .select('player_key, market, line, over_price, under_price, yes_price, bookmaker, commence_time')
+        .in('player_key', [...new Set(shaped.upcoming.map(p => p.playerKey).filter(Boolean))])
+        .in('bookmaker', SHOP_BOOKS)
+        .gt('commence_time', now.toISOString())
+        .limit(5000);
+      if (!error) shaped.upcoming = shaped.upcoming.map(p => ({ ...p, shop: shopProp(data, p) }));
     }
     shaped.upcoming = attachHistory(shaped.upcoming, statRows);
     shaped.live = attachHistory(shaped.live, statRows);

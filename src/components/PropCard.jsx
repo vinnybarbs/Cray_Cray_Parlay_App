@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { teamColors } from '../lib/teamColors'
 import PlayerSheet from './PlayerSheet'
+import LineShop from './LineShop'
 
 // One shadow prop read (owner 2026-10-12: show props as shadow so the
 // site can be envisioned before they publish). Always carries the SHADOW
@@ -304,6 +305,8 @@ export default function PropCard({ p, showOutcome = false }) {
       {!showOutcome && <HistoryChart p={p} />}
 
       {!showOutcome && <SideChips p={p} />}
+
+      {!showOutcome && !started && <LineShop shop={p.shop} compact />}
 
       {playerOpen && (
         <div onClick={(e) => e.stopPropagation()}>
