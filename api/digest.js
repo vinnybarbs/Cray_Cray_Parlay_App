@@ -3,6 +3,7 @@ const { logger } = require('../shared/logger');
 const { getTennisContext } = require('../lib/services/tennis-data');
 const { getUfcContext } = require('../lib/services/ufc-data');
 const { publishFlagsAll } = require('../lib/services/publish-markets.js');
+const { attachShop } = require('../lib/services/line-shop.js');
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -65,7 +66,7 @@ async function attachPublishedPicks(supabase, games, { started = false } = {}) {
   const pendingPicksResult = await safeQuery(async () => {
     let q = supabase
       .from('ai_suggestions')
-      .select('home_team, away_team, game_date, pick, bet_type, odds, edge_pp, tier, tier_history, last_revised_at, session_id, actual_outcome')
+      .select('home_team, away_team, game_date, pick, bet_type, odds, edge_pp, tier, tier_history, last_revised_at, session_id, actual_outcome, odds_event_id')
       .like('session_id', 'auto_digest%')
       .is('voided_at', null)
       .not('tier', 'in', '("Trap","Leg")');
@@ -76,13 +77,16 @@ async function attachPublishedPicks(supabase, games, { started = false } = {}) {
     if (error) throw error;
     return data || [];
   });
+  // Line shopping (build_queue 105): every book's price on the pick's
+  // own side and line. Only before kickoff, a started pick is locked.
+  if (!started) await attachShop(supabase, pendingPicksResult);
   const pickByMatchup = new Map();
   const altsByMatchup = new Map();
   for (const p of pendingPicksResult || []) {
     const key = `${p.home_team}|${p.away_team}`;
     if (String(p.session_id).startsWith('auto_digest_alt_')) {
       if (!altsByMatchup.has(key)) altsByMatchup.set(key, []);
-      altsByMatchup.get(key).push({ pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, outcome: p.actual_outcome });
+      altsByMatchup.get(key).push({ pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, outcome: p.actual_outcome, shop: p.shop || null });
     } else {
       pickByMatchup.set(key, p);
     }
@@ -92,7 +96,7 @@ async function attachPublishedPicks(supabase, games, { started = false } = {}) {
     const key = `${game.home_team}|${game.away_team}`;
     const p = pickByMatchup.get(key);
     game.published_pick = p
-      ? { pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at, outcome: p.actual_outcome }
+      ? { pick: p.pick, bet_type: p.bet_type, odds: p.odds, edge_pp: p.edge_pp, tier: p.tier, tier_history: p.tier_history, last_revised_at: p.last_revised_at, outcome: p.actual_outcome, shop: p.shop || null }
       : null;
     game.published_alts = altsByMatchup.get(key) || null;
   }

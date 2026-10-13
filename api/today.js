@@ -7,6 +7,7 @@
 // Response: { picks: [...], traps: [...], record: { last30, allTime, trapBait }, asOf }
 
 const { createClient } = require('@supabase/supabase-js');
+const { attachShop } = require('../lib/services/line-shop.js');
 
 const HORIZON_HOURS = 30;
 const MAX_PICKS = 5;
@@ -96,6 +97,7 @@ function shapeToday(pickRows, trapRows, recordRows, startedRows = []) {
     edge_pp: r.edge_pp != null ? Number(r.edge_pp) : null,
     tier: r.tier,
     outcome: r.actual_outcome || null,
+    shop: r.shop || null,
     ...bookAndOurPct(r),
   });
   const ranked = latestPerGame((pickRows || []).filter(r => HEADLINE_SESSION.test(String(r.session_id))))
@@ -146,7 +148,7 @@ async function today(req, res) {
   try {
     const now = new Date();
     const horizon = new Date(now.getTime() + HORIZON_HOURS * 3600 * 1000).toISOString();
-    const cols = 'sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, implied_prob, tier, session_id';
+    const cols = 'sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, implied_prob, tier, session_id, odds_event_id';
     const base = () => supabase
       .from('ai_suggestions')
       .select(cols)
@@ -174,6 +176,8 @@ async function today(req, res) {
     const err = picksRes.error || trapsRes.error || recordRes.error;
     if (err) { res.status(500).json({ error: err.message }); return; }
 
+    // Line shopping on the upcoming picks (build_queue 105). Best effort.
+    await attachShop(supabase, picksRes.data);
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     // A failed started query drops that list, never the picks.
     res.json({ ...shapeToday(picksRes.data, trapsRes.data, recordRes.data, startedRes.error ? [] : startedRes.data), asOf: now.toISOString() });

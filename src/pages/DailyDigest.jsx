@@ -7,6 +7,7 @@ import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
 import HouseParlays from '../components/HouseParlays'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
+import LineShop from '../components/LineShop'
 
 // Shadow sports: the board shows the model's read, but nothing publishes
 // until go-live, so no tile may wear bet-tier language. The set lives in
@@ -1040,9 +1041,12 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
                   break-even line read as a third percentage and is gone. */}
               {(() => {
                 const pct = sidePct(game, game.recommended_side, signedPp)
-                return pct ? (
-                  <div className="text-xs text-ink-400 mt-0.5 tabular-nums">{pctPair(pct, true)}</div>
-                ) : null
+                return (
+                  <>
+                    {pct && <div className="text-xs text-ink-400 mt-0.5 tabular-nums">{pctPair(pct, true)}</div>}
+                    {!game.in_progress && <LineShop shop={game.published_pick?.shop} bookPct={pct?.book ?? null} />}
+                  </>
+                )
               })()}
               <TierPathNote published={game.published_pick} />
               {game.in_progress ? <LockedNote game={game} /> : <LiveReadNote game={game} />}
@@ -1100,6 +1104,7 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
             {alt.edge_pp != null && (
               <div className="text-xs text-ink-400 mt-0.5 tabular-nums">{pctPair(bookOurPct(Number(alt.edge_pp), alt.odds, null, alt.implied_prob), true) ?? formatPp(Number(alt.edge_pp))} on this market alone</div>
             )}
+            {!game.in_progress && <LineShop shop={alt.shop} bookPct={bookOurPct(Number(alt.edge_pp), alt.odds, null, alt.implied_prob)?.book ?? null} />}
             <TierPathNote published={alt} />
           </div>
         ))}
