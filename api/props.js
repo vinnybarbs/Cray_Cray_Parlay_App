@@ -4,7 +4,8 @@
 // and nothing touches mv_public_record. Public and read only, the same
 // anon pattern as /api/today.
 //
-// Response: { upcoming: [...], recent: [...], record: { byMarket: [...], total }, asOf }
+// Response: { upcoming: [...], live: [...], recent: [...], record: { byMarket: [...], total }, asOf }
+// live holds reads whose game started in the last 8 hours, with their why.
 // Each upcoming read also carries ourProb and bookProb for its side and
 // history, the player's last games against the line (UI plan item 6).
 
@@ -173,11 +174,18 @@ function attachHistory(upcoming, statRows) {
 }
 
 /** Pure shaping of upcoming, recent and graded rows into the response. */
-function shapeProps(upcomingRows, recentRows, gradedRows) {
+function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
   const upcoming = (upcomingRows || []).filter(showable)
     .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
     .slice(0, MAX_UPCOMING)
     .map(slim);
+  // Reads whose game already kicked off, kept with their why so a bettor
+  // can look back at what the read was (owner 2026-10-13). They are locked:
+  // the line and price are the last ones before kickoff.
+  const live = (liveRows || []).filter(showable)
+    .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
+    .slice(0, MAX_UPCOMING)
+    .map(r => ({ ...slim(r), started: true }));
   const recent = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push'].includes(r.v2_outcome))
     .sort((a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
     .slice(0, 30)
@@ -196,8 +204,11 @@ function shapeProps(upcomingRows, recentRows, gradedRows) {
   const byMarket = [...acc.values()]
     .map(m => ({ ...m, units: round(m.units) }))
     .sort((a, b) => b.units - a.units);
-  return { upcoming, recent, record: { byMarket, total: { ...total, units: round(total.units) }, since: RECORD_SINCE, minPp: MIN_PP } };
+  return { upcoming, live, recent, record: { byMarket, total: { ...total, units: round(total.units) }, since: RECORD_SINCE, minPp: MIN_PP } };
 }
+
+// How long a started read stays up, same window as the game board.
+const STARTED_WINDOW_HOURS = 8;
 
 // The upcoming board also carries what the expanding explanation needs.
 const WHY_COLS = 'v2_mean, v2_factors, factors, narration, narration_side, narration_line';
@@ -215,8 +226,10 @@ async function props(req, res) {
   try {
     const now = new Date();
     const recentFrom = new Date(now.getTime() - RECENT_DAYS * 24 * 3600 * 1000).toISOString();
-    const [upRes, recentRes] = await Promise.all([
+    const liveFrom = new Date(now.getTime() - STARTED_WINDOW_HOURS * 3600 * 1000).toISOString();
+    const [upRes, recentRes, liveRes] = await Promise.all([
       supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
+      supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gte('commence_time', liveFrom).lte('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
       supabase.from('prop_reads').select(COLS).gte('commence_time', recentFrom).lt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(1000),
     ]);
     const graded = [];
@@ -230,10 +243,11 @@ async function props(req, res) {
     }
     const err = upRes.error || recentRes.error;
     if (err) { res.status(500).json({ error: err.message }); return; }
-    const shaped = shapeProps(upRes.data, recentRes.data, graded);
+    // A failed live query drops the started list, never the board.
+    const shaped = shapeProps(upRes.data, recentRes.data, graded, liveRes.error ? [] : liveRes.data);
     // Last games for the upcoming reads. A failure here only drops the
     // chart, never the board.
-    const keys = [...new Set(shaped.upcoming.map(p => p.playerKey).filter(Boolean))];
+    const keys = [...new Set([...shaped.upcoming, ...shaped.live].map(p => p.playerKey).filter(Boolean))];
     let statRows = [];
     if (keys.length > 0) {
       const { data, error } = await supabase.from('nfl_player_game_stats')
@@ -244,6 +258,7 @@ async function props(req, res) {
       if (!error) statRows = data || [];
     }
     shaped.upcoming = attachHistory(shaped.upcoming, statRows);
+    shaped.live = attachHistory(shaped.live, statRows);
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     res.json({ ...shaped, asOf: now.toISOString() });
   } catch (error) {

@@ -33,7 +33,24 @@ function pickWithoutPrice(pick) {
   return String(pick || '').replace(/\s[+-]\d{3,}$/, '')
 }
 
-function PickRow({ p, onOpen, id }) {
+// A started pick keeps its card (owner 2026-10-13). The chip replaces
+// the sport label and a locked line sits under the pick.
+const STARTED_TEXT = { won: 'Final, won', lost: 'Final, lost', push: 'Final, push' }
+const fmtClock = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+function StartedChip({ p }) {
+  const done = STARTED_TEXT[p.outcome]
+  const live = !done && (Date.now() - new Date(p.game_date).getTime()) / 3600e3 <= 4
+  const tone = p.outcome === 'won' ? 'text-signal-pos' : p.outcome === 'lost' ? 'text-signal-neg' : 'text-ink-200'
+  return (
+    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full bg-ink-800 flex items-center gap-1 ${tone}`}>
+      {live && <span className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />}
+      {done || (live ? 'Game in progress' : 'Locked')}
+    </span>
+  )
+}
+
+function PickRow({ p, onOpen, id, started = false }) {
   const t = edgeTier(p.edge_pp)
   return (
     <button
@@ -43,14 +60,16 @@ function PickRow({ p, onOpen, id }) {
     >
       <div className="flex items-center justify-between gap-3">
         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full bg-ink-800 ${t.color}`}>{p.tier}</span>
-        <span className="text-xs text-ink-500">{p.sport}</span>
+        {started ? <StartedChip p={p} /> : <span className="text-xs text-ink-500">{p.sport}</span>}
       </div>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-lg font-semibold text-ink-100 leading-snug min-w-0">{pickWithoutPrice(p.pick)}</span>
         <span className=" text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.odds)}</span>
       </div>
       <div className="text-xs text-ink-400">
-        {p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}
+        {started
+          ? <>{p.sport} · {p.away_team} at {p.home_team} · Locked at {fmtClock(p.game_date)}, {fmtOdds(p.odds)}</>
+          : <>{p.away_team} at {p.home_team} · {fmtGameDateTime(p.game_date)}</>}
       </div>
       <div className="text-sm text-ink-300">
         {p.book_pct != null
@@ -108,6 +127,8 @@ export default function Today() {
 
   const picks = data?.picks || []
   const traps = data?.traps || []
+  const started = data?.started || []
+  const startedProps = (props?.live || []).slice(0, 3)
   const r30 = data?.record?.last30
   const plays = picks.filter(p => Number(p.edge_pp) >= 4).length
   const shownProps = (props?.upcoming || []).slice(0, 3)
@@ -179,6 +200,17 @@ export default function Today() {
           <section className="flex flex-col gap-3" aria-label="Traps">
             <h2 className="text-lg font-semibold text-signal-neg">Stay off these</h2>
             {traps.map((p, i) => <TrapRow key={`${p.home_team}|${p.away_team}|${i}`} id={cardId('trap', i)} p={p} />)}
+          </section>
+        )}
+
+        {(started.length > 0 || startedProps.length > 0) && (
+          <section className="flex flex-col gap-3" aria-label="Started">
+            <h2 className="text-lg font-semibold text-ink-100">Started</h2>
+            <p className="text-sm text-ink-400 -mt-2">Locked when the game started. Tap a pick to see the full read on the board.</p>
+            {started.map((p, i) => (
+              <PickRow key={`started|${p.home_team}|${p.away_team}|${i}`} p={p} started onOpen={() => navigate('/digest')} />
+            ))}
+            {startedProps.map((p, i) => <PropCard key={`started-prop|${p.text}|${i}`} p={p} />)}
           </section>
         )}
 

@@ -194,8 +194,26 @@ function Why({ p }) {
   )
 }
 
+// A started read keeps its card (owner 2026-10-13: "game in progress"
+// and "locked at", so a bettor can come back and see why). The chip says
+// where it stands, the line under the pick says what it locked at.
+function StartedChip({ p }) {
+  const o = OUTCOME[p.outcome]
+  if (o) return <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>Final, {o.label.toLowerCase()}{p.actual != null ? ` · ${p.actual}` : ''}</span>
+  const elapsedH = (Date.now() - new Date(p.commence_time).getTime()) / 3600e3
+  return (
+    <span className="px-2 py-0.5 rounded-full bg-ink-800 text-ink-200 text-xs font-semibold flex-shrink-0 flex items-center gap-1">
+      {elapsedH <= 4 && <span className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />}
+      {elapsedH <= 4 ? 'Game in progress' : 'Locked'}
+    </span>
+  )
+}
+
+const fmtClock = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
 export default function PropCard({ p, showOutcome = false }) {
   const [open, setOpen] = useState(false)
+  const started = !!p.started
   const canExplain = !showOutcome && (p.why?.narration || whyFacts(p).length > 0)
   const o = showOutcome ? OUTCOME[p.outcome] : null
   const hasEvidence = !showOutcome && p.ourProb != null && p.bookProb != null
@@ -206,17 +224,24 @@ export default function PropCard({ p, showOutcome = false }) {
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-ink-100 leading-tight truncate">{p.player || p.text}</div>
           <div className="text-xs text-ink-400 truncate">
-            {p.awayAbbr && p.homeAbbr ? `${p.awayAbbr} at ${p.homeAbbr}` : `${p.away_team} at ${p.home_team}`} · {fmtGameDateTime(p.commence_time)}
+            {p.awayAbbr && p.homeAbbr ? `${p.awayAbbr} at ${p.homeAbbr}` : `${p.away_team} at ${p.home_team}`} · {started ? `Started ${fmtClock(p.commence_time)}` : fmtGameDateTime(p.commence_time)}
           </div>
         </div>
-        {o
-          ? <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{o.label}{p.actual != null ? ` · ${p.actual}` : ''}</span>
-          : <ShadowBadge />}
+        {started
+          ? <StartedChip p={p} />
+          : o
+            ? <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{o.label}{p.actual != null ? ` · ${p.actual}` : ''}</span>
+            : <ShadowBadge />}
       </div>
 
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-lg font-semibold text-ink-100 leading-snug min-w-0 first-letter:uppercase">{p.player ? pickLine(p) : p.text}</span>
-        <span className=" text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.price)}</span>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-lg font-semibold text-ink-100 leading-snug min-w-0 first-letter:uppercase">{p.player ? pickLine(p) : p.text}</span>
+          <span className=" text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.price)}</span>
+        </div>
+        {started && (
+          <span className="text-xs text-ink-400 tabular-nums">Locked at {fmtClock(p.commence_time)}, {fmtOdds(p.price)}</span>
+        )}
       </div>
 
       {!showOutcome && (() => {
