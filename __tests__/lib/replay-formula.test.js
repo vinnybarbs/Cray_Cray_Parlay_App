@@ -98,6 +98,10 @@ describe('standingsFromGames', () => {
 });
 
 describe('parseVariants and dial overrides', () => {
+  test('ml_only parses as a variant flag', () => {
+    const [v] = rf.parseVariants('mlvw:current:ml_only=1,venue_weight=0.8');
+    expect(v.dials).toEqual({ ml_only: 1, venue_weight: 0.8 });
+  });
   test('parses names, kinds, and dial maps', () => {
     expect(rf.parseVariants('july:july;base:current;chalk5:current:chalk_penalty_pp=5,spread_claim_damp=0.25;bad:nope'))
       .toEqual([
