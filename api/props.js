@@ -132,6 +132,7 @@ function whyFor(r) {
   const oppPct = f.opp_ratio != null && Number(f.opp_games) >= 4 ? Math.round((Number(f.opp_ratio) - 1) * 100) : null;
   const why = {
     narration: fresh ? r.narration : null,
+    detail: fresh && r.narration_detail ? r.narration_detail : null,
     projection: r.market === TD_MARKET ? null : num(r.v2_mean),
     recentAvg: num(base.recent_mean),
     longAvg: num(base.long_mean),
@@ -211,7 +212,7 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
 const STARTED_WINDOW_HOURS = 8;
 
 // The upcoming board also carries what the expanding explanation needs.
-const WHY_COLS = 'v2_mean, v2_factors, factors, narration, narration_side, narration_line';
+const WHY_COLS = 'v2_mean, v2_factors, factors, narration, narration_detail, narration_side, narration_line';
 const COLS = 'market, player_key, player_name, v2_prob, anchor_prob, line, v2_side, v2_edge_pp, v2_outcome, consensus_over_price, consensus_under_price, books, commence_time, home_team, away_team, actual_value';
 
 async function props(req, res) {

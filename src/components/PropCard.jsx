@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { teamColors } from '../lib/teamColors'
+import PlayerSheet from './PlayerSheet'
 
 // One shadow prop read (owner 2026-10-12: show props as shadow so the
 // site can be envisioned before they publish). Always carries the SHADOW
@@ -173,13 +174,22 @@ function whyFacts(p) {
   return out
 }
 
-function Why({ p }) {
+function Why({ p, onPlayer }) {
+  const [more, setMore] = useState(false)
   const narration = p.why?.narration
+  const detail = p.why?.detail
   const facts = whyFacts(p)
-  if (!narration && facts.length === 0) return null
+  if (!narration && facts.length === 0 && !onPlayer) return null
   return (
     <div className="flex flex-col gap-3 pt-1">
       {narration && <p className="text-sm text-ink-200 leading-relaxed">{narration}</p>}
+      {/* The longer write-up (owner 2026-10-13: "a more button under
+          the why we like it for the narration"). */}
+      {detail && (more
+        ? <div className="flex flex-col gap-2">
+            {detail.split(/\n\s*\n/).map((para, i) => <p key={i} className="text-sm text-ink-300 leading-relaxed">{para}</p>)}
+          </div>
+        : <button type="button" onClick={() => setMore(true)} className="self-start text-xs font-semibold text-signal-pos hover:underline">Read more</button>)}
       {facts.length > 0 && (
         <dl className="flex flex-col gap-1.5">
           {facts.map(([k, v]) => (
@@ -189,6 +199,15 @@ function Why({ p }) {
             </div>
           ))}
         </dl>
+      )}
+      {onPlayer && p.playerKey && (
+        <button
+          type="button"
+          onClick={onPlayer}
+          className="self-start px-3 py-1.5 rounded-full bg-ink-850 border border-ink-700 text-xs font-semibold text-ink-200 hover:text-ink-100"
+        >
+          {p.player} game log and our history
+        </button>
       )}
     </div>
   )
@@ -214,7 +233,9 @@ const fmtClock = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric'
 export default function PropCard({ p, showOutcome = false }) {
   const [open, setOpen] = useState(false)
   const started = !!p.started
-  const canExplain = !showOutcome && (p.why?.narration || whyFacts(p).length > 0)
+  const [playerOpen, setPlayerOpen] = useState(false)
+  const canExplain = !showOutcome && (p.why?.narration || whyFacts(p).length > 0 || !!p.playerKey)
+  const openPlayer = p.playerKey ? (e) => { e?.stopPropagation?.(); setPlayerOpen(true) } : null
   const o = showOutcome ? OUTCOME[p.outcome] : null
   const hasEvidence = !showOutcome && p.ourProb != null && p.bookProb != null
   return (
@@ -228,7 +249,9 @@ export default function PropCard({ p, showOutcome = false }) {
       <div className="flex items-center gap-3">
         <Avatar name={p.player} team={p.team} />
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-ink-100 leading-tight truncate">{p.player || p.text}</div>
+          {openPlayer && p.player
+            ? <button type="button" onClick={openPlayer} className="block max-w-full text-left font-semibold text-ink-100 leading-tight truncate underline decoration-ink-600 underline-offset-4 hover:decoration-signal-pos">{p.player}</button>
+            : <div className="font-semibold text-ink-100 leading-tight truncate">{p.player || p.text}</div>}
           <div className="text-xs text-ink-400 truncate">
             {p.awayAbbr && p.homeAbbr ? `${p.awayAbbr} at ${p.homeAbbr}` : `${p.away_team} at ${p.home_team}`} · {started ? `Started ${fmtClock(p.commence_time)}` : fmtGameDateTime(p.commence_time)}
           </div>
@@ -273,7 +296,7 @@ export default function PropCard({ p, showOutcome = false }) {
                 <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
               </span>
             </button>
-            {open && <div onClick={(e) => e.stopPropagation()}><Why p={p} /></div>}
+            {open && <div onClick={(e) => e.stopPropagation()}><Why p={p} onPlayer={openPlayer} /></div>}
           </div>
         )
       })()}
@@ -281,6 +304,12 @@ export default function PropCard({ p, showOutcome = false }) {
       {!showOutcome && <HistoryChart p={p} />}
 
       {!showOutcome && <SideChips p={p} />}
+
+      {playerOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <PlayerSheet playerKey={p.playerKey} name={p.player} team={p.team} onClose={() => setPlayerOpen(false)} />
+        </div>
+      )}
     </div>
   )
 }
