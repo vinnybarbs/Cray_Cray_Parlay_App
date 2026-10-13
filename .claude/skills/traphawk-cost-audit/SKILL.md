@@ -13,17 +13,17 @@ Start by reading `agent_reports` for the last month (other workers may have alre
 
 | Call site | Model | Logged where |
 |---|---|---|
-| Pre-analyze narration | Sonnet (NARRATION) for audience worthy games, Haiku (UTILITY) for the rest (api/cron/pre-analyze-games.js 1681) | cron_job_logs details.cost, at STANDARD rates |
-| NFL prop narration (since 2026-10-12) | Sonnet (NARRATION), one short call per shown prop read with v2_edge_pp 4 or more, re-run only when the read's side or line moves, at most 120 a run (api/cron/narrate-nfl-props.js, run after every analyze-nfl-props read) | cron_job_logs job narrate-nfl-props, details.input_tokens, output_tokens and est_cost_usd at standard Sonnet rates. Expect about $2 a week in season |
+| Pre-analyze narration | Sonnet 5.5 (NARRATION) for Play, Strong Play, Sharp Take and Trap tiles, Haiku 5.5 (NARRATION_SMALL) for Lean, Leg and Skip tiles since 2026-10-13 (owner 2026-10-11, build_queue 91, narrationTierFor in api/cron/pre-analyze-games.js). Before that, Sonnet 5 for audience worthy games and Haiku 4.5 for the rest | cron_job_logs details.cost (Sonnet at the standard 3 and 15 per MTok, Haiku 5.5 at 0.10 and 0.50) and details.by_model with calls, input, output and cost per model |
+| NFL prop narration (since 2026-10-12) | Sonnet 5.5 (NARRATION) since 2026-10-13, Sonnet 5 before, one short call per shown prop read with v2_edge_pp 4 or more, re-run only when the read's side or line moves, at most 120 a run (api/cron/narrate-nfl-props.js, run after every analyze-nfl-props read) | cron_job_logs job narrate-nfl-props, details.input_tokens, output_tokens and est_cost_usd at standard Sonnet rates. Expect about $2 a week in season |
 | Integrity sweep records + injuries | Sonnet 5 for lookup and injury judgment since 2026-10-01 (lib/services/data-integrity-agent.js 40 to 41) | agent_intel agent_debug token payloads |
 | Web search fees | n/a | console only, $10 per 1000 searches, agent_debug has per-agent search counts |
-| Fact-check picks | Sonnet | NOT logged, count via ai_suggestions.fact_checked_at |
+| Fact-check picks | Sonnet 5.5 (NARRATION) since 2026-10-13, Sonnet 5 before | NOT logged, count via ai_suggestions.fact_checked_at |
 | Golf notes | Sonnet | RETIRED 2026-10-12 (owner, build_queue 92): analyze-golf unscheduled and its route removed, so this line is zero from that date. Before it, NOT logged, 1 call per tournament per run, 3 runs/day |
 | Enrich articles, news summarizer | Haiku | RETIRED 2026-09-14 (owner, build_queue 36): both jobs unscheduled and the code removed, so this line is zero from that date. Before it, count news_articles.betting_summary |
 | Learning analyzer | Opus 4.8 | RETIRED 2026-09-15 (owner): analyze-outcomes-daily unscheduled, so this line is zero from that date. Its routes and the parlay coordinator lessons read were removed 2026-10-12 (build_queue 92). Before it, five picks a day into ai_suggestions.post_analysis |
 | De-Genny chat | Sonnet | OFF since 2026-09-21 (owner): /api/chat-picks answers 503 unless DEGENNY_CHAT=on, so this line is zero from that date. It had answered anonymous prompts behind only a per address rate limit |
 
-Weather costs zero (Open-Meteo API since Aug 2026). Pricing changes matter: Sonnet 5 intro pricing ($2/$10 per MTok) ends 2026-08-31, standard is $3/$15. Opus 4.8 is $5/$25, Haiku 4.5 $1/$5. The logged `cost` field always uses standard Sonnet rates, so billed narration cost is lower than logged until the intro window closes.
+Weather costs zero (Open-Meteo API since Aug 2026). Pricing changes matter: Sonnet 5 intro pricing ($2/$10 per MTok) ends 2026-08-31, standard is $3/$15. Opus 4.8 is $5/$25, Haiku 4.5 $1/$5. Sonnet 5.5 lists at $2/$10 and Haiku 5.5 at $0.10/$0.50. The logged `cost` field prices Sonnet at $3/$15 and, since 2026-10-13, Haiku 5.5 at its own rate, so billed Sonnet narration runs lower than logged.
 
 ## The queries
 
