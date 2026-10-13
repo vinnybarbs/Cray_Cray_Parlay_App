@@ -218,7 +218,13 @@ export default function PropCard({ p, showOutcome = false }) {
   const o = showOutcome ? OUTCOME[p.outcome] : null
   const hasEvidence = !showOutcome && p.ourProb != null && p.bookProb != null
   return (
-    <div className="bg-ink-900 rounded-2xl border border-ink-700 px-4 py-4 flex flex-col gap-3">
+    // The whole card opens the why (owner 2026-10-13: "I still can't click
+    // anything on a prop to see research"). The labeled button stays for
+    // keyboards and screen readers.
+    <div
+      onClick={canExplain ? () => setOpen(v => !v) : undefined}
+      className={`bg-ink-900 rounded-2xl border border-ink-700 px-4 py-4 flex flex-col gap-3 ${canExplain ? 'cursor-pointer' : ''}`}
+    >
       <div className="flex items-center gap-3">
         <Avatar name={p.player} team={p.team} />
         <div className="min-w-0 flex-1">
@@ -257,7 +263,7 @@ export default function PropCard({ p, showOutcome = false }) {
           <div className="flex flex-col gap-2">
             <button
               type="button"
-              onClick={() => setOpen(o => !o)}
+              onClick={(e) => { e.stopPropagation(); setOpen(o => !o) }}
               aria-expanded={open}
               className="text-left flex flex-col gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-pos"
             >
@@ -267,7 +273,7 @@ export default function PropCard({ p, showOutcome = false }) {
                 <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
               </span>
             </button>
-            {open && <Why p={p} />}
+            {open && <div onClick={(e) => e.stopPropagation()}><Why p={p} /></div>}
           </div>
         )
       })()}
