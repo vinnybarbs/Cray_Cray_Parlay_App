@@ -37,12 +37,22 @@ describe('buildPrompt', () => {
     expect(p).toContain('Zach Ertz over 3.5 receptions');
     expect(p).toContain('PRICE on our side: +110');
     expect(p).toContain('5 vs DAL, 2 vs NYG');
-    expect(p).toContain('Cleared over 3.5 in 1 of them');
+    expect(p).toContain('Went OVER 3.5 in 1 of 2 and UNDER in 1 of 2. Our side (over) hit in 1 of 2.');
     expect(p).toContain('JAX allows 13 percent more receptions');
     expect(p).toContain('about 16.8 points');
     expect(p).not.toContain('WEATHER');
     expect(p).toContain('NEVER invent');
     expect(p).toContain('WRITING STYLE');
+  });
+  // Darnold under 4.5 rushing yards, 2026-10-13: the log went over 7 of
+  // 10 and the text said "only cleared 4.5 in 3". Both directions are now
+  // spelled out, and a log against our side is flagged.
+  it('spells out both directions and flags a log against our side', () => {
+    const vals = [7, 2, 9, 0, 9, 5, 0, 5, 6, 5];
+    const h = { games: vals.map(v => ({ value: v, hit: v < 4.5 })), hits: 3 };
+    const text = factLines(row({ market: 'player_rush_yds', line: 4.5, v2_side: 'under' }), h).join('\n');
+    expect(text).toContain('Went OVER 4.5 in 7 of 10 and UNDER in 3 of 10. Our side (under) hit in 3 of 10.');
+    expect(text).toContain('mostly went AGAINST our side');
   });
   it('leaves out facts it does not have', () => {
     const lines = factLines(row({ v2_factors: {}, factors: {}, v2_mean: null }), null);

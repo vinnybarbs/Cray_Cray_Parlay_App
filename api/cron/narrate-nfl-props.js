@@ -65,7 +65,17 @@ function factLines(r, history, redzone) {
   }
   if (history && history.games && history.games.length > 0) {
     const games = history.games.map(g => `${g.value}${g.opponent ? ` vs ${g.opponent}` : ''}`).join(', ');
-    lines.push(`LAST ${history.games.length} GAMES, oldest first: ${games}. ${td ? `Scored in ${history.hits} of them.` : `Cleared ${r.v2_side} ${Number(r.line)} in ${history.hits} of them.`}`);
+    // Spell out both directions. "Cleared under 4.5 in 3" read to the
+    // model as "cleared 4.5 in 3" and the Darnold under (2026-10-13) was
+    // sold on a log that went over 7 times in 10.
+    const n = history.games.length;
+    const overs = history.games.filter(g => g.value > Number(r.line)).length;
+    const unders = history.games.filter(g => g.value < Number(r.line)).length;
+    const verdict = td
+      ? `Scored in ${history.hits} of them.`
+      : `Went OVER ${Number(r.line)} in ${overs} of ${n} and UNDER in ${unders} of ${n}. Our side (${r.v2_side}) hit in ${history.hits} of ${n}.`;
+    lines.push(`LAST ${n} GAMES, oldest first: ${games}. ${verdict}`);
+    if (history.hits * 2 < n) lines.push('NOTE: the recent log mostly went AGAINST our side. Say so plainly and lean on the other facts. Do not present the log as support.');
   }
   if (f.opp_ratio != null && f.opp_games >= 4) {
     const pct = Math.round((Number(f.opp_ratio) - 1) * 100);
@@ -98,6 +108,7 @@ RULES:
 - Cite specific numbers from the facts. NEVER invent a number, stat, injury, role, coach decision or trend that is not listed above.
 - Do not mention probabilities, edges, percentages of confidence, models or "our projection". Talk about the player and the game.
 - Do not tell the reader to bet, and do not mention any sportsbook.
+- Count and list game values exactly as given. Do not describe where we are in the season (no "late season" or "early season").
 - ${WRITING_STYLE}
 
 Respond in exactly this JSON format, no markdown, paragraphs in "detail" separated by a blank line:
