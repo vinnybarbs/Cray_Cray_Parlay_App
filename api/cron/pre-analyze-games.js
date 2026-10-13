@@ -34,7 +34,7 @@ const { shouldAlertTierEntry, sendTierAlert } = require('../../lib/services/disc
 const { chooseAltMarkets, altSessionId } = require('../../lib/services/alt-markets.js');
 const { createRatingsProvider, getTennisCalibrationMultiplier } = require('../../lib/services/tennis-ratings.js');
 const { getCalibrationMultiplier } = require('../../lib/services/calibration-multiplier.js');
-const { practiceReportText } = require('../../lib/services/nfl-inactives.js');
+const { practiceReportText, pricedInjuryText } = require('../../lib/services/nfl-inactives.js');
 const { nflWeekFor } = require('../../lib/services/prop-edge.js');
 const espnNews = require('../../lib/services/espn-news.js');
 
@@ -962,6 +962,10 @@ async function analyzeGame(game, oddsCtx, newsCtx, injuryCtx, rankCtx, homeTrend
 
   if (playerStatsCtx) contextParts.push(`Key player averages:\n${playerStatsCtx}`);
   if (injuryCtx) contextParts.push(`Injuries: ${injuryCtx}`);
+  // Football: the status list the math priced is newer than the practice
+  // report above, so it goes in too and names the final word (build_queue 106).
+  const pricedInj = pricedInjuryText(edgeData?.factors?.injuryReport, game.home_team, game.away_team);
+  if (pricedInj) contextParts.push(pricedInj);
   if (newsCtx) contextParts.push(`Recent news:\n${newsCtx}`);
 
   // Statistical edge block. Inject only when EdgeCalculator has REAL record/form data.
