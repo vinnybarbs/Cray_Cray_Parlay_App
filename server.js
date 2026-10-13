@@ -115,6 +115,8 @@ const today = require('./api/today');
 app.get('/api/today', today);
 const propsBoard = require('./api/props');
 app.get('/api/props', propsBoard);
+const playerSheet = require('./api/player');
+app.get('/api/player', playerSheet);
 
 // /api/review-bundle and /api/pipeline-health were retired 2026-10-09
 // (owner). They fed two claude.ai scheduled tasks from before the cloud

@@ -1,7 +1,7 @@
 jest.mock('../../lib/services/claude.js', () => ({
   getClient: () => null, MODELS: { NARRATION: 'test-model' }, WRITING_STYLE: 'WRITING STYLE: plain.', extractJson: (t) => JSON.parse(t),
 }));
-const { needsNarration, buildPrompt, factLines } = require('../../api/cron/narrate-nfl-props');
+const { needsNarration, buildPrompt, factLines, summarizeRedzone } = require('../../api/cron/narrate-nfl-props');
 const { whyFor } = require('../../api/props');
 
 const row = (o) => ({
@@ -16,9 +16,14 @@ const row = (o) => ({
 describe('needsNarration', () => {
   it('narrates a shown read with no text, or text for another side or line', () => {
     expect(needsNarration(row())).toBe(true);
-    expect(needsNarration(row({ narration: 'x', narration_side: 'over', narration_line: 3.5 }))).toBe(false);
-    expect(needsNarration(row({ narration: 'x', narration_side: 'under', narration_line: 3.5 }))).toBe(true);
-    expect(needsNarration(row({ narration: 'x', narration_side: 'over', narration_line: 4.5 }))).toBe(true);
+    expect(needsNarration(row({ narration: 'x', narration_detail: 'y', narration_side: 'over', narration_line: 3.5 }))).toBe(false);
+    expect(needsNarration(row({ narration: 'x', narration_detail: 'y', narration_side: 'under', narration_line: 3.5 }))).toBe(true);
+    expect(needsNarration(row({ narration: 'x', narration_detail: 'y', narration_side: 'over', narration_line: 4.5 }))).toBe(true);
+  });
+  // Read more (owner 2026-10-13): a read with only the short text gets
+  // its longer write-up on the next run.
+  it('narrates a read that has the short text but no detail', () => {
+    expect(needsNarration(row({ narration: 'x', narration_side: 'over', narration_line: 3.5 }))).toBe(true);
   });
   it('skips reads the site does not show', () => {
     expect(needsNarration(row({ v2_edge_pp: 3 }))).toBe(false);
@@ -62,5 +67,17 @@ describe('whyFor', () => {
   });
   it('is null when there is nothing to show', () => {
     expect(whyFor(row({ v2_factors: null, factors: null, v2_mean: null }))).toBeNull();
+  });
+});
+
+describe('red zone facts', () => {
+  it('sums the last four games per player and lists them', () => {
+    const keyById = new Map([['id1', 'p1']]);
+    const rows = [1, 2, 3, 4, 5].map(w => ({ player_id: 'id1', week: 6 - w, rz_carries: 2, gl_carries: 1, rz_targets: 1, team_rz_carries: 6, team_rz_targets: 5 }));
+    const rz = summarizeRedzone(rows, keyById).get('p1');
+    expect(rz).toEqual({ games: 4, rz_carries: 8, gl_carries: 4, rz_targets: 4, team_rz_carries: 24, team_rz_targets: 20 });
+    const lines = factLines(row(), null, rz).join('\n');
+    expect(lines).toContain("RED ZONE, last 4 games: 8 red zone carries of the team's 24, 4 red zone targets of the team's 20, 4 goal line carries.");
+    expect(buildPrompt(row(), null, rz)).toContain('"detail"');
   });
 });

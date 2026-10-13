@@ -40,7 +40,7 @@ const round1 = (x) => Math.round(Number(x) * 10) / 10;
 /** Does this read need (new) narration? Pure. */
 function needsNarration(r) {
   if (!showable(r)) return false;
-  if (!r.narration) return true;
+  if (!r.narration || !r.narration_detail) return true;
   if (r.narration_side !== r.v2_side) return true;
   return Number(r.narration_line) !== Number(r.line);
 }
@@ -49,7 +49,7 @@ function needsNarration(r) {
  * The facts block for one read: only numbers we actually hold, so the
  * model has nothing to invent from. Pure.
  */
-function factLines(r, history) {
+function factLines(r, history, redzone) {
   const f = r.v2_factors || {};
   const base = r.factors || {};
   const td = r.market === 'player_anytime_td';
@@ -74,30 +74,39 @@ function factLines(r, history) {
   if (f.team_implied != null) lines.push(`GAME SCRIPT: the betting market expects the player's team to score about ${round1(f.team_implied)} points.`);
   if (f.wind_mph != null && Number(f.wind_mph) >= 12) lines.push(`WEATHER: wind around ${Math.round(Number(f.wind_mph))} mph.`);
   if (f.status) lines.push(`INJURY STATUS: ${f.status}.`);
+  if (redzone && redzone.games > 0) {
+    const parts = [];
+    if (redzone.rz_carries > 0) parts.push(`${redzone.rz_carries} red zone carries${redzone.team_rz_carries > 0 ? ` of the team's ${redzone.team_rz_carries}` : ''}`);
+    if (redzone.rz_targets > 0) parts.push(`${redzone.rz_targets} red zone targets${redzone.team_rz_targets > 0 ? ` of the team's ${redzone.team_rz_targets}` : ''}`);
+    if (redzone.gl_carries > 0) parts.push(`${redzone.gl_carries} goal line carries`);
+    if (parts.length > 0) lines.push(`RED ZONE, last ${redzone.games} games: ${parts.join(', ')}.`);
+  }
   return lines;
 }
 
 /** The full prompt for one read. Pure. */
-function buildPrompt(r, history) {
-  return `You write the short "why" under a player prop on TrapHawk, a sports betting research app. The math already picked the side. Explain it to a casual bettor in plain words, using only the facts below.
+function buildPrompt(r, history, redzone) {
+  return `You write the "why" under a player prop on TrapHawk, a sports betting research app. The math already picked the side. Explain it to a casual bettor in plain words, using only the facts below.
 
-${factLines(r, history).join('\n')}
+${factLines(r, history, redzone).join('\n')}
+
+Write two things:
+1. "narration": 2 or 3 short sentences, under 60 words total. Lead with the strongest reason, usually the recent games against this line or the matchup.
+2. "detail": the longer read behind a "Read more" button, two short paragraphs, 110 to 170 words total. Paragraph one: the player's role and recent form, walking through the game log and any red zone usage. Paragraph two: this game, the matchup, game script and weather where listed, then one honest sentence on what would make this read miss.
 
 RULES:
-- 2 or 3 short sentences, under 60 words total.
-- Lead with the strongest reason, usually the recent games against this line or the matchup.
-- Cite specific numbers from the facts. NEVER invent a number, stat, injury or trend that is not listed above.
+- Cite specific numbers from the facts. NEVER invent a number, stat, injury, role, coach decision or trend that is not listed above.
 - Do not mention probabilities, edges, percentages of confidence, models or "our projection". Talk about the player and the game.
 - Do not tell the reader to bet, and do not mention any sportsbook.
 - ${WRITING_STYLE}
 
-Respond in exactly this JSON format, no markdown:
-{"narration": "..."}`;
+Respond in exactly this JSON format, no markdown, paragraphs in "detail" separated by a blank line:
+{"narration": "...", "detail": "..."}`;
 }
 
 async function loadCandidates(supabase) {
   const { data, error } = await supabase.from('prop_reads')
-    .select('id, market, player_key, player_name, line, v2_side, v2_edge_pp, v2_mean, v2_factors, factors, consensus_over_price, consensus_under_price, home_team, away_team, commence_time, narration, narration_side, narration_line')
+    .select('id, market, player_key, player_name, line, v2_side, v2_edge_pp, v2_mean, v2_factors, factors, consensus_over_price, consensus_under_price, home_team, away_team, commence_time, narration, narration_detail, narration_side, narration_line')
     .gt('commence_time', new Date().toISOString())
     .gte('v2_edge_pp', 4)
     .order('v2_edge_pp', { ascending: false })
@@ -120,17 +129,55 @@ async function loadHistory(supabase, rows) {
   return new Map(attachHistory(slimmed, data || []).map(p => [p.id, p.history]));
 }
 
-async function narrateOne(claude, r, history) {
+async function narrateOne(claude, r, history, redzone) {
   const data = await claude.messages.create({
     model: MODELS.NARRATION,
-    max_tokens: 400,
+    max_tokens: 900,
     thinking: { type: 'disabled' },
-    messages: [{ role: 'user', content: buildPrompt(r, history) }],
+    messages: [{ role: 'user', content: buildPrompt(r, history, redzone) }],
   });
   const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
   const parsed = extractJson(text);
   const narration = parsed && typeof parsed.narration === 'string' ? parsed.narration.trim() : null;
-  return { narration, usage: data.usage || {} };
+  const detail = parsed && typeof parsed.detail === 'string' ? parsed.detail.trim() : null;
+  return { narration, detail, usage: data.usage || {} };
+}
+
+/**
+ * Red zone usage over each player's last REDZONE_GAMES games, keyed by
+ * player_key. Fail soft: an empty map only drops the line from the facts.
+ */
+const REDZONE_GAMES = 4;
+async function loadRedzone(supabase, rows) {
+  const keys = [...new Set(rows.map(r => r.player_key).filter(Boolean))];
+  if (keys.length === 0) return new Map();
+  const { data: ids, error } = await supabase.from('nfl_player_game_stats')
+    .select('player_key, player_id').in('player_key', keys).not('player_id', 'is', null).limit(keys.length * 25);
+  if (error || !ids) return new Map();
+  const keyById = new Map(ids.map(x => [x.player_id, x.player_key]));
+  if (keyById.size === 0) return new Map();
+  const { data: rz, error: rzErr } = await supabase.from('nfl_player_redzone')
+    .select('player_id, season, week, rz_carries, gl_carries, rz_targets, team_rz_carries, team_rz_targets')
+    .in('player_id', [...keyById.keys()])
+    .order('season', { ascending: false }).order('week', { ascending: false })
+    .limit(keyById.size * REDZONE_GAMES * 2);
+  if (rzErr || !rz) return new Map();
+  return summarizeRedzone(rz, keyById);
+}
+
+/** Sum the last REDZONE_GAMES rows per player. Rows newest first. Pure. */
+function summarizeRedzone(rows, keyById) {
+  const out = new Map();
+  for (const g of rows) {
+    const key = keyById.get(g.player_id);
+    if (!key) continue;
+    const acc = out.get(key) || { games: 0, rz_carries: 0, gl_carries: 0, rz_targets: 0, team_rz_carries: 0, team_rz_targets: 0 };
+    if (acc.games >= REDZONE_GAMES) continue;
+    acc.games++;
+    for (const k of ['rz_carries', 'gl_carries', 'rz_targets', 'team_rz_carries', 'team_rz_targets']) acc[k] += Number(g[k]) || 0;
+    out.set(key, acc);
+  }
+  return out;
 }
 
 /**
@@ -147,18 +194,20 @@ async function narrateProps(supabase) {
   summary.candidates = rows.length;
   if (rows.length === 0) return summary;
   const history = await loadHistory(supabase, rows);
+  const redzone = await loadRedzone(supabase, rows).catch(() => new Map());
 
   let next = 0;
   async function worker() {
     while (next < rows.length) {
       const r = rows[next++];
       try {
-        const { narration, usage } = await narrateOne(claude, r, history.get(r.id));
+        const { narration, detail, usage } = await narrateOne(claude, r, history.get(r.id), redzone.get(r.player_key));
         summary.input_tokens += usage.input_tokens || 0;
         summary.output_tokens += usage.output_tokens || 0;
         if (!narration) throw new Error('unparseable narration');
         const { error } = await supabase.from('prop_reads').update({
           narration,
+          narration_detail: detail,
           narration_side: r.v2_side,
           narration_line: r.line,
           narration_model: MODELS.NARRATION,
@@ -180,4 +229,4 @@ async function narrateProps(supabase) {
   return summary;
 }
 
-module.exports = { narrateProps, needsNarration, buildPrompt, factLines, MAX_PER_RUN };
+module.exports = { narrateProps, needsNarration, buildPrompt, factLines, summarizeRedzone, MAX_PER_RUN };
