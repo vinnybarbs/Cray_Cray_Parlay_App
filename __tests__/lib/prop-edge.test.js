@@ -28,6 +28,18 @@ describe('consensusFromBooks', () => {
     const c = pe.consensusFromBooks([{ bookmaker: 'x', line: 3.5, over_price: -150, under_price: 120 }]);
     expect(c.overProb).toBeGreaterThan(0.55);
   });
+  test('prices straddling even money average as probability, not as American numbers', () => {
+    // Kincaid over 4.5 receptions, 2026-10-12: the old arithmetic mean was -2.
+    const c = pe.consensusFromBooks([
+      { bookmaker: 'a', line: 4.5, over_price: 100, under_price: -130 },
+      { bookmaker: 'b', line: 4.5, over_price: -105, under_price: -140 },
+      { bookmaker: 'c', line: 4.5, over_price: 107, under_price: -136 },
+      { bookmaker: 'd', line: 4.5, over_price: -110, under_price: -120 },
+    ]);
+    expect(Math.abs(c.overPrice)).toBeGreaterThanOrEqual(100);
+    expect(c.overPrice).toBe(-102);
+    expect(c.underPrice).toBe(-131);
+  });
   test('no usable rows is null', () => {
     expect(pe.consensusFromBooks([])).toBeNull();
     expect(pe.consensusFromBooks([{ bookmaker: 'x', line: null, over_price: -110, under_price: -110 }])).toBeNull();
