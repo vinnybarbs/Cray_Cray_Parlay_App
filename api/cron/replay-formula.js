@@ -20,7 +20,7 @@ async function replayFormula(req, res) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
   if (cronSecret !== process.env.CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' });
   const sport = String(req.query.sport || 'MLB');
-  const days = Math.min(120, Math.max(1, parseInt(req.query.days, 10) || 30));
+  const days = Math.min(200, Math.max(1, parseInt(req.query.days, 10) || 30));
   const formulas = String(req.query.formulas || 'july,current').split(',').map(s => s.trim()).filter(f => ['july', 'current'].includes(f));
   const runId = req.query.run_id ? String(req.query.run_id).slice(0, 80) : null;
   // variants=name:kind[:dial=value,...];... runs a dial sweep in one pass.
