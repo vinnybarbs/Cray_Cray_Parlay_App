@@ -111,7 +111,7 @@ async function getDigest(req, res) {
 
   try {
     // 1. Today's games by sport from game_analysis
-    const todaysGamesResult = await safeQuery(async () => {
+    const todaysGamesP = safeQuery(async () => {
       const { data, error } = await supabase
         .from('game_analysis')
         .select(GAME_COLS)
@@ -124,34 +124,28 @@ async function getDigest(req, res) {
       return data || [];
     });
 
-    // Attach canonical fact sheet per game via build_game_fact_sheet() RPC.
-    // Non-breaking: every flat field on the game row (edge_score, home_record,
-    // analysis_snippet, etc.) stays intact. The `fact_sheet` key is additive
-    // so the tile component can migrate to the canonical shape incrementally.
-    // Parallel RPC calls. ~50 games at one function call each runs in ms.
-    const games = todaysGamesResult || [];
-    await Promise.all(games.map(async (game) => {
-      try {
-        const { data, error } = await supabase.rpc('build_game_fact_sheet', { p_game_key: game.game_key });
-        if (error) {
-          logger.warn('fact_sheet RPC failed', { game_key: game.game_key, error: error.message });
-          game.fact_sheet = null;
-          return;
-        }
-        game.fact_sheet = data || null;
-      } catch (err) {
-        logger.warn('fact_sheet RPC threw', { game_key: game.game_key, error: err.message });
-        game.fact_sheet = null;
+    // The board used to call build_game_fact_sheet() once per game here,
+    // 67 calls on 2026-10-13 at about 560 ms each, and wait for all of
+    // them before running anything else. No board component reads
+    // fact_sheet (the Research modal builds its own in deepResearch), so
+    // the calls are gone and the sections below run side by side.
+    const upcomingP = todaysGamesP.then(async (rows) => {
+      const games = rows || [];
+      await attachPublishedPicks(supabase, games);
+      const gamesBySport = {};
+      for (const game of games) {
+        const sport = game.sport || 'Unknown';
+        if (!gamesBySport[sport]) gamesBySport[sport] = [];
+        gamesBySport[sport].push(game);
       }
-    }));
-
-    await attachPublishedPicks(supabase, games);
+      return gamesBySport;
+    });
 
     // 1b. Games that already started. The upcoming query above drops them
     // at kickoff, which took the reasoning away exactly when a bettor wants
     // to look back at it. The last analysis row stays as it was at lock,
     // stale or expired included, since nothing refreshes a started game.
-    const startedGames = (await safeQuery(async () => {
+    const startedP = safeQuery(async () => {
       const { data, error } = await supabase
         .from('game_analysis')
         .select(GAME_COLS)
@@ -160,20 +154,15 @@ async function getDigest(req, res) {
         .order('game_date', { ascending: false });
       if (error) throw error;
       return data || [];
-    })) || [];
-    await attachPublishedPicks(supabase, startedGames, { started: true });
-    for (const g of startedGames) g.in_progress = true;
-
-    // Group games by sport
-    const gamesBySport = {};
-    for (const game of games) {
-      const sport = game.sport || 'Unknown';
-      if (!gamesBySport[sport]) gamesBySport[sport] = [];
-      gamesBySport[sport].push(game);
-    }
+    }).then(async (rows) => {
+      const startedGames = rows || [];
+      await attachPublishedPicks(supabase, startedGames, { started: true });
+      for (const g of startedGames) g.in_progress = true;
+      return startedGames;
+    });
 
     // 2. Key injuries from news_cache, as sport-level summaries
-    const injuriesResult = await safeQuery(async () => {
+    const injuriesP = safeQuery(async () => {
       const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('news_cache')
@@ -196,14 +185,8 @@ async function getDigest(req, res) {
       return filtered;
     });
 
-    // Index injuries by sport code
-    const injuriesBySport = {};
-    for (const entry of injuriesResult || []) {
-      injuriesBySport[entry.team_name] = entry;
-    }
-
     // 3. Recent results from ai_suggestions (last 3 days for more data)
-    const yesterdayResultsResult = await safeQuery(async () => {
+    const yesterdayResultsP = safeQuery(async () => {
       const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('ai_suggestions')
@@ -244,7 +227,7 @@ async function getDigest(req, res) {
     // era, actionable tiers, no soccer v1) so the digest and the ledger can
     // never tell different stories. mv_model_accuracy keeps the full history
     // for calibration and stays off public surfaces.
-    const modelAccuracyResult = await safeQuery(async () => {
+    const modelAccuracyP = safeQuery(async () => {
       const { data, error } = await supabase
         .from('mv_public_record')
         .select('period_bucket, dimension_type, dimension_value, won, lost, push, total, roi_units')
@@ -296,7 +279,7 @@ async function getDigest(req, res) {
     });
 
     // 5. Upcoming game count by sport from odds_cache
-    const upcomingCountResult = await safeQuery(async () => {
+    const upcomingCountP = safeQuery(async () => {
       const now = new Date().toISOString();
       const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
@@ -321,9 +304,10 @@ async function getDigest(req, res) {
     });
 
     // 6. Golf tournaments (leaderboard from ESPN + outright odds)
-    const golfResult = await safeQuery(async () => {
+    const golfP = safeQuery(async () => {
       try {
-        const espnRes = await fetch('https://site.web.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard');
+        // Capped so a slow ESPN never holds the whole board.
+        const espnRes = await fetch('https://site.web.api.espn.com/apis/site/v2/sports/golf/pga/scoreboard', { signal: AbortSignal.timeout(3000) });
         if (!espnRes.ok) return null;
         const espnData = await espnRes.json();
         const events = espnData.events || [];
@@ -392,7 +376,7 @@ async function getDigest(req, res) {
     // On Deck: games with odds beyond the 3-day analysis window. The books
     // post weeks ahead; the board looked "thin" because this wall of real
     // data was invisible until games entered the window.
-    const onDeckResult = await safeQuery(async () => {
+    const onDeckP = safeQuery(async () => {
       const windowEnd = new Date(Date.now() + 3 * 24 * 3600e3).toISOString();
       const horizon = new Date(Date.now() + 14 * 24 * 3600e3).toISOString();
       const { data, error } = await supabase
@@ -443,7 +427,7 @@ async function getDigest(req, res) {
     });
 
     // First game time for countdown
-    const firstGameResult = await safeQuery(async () => {
+    const firstGameP = safeQuery(async () => {
       const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('odds_cache')
@@ -458,7 +442,23 @@ async function getDigest(req, res) {
     // Which markets publish per sport (dial board publish_ml, publish_spread,
     // publish_total, 2026-09-13). The board withholds a shadow market's read
     // and shows a sport as shadow only when none of its markets publishes.
-    const publishMarkets = await safeQuery(() => publishFlagsAll(supabase));
+    const publishMarketsP = safeQuery(() => publishFlagsAll(supabase));
+
+    const [
+      gamesBySport, startedGames, injuriesResult, yesterdayResultsResult,
+      modelAccuracyResult, upcomingCountResult, golfResult, onDeckResult,
+      firstGameResult, publishMarkets,
+    ] = await Promise.all([
+      upcomingP, startedP, injuriesP, yesterdayResultsP,
+      modelAccuracyP, upcomingCountP, golfP, onDeckP,
+      firstGameP, publishMarketsP,
+    ]);
+
+    // Index injuries by sport code
+    const injuriesBySport = {};
+    for (const entry of injuriesResult || []) {
+      injuriesBySport[entry.team_name] = entry;
+    }
 
     res.json({
       status: 'ok',
