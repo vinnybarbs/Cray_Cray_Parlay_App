@@ -789,7 +789,7 @@ function MarketRow({ sides, recommendedSide, shadow = false }) {
   )
 }
 
-function MarketTabs({ game, shadow = false }) {
+function MarketTabs({ game, shadow = false, legSide = null }) {
   const { edges, edges_raw: edgesRaw, recommended_side } = game
   // Calibration-muted: the raw model computed a real edge but the
   // calibrated value is exactly zero, meaning the market's multiplier is
@@ -850,7 +850,9 @@ function MarketTabs({ game, shadow = false }) {
       </div>
       <MarketRow
         sides={sidesByTab[activeTab] || []}
-        recommendedSide={recommended_side}
+        // A Leg is always the favorite (owner 2026-10-13), so on a Leg
+        // tile the ML arrow marks the favorite, not a sub 2% lean to the dog.
+        recommendedSide={legSide && activeTab === 'ml' ? legSide : recommended_side}
         shadow={shadow || isShadowMarket(game.sport, activeTab)}
       />
     </div>
@@ -1104,7 +1106,17 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
 
         {/* Per-market tabs */}
         <div className="mb-3">
-          <MarketTabs game={game} shadow={SHADOW_DISPLAY.has(sport)} />
+          <MarketTabs
+            game={game}
+            shadow={SHADOW_DISPLAY.has(sport)}
+            legSide={(() => {
+              const pp = signedPp
+              const hp = game.calc_home_prob ?? 0
+              const ap = game.calc_away_prob ?? 0
+              if (pp == null || pp >= 2 || pp <= -2 || Math.max(hp, ap) < 0.65) return null
+              return hp >= ap ? 'home_ml' : 'away_ml'
+            })()}
+          />
         </div>
 
         {/* Analysis snippet (expandable) */}
