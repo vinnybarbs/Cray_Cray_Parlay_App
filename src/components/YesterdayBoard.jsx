@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { edgeTier, formatPp } from '../lib/tiers'
+import PctStack from './PctStack'
 import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
 
@@ -10,13 +11,13 @@ import { fmtGameDateTime } from '../lib/gameTime'
 
 function OutcomeChip({ outcome }) {
   const map = {
-    won:  { label: 'WON',  cls: 'bg-signal-pos-dim/40 text-signal-pos' },
-    lost: { label: 'LOST', cls: 'bg-signal-neg-dim/40 text-signal-neg' },
-    push: { label: 'PUSH', cls: 'bg-ink-850 text-ink-300' },
-    void: { label: 'VOID', cls: 'bg-ink-850 text-ink-400' },
+    won:  { label: 'Won',  cls: 'bg-signal-pos-dim/40 text-signal-pos' },
+    lost: { label: 'Lost', cls: 'bg-signal-neg-dim/40 text-signal-neg' },
+    push: { label: 'Push', cls: 'bg-ink-850 text-ink-300' },
+    void: { label: 'Void', cls: 'bg-ink-850 text-ink-400' },
   }
-  const m = map[outcome] || { label: 'OPEN', cls: 'bg-ink-850 text-ink-200' }
-  return <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
+  const m = map[outcome] || { label: 'Open', cls: 'bg-ink-850 text-ink-200' }
+  return <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
 }
 
 export default function YesterdayBoard({ alwaysOpen = false }) {
@@ -76,7 +77,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
       {error && <p className="text-signal-neg text-sm">Couldn't load yesterday's board: {error}</p>}
       {data && (
         <div className="bg-ink-950/60 rounded-sharp shadow-hairline overflow-hidden">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-ink-950 text-xs text-ink-400">
             <span className="text-ink-200">{dateLabel}</span>
             {s && s.total > 0 && (
               <>
@@ -89,26 +90,26 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
           </div>
           {data.traps?.length > 0 && (
             <>
-              <div className="px-4 py-2 bg-ink-950 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500 border-t border-ink-800">
+              <div className="px-4 py-2 bg-ink-950 text-xs text-ink-500 border-t border-ink-800">
                 Traps called · the advice was not to bet these sides
               </div>
               {data.traps.map((p, i) => {
-                const fade = p.actual_outcome === 'lost' ? { label: 'WARNING HELD', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
-                  : p.actual_outcome === 'won' ? { label: 'BAIT CAME IN', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
-                  : { label: p.actual_outcome === 'push' || p.actual_outcome === 'void' ? 'PUSH' : 'OPEN', cls: 'bg-ink-850 text-ink-300' }
+                const fade = p.actual_outcome === 'lost' ? { label: 'Trap held', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
+                  : p.actual_outcome === 'won' ? { label: 'Bait came in', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
+                  : { label: p.actual_outcome === 'push' || p.actual_outcome === 'void' ? 'Push' : 'Open', cls: 'bg-ink-850 text-ink-300' }
                 return (
                   <div key={`trap-${i}`} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800">
-                    <span className="flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider text-signal-neg bg-signal-neg-dim/30">
+                    <span className="flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-xs font-bold text-signal-neg bg-signal-neg-dim/30">
                       TRAP
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink-100 truncate">
                         {p.pick}
-                        {p.odds && <span className="ml-2 font-mono text-xs text-ink-400">{p.odds}</span>}
+                        {p.odds && <span className="ml-2 tabular-nums text-xs text-ink-400">{p.odds}</span>}
                       </div>
-                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
+                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} at {p.home_team}</div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-sharp font-mono text-[10px] font-bold tracking-wider flex-shrink-0 ${fade.cls}`}>{fade.label}</span>
+                    <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${fade.cls}`}>{fade.label}</span>
                   </div>
                 )
               })}
@@ -127,18 +128,18 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                     onClick={() => setOpenRow(isOpen ? null : i)}
                     className={`w-full flex items-center gap-3 px-4 py-2.5 border-t border-ink-800 text-left transition-colors ${isOpen ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}
                   >
-                    <span className={`flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${tier.color} ${tier.bg}`}>
+                    <span className={`flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-xs font-bold ${tier.color} ${tier.bg}`}>
                       {tier.label}
                     </span>
-                    <span className={`flex-shrink-0 w-14 text-right font-mono text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-                      {p.edge_pp != null ? formatPp(p.edge_pp) : '-'}
+                    <span className={`flex-shrink-0 w-14 text-right text-xs font-bold tabular-nums ${p.edge_pp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
+                      <PctStack edgePp={p.edge_pp} odds={p.odds} impliedProb={p.implied_prob} />
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium text-ink-100 truncate">
                         {p.pick}
-                        {p.odds && <span className="ml-2 font-mono text-xs text-ink-400">{p.odds}</span>}
+                        {p.odds && <span className="ml-2 tabular-nums text-xs text-ink-400">{p.odds}</span>}
                       </div>
-                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} @ {p.home_team}</div>
+                      <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} at {p.home_team}</div>
                     </div>
                     <OutcomeChip outcome={p.actual_outcome} />
                   </button>
@@ -147,7 +148,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                       {p.reasoning
                         ? <p className="text-xs text-ink-200 leading-relaxed max-w-2xl">{p.reasoning}</p>
                         : <p className="text-xs text-ink-500">No written analysis was stored with this pick.</p>}
-                      <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+                      <p className="mt-2 text-xs text-ink-500">
                         {tier.label}{tier.subtitle && tier.subtitle.toLowerCase() !== tier.label.toLowerCase() ? ` · ${tier.subtitle}` : ''} · published {fmtPublished(p.created_at)}, before the game started
                       </p>
                       {/* Tiers revise until lock. When this pick's tier moved
@@ -155,7 +156,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                           label never silently differs from a reader's earlier
                           visit (the 2026-08-21 Rays/Padres swap). */}
                       {Array.isArray(p.tier_history) && p.tier_history.length > 1 && (
-                        <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+                        <p className="mt-1 text-xs text-ink-500">
                           tier path: {p.tier_history.map((h) => h.at
                             ? `${h.tier} ${new Date(h.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
                             : h.tier).join(', then ')}

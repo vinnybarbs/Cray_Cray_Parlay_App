@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import BrandMark from '../components/BrandMark'
 import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
+import PctStack from '../components/PctStack'
 import { isShadowSport } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -76,24 +77,24 @@ function PickRow({ row, isOpen, onToggle }) {
   return (
     <div>
     <button onClick={onToggle} className={`w-full text-left flex items-center gap-3 px-4 py-3 border-t border-ink-800 transition-colors ${isOpen ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}>
-      <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider ${isPreview ? 'text-ink-300 bg-ink-850 shadow-hairline' : `${tier.color} ${tier.bg}`}`}>
+      <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-xs font-bold ${isPreview ? 'text-ink-300 bg-ink-850 shadow-hairline' :`${tier.color} ${tier.bg}`}`}>
         {isPreview ? 'Preview' : tier.label}
       </span>
-      <span className={`flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-        {isPreview ? '-' : formatPp(effPp)}
+      <span className={`flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
+        {isPreview ? '-' : <PctStack edgePp={effPp} odds={row.odds} impliedProb={row.implied_prob} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
           {row.game.recommended_pick
             || (showBestSide ? `best side: ${sideLabel(story.bestSide, row.game)}` : `${row.game.away_team} @ ${row.game.home_team}`)}
-          {odds && <span className="ml-2 font-mono text-xs text-ink-300">{odds}</span>}
+          {odds && <span className="ml-2 tabular-nums text-xs text-ink-300">{odds}</span>}
         </div>
         <div className="text-xs text-ink-400 truncate">
-          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} @ {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} @ {row.game.home_team} · below the 2pp pick bar</> : <> · analysis, no graded side</>}
+          {row.sport}{row.game.recommended_pick ? <> · {row.game.away_team} at {row.game.home_team}</> : showBestSide ? <> · {row.game.away_team} at {row.game.home_team} · under 2 points, no pick</> : <> · analysis, no graded side</>}
           {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
         </div>
       </div>
-      <span className={`flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider ${isPreview ? 'text-ink-500' : tier.color}`}>
+      <span className={`flex-shrink-0 px-3 py-1.5 text-xs ${isPreview ? 'text-ink-500' : tier.color}`}>
         {isPreview ? 'no bet graded' : tier.subtitle}
       </span>
     </button>
@@ -123,11 +124,11 @@ function TrapRow({ row }) {
   const bait = (t.signals || []).map(s => s.label).join(' · ')
   return (
     <div className="w-full flex items-center gap-3 px-4 py-3 border-t border-ink-800">
-      <span className="flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-[10px] font-mono font-bold uppercase tracking-wider text-signal-neg bg-signal-neg-dim/30 shadow-hairline-neg">
+      <span className="flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-xs font-bold text-signal-neg bg-signal-neg-dim/30 shadow-hairline-neg">
         Trap
       </span>
-      <span className="flex-shrink-0 w-16 text-right font-mono text-sm font-bold tabular-nums text-signal-neg">
-        {formatPp(t.edge_pp)}
+      <span className="flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums text-signal-neg">
+        <PctStack edgePp={t.edge_pp} odds={row.odds ?? t.odds} impliedProb={t.implied_prob} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
@@ -139,11 +140,11 @@ function TrapRow({ row }) {
           </div>
         )}
         <div className="text-xs text-ink-400 truncate">
-          {row.sport} · {row.game.away_team} @ {row.game.home_team}
+          {row.sport} · {row.game.away_team} at {row.game.home_team}
           {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
         </div>
       </div>
-      <span className="flex-shrink-0 px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-signal-neg">
+      <span className="flex-shrink-0 px-3 py-1.5 text-xs text-signal-neg">
         don't bet it
       </span>
     </div>
@@ -241,7 +242,7 @@ export default function GeneratorPage() {
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
         <BrandMark />
         <span className="text-sm font-semibold text-ink-200 hidden sm:inline">The Board</span>
-        <span className="hidden sm:inline font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">every graded pick · filter it your way</span>
+        <span className="hidden sm:inline text-xs text-ink-500">Every graded pick, filter it your way</span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => navigate('/digest')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Digest</button>
           <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
@@ -254,10 +255,10 @@ export default function GeneratorPage() {
         {/* Filters */}
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-4 space-y-3">
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 w-14 flex-shrink-0">Sport</span>
+            <span className="text-xs text-ink-400 w-14 flex-shrink-0">Sport</span>
             <button
               onClick={() => setSelectedSports([])}
-              className={`px-3 py-1 rounded-sharp text-xs font-mono font-medium transition-all ${selectedSports.length === 0 ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
+              className={`px-3 py-1 rounded-sharp text-sm font-medium transition-all ${selectedSports.length === 0 ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
             >
               All
             </button>
@@ -265,25 +266,25 @@ export default function GeneratorPage() {
               <button
                 key={s}
                 onClick={() => toggleSport(s)}
-                className={`px-3 py-1 rounded-sharp text-xs font-mono font-medium transition-all ${selectedSports.includes(s) ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
+                className={`px-3 py-1 rounded-sharp text-sm font-medium transition-all ${selectedSports.includes(s) ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
               >
                 {s}
               </button>
             ))}
           </div>
           <div className="flex flex-wrap gap-2 items-center">
-            <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 w-14 flex-shrink-0">Edge</span>
+            <span className="text-xs text-ink-400 w-14 flex-shrink-0">Edge</span>
             {MIN_TIER_OPTIONS.map(o => (
               <button
                 key={o.key}
                 onClick={() => setMinTier(o.key)}
-                className={`px-3 py-1 rounded-sharp text-xs font-mono font-medium transition-all ${minTier === o.key ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
+                className={`px-3 py-1 rounded-sharp text-sm font-medium transition-all ${minTier === o.key ? 'bg-signal-pos text-ink-950' : 'bg-ink-850 shadow-hairline text-ink-300 hover:bg-ink-800'}`}
               >
                 {o.label}
               </button>
             ))}
           </div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-500">
+          <p className="text-xs text-ink-500">
             {TIERS.filter(t => t.min >= 2).map(t => `${t.label} ${t.range}`).join(' · ')}
           </p>
         </div>
@@ -310,7 +311,7 @@ export default function GeneratorPage() {
             filters, and it should never read as an outage. */}
         {!loading && !error && allRows.length === 0 && trapRows.length === 0 && (
           <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
-            <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-400 mb-3">
+            <div className="text-xs text-ink-400 mb-3">
               Slate status
             </div>
             <h2 className="text-xl font-bold text-ink-100 leading-tight">The slate is dark.</h2>
@@ -320,12 +321,12 @@ export default function GeneratorPage() {
               to grade until new games go up.
             </p>
             {data?.firstGameTime && (
-              <p className="mt-4 font-mono text-sm text-signal-pos">
+              <p className="mt-4 tabular-nums text-sm text-signal-pos">
                 Next slate: {fmtGameDateTime(data.firstGameTime)}
               </p>
             )}
             {Object.entries(data?.upcomingCounts || {}).filter(([, n]) => n > 0).length > 0 && (
-              <p className="mt-1 font-mono text-xs text-ink-400">
+              <p className="mt-1 tabular-nums text-xs text-ink-400">
                 On deck: {Object.entries(data.upcomingCounts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([s, n]) => `${s} ${n}`).join(' · ')}
               </p>
             )}
@@ -339,7 +340,7 @@ export default function GeneratorPage() {
         {/* Rows */}
         {!loading && !error && allRows.length > 0 && (
           <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500">
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-950 text-xs text-ink-500">
               <span className="w-24 text-center flex-shrink-0">Tier</span>
               <span className="w-16 text-right flex-shrink-0">Edge</span>
               <span className="flex-1">Pick · matchup</span>
@@ -348,7 +349,7 @@ export default function GeneratorPage() {
             {rows.length === 0 ? (
               <div className="px-4 py-10 text-center">
                 <p className="text-sm text-ink-300">Nothing clears that filter right now.</p>
-                <p className="text-xs text-ink-500 mt-1 font-mono">Loosen the edge floor or check back after the next analysis run.</p>
+                <p className="text-xs text-ink-500 mt-1 tabular-nums">Loosen the edge floor or check back after the next analysis run.</p>
               </div>
             ) : (
               rows.map(row => {
@@ -371,7 +372,7 @@ export default function GeneratorPage() {
             Not the inverse of any pick. */}
         {!loading && !error && trapRows.length > 0 && (
           <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-950 text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500">
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-950 text-xs text-ink-500">
               <span className="text-signal-neg">Traps</span>
               <span>looks like a good bet · isn't</span>
               <span className="ml-auto flex-shrink-0">{trapRows.filter(r => selectedSports.length === 0 || selectedSports.includes(r.sport)).length} called</span>
@@ -385,8 +386,8 @@ export default function GeneratorPage() {
         )}
 
         {!loading && !error && allRows.length > 0 && (
-          <p className="text-[10px] font-mono uppercase tracking-[0.18em] text-ink-500 text-center">
-            same math as the digest · picks below 2pp are shown so you know what to skip, not to bet
+          <p className="text-xs text-ink-500 text-center">
+            same math as the digest · picks within 2% of the book are shown so you know what to skip, not to bet
           </p>
         )}
       </div>

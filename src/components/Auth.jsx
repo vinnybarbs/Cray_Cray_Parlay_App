@@ -70,20 +70,20 @@ export default function Auth({ onClose }) {
       <div className="fixed inset-0 bg-ink-950/80 backdrop-blur-sm flex items-center justify-center z-50">
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-8 max-w-md w-full mx-4 text-center">
           <div className="text-3xl mb-4">📬</div>
-          <h2 className="font-mono text-xl font-semibold uppercase tracking-[0.08em] text-ink-100 mb-3">
+          <h2 className="text-xl font-semibold text-ink-100 mb-3">
             Check your email
           </h2>
           <p className="text-sm text-ink-300 leading-relaxed mb-2">
             We sent a confirmation link to
           </p>
-          <p className="font-mono text-sm text-signal-pos mb-4 break-all">{email}</p>
+          <p className="tabular-nums text-sm text-signal-pos mb-4 break-all">{email}</p>
           <p className="text-xs text-ink-400 leading-relaxed mb-6">
             Click the link to activate your account, then come back and sign
             in. If it isn't in your inbox within a minute, check spam.
           </p>
           <button
             onClick={onClose}
-            className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 font-mono font-medium uppercase tracking-[0.12em] text-sm transition-colors"
+            className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 font-medium text-sm transition-colors"
           >
             Got it
           </button>
@@ -96,13 +96,13 @@ export default function Auth({ onClose }) {
     <div className="fixed inset-0 bg-ink-950/80 backdrop-blur-sm flex items-center justify-center z-50">
       <div className="bg-ink-900 rounded-sharp shadow-hairline p-8 max-w-md w-full mx-4">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="font-mono text-xl font-semibold uppercase tracking-[0.08em] text-ink-100">
+          <h2 className="text-xl font-semibold text-ink-100">
             {isSignUp ? 'Create Account' : 'Sign In'}
           </h2>
           {onClose && (
             <button
               onClick={onClose}
-              className="text-ink-400 hover:text-ink-100 font-mono"
+              className="text-ink-400 hover:text-ink-100 tabular-nums"
             >
               ✕
             </button>
@@ -112,7 +112,7 @@ export default function Auth({ onClose }) {
         {/* Google Sign In */}
         <button
           onClick={handleGoogleSignIn}
-          className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 font-mono font-medium text-sm flex items-center justify-center gap-2 mb-4 transition-colors"
+          className="w-full bg-ink-800 shadow-hairline text-ink-100 py-2 px-4 rounded-sharp hover:bg-ink-700 tabular-nums font-medium text-sm flex items-center justify-center gap-2 mb-4 transition-colors"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -134,7 +134,7 @@ export default function Auth({ onClose }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-300 mb-1.5">
+            <label className="block text-xs font-medium text-ink-300 mb-1.5">
               Email
             </label>
             <input
@@ -142,13 +142,13 @@ export default function Auth({ onClose }) {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 font-mono text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
+              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 tabular-nums text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
               placeholder="you@example.com"
             />
           </div>
 
           <div>
-            <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-ink-300 mb-1.5">
+            <label className="block text-xs font-medium text-ink-300 mb-1.5">
               Password
             </label>
             <input
@@ -157,13 +157,13 @@ export default function Auth({ onClose }) {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={6}
-              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 font-mono text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
+              className="w-full px-3 py-2 bg-ink-850 shadow-hairline rounded-sharp text-ink-100 tabular-nums text-sm placeholder:text-ink-500 focus:outline-none focus:shadow-hairline-bright focus:ring-1 focus:ring-signal-pos transition-shadow"
               placeholder="••••••••"
             />
           </div>
 
           {error && (
-            <div className="text-signal-neg text-sm bg-signal-neg-dim/30 shadow-hairline-neg p-3 rounded-sharp font-mono">
+            <div className="text-signal-neg text-sm bg-signal-neg-dim/30 shadow-hairline-neg p-3 rounded-sharp tabular-nums">
               {error}
             </div>
           )}
@@ -171,7 +171,7 @@ export default function Auth({ onClose }) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-signal-pos text-ink-950 py-2 px-4 rounded-sharp hover:bg-signal-pos/90 disabled:opacity-50 disabled:cursor-not-allowed font-mono font-bold uppercase tracking-[0.12em] text-sm"
+            className="w-full bg-signal-pos text-ink-950 py-2 px-4 rounded-sharp hover:bg-signal-pos/90 disabled:opacity-50 disabled:cursor-not-allowed font-bold text-sm"
           >
             {loading ? 'Loading...' : isSignUp ? 'Sign Up' : 'Sign In'}
           </button>
@@ -183,7 +183,7 @@ export default function Auth({ onClose }) {
               setIsSignUp(!isSignUp)
               setError('')
             }}
-            className="font-mono text-[11px] uppercase tracking-[0.12em] text-signal-pos/80 hover:text-signal-pos"
+            className="text-[11px] text-signal-pos/80 hover:text-signal-pos"
           >
             {isSignUp 
               ? 'Already have an account? Sign in' 

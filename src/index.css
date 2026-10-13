@@ -29,7 +29,7 @@
   --color-signal-neg-dim: #5d1f1f;
   --color-signal-neutral: #9ea1a8;
 
-  --radius-sharp: 2px;
+  --radius-sharp: 12px;
 
   /* Hairline insets. Terminal-panel borders that don't affect layout. */
   --shadow-hairline:        inset 0 0 0 1px var(--color-ink-600);
@@ -58,4 +58,19 @@
 }
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Live strip on Today (owner 2026-10-12: carry the landing ticker into the
+   app, calmer). Pauses on touch and hover, and stops for reduced motion,
+   where the strip becomes a plain horizontal scroller. */
+@keyframes live-strip-scroll {
+  0% { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(-50%, 0, 0); }
+}
+.live-strip-track { animation: live-strip-scroll 60s linear infinite; }
+.live-strip:hover .live-strip-track,
+.live-strip:active .live-strip-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .live-strip-track { animation: none; }
+  .live-strip { overflow-x: auto; }
 }

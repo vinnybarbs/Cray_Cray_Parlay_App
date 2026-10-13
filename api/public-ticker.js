@@ -36,6 +36,31 @@ function sideLabel(side, g) {
   }
 }
 
+// Book vs us for the strip (owner 2026-10-12): the no-vig probability of
+// the side from both prices, plus the edge. Mirrors src/lib/tiers.js sidePct.
+const SIDE_PRICES = {
+  home_ml: ['moneyline_home', 'moneyline_away'],
+  away_ml: ['moneyline_away', 'moneyline_home'],
+  home_spread: ['spread_home_price', 'spread_away_price'],
+  away_spread: ['spread_away_price', 'spread_home_price'],
+  over: ['over_price', 'under_price'],
+  under: ['under_price', 'over_price'],
+};
+function rawImplied(odds) {
+  const n = parseInt(odds, 10);
+  if (!Number.isFinite(n) || n === 0) return null;
+  return n < 0 ? -n / (-n + 100) : 100 / (n + 100);
+}
+function sidePct(g, side, pp) {
+  const keys = SIDE_PRICES[side];
+  if (!keys) return { book_pct: null, our_pct: null };
+  const a = rawImplied(g[keys[0]]);
+  if (a == null) return { book_pct: null, our_pct: null };
+  const b = rawImplied(g[keys[1]]);
+  const p = b != null ? a / (a + b) : a / 1.045;
+  return { book_pct: Math.round(p * 100), our_pct: Math.round(p * 100 + pp) };
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -51,7 +76,7 @@ module.exports = async (req, res) => {
 
     const { data: games, error } = await supabase
       .from('game_analysis')
-      .select('sport, home_team, away_team, game_date, spread, total, edges')
+      .select('sport, home_team, away_team, game_date, spread, total, edges, moneyline_home, moneyline_away, spread_home_price, spread_away_price, over_price, under_price')
       .gte('game_date', from)
       .lte('game_date', to)
       .order('game_date', { ascending: true })
@@ -75,7 +100,7 @@ module.exports = async (req, res) => {
       const label = sideLabel(best.side, g);
       if (!label) continue;
       const pp = Math.round(best.val * 1000) / 10;
-      items.push({ sport: g.sport, label, pp, tier: edgeTier(pp) });
+      items.push({ sport: g.sport, label, pp, tier: edgeTier(pp), ...sidePct(g, best.side, pp) });
     }
 
     // Strongest signals first, then cap the reel.

@@ -104,7 +104,7 @@ export default function PickCard({ pick, onAdd, isAdded }) {
             {formatDate(pick.commenceTime || pick.gameDate)} • {pick.sport}
           </div>
           <div className="text-sm font-semibold text-ink-100">
-            {pick.awayTeam} @ {pick.homeTeam}
+            {pick.awayTeam} at {pick.homeTeam}
           </div>
           {pick.matchupSnapshot && (
             <div className="mt-1 text-[11px] text-ink-200 bg-ink-950/60 rounded px-2 py-1 border border-ink-700">

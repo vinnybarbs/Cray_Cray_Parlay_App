@@ -74,9 +74,9 @@ function InstallSheet({ onClose }) {
         </div>
         {ios ? (
           <ol className="font-sans text-sm text-ink-200 flex flex-col gap-3 mb-5">
-            <li className="flex gap-3"><span className="font-mono text-signal-pos">1</span><span>Tap <ShareIcon /> Share in Safari's toolbar.</span></li>
-            <li className="flex gap-3"><span className="font-mono text-signal-pos">2</span><span>Scroll down and tap <span className="font-semibold text-ink-100">Add to Home Screen</span>.</span></li>
-            <li className="flex gap-3"><span className="font-mono text-signal-pos">3</span><span>Tap <span className="font-semibold text-ink-100">Add</span>. TrapHawk opens like any other app.</span></li>
+            <li className="flex gap-3"><span className="tabular-nums text-signal-pos">1</span><span>Tap <ShareIcon /> Share in Safari's toolbar.</span></li>
+            <li className="flex gap-3"><span className="tabular-nums text-signal-pos">2</span><span>Scroll down and tap <span className="font-semibold text-ink-100">Add to Home Screen</span>.</span></li>
+            <li className="flex gap-3"><span className="tabular-nums text-signal-pos">3</span><span>Tap <span className="font-semibold text-ink-100">Add</span>. TrapHawk opens like any other app.</span></li>
           </ol>
         ) : (
           <p className="font-sans text-sm text-ink-200 mb-5">
@@ -94,7 +94,7 @@ function InstallSheet({ onClose }) {
 
 const VARIANTS = {
   // Full width secondary button, for heroes and page footers.
-  block: 'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-sharp shadow-hairline hover:shadow-hairline-bright text-ink-100 text-xs font-mono font-bold uppercase tracking-[0.18em] transition-shadow',
+  block: 'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-4 rounded-sharp shadow-hairline hover:shadow-hairline-bright text-ink-100 text-sm font-semibold transition-shadow',
   // Small pill for page headers.
   header: 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-signal-pos/10 text-signal-pos text-xs font-semibold hover:bg-signal-pos/20 transition-colors flex-shrink-0',
 }

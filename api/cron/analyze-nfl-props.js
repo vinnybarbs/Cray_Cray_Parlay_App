@@ -12,6 +12,7 @@
  * Endpoints:
  *   POST /cron/analyze-nfl-props?secret=...            (read, default)
  *   POST /cron/analyze-nfl-props?secret=...&mode=grade (settle)
+ *   POST /cron/analyze-nfl-props?secret=...&mode=narrate (prop narration only)
  */
 
 'use strict';
@@ -21,6 +22,7 @@ const propEdge = require('../../lib/services/prop-edge.js');
 const { edgeTier } = require('../../lib/services/pick-grader.js');
 const { teamAbbr, nameKey } = require('../../lib/services/nfl-inactives.js');
 const { getWeatherForGames } = require('../../lib/services/weather-data.js');
+const { narrateProps } = require('./narrate-nfl-props.js');
 
 const SPORT = 'NFL';
 const ODDS_SPORT = 'americanfootball_nfl';
@@ -382,7 +384,21 @@ async function runRead() {
   summary.dials = dials;
   summary.duration_ms = Date.now() - started;
   await log(summary.errors.length ? 'partial' : 'completed', summary);
+  // The shown reads get their short narration right after the read
+  // lands. Fail soft: a narration problem never fails the read.
+  await runNarrate();
   return summary;
+}
+
+async function runNarrate() {
+  try {
+    const n = await narrateProps(supabase);
+    await log(n.errors.length && !n.narrated ? 'partial' : 'completed', n, 'narrate-nfl-props');
+    return n;
+  } catch (err) {
+    await log('failed', { error: err.message }, 'narrate-nfl-props');
+    return null;
+  }
 }
 
 async function runGrade() {
@@ -455,11 +471,13 @@ async function runGrade() {
 async function analyzeNflProps(req, res) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
   if (cronSecret !== process.env.CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' });
-  const mode = req.query.mode === 'grade' ? 'grade' : 'read';
+  const mode = ['grade', 'narrate'].includes(req.query.mode) ? req.query.mode : 'read';
   res.status(202).json({ status: 'accepted', message: `NFL props ${mode} started` });
   (async () => {
     try {
-      if (mode === 'grade') await runGrade(); else await runRead();
+      if (mode === 'grade') await runGrade();
+      else if (mode === 'narrate') await runNarrate();
+      else await runRead();
     } catch (err) {
       console.error('analyze-nfl-props error:', err.message);
       await log('failed', { mode, error: err.message }, mode === 'grade' ? 'grade-nfl-props' : 'analyze-nfl-props');
@@ -470,4 +488,5 @@ async function analyzeNflProps(req, res) {
 module.exports = analyzeNflProps;
 module.exports.runRead = runRead;
 module.exports.runGrade = runGrade;
+module.exports.runNarrate = runNarrate;
 module.exports.tdRow = tdRow;

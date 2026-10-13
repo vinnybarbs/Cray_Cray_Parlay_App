@@ -56,3 +56,20 @@ describe('shapeToday', () => {
     expect(out.record.trapBait.units).toBe(-13);
   });
 });
+
+describe('bookAndOurPct (owner 2026-10-12: "Book says 56%, we say 67%")', () => {
+  const { bookAndOurPct } = require('../../api/today.js');
+  test('uses the stored no-vig implied probability when present', () => {
+    expect(bookAndOurPct({ odds: '-112', implied_prob: 0.504, edge_pp: 5.5 })).toEqual({ book_pct: 50, our_pct: 56 });
+  });
+  test('falls back to the price with a typical margin removed', () => {
+    expect(bookAndOurPct({ odds: '-110', edge_pp: 8.2 })).toEqual({ book_pct: 50, our_pct: 58 });
+  });
+  test('a trap reads lower than the book', () => {
+    expect(bookAndOurPct({ odds: '-205', implied_prob: 0.645, edge_pp: -2.6 })).toEqual({ book_pct: 65, our_pct: 62 });
+  });
+  test('missing price or edge gives nulls', () => {
+    expect(bookAndOurPct({ odds: null, edge_pp: 3 })).toEqual({ book_pct: null, our_pct: null });
+    expect(bookAndOurPct({ odds: '-110', edge_pp: null })).toEqual({ book_pct: null, our_pct: null });
+  });
+});

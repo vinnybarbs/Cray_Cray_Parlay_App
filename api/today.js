@@ -57,6 +57,31 @@ function recordOf(row) {
  * only (auto_digest_YYYY-MM-DD), not the spotlight alternates, which ride
  * under a headline on the full board.
  */
+// Owner 2026-10-12: cards say "Book says 56%, we say 67%". The book
+// number is the no-vig market probability the edge was measured against:
+// implied_prob when the row stored it, else the pick's own price with a
+// typical two way margin (4.5 percent) taken out. Our number is that plus
+// the published edge, so the gap always equals the claim on the card.
+const TYPICAL_OVERROUND = 1.045;
+
+function rawImplied(odds) {
+  const n = parseInt(odds, 10);
+  if (!Number.isFinite(n) || n === 0) return null;
+  return n < 0 ? -n / (-n + 100) : 100 / (n + 100);
+}
+
+function bookAndOurPct(r) {
+  const edge = r.edge_pp != null ? Number(r.edge_pp) : null;
+  let book = r.implied_prob != null ? Number(r.implied_prob) : null;
+  if (book == null) {
+    const raw = rawImplied(r.odds);
+    if (raw != null) book = raw / TYPICAL_OVERROUND;
+  }
+  if (book == null || edge == null) return { book_pct: null, our_pct: null };
+  const bookPct = Math.round(book * 100);
+  return { book_pct: bookPct, our_pct: Math.round(book * 100 + edge) };
+}
+
 function shapeToday(pickRows, trapRows, recordRows) {
   const slim = r => ({
     sport: r.sport,
@@ -68,6 +93,7 @@ function shapeToday(pickRows, trapRows, recordRows) {
     odds: r.odds,
     edge_pp: r.edge_pp != null ? Number(r.edge_pp) : null,
     tier: r.tier,
+    ...bookAndOurPct(r),
   });
   const ranked = latestPerGame((pickRows || []).filter(r => HEADLINE_SESSION.test(String(r.session_id))))
     .sort((a, b) => Number(b.edge_pp) - Number(a.edge_pp));
@@ -109,7 +135,7 @@ async function today(req, res) {
   try {
     const now = new Date();
     const horizon = new Date(now.getTime() + HORIZON_HOURS * 3600 * 1000).toISOString();
-    const cols = 'sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, session_id';
+    const cols = 'sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, implied_prob, tier, session_id';
     const base = () => supabase
       .from('ai_suggestions')
       .select(cols)
@@ -138,3 +164,4 @@ async function today(req, res) {
 module.exports = today;
 module.exports.shapeToday = shapeToday;
 module.exports.latestPerGame = latestPerGame;
+module.exports.bookAndOurPct = bookAndOurPct;

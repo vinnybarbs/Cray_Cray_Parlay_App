@@ -13,6 +13,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../shared/logger');
+const { enrichParlayLegOutcomes } = require('../lib/services/parlay-leg-outcomes.js');
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
