@@ -8,7 +8,7 @@ const { logger } = require('../shared/logger');
 const { supabase } = require('../lib/middleware/supabaseAuth');
 const aiInstructions = require('../lib/services/ai-instructions');
 const pickGrader = require('../lib/services/pick-grader');
-const { getClient: getClaude, complete, MODELS, WRITING_STYLE } = require('../lib/services/claude');
+const { getClient: getClaude, complete, MODELS, WRITING_STYLE, thinkingOff } = require('../lib/services/claude');
 const { siteDay } = require('../shared/site-day.js');
 
 // Tool definitions the model can call to query our database (legacy
@@ -897,7 +897,7 @@ async function callClaude(system, messages, toolChoice = 'auto') {
   return claude.messages.create({
     model: MODELS.CHAT,
     max_tokens: 2000,
-    thinking: { type: 'disabled' },
+    thinking: thinkingOff(MODELS.CHAT),
     system,
     tools: CLAUDE_TOOLS,
     // 'required' forces at least one tool call (data before takes);

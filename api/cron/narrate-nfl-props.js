@@ -15,7 +15,7 @@
 
 'use strict';
 
-const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson } = require('../../lib/services/claude.js');
+const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson, thinkingOff } = require('../../lib/services/claude.js');
 const { showable, describe, attachHistory } = require('../props.js');
 
 // Most reads a single run narrates. A Sunday slate shows about 250, so
@@ -133,7 +133,7 @@ async function narrateOne(claude, r, history, redzone) {
   const data = await claude.messages.create({
     model: MODELS.NARRATION,
     max_tokens: 900,
-    thinking: { type: 'disabled' },
+    thinking: thinkingOff(MODELS.NARRATION),
     messages: [{ role: 'user', content: buildPrompt(r, history, redzone) }],
   });
   const text = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();

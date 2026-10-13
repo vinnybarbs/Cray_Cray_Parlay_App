@@ -12,7 +12,7 @@ const aiInstructions = require('../../lib/services/ai-instructions.js');
 const { EdgeCalculator } = require('../../lib/services/edge-calculator.js');
 const pickGrader = require('../../lib/services/pick-grader.js');
 const { getIntelContext } = require('../../lib/services/data-integrity-agent.js');
-const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson } = require('../../lib/services/claude.js');
+const { getClient: getClaude, MODELS, WRITING_STYLE, extractJson, thinkingOff, narrationModelForTier, estimateCost } = require('../../lib/services/claude.js');
 const tennisModel = require('../../lib/services/edge-models/tennis-model.js');
 const { getTennisContext, formatTennisContext } = require('../../lib/services/tennis-data.js');
 const { getUfcContext, formatUfcContext, isKnownUfcBout } = require('../../lib/services/ufc-data.js');
@@ -890,6 +890,27 @@ async function getPlayerStatsContext(homeTeam, awayTeam, sportSlug) {
 }
 
 /**
+ * The tier a game's narration is written for, read off the math before the
+ * Claude call: Trap when the detector made a call, the pp band of the pick
+ * when it clears the raw 2pp gate (a sub-Lean scored claim still publishes
+ * as Lean), Leg when either side is 65 percent or better, Skip otherwise.
+ */
+function narrationTierFor({ mathPick, edgeData, trapCalls }) {
+  if (trapCalls && trapCalls.length > 0) return 'Trap';
+  if (mathPick) {
+    const side = mathPick.recommended_side;
+    const gate = edgeData?.edgesRaw?.[side] ?? edgeData?.edgesPreBand?.[side] ?? mathPick.signedEdge;
+    if (gate != null && gate * 100 >= 2) {
+      const scored = edgeData?.edges?.[side] ?? gate;
+      const t = pickGrader.edgeTier(scored * 100);
+      return t === 'Skip' || t === 'Trap' || t == null ? 'Lean' : t;
+    }
+  }
+  if (edgeData?.homeWinProb >= 0.65 || edgeData?.awayWinProb >= 0.65) return 'Leg';
+  return 'Skip';
+}
+
+/**
  * Generate AI analysis for a single game. Returns the analysis fields on
  * success, or { error } on failure so the caller can log the real reason.
  */
@@ -1098,9 +1119,8 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
     // analysis expired a minute later, and a +15pp Sharp Take fell off
     // the board with the next cron scheduled after first pitch. These
     // failures are transient, one more attempt is cheap insurance.
-    // Cost tiering (owner decision 2026-08-19): audience-worthy tiles
-    // (publishable picks, traps, possible legs) narrate on Sonnet, the
-    // Skip and bubble tiles narrate on Haiku at a third of the price.
+    // Cost tiering (owner 2026-10-11, build_queue 91): the caller picks
+    // Sonnet for Play and above and Traps, Haiku for Lean, Leg and Skip.
     const model = narrationModel || MODELS.NARRATION;
     let lastErr = null;
     for (let attempt = 1; attempt <= 2; attempt++) {
@@ -1114,9 +1134,10 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
           messages: [{ role: 'user', content: prompt }],
         };
         // Narration only. The math already picked the side. Thinking stays
-        // off to keep the per-game cost/latency profile of the old setup.
-        // Haiku runs without a thinking param at all.
-        if (model !== MODELS.UTILITY) params.thinking = { type: 'disabled' };
+        // off to keep the per-game cost/latency profile of the old setup,
+        // through whichever param this model accepts.
+        const thinking = thinkingOff(model);
+        if (thinking) params.thinking = thinking;
         const data = await claude.messages.create(params);
 
         const content = data.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
@@ -1344,6 +1365,8 @@ async function runPreAnalysis(sportSlugs) {
     const changedKeyCounts = {};
     let totalPromptTokens = 0;
     let totalCompletionTokens = 0;
+    // Tokens per narration model, for the by_model cost split.
+    const byModel = {};
     const errors = [];
 
     const batch = gamesToAnalyze.slice(0, 50);
@@ -1669,16 +1692,13 @@ async function runPreAnalysis(sportSlugs) {
           for (const k of contextChangedKeys) changedKeyCounts[k] = (changedKeyCounts[k] || 0) + 1;
         }
 
-        // Model tiering by audience (owner decision 2026-08-19, cost).
-        // Sonnet narrates anything a bettor acts on: a publishable pick
-        // (pre-band 2pp+), a trap call, or a possible leg (65%+ side).
-        // Skip and bubble tiles, most of a full tennis draw, narrate on
-        // Haiku at roughly a third of the price.
-        const audienceWorthy =
-          (mathPick && ((edgeData?.edgesPreBand?.[mathPick.recommended_side] ?? mathPick.signedEdge) || 0) * 100 >= 2)
-          || trapCalls.length > 0
-          || (edgeData?.homeWinProb >= 0.65 || edgeData?.awayWinProb >= 0.65);
-        const narrationModel = audienceWorthy ? MODELS.NARRATION : MODELS.UTILITY;
+        // Model by the tier the math assigned (owner 2026-10-11, build_queue
+        // 91): Play, Strong Play, Sharp Take and Trap narrate on Sonnet,
+        // Lean, Leg and Skip on Haiku. The tier is read before the price
+        // rails, which only ever deduct, so a railed pick can narrate on
+        // Sonnet and publish as Lean, never the other way.
+        const narrationTier = narrationTierFor({ mathPick, edgeData, trapCalls });
+        const narrationModel = narrationModelForTier(narrationTier);
 
         // A whole-sport shadow read is never narrated (owner 2026-09-14):
         // the math runs, the edges are stored and graded into the shadow
@@ -1819,6 +1839,12 @@ async function runPreAnalysis(sportSlugs) {
             analyzed++;
             totalPromptTokens += result.prompt_tokens || 0;
             totalCompletionTokens += result.completion_tokens || 0;
+            if (result.model_used) {
+              const m = byModel[result.model_used] || (byModel[result.model_used] = { calls: 0, input: 0, output: 0 });
+              m.calls++;
+              m.input += result.prompt_tokens || 0;
+              m.output += result.completion_tokens || 0;
+            }
 
             // Publication. Picks (>= +2pp) and traps (detector calls at
             // <= -2pp with real lure) publish INDEPENDENTLY: a game can
@@ -2255,8 +2281,11 @@ async function runPreAnalysis(sportSlugs) {
     }
 
     const duration = Date.now() - startTime;
-    // Sonnet per-token rates ($3 in / $15 out per MTok)
-    const estimatedCost = ((totalPromptTokens * 0.000003) + (totalCompletionTokens * 0.000015)).toFixed(4);
+    // Priced per model (estimateCost in claude.js): Sonnet at the 3 and 15
+    // per MTok the ceiling has always been measured in, Haiku at its own
+    // rate. by_model carries the split for the cost audit.
+    for (const [m, v] of Object.entries(byModel)) v.cost = Number(estimateCost(m, v.input, v.output).toFixed(4));
+    const estimatedCost = Object.values(byModel).reduce((sum, v) => sum + v.cost, 0).toFixed(4);
 
     // Log results to cron_job_logs for admin dashboard visibility
     try {
@@ -2277,7 +2306,8 @@ async function runPreAnalysis(sportSlugs) {
           changed_keys: changedKeyCounts,
           errors: errors.slice(0, 5),
           duration_ms: duration,
-          cost: estimatedCost
+          cost: estimatedCost,
+          by_model: byModel,
         })
       });
     } catch (e) { /* don't block on logging */ }
@@ -2307,3 +2337,4 @@ module.exports = preAnalyzeGames;
 // watch-nfl-inactives re-runs the NFL slate in process after a late
 // scratch marks an analysis stale.
 module.exports.runPreAnalysis = runPreAnalysis;
+module.exports.narrationTierFor = narrationTierFor;
