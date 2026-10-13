@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import InstallButton from '../components/InstallButton'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct, sidePct, bookOurPct, pctPair, rawImplied } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct, sidePct, legPct, bookOurPct, pctPair, rawImplied } from '../lib/tiers'
 import { setPublishFlags, isShadowSport, isShadowMarket } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -291,7 +291,12 @@ function DeepResearchModal({ gameKey, game, onClose }) {
                   legacy 0-10 edge_score. Showing both on one screen confused
                   users: "is it 12.3pp or 10/10?" The pp number is the truth;
                   edge_score is a saturated derivative of the same data. */}
-              <EdgeChip signedPp={finalPpFor(analysis)} pct={sidePct(analysis, analysis.recommended_side, finalPpFor(analysis))} shadow={SHADOW_DISPLAY.has(analysis.sport)} />
+              {(() => {
+                const pp = finalPpFor(analysis)
+                const isLeg = pp != null && pp < 2 && pp > -2
+                  && Math.max(analysis.calc_home_prob ?? 0, analysis.calc_away_prob ?? 0) >= 0.65
+                return <EdgeChip signedPp={pp} pct={isLeg ? legPct(analysis) : sidePct(analysis, analysis.recommended_side, pp)} leg={isLeg} shadow={SHADOW_DISPLAY.has(analysis.sport)} />
+              })()}
               {analysis.edge_movement && (
                 <span className="text-sm flex items-center gap-1 text-ink-300">
                   Movement: {edgeMovementIcon(analysis.edge_movement)}
@@ -784,7 +789,7 @@ function MarketRow({ sides, recommendedSide, shadow = false }) {
   )
 }
 
-function MarketTabs({ game, shadow = false }) {
+function MarketTabs({ game, shadow = false, legSide = null }) {
   const { edges, edges_raw: edgesRaw, recommended_side } = game
   // Calibration-muted: the raw model computed a real edge but the
   // calibrated value is exactly zero, meaning the market's multiplier is
@@ -845,7 +850,9 @@ function MarketTabs({ game, shadow = false }) {
       </div>
       <MarketRow
         sides={sidesByTab[activeTab] || []}
-        recommendedSide={recommended_side}
+        // A Leg is always the favorite (owner 2026-10-13), so on a Leg
+        // tile the ML arrow marks the favorite, not a sub 2% lean to the dog.
+        recommendedSide={legSide && activeTab === 'ml' ? legSide : recommended_side}
         shadow={shadow || isShadowMarket(game.sport, activeTab)}
       />
     </div>
@@ -982,13 +989,18 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
               </div>
             )}
           </div>
-          <EdgeChip
-            signedPp={signedPp}
-            pct={sidePct(game, game.recommended_side, signedPp)}
-            shadow={SHADOW_DISPLAY.has(sport)}
-            leg={signedPp != null && signedPp < 2 && signedPp > -2
-              && Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0) >= 0.65}
-          />
+          {(() => {
+            const isLeg = signedPp != null && signedPp < 2 && signedPp > -2
+              && Math.max(game.calc_home_prob ?? 0, game.calc_away_prob ?? 0) >= 0.65
+            return (
+              <EdgeChip
+                signedPp={signedPp}
+                pct={isLeg ? legPct(game) : sidePct(game, game.recommended_side, signedPp)}
+                shadow={SHADOW_DISPLAY.has(sport)}
+                leg={isLeg}
+              />
+            )
+          })()}
         </div>
 
         {/* Recommended read. A trap read (negative edge) must never render
@@ -1094,7 +1106,17 @@ function GameCard({ game, gameKey, sport, onDeepResearch }) {
 
         {/* Per-market tabs */}
         <div className="mb-3">
-          <MarketTabs game={game} shadow={SHADOW_DISPLAY.has(sport)} />
+          <MarketTabs
+            game={game}
+            shadow={SHADOW_DISPLAY.has(sport)}
+            legSide={(() => {
+              const pp = signedPp
+              const hp = game.calc_home_prob ?? 0
+              const ap = game.calc_away_prob ?? 0
+              if (pp == null || pp >= 2 || pp <= -2 || Math.max(hp, ap) < 0.65) return null
+              return hp >= ap ? 'home_ml' : 'away_ml'
+            })()}
+          />
         </div>
 
         {/* Analysis snippet (expandable) */}

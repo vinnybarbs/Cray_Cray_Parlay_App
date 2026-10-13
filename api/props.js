@@ -227,7 +227,8 @@ async function props(req, res) {
     const now = new Date();
     const recentFrom = new Date(now.getTime() - RECENT_DAYS * 24 * 3600 * 1000).toISOString();
     const liveFrom = new Date(now.getTime() - STARTED_WINDOW_HOURS * 3600 * 1000).toISOString();
-    const [upRes, recentRes, liveRes] = await Promise.all([
+    // Order matters: the names below bind by position.
+    const [upRes, liveRes, recentRes] = await Promise.all([
       supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
       supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gte('commence_time', liveFrom).lte('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
       supabase.from('prop_reads').select(COLS).gte('commence_time', recentFrom).lt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(1000),
