@@ -247,6 +247,23 @@ export function sidePct(game, side, signedPp) {
   return bookOurPct(signedPp, odds, game[keys[1]])
 }
 
+// A Leg tile is about the favorite, which is not always the recommended
+// side. The chip showed the underdog's 19% over a Sundell -550 leg (owner
+// 2026-10-13: "19% what?"). This prices the high probability side: ours is
+// the model's win chance, book is that side's no-vig moneyline.
+export function legPct(game) {
+  if (!game) return null
+  const home = Number(game.calc_home_prob ?? 0)
+  const away = Number(game.calc_away_prob ?? 0)
+  const isHome = home >= away
+  const prob = isHome ? home : away
+  if (!(prob > 0)) return null
+  const [own, other] = SIDE_PRICES[isHome ? 'home_ml' : 'away_ml']
+  const book = bookProb(game[own], game[other])
+  if (book == null) return null
+  return { book: Math.round(book * 100), ours: Math.round(prob * 100) }
+}
+
 // "Book 50%, us 61%" for tight spots, "Book says 50%, we say 61%" in prose.
 export function pctPair(p, long = false) {
   if (!p) return null
