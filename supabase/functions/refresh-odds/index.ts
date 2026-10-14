@@ -18,6 +18,24 @@ const EXTRA_SOCCER = [
   "soccer_france_ligue_one"
 ];
 const SOCCER_MARKETS = "h2h,totals";
+// Every soccer key, the six above plus EPL and MLS. All shadow, all
+// priced on h2h and totals only (spreads come back empty and the bulk
+// odds call bills per market requested).
+const SOCCER_SPORTS = ["soccer_epl", "soccer_usa_mls", ...EXTRA_SOCCER];
+
+// Credit budget (owner 2026-10-13: "we need to be at 20 mins on game day
+// but ... too frequent a day or days before a game"). The audit that day
+// found about 5,000 credits a day on a 100K month. A sport with a game
+// starting inside GAME_DAY_AHEAD_MS (or one that started inside
+// LIVE_BEHIND_MS) refreshes every run, every 20 minutes. Any other sport
+// refreshes only on the run at the top of every SLOW_EVERY_HOURS hour.
+// Soccer is shadow and never refreshes more than hourly. Hotness reads
+// the commence times already in odds_cache, so it costs no API call, and
+// a sport with nothing cached is cold (an off season key returns no
+// events, which is free, on its slow run).
+const GAME_DAY_AHEAD_MS = 18 * 3600 * 1000;
+const LIVE_BEHIND_MS = 4 * 3600 * 1000;
+const SLOW_EVERY_HOURS = 3;
 
 const TEAM_SPORTS = [
   "americanfootball_nfl",
@@ -71,7 +89,16 @@ const TENNIS_FALLBACK = [
   "tennis_wta_china_open"
 ];
 
-const PROP_SPORTS = ["americanfootball_nfl", "americanfootball_nfl_preseason", "basketball_nba", "basketball_ncaab"];
+// College basketball props came out 2026-10-13 (owner: "College
+// basketball shouldn't be calling player props"). Nothing reads them, and
+// in season they alone would have cost about 4,300 credits a day.
+const PROP_SPORTS = ["americanfootball_nfl", "americanfootball_nfl_preseason", "basketball_nba"];
+// Per event props bill per market per event, so they are the expensive
+// call. Only events starting inside PROPS_WINDOW_MS, and only on the slow
+// cadence runs: about two pulls per game. The NFL prop model reads
+// player_props from sync-nfl-props, not these rows. These feed the
+// on demand Player Props builder (api/suggest-picks.js).
+const PROPS_WINDOW_MS = 6 * 3600 * 1000;
 
 const CORE_MARKETS = "h2h,spreads,totals";
 
@@ -95,19 +122,13 @@ const PROP_MARKETS = {
     "player_threes",
     "player_steals",
     "player_blocks"
-  ],
-  basketball_ncaab: [
-    "player_points",
-    "player_rebounds",
-    "player_assists",
-    "player_threes"
   ]
 };
 
 // Expanded to 6 US-regulated books for cross-book line comparison (market_edge
-// in the fact sheet). The-odds-api bills per request, not per bookmaker, so
-// adding books does not increase API credit cost; it just returns richer payloads.
-// If a book key is invalid, the API silently omits it (no error).
+// in the fact sheet). Up to 10 bookmakers bill as one region, so these six
+// cost the same as one book. An 11th would double every call. If a book
+// key is invalid, the API silently omits it (no error).
 const BOOKMAKERS = "draftkings,fanduel,betmgm,caesars,betrivers,fanatics";
 const REGIONS = "us";
 const ODDS_FORMAT = "american";
@@ -315,13 +336,46 @@ async function refreshOdds(req: Request): Promise<Response> {
     const resolved = await resolveSports(oddsApiKey);
     console.log(`🎾 Tennis keys this run (${resolved.discovered ? "discovered" : "fallback"}): ${resolved.tennis.join(", ") || "none"}`);
 
-    // The run at minute 0 to 19 of the hour is the hourly one.
-    const hourlyRun = new Date().getUTCMinutes() < 20;
+    // The run at minute 0 to 19 of the hour is the hourly one, and the
+    // hourly run every SLOW_EVERY_HOURS hours is the slow cadence run.
+    const nowDate = new Date();
+    const hourlyRun = nowDate.getUTCMinutes() < 20;
+    const slowRun = hourlyRun && nowDate.getUTCHours() % SLOW_EVERY_HOURS === 0;
     const hourlySkipped: string[] = [];
+    const cadenceSkipped: string[] = [];
+
+    // Game day sports from the commence times already cached.
+    const hotSports = new Set<string>();
+    {
+      const from = new Date(Date.now() - LIVE_BEHIND_MS).toISOString();
+      const to = new Date(Date.now() + GAME_DAY_AHEAD_MS).toISOString();
+      // One tiny lookup per sport: a single query capped by the API row
+      // limit could miss a sport on a busy day and leave it on the slow
+      // cadence through its own games.
+      await Promise.all(resolved.sports.map(async (s) => {
+        const { data: soon, error: soonErr } = await supabase
+          .from("odds_cache")
+          .select("external_game_id")
+          .eq("sport", s)
+          .gte("commence_time", from)
+          .lte("commence_time", to)
+          .limit(1);
+        // Fail open: a failed lookup refreshes the sport rather than
+        // starve the board.
+        if (soonErr || (soon && soon.length > 0)) hotSports.add(s);
+      }));
+    }
+    console.log(`🔥 Game day sports: ${[...hotSports].join(", ") || "none"} (hourly ${hourlyRun}, slow ${slowRun})`);
 
     for (const sport of resolved.sports) {
-      if (EXTRA_SOCCER.includes(sport) && !hourlyRun) {
+      const isSoccer = SOCCER_SPORTS.includes(sport);
+      const hot = hotSports.has(sport);
+      if (isSoccer && !hourlyRun) {
         hourlySkipped.push(sport);
+        continue;
+      }
+      if (!hot && !slowRun) {
+        cadenceSkipped.push(sport);
         continue;
       }
       if (Date.now() - startTime > TIME_BUDGET_MS) {
@@ -332,7 +386,7 @@ async function refreshOdds(req: Request): Promise<Response> {
         const params = new URLSearchParams({
           apiKey: oddsApiKey,
           regions: REGIONS,
-          markets: EXTRA_SOCCER.includes(sport) ? SOCCER_MARKETS : CORE_MARKETS,
+          markets: isSoccer ? SOCCER_MARKETS : CORE_MARKETS,
           oddsFormat: ODDS_FORMAT,
           bookmakers: BOOKMAKERS
         });
@@ -376,10 +430,13 @@ async function refreshOdds(req: Request): Promise<Response> {
 
         // Swap this sport's rows only now that fresh data is in hand. A
         // fetch failure above leaves yesterday's rows serving the board.
+        // Player prop rows stay: they refresh on their own slower cadence
+        // below, and this delete used to wipe them every 20 minutes.
         const { error: deleteError } = await supabase
           .from("odds_cache")
           .delete()
-          .eq("sport", sport);
+          .eq("sport", sport)
+          .not("market_type", "like", "player_%");
         if (deleteError) {
           console.error(`⚠️ Error clearing ${sport}, keeping old rows:`, deleteError);
           continue;
@@ -403,19 +460,32 @@ async function refreshOdds(req: Request): Promise<Response> {
       console.log(`⏱️ Time budget hit, sports carried to next run: ${skippedForTime.join(", ")}`);
     }
 
-    // Player props: hard-capped inline walk. The dedicated sync crons own
-    // props at scale; this pass only freshens events inside 48 hours, at
-    // most 15 per sport, so 991 preseason NFL events can never eat the
-    // run the way the uncapped loop did.
-    console.log("🎯 Fetching capped player props...");
-    const PROPS_WINDOW_MS = 48 * 3600 * 1000;
+    // Player props: hard-capped inline walk, slow cadence runs only. The
+    // dedicated sync crons own props at scale; this pass only freshens
+    // events inside PROPS_WINDOW_MS that have not started, at most 15 per
+    // sport. Prop rows for games that started over 6 hours ago are
+    // cleared here, since the core swap no longer deletes them.
     const PROPS_MAX_EVENTS = 15;
+    let propEvents = 0;
+    {
+      const { error: oldPropErr } = await supabase
+        .from("odds_cache")
+        .delete()
+        .like("market_type", "player_%")
+        .lt("commence_time", new Date(Date.now() - 6 * 3600 * 1000).toISOString());
+      if (oldPropErr) console.log("⚠️ Old prop cleanup failed:", oldPropErr.message);
+    }
+    if (slowRun) console.log("🎯 Fetching capped player props...");
 
-    for (const sport of PROP_SPORTS) {
+    for (const sport of (slowRun ? PROP_SPORTS : [])) {
       if (Date.now() - startTime > TIME_BUDGET_MS) break;
       const games = (coreGames[sport] || [])
-        .filter(g => new Date(g.commence_time).getTime() - Date.now() < PROPS_WINDOW_MS)
+        .filter(g => {
+          const until = new Date(g.commence_time).getTime() - Date.now();
+          return until > 0 && until < PROPS_WINDOW_MS;
+        })
         .slice(0, PROPS_MAX_EVENTS);
+      propEvents += games.length;
       const propList = PROP_MARKETS[sport as keyof typeof PROP_MARKETS];
       if (!propList || propList.length === 0) continue;
 
@@ -500,7 +570,11 @@ async function refreshOdds(req: Request): Promise<Response> {
     // Directive 14: a run that fetched games but wrote nothing is partial,
     // never completed. Cron status alone is not proof of ingestion.
     try {
-      const status = (totalGames > 0 && totalOddsInserted === 0) || totalGames === 0 || failedSports.length > 0
+      // A run that fetched no sport at all (nothing on game day between
+      // slow runs) is a healthy skip, not a starved feed.
+      const fetchedSports = Object.keys(perSport).length;
+      const status = (totalGames > 0 && totalOddsInserted === 0)
+        || (fetchedSports > 0 && totalGames === 0) || failedSports.length > 0
         ? "partial" : "completed";
       await supabase.from("cron_job_logs").insert({
         job_name: "refresh-odds-hourly",
@@ -508,7 +582,9 @@ async function refreshOdds(req: Request): Promise<Response> {
         details: JSON.stringify({
           games: totalGames, rows: totalOddsInserted, per_sport: perSport, failed_sports: failedSports,
           tennis_keys: resolved.tennis, tennis_discovered: resolved.discovered,
-          skipped_for_time: skippedForTime, hourly_skipped: hourlySkipped, duration_ms: duration
+          skipped_for_time: skippedForTime, hourly_skipped: hourlySkipped,
+          cadence_skipped: cadenceSkipped, game_day_sports: [...hotSports], slow_run: slowRun,
+          prop_events: propEvents, duration_ms: duration
         })
       });
     } catch (e) {
