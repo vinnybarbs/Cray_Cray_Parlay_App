@@ -68,6 +68,15 @@ describe('historical odds helpers', () => {
       .rejects.toThrow(/apiKey=\*\*\*/);
   });
 
+  test('rowsFromSnapshot keeps one row per game, book and market when the snapshot repeats one', () => {
+    const game = { id: 'a', commence_time: '2025-02-11T20:00:00Z', home_team: 'H', away_team: 'A',
+      bookmakers: [{ key: 'fanduel', markets: [{ key: 'h2h', outcomes: [{ name: 'H', price: 120 }] }] }] };
+    const later = { ...game, bookmakers: [{ key: 'fanduel', markets: [{ key: 'h2h', outcomes: [{ name: 'H', price: 125 }] }] }] };
+    const rows = h.rowsFromSnapshot('soccer_uefa_champs_league', { data: [game, later] }, '2025-02-11T20:00:00Z');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].outcomes[0].price).toBe(125);
+  });
+
   test('isPropMarkets is true only when every market is a player prop', () => {
     expect(h.isPropMarkets('player_receptions,player_pass_tds')).toBe(true);
     expect(h.isPropMarkets('h2h,totals')).toBe(false);

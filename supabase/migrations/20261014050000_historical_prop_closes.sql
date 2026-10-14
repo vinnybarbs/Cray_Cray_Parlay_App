@@ -101,3 +101,10 @@ select 'americanfootball_nfl', m::date, (m + interval '1 month')::date,
 from generate_series(date '2023-09-01', date '2026-10-01', interval '1 month') m
 where extract(month from m) in (9, 10, 11, 12, 1, 2)
 on conflict do nothing;
+
+-- The UCL February 2025 window failed on a snapshot that listed one game
+-- twice (the upsert batch touched a row twice). rowsFromSnapshot now keys
+-- rows by the primary key, so that window goes back in the queue.
+update public.historical_odds_jobs
+set status = 'pending', error = null, done_at = null
+where status = 'failed' and error like '%cannot affect row a second time%';
