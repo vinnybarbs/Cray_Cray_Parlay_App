@@ -200,23 +200,32 @@ async function runModelFeed() {
     .limit(FEED_LIMIT);
   if (dErr) throw dErr;
 
-  const embeds = [
-    ...(changes || []).map(formatWeightChange),
-    ...(directives || []).map(d => formatDirective(d, new Date(d.created_at) > new Date(sinceDirectives))),
-  ];
+  // Dial moves and directives post to their own private channels (owner
+  // 2026-10-14: not every dial move in one channel). Each cursor advances
+  // only after its own post lands, so a missing webhook or an outage
+  // replays those rows next hour instead of losing them.
+  const dialEmbeds = (changes || []).map(formatWeightChange);
+  const directiveEmbeds = (directives || []).map(d => formatDirective(d, new Date(d.created_at) > new Date(sinceDirectives)));
+  const embeds = [...dialEmbeds, ...directiveEmbeds];
 
-  let result = { sent: false, reason: 'nothing new' };
-  if (embeds.length) result = await sendDiscordEmbeds(embeds, 'model');
+  const nothing = { sent: false, reason: 'nothing new' };
+  const dialResult = dialEmbeds.length ? await sendDiscordEmbeds(dialEmbeds, 'dials') : nothing;
+  const directiveResult = directiveEmbeds.length ? await sendDiscordEmbeds(directiveEmbeds, 'directives') : nothing;
 
-  // Advance the cursor only after a real post, so a missing webhook or an
-  // outage replays the rows next hour instead of losing them.
-  if (embeds.length && result.sent) {
-    if (changes?.length) await writeCursor('weight_changes', maxStamp(changes, ['changed_at']) || changes[changes.length - 1].changed_at);
-    if (directives?.length) {
-      const last = maxStamp(directives, ['created_at', 'updated_at']);
-      if (last) await writeCursor('directives', last);
-    }
+  if (dialEmbeds.length && dialResult.sent) {
+    await writeCursor('weight_changes', maxStamp(changes, ['changed_at']) || changes[changes.length - 1].changed_at);
   }
+  if (directiveEmbeds.length && directiveResult.sent) {
+    const last = maxStamp(directives, ['created_at', 'updated_at']);
+    if (last) await writeCursor('directives', last);
+  }
+  const posted = [dialEmbeds.length ? dialResult : null, directiveEmbeds.length ? directiveResult : null].filter(Boolean);
+  const result = {
+    sent: posted.length > 0 && posted.every(r => r.sent),
+    channel: posted.map(r => r.channel).filter(Boolean).join(',') || null,
+    fallback: posted.some(r => r.fallback),
+    reason: posted.map(r => r.reason).filter(Boolean).join('; ') || (posted.length ? null : 'nothing new'),
+  };
 
   await supabase.from('cron_job_logs').insert({
     job_name: 'discord-model-feed',
@@ -246,7 +255,7 @@ async function runDialBoard() {
   if (err) throw err;
   const weekLabel = `week of ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Denver', month: 'short', day: 'numeric' })}`;
   const embed = formatDialBoard({ multipliers: multRes.data || [], changes: chRes.data || [], bucketTargets: tgtRes.data || [], publishDials: pubRes.data || [], weekLabel });
-  const result = await sendDiscordEmbeds([embed], 'model');
+  const result = await sendDiscordEmbeds([embed], 'dials');
   await supabase.from('cron_job_logs').insert({
     job_name: 'discord-dial-board',
     status: result.sent ? 'completed' : 'skipped',
