@@ -5,15 +5,15 @@ import Auth from '../components/Auth'
 import { useAuth } from '../contexts/AuthContext'
 import { apiFetch } from '../lib/api'
 
-// Account and Pro (owner 2026-10-14): one plan. Launch members pay
-// $9.99 a month and keep that price for life. Stripe hosts checkout and
+// Account and Pro (owner 2026-10-14): one plan. Founding members pay
+// $9.99 a month and keep that price while they stay subscribed. Stripe hosts checkout and
 // the billing portal, so no card field lives on this page.
 export const LAUNCH_PRICE = '$9.99'
 export const LAUNCH_ANNUAL = '$89'
 export const STANDARD_PRICE = '$19.99'
 const STANDARD_ANNUAL = '$119.99'
 
-const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null)
+const fmtDate = (iso) => (iso && iso !== 'infinity' ? new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null)
 
 function useBillingStatus(isAuthenticated, poll) {
   const [status, setStatus] = useState(null)
@@ -57,6 +57,48 @@ async function goTo(path, setBusy, setError, body = null) {
   }
 }
 
+// Owner promo codes: free Pro for friends who will spread the word.
+function PromoCode({ onDone }) {
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+  async function submit(e) {
+    e.preventDefault()
+    if (!code.trim()) return
+    setBusy(true)
+    setMsg(null)
+    try {
+      const r = await apiFetch('/api/billing/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code.trim() }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(d.error || 'That code does not work.')
+      setMsg({ ok: true, text: d.until === 'infinity' ? 'Done. You have Pro free, for good.' : `Done. You have Pro free until ${fmtDate(d.until)}.` })
+      setTimeout(onDone, 1500)
+    } catch (err) {
+      setMsg({ ok: false, text: err.message })
+      setBusy(false)
+    }
+  }
+  return (
+    <form onSubmit={submit} className="bg-ink-900 rounded-2xl border border-ink-700 p-4 flex flex-col gap-3">
+      <label htmlFor="promo" className="text-sm text-ink-300">Have a code?</label>
+      <div className="flex gap-2">
+        <input
+          id="promo"
+          value={code}
+          onChange={e => setCode(e.target.value.toUpperCase())}
+          autoCapitalize="characters"
+          autoComplete="off"
+          maxLength={40}
+          placeholder="CODE"
+          className="flex-1 min-w-0 px-4 py-3 rounded-xl bg-ink-950 border border-ink-700 text-ink-100 tracking-wider focus:outline-none focus:border-signal-pos"
+        />
+        <button type="submit" disabled={busy || !code.trim()} className="px-5 py-3 rounded-xl bg-ink-800 text-ink-100 font-semibold hover:bg-ink-700 disabled:opacity-60 transition">Apply</button>
+      </div>
+      {msg && <p className={`text-sm ${msg.ok ? 'text-signal-pos' : 'text-signal-neg'}`}>{msg.text}</p>}
+    </form>
+  )
+}
+
 export default function Account() {
   const navigate = useNavigate()
   const { search } = useLocation()
@@ -70,6 +112,7 @@ export default function Account() {
 
   const access = status?.access
   const subscribed = access?.reason === 'subscribed'
+  const comped = access?.reason === 'comp'
   const launchOffer = status?.offer === 'launch'
   const yearly = period === 'year' && status?.yearlyReady
   const price = yearly ? (launchOffer ? LAUNCH_ANNUAL : STANDARD_ANNUAL) : (launchOffer ? LAUNCH_PRICE : STANDARD_PRICE)
@@ -114,7 +157,7 @@ export default function Account() {
             {subscribed && (
               <>
                 <p className="text-ink-200">
-                  You are on Pro{status.launchMember ? ` at the founding price, locked in for life` : ''}.
+                  You are on Pro{status.launchMember ? ', at the founding price for as long as you stay subscribed' : ''}.
                 </p>
                 {access.until && (
                   <p className="text-sm text-ink-400">
@@ -130,9 +173,17 @@ export default function Account() {
               </>
             )}
 
-            {access?.reason === 'comp' && <p className="text-ink-200">You have Pro on the house until {fmtDate(access.until)}.</p>}
+            {comped && (
+              <p className="text-ink-200">
+                {access.until === 'infinity' ? 'You have Pro free, for good.' : `You have Pro free until ${fmtDate(access.until)}.`}
+              </p>
+            )}
 
-            {!subscribed && (
+            {!subscribed && !comped && !status.paywall && (
+              <p className="text-ink-200">Everything on TrapHawk is free right now. No card, nothing to do.</p>
+            )}
+
+            {!subscribed && !comped && status.paywall && (
               <>
                 {access?.reason === 'trial' && <p className="text-ink-200">Your free week runs until {fmtDate(access.until)}.</p>}
                 {access && !access.entitled && <p className="text-ink-200">Your free week is over. The ledger, every Lean and every trap stay free.</p>}
@@ -150,7 +201,7 @@ export default function Account() {
                   <p><span className="text-4xl font-bold tabular-nums">{price}</span><span className="text-ink-400"> {per}</span></p>
                   {launchOffer && (
                     <p className="mt-1 text-sm text-signal-pos">
-                      Founding price, yours for as long as you stay.
+                      Founding price, yours for as long as you stay subscribed.
                       {status.launchEnds ? ` Open until ${fmtDate(new Date(new Date(status.launchEnds).getTime() - 1).toISOString())}.` : ''}
                       {status.launchSeatsLeft != null && status.launchSeatsLeft <= 50 ? ` ${status.launchSeatsLeft} launch spots left.` : ''}
                     </p>
@@ -169,6 +220,10 @@ export default function Account() {
             )}
             {error && <p className="text-sm text-signal-neg">{error}</p>}
           </div>
+        )}
+
+        {isAuthenticated && status && !subscribed && access?.until !== 'infinity' && (
+          <PromoCode onDone={() => window.location.reload()} />
         )}
 
         <button onClick={() => navigate('/today')} className="text-sm font-semibold text-signal-pos hover:underline self-center">Back to Today</button>

@@ -7,6 +7,7 @@
 //   GET  /api/billing/status    access, plan and whether launch seats remain
 //   POST /api/billing/checkout  { interval: month or year }, answers { url }
 //   POST /api/billing/portal    { url } of the Stripe customer portal
+//   POST /api/billing/redeem    { code }, free Pro from an owner promo code
 //   POST /api/stripe/webhook    raw body, signature checked
 
 const billing = require('../lib/services/billing.js');
@@ -144,4 +145,42 @@ async function webhook(req, res) {
   }
 }
 
-module.exports = { status, checkout, portal, webhook };
+// Promo codes are guessable only by trying, so each user gets a handful
+// of attempts an hour.
+const REDEEM_LIMIT = 10;
+const redeemTries = new Map();
+
+const REDEEM_MESSAGES = {
+  invalid: 'That code does not work.',
+  expired: 'That code has expired.',
+  used_up: 'That code has been used up.',
+};
+
+async function redeem(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  const supabase = billing.getSupabase();
+  if (!supabase) return res.status(500).json({ error: 'Supabase not configured' });
+  try {
+    const viewer = await requireViewer(req, res);
+    if (!viewer) return;
+    const code = String((req.body && req.body.code) || '').trim();
+    if (code.length < 3 || code.length > 40) return res.status(400).json({ error: REDEEM_MESSAGES.invalid });
+    const now = Date.now();
+    const tries = (redeemTries.get(viewer.user.id) || []).filter(t => t > now - 3600e3);
+    if (tries.length >= REDEEM_LIMIT) return res.status(429).json({ error: 'Too many tries, wait an hour.' });
+    redeemTries.set(viewer.user.id, [...tries, now]);
+
+    const { data, error } = await supabase.rpc('redeem_promo_code', { p_code: code, p_user: viewer.user.id, p_email: viewer.user.email || null });
+    if (error) throw error;
+    const row = Array.isArray(data) ? data[0] : data;
+    const result = row && row.out_result;
+    if (result !== 'ok' && result !== 'already') return res.status(400).json({ error: REDEEM_MESSAGES[result] || REDEEM_MESSAGES.invalid });
+    forgetViewers();
+    res.json({ ok: true, already: result === 'already', until: row.out_until });
+  } catch (err) {
+    logger.error('Promo redeem failed', { error: err.message });
+    res.status(500).json({ error: 'Could not apply the code, try again' });
+  }
+}
+
+module.exports = { status, checkout, portal, webhook, redeem };

@@ -82,6 +82,9 @@ describe('entitlementFor', () => {
       expect(billing.entitlementFor(old, { status }, NOW)).toMatchObject({ entitled: false, reason: status });
     }
   });
+  test('a forever comp', () => {
+    expect(billing.entitlementFor(old, { status: 'none', comp_until: 'infinity' }, NOW)).toMatchObject({ entitled: true, reason: 'comp' });
+  });
   test('comp grant until a date', () => {
     expect(billing.entitlementFor(old, { status: 'none', comp_until: '2026-12-31T00:00:00Z' }, NOW).reason).toBe('comp');
     expect(billing.entitlementFor(old, { status: 'none', comp_until: '2026-10-01T00:00:00Z' }, NOW).entitled).toBe(false);
@@ -99,8 +102,13 @@ describe('subscriptionPatch', () => {
     expect(p).toMatchObject({ stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_1', status: 'active', plan: 'launch', launch_member: true });
     expect(p.current_period_end).toBe(new Date(1793000000 * 1000).toISOString());
   });
-  test('a cancel never clears launch_member', () => {
-    expect(billing.subscriptionPatch(sub({ status: 'canceled' }), ENV)).not.toHaveProperty('launch_member');
+  test('the founding price lapses once the subscription ends', () => {
+    for (const status of ['canceled', 'unpaid', 'incomplete_expired']) {
+      expect(billing.subscriptionPatch(sub({ status }), ENV).launch_member).toBe(false);
+    }
+  });
+  test('a cancel at period end keeps the founding price until then', () => {
+    expect(billing.subscriptionPatch(sub({ cancel_at_period_end: true }), ENV)).toMatchObject({ launch_member: true, cancel_at_period_end: true });
   });
   test('an incomplete checkout is not a launch seat', () => {
     expect(billing.subscriptionPatch(sub({ status: 'incomplete' }), ENV)).not.toHaveProperty('launch_member');

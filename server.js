@@ -139,6 +139,7 @@ app.get('/api/board-history', boardHistory);
 app.get('/api/billing/status', billingApi.status);
 app.post('/api/billing/checkout', billingApi.checkout);
 app.post('/api/billing/portal', billingApi.portal);
+app.post('/api/billing/redeem', billingApi.redeem);
 const houseParlaysApi = require('./api/house-parlays');
 app.get('/api/house-parlays', houseParlaysApi);
 

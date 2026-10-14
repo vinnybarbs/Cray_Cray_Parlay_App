@@ -218,13 +218,13 @@ function Pricing({ onStartTrial }) {
       <div className="max-w-5xl mx-auto px-4 py-14 md:py-20 grid md:grid-cols-2 gap-8 items-center">
         <div>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">One plan. Try it free.</h2>
-          <p className="mt-3 text-ink-300">Pay nothing for 7 days, no card needed. Join at launch and your price never goes up. Cancel anytime yourself.</p>
+          <p className="mt-3 text-ink-300">Pay nothing for 7 days, no card needed. Join at launch and your price never goes up while you stay subscribed. Cancel anytime yourself.</p>
           <p className="mt-3 text-sm text-ink-400">The ledger, every Lean and every trap stay free forever.</p>
         </div>
         <div className="bg-ink-900 rounded-2xl border border-ink-700 p-6">
           <p className="text-ink-300">TrapHawk Pro</p>
           <p className="mt-1"><span className="text-4xl font-bold tabular-nums">{LAUNCH_PRICE}</span><span className="text-ink-400"> a month</span></p>
-          <p className="mt-1 text-sm text-signal-pos">Founding price, locked in for life, or {LAUNCH_ANNUAL} a year. {STANDARD_PRICE} a month for new members after November 30.</p>
+          <p className="mt-1 text-sm text-signal-pos">Founding price, or {LAUNCH_ANNUAL} a year, kept as long as you stay subscribed. {STANDARD_PRICE} a month for new members after November 30.</p>
           <ul className="mt-5 flex flex-col gap-2.5">
             {included.map(f => (
               <li key={f} className="flex gap-2.5 text-sm text-ink-200">
