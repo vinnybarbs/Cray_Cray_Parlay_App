@@ -94,11 +94,13 @@ const TENNIS_FALLBACK = [
 // in season they alone would have cost about 4,300 credits a day.
 const PROP_SPORTS = ["americanfootball_nfl", "americanfootball_nfl_preseason", "basketball_nba"];
 // Per event props bill per market per event, so they are the expensive
-// call. Only events starting inside PROPS_WINDOW_MS, and only on the slow
-// cadence runs: about two pulls per game. The NFL prop model reads
-// player_props from sync-nfl-props, not these rows. These feed the
-// on demand Player Props builder (api/suggest-picks.js).
-const PROPS_WINDOW_MS = 6 * 3600 * 1000;
+// call. Owner 2026-10-13: "the day of the game player props should be
+// pulled for movement every 20 mins". A game inside PROPS_LIVE_MS gets
+// props every run (every 20 minutes). A game later that day (inside
+// GAME_DAY_AHEAD_MS) gets them on the slow 3 hour runs. The NFL prop
+// model reads player_props from sync-nfl-props, not these rows. These
+// feed the on demand Player Props builder (api/suggest-picks.js).
+const PROPS_LIVE_MS = 3 * 3600 * 1000;
 
 const CORE_MARKETS = "h2h,spreads,totals";
 
@@ -460,10 +462,10 @@ async function refreshOdds(req: Request): Promise<Response> {
       console.log(`⏱️ Time budget hit, sports carried to next run: ${skippedForTime.join(", ")}`);
     }
 
-    // Player props: hard-capped inline walk, slow cadence runs only. The
-    // dedicated sync crons own props at scale; this pass only freshens
-    // events inside PROPS_WINDOW_MS that have not started, at most 15 per
-    // sport. Prop rows for games that started over 6 hours ago are
+    // Player props: hard-capped inline walk. The dedicated sync crons own
+    // props at scale; this pass only freshens game day events that have
+    // not started (every run inside PROPS_LIVE_MS, slow runs out to
+    // GAME_DAY_AHEAD_MS), at most 15 per sport. Prop rows for games that started over 6 hours ago are
     // cleared here, since the core swap no longer deletes them.
     const PROPS_MAX_EVENTS = 15;
     let propEvents = 0;
@@ -475,14 +477,14 @@ async function refreshOdds(req: Request): Promise<Response> {
         .lt("commence_time", new Date(Date.now() - 6 * 3600 * 1000).toISOString());
       if (oldPropErr) console.log("⚠️ Old prop cleanup failed:", oldPropErr.message);
     }
-    if (slowRun) console.log("🎯 Fetching capped player props...");
+    console.log("🎯 Fetching capped player props...");
 
-    for (const sport of (slowRun ? PROP_SPORTS : [])) {
+    for (const sport of PROP_SPORTS) {
       if (Date.now() - startTime > TIME_BUDGET_MS) break;
       const games = (coreGames[sport] || [])
         .filter(g => {
           const until = new Date(g.commence_time).getTime() - Date.now();
-          return until > 0 && until < PROPS_WINDOW_MS;
+          return until > 0 && until < (slowRun ? GAME_DAY_AHEAD_MS : PROPS_LIVE_MS);
         })
         .slice(0, PROPS_MAX_EVENTS);
       propEvents += games.length;
