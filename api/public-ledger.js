@@ -130,7 +130,7 @@ async function getPublicLedger(req, res) {
         .like('session_id', 'auto_digest%')
         .is('voided_at', null)
         .eq('actual_outcome', 'pending')
-        .not('sport', 'in', '("EPL","MLS","Soccer","World Cup","Champions League","Copa America","Euros")')
+        .not('sport', 'in', '("EPL","MLS","Soccer","World Cup","Champions League","Europa League","La Liga","Serie A","Bundesliga","Ligue 1","Copa America","Euros")')
         .gt('game_date', new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString())
         .order('game_date', { ascending: true })
         .limit(100);
@@ -146,7 +146,7 @@ async function getPublicLedger(req, res) {
     // scrapped pre-launch (2026-07-12). Its rows stay in the database but
     // appear nowhere on the site. Soccer returns as v2 with a real
     // three-way model.
-    const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+    const SOCCER_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Copa America', 'Euros']);
     // Dedupe picks, traps, and legs SEPARATELY. All three publish
     // independently (same game can carry all three), so a game-level
     // dedupe would drop whichever rows revised earlier. Mirrors

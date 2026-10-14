@@ -110,7 +110,7 @@ function formatMorningBoard(rows, dateLabel, gimmes = []) {
 }
 
 // Shadow sports never reach the record, so they never reach this list.
-const NON_PUBLISHED_SPORTS = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+const NON_PUBLISHED_SPORTS = new Set(['NFL', 'NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Copa America', 'Euros']);
 
 function fairImplied(ml) {
   const n = Number(ml);

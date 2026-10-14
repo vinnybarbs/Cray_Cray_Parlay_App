@@ -16,7 +16,7 @@
 // Since 2026-09-13 this set is only the FALLBACK: publication is per
 // sport and market on the dial board and reaches the client as
 // publishMarkets on /api/digest (src/lib/publish-flags.js).
-export const SHADOW_SPORTS = new Set(['NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros'])
+export const SHADOW_SPORTS = new Set(['NCAAF', 'EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Copa America', 'Euros'])
 
 // Strong Play restored 2026-08-16 at 7-10pp (owner decision: 7pp is the
 // betting floor, so that band earns its own label). It was merged into

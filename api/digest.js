@@ -30,6 +30,12 @@ const SPORT_SLUG_TO_DISPLAY = {
   icehockey_nhl: 'NHL',
   soccer_epl: 'EPL',
   soccer_usa_mls: 'MLS',
+  soccer_uefa_champs_league: 'Champions League',
+  soccer_uefa_europa_league: 'Europa League',
+  soccer_spain_la_liga: 'La Liga',
+  soccer_italy_serie_a: 'Serie A',
+  soccer_germany_bundesliga: 'Bundesliga',
+  soccer_france_ligue_one: 'Ligue 1',
 };
 
 // The published pick row (headline) and the spotlight (alt market) rows
@@ -411,6 +417,7 @@ async function getDigest(req, res) {
           : g.sport === 'soccer_fifa_world_cup' ? 'World Cup'
           : g.sport === 'soccer_epl' ? 'EPL'
           : g.sport === 'soccer_usa_mls' ? 'MLS'
+          : SPORT_SLUG_TO_DISPLAY[g.sport] ? SPORT_SLUG_TO_DISPLAY[g.sport]
           : g.sport === 'baseball_mlb' ? 'MLB'
           : g.sport === 'basketball_nba' ? 'NBA'
           : g.sport === 'basketball_ncaab' ? 'NCAAB'

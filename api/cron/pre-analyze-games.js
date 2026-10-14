@@ -87,6 +87,11 @@ const SLUG_TO_SPORT = {
   soccer_fifa_world_cup: 'World Cup',
   soccer_fifa_world_cup_womens: 'World Cup',
   soccer_uefa_champs_league: 'Champions League',
+  soccer_uefa_europa_league: 'Europa League',
+  soccer_spain_la_liga: 'La Liga',
+  soccer_italy_serie_a: 'Serie A',
+  soccer_germany_bundesliga: 'Bundesliga',
+  soccer_france_ligue_one: 'Ligue 1',
   soccer_conmebol_copa_america: 'Copa America',
   soccer_uefa_european_championship: 'Euros',
   mma_mixed_martial_arts: 'UFC'
@@ -124,7 +129,7 @@ const SLUG_TO_SPORT = {
 // flat 0 until the shadow record clears break even (preseason totals
 // ran 37.5 percent). NCAAF remains shadowed while the program strength
 // prior accrues attribution.
-const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros', 'NCAAF']);
+const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Copa America', 'Euros', 'NCAAF']);
 // THE TENNIS LONGSHOT FENCE (directive 4). +251 from 2026-09-01; +111
 // from 2026-09-13: the 30 day published record split favorites 27-8
 // +5.2u against dogs at +111 or longer 12-33 -10.4u (26.7 percent at
@@ -135,7 +140,7 @@ const SHADOW_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions L
 const TENNIS_LONGSHOT_FENCE = 111;
 // Model routing for the three-way soccer family only. SHADOW_SPORTS
 // answers "does it publish"; this set answers "which model prices it".
-const SOCCER_1X2_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Copa America', 'Euros']);
+const SOCCER_1X2_SPORTS = new Set(['EPL', 'MLS', 'Soccer', 'World Cup', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Copa America', 'Euros']);
 
 // ATP slams are best of five. Everything else, including all WTA events,
 // is best of three. The tennis model prices the reliability gap between
@@ -1205,6 +1210,7 @@ const SPORT_GROUPS = {
   'tennis': ['tennis_%'],
   'soccer': ['soccer_%'],
   'worldcup': ['soccer_fifa_world_cup'],
+  'europe': ['soccer_uefa_champs_league', 'soccer_uefa_europa_league', 'soccer_spain_la_liga', 'soccer_italy_serie_a', 'soccer_germany_bundesliga', 'soccer_france_ligue_one'],
   'nfl': ['americanfootball_nfl', 'americanfootball_nfl_preseason'],
   'ncaaf': ['americanfootball_ncaaf'],
   'football': ['americanfootball_nfl', 'americanfootball_nfl_preseason', 'americanfootball_ncaaf'],

@@ -3,6 +3,22 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 // @ts-ignore - Deno imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+// The big European competitions (owner 2026-10-13: "wire up all major
+// soccer leagues"). Shadow sports like EPL and MLS. They refresh at the
+// top of the hour only, on h2h and totals (soccer spreads never come back
+// from the US books), so the six cost at most 2 credits each per hour on a
+// 100K monthly plan. An hourly quote still clears the 90 minute closing
+// line fence.
+const EXTRA_SOCCER = [
+  "soccer_uefa_champs_league",
+  "soccer_uefa_europa_league",
+  "soccer_spain_la_liga",
+  "soccer_italy_serie_a",
+  "soccer_germany_bundesliga",
+  "soccer_france_ligue_one"
+];
+const SOCCER_MARKETS = "h2h,totals";
+
 const TEAM_SPORTS = [
   "americanfootball_nfl",
   // Preseason NFL is a SEPARATE sport key on The Odds API. Without it the
@@ -17,7 +33,8 @@ const TEAM_SPORTS = [
   "baseball_mlb",
   "soccer_epl",
   "soccer_usa_mls",
-  "mma_mixed_martial_arts"
+  "mma_mixed_martial_arts",
+  ...EXTRA_SOCCER
 ];
 // Tennis tournament keys rotate weekly and only return data in season. A
 // hand list went dark twice (2026-07-12 after Wimbledon, 2026-09-13 after
@@ -298,7 +315,15 @@ async function refreshOdds(req: Request): Promise<Response> {
     const resolved = await resolveSports(oddsApiKey);
     console.log(`🎾 Tennis keys this run (${resolved.discovered ? "discovered" : "fallback"}): ${resolved.tennis.join(", ") || "none"}`);
 
+    // The run at minute 0 to 19 of the hour is the hourly one.
+    const hourlyRun = new Date().getUTCMinutes() < 20;
+    const hourlySkipped: string[] = [];
+
     for (const sport of resolved.sports) {
+      if (EXTRA_SOCCER.includes(sport) && !hourlyRun) {
+        hourlySkipped.push(sport);
+        continue;
+      }
       if (Date.now() - startTime > TIME_BUDGET_MS) {
         skippedForTime.push(sport);
         continue;
@@ -307,7 +332,7 @@ async function refreshOdds(req: Request): Promise<Response> {
         const params = new URLSearchParams({
           apiKey: oddsApiKey,
           regions: REGIONS,
-          markets: CORE_MARKETS,
+          markets: EXTRA_SOCCER.includes(sport) ? SOCCER_MARKETS : CORE_MARKETS,
           oddsFormat: ODDS_FORMAT,
           bookmakers: BOOKMAKERS
         });
@@ -483,7 +508,7 @@ async function refreshOdds(req: Request): Promise<Response> {
         details: JSON.stringify({
           games: totalGames, rows: totalOddsInserted, per_sport: perSport, failed_sports: failedSports,
           tennis_keys: resolved.tennis, tennis_discovered: resolved.discovered,
-          skipped_for_time: skippedForTime, duration_ms: duration
+          skipped_for_time: skippedForTime, hourly_skipped: hourlySkipped, duration_ms: duration
         })
       });
     } catch (e) {

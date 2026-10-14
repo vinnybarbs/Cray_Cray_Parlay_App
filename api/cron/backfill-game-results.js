@@ -19,7 +19,25 @@ const SPORT_PATHS = {
   MLB: 'baseball/mlb',
   EPL: 'soccer/eng.1',
   MLS: 'soccer/usa.1',
+  UCL: 'soccer/uefa.champions',
+  UEL: 'soccer/uefa.europa',
+  LALIGA: 'soccer/esp.1',
+  SERIEA: 'soccer/ita.1',
+  BUNDESLIGA: 'soccer/ger.1',
+  LIGUE1: 'soccer/fra.1',
   UFC: 'mma/ufc'
+};
+
+// The query param is upper case with no spaces, so the European leagues
+// take a short code there and store under the display sport that
+// game_analysis carries (the shadow grader joins on it).
+const STORED_SPORT = {
+  UCL: 'Champions League',
+  UEL: 'Europa League',
+  LALIGA: 'La Liga',
+  SERIEA: 'Serie A',
+  BUNDESLIGA: 'Bundesliga',
+  LIGUE1: 'Ligue 1'
 };
 
 function sleep(ms) {
@@ -90,7 +108,7 @@ async function fetchScoreboard(sport, sportPath, dateStr, errors = []) {
       games.push({
         espn_event_id: event.id,
         game_id: parseInt(event.id, 10) || Math.floor(Math.random() * 900000000) + 100000000,
-        sport,
+        sport: STORED_SPORT[sport] || sport,
         season,
         date: dateOnly,
         home_team_id: home.team.id ? parseInt(home.team.id, 10) : null,
