@@ -21,6 +21,7 @@ const { getStartingGoaliesText } = require('../../lib/services/nhl-goalies.js');
 const bandCalibration = require('../../lib/services/band-calibration.js');
 const ufcModel = require('../../lib/services/edge-models/ufc-model.js');
 const soccer1x2 = require('../../lib/services/edge-models/soccer-1x2.js');
+const soccerStrengths = require('../../lib/services/soccer-strengths.js');
 const trapDetector = require('../../lib/services/trap-detector.js');
 const { runRuleGates } = require('../../lib/services/rule-gates.js');
 const { applyExposureGuard } = require('../../lib/services/exposure-guard.js');
@@ -1503,10 +1504,17 @@ async function runPreAnalysis(sportSlugs) {
             // to seed go-live k from. Model routing and publication
             // shadowing are different questions; football belongs to the
             // core team calculator below, shadow or not.
+            // Goal model (2026-10-14): club ratings from fit-soccer-strengths.
+            // goal_model_weight is 0 on every soccer sport, so the model's
+            // probabilities are recorded in edge_factors and move no claim.
+            const goal = soccerStrengths.goalInputsFor(
+              await soccerStrengths.loadCurrent(supabase), sportDisplay, game.home_team, game.away_team);
             edgeData = soccer1x2.calculateSoccer1x2Edges({
               homeTeam: game.home_team,
               awayTeam: game.away_team,
-              books: soccer1x2.fromOddsCacheRows(game.h2hRows || [], game.home_team, game.away_team)
+              books: soccer1x2.fromOddsCacheRows(game.h2hRows || [], game.home_team, game.away_team),
+              strengths: goal.strengths,
+              options: { modelWeight: goal.modelWeight }
             });
           } else {
             edgeData = await edgeCalc.calculateEdge(game);

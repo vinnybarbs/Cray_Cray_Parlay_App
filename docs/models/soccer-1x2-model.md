@@ -405,4 +405,18 @@ v2 constants (SOCCER_V2 export):
 
 Do not add home advantage on top of the market anchor (directive 19 double count). The EPL and MLS core dial rows (home_advantage, venue_weight and the rest) are read only by the core calculator, never by this module.
 
-Next: fit Dixon-Coles strengths on game_results and give the goal model weight only after the replay (extended to call calculateSoccer1x2Edges against closing Draw prices) shows it beats the close.
+Next: the goal model below. It gets weight only after its replay against closing Draw prices shows it beats the close.
+
+
+## Goal model (2026-10-14)
+
+Owner ask 2026-10-13: "Do goal model". lib/services/soccer-strengths.js fits, api/cron/fit-soccer-strengths.js runs it daily at 09:10 UTC.
+
+- Model: log home rate = mu[competition] + home[competition] + attack[home] - defense[away], log away rate = mu[competition] + attack[away] - defense[home], Poisson goals, matches weighted by age with a 180 day half life, ridge 3 (in weighted matches) on every club rating, so a thin club stays near average. rho (Dixon-Coles) is a grid search with the rates held fixed.
+- Pools: europe (EPL, La Liga, Serie A, Bundesliga, Ligue 1, Champions League, Europa League, linked through the European cups, one rating per club across competitions) and mls. Each competition keeps its own scoring rate and home edge.
+- Data: ESPN scoreboards into soccer_match_history (430 day walk the first time a competition is thin, then the last 5 days). Not game_results: that table grades, and a deep walk there would hand old pending rows results.
+- Pricing: a club needs 5 weighted matches before it gets a price. Odds API names match ESPN names on the JS soccerTeamKey plus the soccer_team_aliases table.
+- Weight: the goal_model_weight dial, 0 on all eight sports. At 0 the probabilities and expected goals are recorded on every read in edge_factors.goalModel and no claim moves, and confidence does not rise.
+- Evidence: every fit replays walk forward over every soccer match with a stored closing three way price (fit on matches before that Monday, price the week) and stores log loss and Brier per blend weight (0 is the close alone, 1 the model alone) in soccer_model_fits.evaluation, overall and per competition.
+- Raising the weight: only where a blend beats the close out of sample on the three test protocol, as an owner call. It changes how claims are generated, so it is a new calibration regime (fit floor advance).
+- Cost: ESPN only, no Odds API credits, no model calls.
