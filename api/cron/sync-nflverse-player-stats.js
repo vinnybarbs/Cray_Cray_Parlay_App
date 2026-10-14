@@ -182,3 +182,4 @@ module.exports = syncNflPlayerStats;
 module.exports.parseCsv = parseCsv;
 module.exports.mapStatRow = mapStatRow;
 module.exports.defaultSeason = defaultSeason;
+module.exports.runSync = runSync;
