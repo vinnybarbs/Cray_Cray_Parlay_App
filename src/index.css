@@ -60,17 +60,23 @@
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Live strip on Today (owner 2026-10-12: carry the landing ticker into the
-   app, calmer). Pauses on touch and hover, and stops for reduced motion,
-   where the strip becomes a plain horizontal scroller. */
+/* Landing ticker (rebuilt 2026-10-14). The track holds the row twice, so
+   shifting by exactly half loops with no jump. Soft fades at both edges.
+   Pauses on touch and hover, and stops for reduced motion, where the
+   strip becomes a plain horizontal scroller. */
 @keyframes live-strip-scroll {
   0% { transform: translate3d(0, 0, 0); }
   100% { transform: translate3d(-50%, 0, 0); }
 }
-.live-strip-track { animation: live-strip-scroll 60s linear infinite; }
+.live-strip-viewport {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 48px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 24px, #000 calc(100% - 48px), transparent);
+}
+.live-strip-track { animation: live-strip-scroll 60s linear infinite; will-change: transform; }
 .live-strip:hover .live-strip-track,
-.live-strip:active .live-strip-track { animation-play-state: paused; }
+.live-strip:active .live-strip-track,
+.live-strip:focus-within .live-strip-track { animation-play-state: paused; }
 @media (prefers-reduced-motion: reduce) {
   .live-strip-track { animation: none; }
-  .live-strip { overflow-x: auto; }
+  .live-strip-viewport { overflow-x: auto; }
 }

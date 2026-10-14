@@ -215,3 +215,6 @@ async function backfillGameResults(req, res) {
 }
 
 module.exports = backfillGameResults;
+// The soccer goal model fitter walks ESPN history with the same reader.
+module.exports.fetchScoreboard = fetchScoreboard;
+module.exports.SPORT_PATHS = SPORT_PATHS;

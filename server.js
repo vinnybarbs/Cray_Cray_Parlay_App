@@ -485,6 +485,14 @@ app.post('/cron/probe-data-sources', probeDataSources);
 const syncStandings = require('./api/cron/sync-standings');
 app.post('/cron/sync-standings', syncStandings);
 
+// Soccer goal model: ESPN match history, team ratings, closing price replay
+const fitSoccerStrengths = require('./api/cron/fit-soccer-strengths');
+app.post('/cron/fit-soccer-strengths', fitSoccerStrengths);
+
+// Historical odds backfill queue (historical_odds_jobs into historical_closing_lines)
+const backfillHistoricalOdds = require('./api/cron/backfill-historical-odds');
+app.post('/cron/backfill-historical-odds', backfillHistoricalOdds);
+
 // Sync ATP/WTA rankings + recent match results from ESPN (tennis pre-match context)
 const syncTennisData = require('./api/cron/sync-tennis-data');
 app.post('/cron/sync-tennis-data', syncTennisData);
