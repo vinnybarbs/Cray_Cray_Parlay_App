@@ -24,6 +24,9 @@ const LONGSHOT_BOOK = { bookmaker: 'draftkings', home: -900, draw: 800, away: 20
 const DRAW_FAV_BOOK = { bookmaker: 'fanduel', home: 400, draw: -175, away: 340 };  // Austin vs Seattle
 
 const sum3 = (p) => p.home + p.draw + p.away;
+// v2 needs three books before it will claim anything.
+const THREE = (b) => [b, { ...b, bookmaker: 'draftkings' }, { ...b, bookmaker: 'betmgm' }];
+const GOAL_ON = { modelWeight: 0.35 };
 
 describe('americanToProb', () => {
   test('converts negative and positive prices', () => {
@@ -245,7 +248,7 @@ describe('calculateSoccer1x2Edges', () => {
       books: [EVEN_BOOK],
     });
     expect(result).not.toBeNull();
-    expect(result.modelSource).toBe('shin_market_only');
+    expect(result.modelSource).toBe('market_only');
     expect(result.homeWinProb + result.drawProb + result.awayWinProb).toBeCloseTo(1, 3);
     expect(result.impliedHomeProb + result.impliedDrawProb + result.impliedAwayProb).toBeCloseTo(1, 3);
     expect(Object.keys(result.edges).sort()).toEqual(['away_ml', 'draw', 'home_ml']);
@@ -254,15 +257,16 @@ describe('calculateSoccer1x2Edges', () => {
 
   test('edge sign convention: model above implied is positive', () => {
     const result = calculateSoccer1x2Edges({
-      books: [EVEN_BOOK],
+      books: THREE(EVEN_BOOK),
       strengths: { homeExpectedGoals: 2.2, awayExpectedGoals: 0.8 },
+      options: GOAL_ON,
     });
-    expect(result.modelSource).toBe('shin_goal_blend');
-    // A strong goal model tilt toward home must produce a positive home edge
-    // and the three signed edges must roughly offset.
+    expect(result.modelSource).toBe('market_goal_blend');
+    // A strong goal model tilt toward home must produce a positive home
+    // edge and no positive claim on the other two outcomes.
     expect(result.edges.home_ml).toBeGreaterThan(0);
-    const totalEdge = result.edgesRaw.home_ml + result.edgesRaw.draw + result.edgesRaw.away_ml;
-    expect(Math.abs(totalEdge)).toBeLessThan(0.01);
+    expect(result.edges.draw).toBeLessThanOrEqual(0);
+    expect(result.edges.away_ml).toBeLessThanOrEqual(0);
   });
 
   test('edges are capped at maxEdge', () => {
@@ -278,9 +282,9 @@ describe('calculateSoccer1x2Edges', () => {
 
   test('calibration multiplier of 0 zeroes published edges but keeps raw', () => {
     const result = calculateSoccer1x2Edges({
-      books: [EVEN_BOOK],
+      books: THREE(EVEN_BOOK),
       strengths: { homeExpectedGoals: 2.0, awayExpectedGoals: 0.9 },
-      options: { calibrationMultiplier: 0 },
+      options: { ...GOAL_ON, calibrationMultiplier: 0 },
     });
     expect(result.edges.home_ml).toBe(0);
     expect(result.edgesRaw.home_ml).not.toBe(0);
@@ -289,7 +293,7 @@ describe('calculateSoccer1x2Edges', () => {
   test('draw can be the recommended side', () => {
     // Goal model that loves the draw: low scoring and negative rho.
     const result = calculateSoccer1x2Edges({
-      books: [EVEN_BOOK],
+      books: THREE(EVEN_BOOK),
       strengths: { homeExpectedGoals: 0.7, awayExpectedGoals: 0.7, rho: -0.12 },
       options: { modelWeight: 0.8 },
     });
@@ -307,14 +311,64 @@ describe('calculateSoccer1x2Edges', () => {
 
   test('legacy scalars mirror the largest magnitude edge', () => {
     const result = calculateSoccer1x2Edges({
-      books: [EVEN_BOOK],
+      books: THREE(EVEN_BOOK),
       strengths: { homeExpectedGoals: 2.2, awayExpectedGoals: 0.8 },
+      options: GOAL_ON,
     });
     const sideKey = { home: 'home_ml', draw: 'draw', away: 'away_ml' };
     const magnitudes = Object.values(result.edges).map(Math.abs);
     expect(Math.abs(result.edge)).toBeCloseTo(Math.max(...magnitudes), 10);
     expect(result.edges[sideKey[result.edgeSide]]).toBe(result.edge);
     expect(result.edgePercent).toBeCloseTo(Math.abs(result.edge) * 100, 2);
+  });
+});
+
+describe('v2 starting setup (owner 2026-10-13)', () => {
+  test('market only: every edge is 0, a devig difference is not a claim', () => {
+    const result = calculateSoccer1x2Edges({ books: THREE(EVEN_BOOK) });
+    expect(result.edges).toEqual({ home_ml: 0, draw: 0, away_ml: 0 });
+    expect(result.edgesRaw).toEqual({ home_ml: 0, draw: 0, away_ml: 0 });
+    expect(pickBest1x2Side(result, { minEdgePp: 2 })).toBeNull();
+  });
+
+  test('goal model input is ignored at the default weight 0', () => {
+    const result = calculateSoccer1x2Edges({
+      books: THREE(EVEN_BOOK),
+      strengths: { homeExpectedGoals: 2.2, awayExpectedGoals: 0.8 },
+    });
+    expect(result.modelSource).toBe('market_only');
+    expect(result.edges.home_ml).toBe(0);
+  });
+
+  test('fewer than three books never claims', () => {
+    const result = calculateSoccer1x2Edges({
+      books: [EVEN_BOOK],
+      strengths: { homeExpectedGoals: 2.2, awayExpectedGoals: 0.8 },
+      options: GOAL_ON,
+    });
+    expect(result.dataQuality.thinMarket).toBe(true);
+    expect(result.edges.home_ml).toBe(0);
+  });
+
+  test('claims cap at 8pp and draw claims at 4pp', () => {
+    const result = calculateSoccer1x2Edges({
+      books: THREE(EVEN_BOOK),
+      strengths: { homeExpectedGoals: 0.4, awayExpectedGoals: 0.4, rho: -0.15 },
+      options: { modelWeight: 1 },
+    });
+    expect(result.edges.draw).toBeLessThanOrEqual(0.04);
+    for (const v of Object.values(result.edges)) expect(Math.abs(v)).toBeLessThanOrEqual(0.08);
+  });
+
+  test('a side priced +250 or longer is fenced', () => {
+    const result = calculateSoccer1x2Edges({
+      books: THREE(LONGSHOT_BOOK),
+      strengths: { homeExpectedGoals: 0.5, awayExpectedGoals: 3.5 },
+      options: { modelWeight: 1 },
+    });
+    expect(result.edges.away_ml).toBe(0);
+    expect(result.edges.home_ml).toBe(0);
+    expect(result.factors.gates.fenced).toEqual(expect.arrayContaining(['home_ml', 'away_ml']));
   });
 });
 

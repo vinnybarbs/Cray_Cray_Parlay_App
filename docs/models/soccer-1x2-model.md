@@ -386,3 +386,23 @@ pp like any other and flows through the same >= 2pp / negative-Trap logic.
   https://www.football-data.org/client/register
 - football-data.org free tier limits summary (10 calls per minute, 12
   competitions). https://www.thestatsapi.com/blog/football-data-org-free-tier-limits-2026
+
+
+## v2 starting setup (2026-10-14)
+
+Owner call 2026-10-13 ("Switch now"). Evidence from 245 graded EPL and MLS reads: the v1 edge was Shin consensus minus proportional consensus of the same prices, so every read was a 0.5 to 1.5pp lean to the favorite (99 percent of reads), and those went 46.9 percent against 49.7 implied, -29.8u. Draws ran 30.0 percent against 23.9 implied (+44.3u at the close, one half season, a hypothesis to track).
+
+v2 constants (SOCCER_V2 export):
+
+| Setting | v1 | v2 |
+|---|---|---|
+| Devig | Shin model over proportional implied | proportional both sides |
+| Goal model weight | 0.35 (never fed) | 0 until fitted out of sample, then 0.15 to 0.25 |
+| Claim floor | none (2pp record gate) | 3pp |
+| Cap | 15pp | 8pp, draw 4pp |
+| Price fence | none | no claim on a home or away side at +250 or longer, -250 or shorter |
+| Minimum books | 1 | 3 |
+
+Do not add home advantage on top of the market anchor (directive 19 double count). The EPL and MLS core dial rows (home_advantage, venue_weight and the rest) are read only by the core calculator, never by this module.
+
+Next: fit Dixon-Coles strengths on game_results and give the goal model weight only after the replay (extended to call calculateSoccer1x2Edges against closing Draw prices) shows it beats the close.
