@@ -24,6 +24,12 @@ const SPORT_META = {
   NHL:   { emoji: '🏒', label: 'NHL' },
   EPL:   { emoji: '⚽', label: 'EPL' },
   MLS:   { emoji: '⚽', label: 'MLS' },
+  'Champions League': { emoji: '⚽', label: 'Champions League' },
+  'Europa League':    { emoji: '⚽', label: 'Europa League' },
+  'La Liga':          { emoji: '⚽', label: 'La Liga' },
+  'Serie A':          { emoji: '⚽', label: 'Serie A' },
+  'Bundesliga':       { emoji: '⚽', label: 'Bundesliga' },
+  'Ligue 1':          { emoji: '⚽', label: 'Ligue 1' },
   NCAAB: { emoji: '🏀', label: 'NCAAB' },
   NCAAF: { emoji: '🏈', label: 'NCAAF' },
 }
@@ -50,6 +56,12 @@ const ANALYSIS_SPORT_TO_CODE = {
   americanfootball_ncaaf: 'NCAAF',
   soccer_epl: 'EPL',
   soccer_usa_mls: 'MLS',
+  soccer_uefa_champs_league: 'Champions League',
+  soccer_uefa_europa_league: 'Europa League',
+  soccer_spain_la_liga: 'La Liga',
+  soccer_italy_serie_a: 'Serie A',
+  soccer_germany_bundesliga: 'Bundesliga',
+  soccer_france_ligue_one: 'Ligue 1',
 }
 
 import { fmtGameDateTime, fmtGameDay, fmtFullDate as formatFullDate } from '../lib/gameTime'
