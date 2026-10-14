@@ -32,11 +32,13 @@ async function dialSearch(req, res) {
   const top = Math.min(6, Math.max(1, parseInt(req.query.top, 10) || 4));
   const file = String(req.query.file ?? '1') !== '0';
   const apply = String(req.query.apply || '') === '1';
+  // history_gate=0 keeps the prior season replay as evidence only.
+  const historyGate = String(req.query.history_gate ?? '1') !== '0';
   res.status(202).json({ status: 'accepted', message: `Dial search started: ${sports.join(', ')}, last ${recentDays} days, confirmed on the ${confirmDays} before` });
   (async () => {
     for (const sport of sports) {
       try {
-        const summary = await runDialSearch(supabase, { sport, recentDays, confirmDays, minDelta, top, file, apply, log: (m) => console.warn(m) });
+        const summary = await runDialSearch(supabase, { sport, recentDays, confirmDays, minDelta, top, file, apply, historyGate, log: (m) => console.warn(m) });
         await supabase.from('cron_job_logs').insert({ job_name: 'dial-search', status: 'completed', details: JSON.stringify(summary) });
       } catch (err) {
         console.error(`dial-search ${sport} error:`, err.message);

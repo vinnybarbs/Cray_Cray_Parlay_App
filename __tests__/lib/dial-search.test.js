@@ -1,8 +1,13 @@
 // The weekly dial search: the variant grid, the stage 1 winners, and the
 // two stage run on a mocked replay.
 
-jest.mock('../../lib/replay/replay-formula.js', () => ({ runReplay: jest.fn(), siteDate: (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/Denver' }) }));
-const { runReplay } = require('../../lib/replay/replay-formula.js');
+jest.mock('../../lib/replay/replay-formula.js', () => ({
+  runReplay: jest.fn(),
+  runHistoryReplay: jest.fn(async (_s, opts) => ({ formulas: Object.fromEntries(opts.variants.map(v => [v.name, { picks: 0, won: 0, lost: 0, units: 0 }])), games_with_results: 0, games_unmatched: 0 })),
+  priorSeasonWindows: () => [{ since: '2025-08-01T00:00:00Z', until: '2025-10-13T00:00:00Z' }],
+  siteDate: (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/Denver' }),
+}));
+const { runReplay, runHistoryReplay } = require('../../lib/replay/replay-formula.js');
 const ds = require('../../lib/replay/dial-search');
 const { parseSports } = require('../../api/cron/dial-search');
 
@@ -140,6 +145,29 @@ describe('runDialSearch', () => {
     expect(db.writes[0][2]).toMatchObject({ sport: 'NFL', dial: 'venue_weight', value: 0.1875 });
     expect(db.writes[1][2]).toMatchObject({ source: 'dial-search-auto', before: { venue_weight: 0.25 }, after: { venue_weight: 0.1875 } });
     expect(db.writes[2][2].sunset_on).toBe(ds.addDays(out.applied.sunset_on, 0));
+  });
+
+  test('with the history gate, a move that lost over the prior seasons does not land', async () => {
+    const db = fakeDb({ dials: board });
+    db.rpc.mockResolvedValueOnce({ data: { filed: 1, passed: [{ name: 'venue_weight_dn', delta_units: 4, won: 22, lost: 16, units: 5 }] }, error: null });
+    runReplay.mockImplementationOnce(searchWeek).mockImplementationOnce(confirmWindow);
+    runHistoryReplay.mockResolvedValueOnce({ formulas: { base: { picks: 120, won: 62, lost: 58, units: 2 }, venue_weight_dn: { picks: 118, won: 57, lost: 61, units: -6 } }, games_with_results: 400, games_unmatched: 3 });
+    const out = await ds.runDialSearch(db, { sport: 'NFL', apply: true, stamp: 'x' });
+    expect(runHistoryReplay.mock.calls.at(-1)[1]).toMatchObject({ sport: 'NFL', runId: 'dial_search_nfl_x_history' });
+    expect(out.history.verdicts.venue_weight_dn).toMatchObject({ checked: true, holds: false, delta_units: -8 });
+    expect(out.applied).toBeNull();
+    expect(db.writes).toEqual([]);
+  });
+
+  test('with the gate off, the history rides on the move as evidence', async () => {
+    const db = fakeDb({ dials: board });
+    db.rpc.mockResolvedValueOnce({ data: { filed: 1, passed: [{ name: 'venue_weight_dn', delta_units: 4, won: 22, lost: 16, units: 5 }] }, error: null });
+    runReplay.mockImplementationOnce(searchWeek).mockImplementationOnce(confirmWindow);
+    runHistoryReplay.mockResolvedValueOnce({ formulas: { base: { picks: 120, won: 62, lost: 58, units: 2 }, venue_weight_dn: { picks: 118, won: 57, lost: 61, units: -6 } }, games_with_results: 400, games_unmatched: 3 });
+    const out = await ds.runDialSearch(db, { sport: 'NFL', apply: true, historyGate: false, stamp: 'x' });
+    expect(out.applied).toMatchObject({ dial: 'venue_weight' });
+    expect(db.writes[2][2].evidence.history).toMatchObject({ holds: false, units: -6 });
+    expect(db.writes[1][2].reason).toMatch(/prior 3 seasons it went 57-61, -6u, -8u over base/);
   });
 
   test('with apply but nothing passed, no dial moves', async () => {

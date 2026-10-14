@@ -15,11 +15,59 @@
  * backfill (historical_prop_closes). After an NFL prop window, a season
  * with no nflverse stat lines yet is synced once, so the
  * historical_prop_results view can grade it.
+ *
+ * After a game market window for a US team sport, the ESPN finals for the
+ * window's days land in historical_game_results (free calls), so the
+ * replay's history mode can grade those games and rebuild each team's
+ * record as of the morning of the game.
  */
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
 const { backfillWindow, backfillPropsWindow, isPropMarkets } = require('../../lib/services/historical-odds.js');
 const { runSync: syncNflverseSeason } = require('./sync-nflverse-player-stats.js');
+const { fetchScoreboard, SPORT_PATHS } = require('./backfill-game-results.js');
+
+// Odds API key to the display sport game_results and the replay use.
+const RESULTS_SPORT = {
+  americanfootball_nfl: 'NFL',
+  americanfootball_ncaaf: 'NCAAF',
+  baseball_mlb: 'MLB',
+  basketball_nba: 'NBA',
+  icehockey_nhl: 'NHL',
+};
+
+/** Compact ESPN dates (YYYYMMDD) for every day of [windowStart, windowEnd). */
+function windowDays(windowStart, windowEnd) {
+  const out = [];
+  const end = Date.parse(`${windowEnd}T12:00:00Z`);
+  for (let t = Date.parse(`${windowStart}T12:00:00Z`); t < end; t += 86400000) {
+    // Noon UTC anchors keep the calendar day, so UTC parts are the date.
+    const d = new Date(t);
+    out.push(`${d.getUTCFullYear()}${String(d.getUTCMonth() + 1).padStart(2, '0')}${String(d.getUTCDate()).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** ESPN finals for a window into historical_game_results. Returns counts. */
+async function ingestResults(sport, windowStart, windowEnd) {
+  const errors = [];
+  let written = 0;
+  const days = windowDays(windowStart, windowEnd);
+  for (let i = 0; i < days.length; i += 6) {
+    const batch = days.slice(i, i + 6).map((d) => fetchScoreboard(sport, SPORT_PATHS[sport], d, errors));
+    const games = (await Promise.all(batch)).flat();
+    if (!games.length) continue;
+    const rows = [...new Map(games.map((g) => [g.espn_event_id, {
+      espn_event_id: String(g.espn_event_id), sport, date: g.date,
+      home_team_name: g.home_team_name, away_team_name: g.away_team_name,
+      home_score: g.home_score, away_score: g.away_score, status: 'final',
+    }])).values()];
+    const { error } = await supabase.from('historical_game_results').upsert(rows, { onConflict: 'espn_event_id' });
+    if (error) errors.push(error.message);
+    else written += rows.length;
+  }
+  return { results_written: written, results_errors: errors.length };
+}
 
 const MAX_RUN_MS = 10 * 60 * 1000;
 
@@ -70,6 +118,7 @@ async function run() {
       const fn = props ? backfillPropsWindow : backfillWindow;
       const r = await fn({ fetchFn: fetch, supabase, apiKey, ...job, windowStart: job.window_start, windowEnd: job.window_end });
       if (props && job.sport === 'americanfootball_nfl') await ensureNflStats(nflSeasonOf(job.window_start), synced);
+      if (!props && RESULTS_SPORT[job.sport]) Object.assign(r, await ingestResults(RESULTS_SPORT[job.sport], job.window_start, job.window_end));
       await supabase.from('historical_odds_jobs').update({
         status: 'done', events: r.events, kickoffs: r.kickoffs, games_with_close: r.gamesWithClose,
         rows_written: r.rowsWritten, credits_used: r.credits, done_at: new Date().toISOString(), error: null,
@@ -112,3 +161,4 @@ async function backfillHistoricalOdds(req, res) {
 module.exports = backfillHistoricalOdds;
 module.exports.run = run;
 module.exports.nflSeasonOf = nflSeasonOf;
+module.exports.windowDays = windowDays;
