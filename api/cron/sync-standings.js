@@ -19,8 +19,18 @@ const SPORT_CONFIGS = {
   NCAAB: { path: 'basketball/mens-college-basketball',    season: () => currentSeason('NCAAB'), groups: 50 },
   NCAAF: { path: 'football/college-football',             season: () => currentSeason('NCAAF'), groups: 80 },
   EPL:   { path: 'soccer/eng.1',                          season: () => currentSeason('EPL') },
-  MLS:   { path: 'soccer/usa.1',                          season: () => new Date().getFullYear() }
+  MLS:   { path: 'soccer/usa.1',                          season: () => new Date().getFullYear() },
+  // European competitions (2026-10-13). The query param is upper case
+  // with no spaces, so these take a short code and store their teams
+  // under the display sport that game_analysis and the tiles use.
+  UCL:        { path: 'soccer/uefa.champions', season: () => currentSeason('UCL'), stored: 'Champions League' },
+  UEL:        { path: 'soccer/uefa.europa',    season: () => currentSeason('UEL'), stored: 'Europa League' },
+  LALIGA:     { path: 'soccer/esp.1',          season: () => currentSeason('LALIGA'), stored: 'La Liga' },
+  SERIEA:     { path: 'soccer/ita.1',          season: () => currentSeason('SERIEA'), stored: 'Serie A' },
+  BUNDESLIGA: { path: 'soccer/ger.1',          season: () => currentSeason('BUNDESLIGA'), stored: 'Bundesliga' },
+  LIGUE1:     { path: 'soccer/fra.1',          season: () => currentSeason('LIGUE1'), stored: 'Ligue 1' }
 };
+const SOCCER_STORED = new Set(['EPL', 'MLS', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1']);
 
 /**
  * Determine the current season year for sports that span two calendar years.
@@ -104,7 +114,7 @@ async function fetchESPNStandings(sport, config, seasonOverride = null) {
         espn_id: team.id,
         name: team.displayName,
         abbreviation: team.abbreviation,
-        sport,
+        sport: config.stored || sport,
         conference,
         wins: overall ? overall.wins : (parseInt(stats.wins) || 0),
         losses: overall ? overall.losses : (parseInt(stats.losses) || 0),
@@ -186,9 +196,8 @@ async function ensureTeam(teamData) {
 
     // Mascot match (last word), never for soccer where the last word is a
     // club suffix shared across the league (United, City, FC, Town).
-    const SOCCER = new Set(['EPL', 'MLS']);
     const mascot = teamData.name.split(' ').slice(-1)[0];
-    if (!SOCCER.has(teamData.sport) && mascot.length >= 4) {
+    if (!SOCCER_STORED.has(teamData.sport) && mascot.length >= 4) {
       const { data: fuzzyMascot } = await supabase
         .from('teams')
         .select('id, name, provider_ids')
@@ -291,7 +300,7 @@ async function syncStandings(req, res) {
         let purged = 0;
         if (teams.length >= 10 && seenTeamIds.length >= 10) {
           const { data: sportTeams } = await supabase
-            .from('teams').select('id').eq('sport', sport);
+            .from('teams').select('id').eq('sport', config.stored || sport);
           const staleIds = (sportTeams || []).map(t => t.id).filter(id => !seenTeamIds.includes(id));
           if (staleIds.length > 0) {
             const { error: purgeErr, count } = await supabase

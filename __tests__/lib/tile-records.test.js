@@ -26,6 +26,8 @@ describe('tile records: the record with more games wins', () => {
 
   test('soccer standings format is W-D-L, others W-L or W-L-T', () => {
     expect(formatStandingsRecord('MLS', { wins: 12, losses: 4, ties: 8 })).toBe('12-8-4');
+    expect(formatStandingsRecord('La Liga', { wins: 5, losses: 0, ties: 1 })).toBe('5-1-0');
+    expect(formatStandingsRecord('Champions League', { wins: 2, losses: 1, ties: 0 })).toBe('2-0-1');
     expect(formatStandingsRecord('NFL', { wins: 12, losses: 4, ties: 1 })).toBe('12-4-1');
     expect(formatStandingsRecord('MLB', { wins: 85, losses: 62, ties: 0 })).toBe('85-62');
     expect(formatStandingsRecord('MLB', null)).toBeNull();
