@@ -1,18 +1,30 @@
-// Public-ticker endpoint. Serves real edges for the Landing ticker.
+// Public-ticker endpoint. Serves the Landing ticker.
 //
-// The ticker used to scroll a hardcoded demo array labeled LIVE, which showed
-// NBA/NFL edges in July. Bettors notice. This returns actual per-side edges
-// from game_analysis for the next ~36 hours, plus which leagues currently
-// have games, so the Landing can render live numbers for in-season leagues
-// and honest coverage status for off-season ones.
+// Rebuilt 2026-10-14 (owner: "ticker is broke and crap looking"). The old
+// version read raw game_analysis edges, so it showed what the board never
+// publishes: muted markets (an MLB total as an 11 point Sharp Take while
+// MLB totals publish 0), whole shadow sports (MLS, with a nickname of
+// "SC"), Skip tier sides, games already under way, and totals with no
+// teams ("NHL O 6.5" four times). It now reads the same published picks
+// and traps Today shows, upcoming games only, and gates every item on the
+// publish dials, so the ticker can never say something the app does not.
 //
 // Response: {
-//   items:    [{ sport, label, pp, tier }],   // strongest signed edges, pos and neg
-//   inSeason: ['MLB', ...],                    // leagues with games in the window
+//   items:    [{ kind, sport, label, matchup, tier, book_pct, our_pct, pp, game_date }],
+//   inSeason: ['NHL', ...],   // sports with an item in the window
 // }
 
 const { createClient } = require('@supabase/supabase-js');
-const { edgeTier } = require('../lib/services/pick-grader.js');
+const { latestPerGame, bookAndOurPct } = require('./today.js');
+const { publishFlagsAll, CODE_SHADOW_SPORTS } = require('../lib/services/publish-markets.js');
+
+const HORIZON_HOURS = 36;
+const MAX_PICKS = 8;
+const MAX_TRAPS = 4;
+// Lean and above. A Skip or Leg never reaches the ticker.
+const MIN_PP = 2;
+const HEADLINE_SESSION = /^auto_digest_\d{4}-\d{2}-\d{2}$/;
+const TRAP_SESSION = /^auto_digest_trap_\d{4}-\d{2}-\d{2}$/;
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -21,47 +33,104 @@ function getSupabase() {
   return createClient(url, key);
 }
 
-// "Los Angeles Dodgers" -> "Dodgers"; "Jannik Sinner" -> "Sinner"
-const nickname = (team) => (team || '').trim().split(' ').pop();
+// Nicknames that are two words. Everything else is the last word, which
+// also gives a tennis or UFC surname.
+const TWO_WORD = ['Red Sox', 'White Sox', 'Blue Jays', 'Maple Leafs', 'Red Wings', 'Blue Jackets', 'Golden Knights', 'Trail Blazers'];
+// One on one sports have no home side, so the game reads "A vs B".
+const INDIVIDUAL = new Set(['Tennis', 'UFC', 'MMA', 'Boxing']);
+function nickname(team) {
+  const t = String(team || '').trim();
+  const two = TWO_WORD.find(n => t.endsWith(` ${n}`) || t === n);
+  return two || t.split(/\s+/).pop();
+}
 
-function sideLabel(side, g) {
-  switch (side) {
-    case 'home_ml':     return `${nickname(g.home_team)} ML`;
-    case 'away_ml':     return `${nickname(g.away_team)} ML`;
-    case 'home_spread': return g.spread != null ? `${nickname(g.home_team)} ${g.spread > 0 ? '+' : ''}${g.spread}` : null;
-    case 'away_spread': return g.spread != null ? `${nickname(g.away_team)} ${-g.spread > 0 ? '+' : ''}${-g.spread}` : null;
-    case 'over':        return g.total != null ? `O ${g.total}` : null;
-    case 'under':       return g.total != null ? `U ${g.total}` : null;
-    default:            return null;
+/** 'ml' | 'spread' | 'total' from the stored bet_type. */
+function marketOf(betType) {
+  const b = String(betType || '').toLowerCase();
+  if (b.includes('money')) return 'ml';
+  if (b.includes('spread') || b.includes('puck') || b.includes('run line')) return 'spread';
+  if (b.includes('total') || b.includes('over') || b.includes('under')) return 'total';
+  return null;
+}
+
+/**
+ * Pure: the short side and the matchup for one pick row.
+ * "Boston Bruins ML -130" -> { label: 'Bruins ML', matchup: 'Bruins at Sharks' }
+ * "Over 6.5" -> { label: 'Over 6.5', matchup: 'Flames at Ducks' }
+ */
+function labelFor(r) {
+  const away = nickname(r.away_team);
+  const home = nickname(r.home_team);
+  const solo = INDIVIDUAL.has(r.sport);
+  const matchup = away && home ? (solo ? `${away} vs ${home}` : `${away} at ${home}`) : null;
+  const pick = String(r.pick || '').trim();
+  const market = marketOf(r.bet_type);
+  if (market === 'total') {
+    const m = pick.match(/^(Over|Under)\s+([\d.]+)/i);
+    if (!m) return null;
+    return { label: `${m[1][0].toUpperCase()}${m[1].slice(1).toLowerCase()} ${m[2]}`, matchup };
   }
+  for (const team of [r.home_team, r.away_team]) {
+    if (team && pick.startsWith(team)) {
+      const rest = pick.slice(team.length).trim();
+      if (market === 'ml') return { label: `${nickname(team)} ML`, matchup };
+      const line = rest.match(/^([+-]?[\d.]+)/);
+      if (market === 'spread' && line) return { label: `${nickname(team)} ${line[1]}`, matchup };
+    }
+  }
+  return null;
 }
 
-// Book vs us for the strip (owner 2026-10-12): the no-vig probability of
-// the side from both prices, plus the edge. Mirrors src/lib/tiers.js sidePct.
-const SIDE_PRICES = {
-  home_ml: ['moneyline_home', 'moneyline_away'],
-  away_ml: ['moneyline_away', 'moneyline_home'],
-  home_spread: ['spread_home_price', 'spread_away_price'],
-  away_spread: ['spread_away_price', 'spread_home_price'],
-  over: ['over_price', 'under_price'],
-  under: ['under_price', 'over_price'],
-};
-function rawImplied(odds) {
-  const n = parseInt(odds, 10);
-  if (!Number.isFinite(n) || n === 0) return null;
-  return n < 0 ? -n / (-n + 100) : 100 / (n + 100);
-}
-function sidePct(g, side, pp) {
-  const keys = SIDE_PRICES[side];
-  if (!keys) return { book_pct: null, our_pct: null };
-  const a = rawImplied(g[keys[0]]);
-  if (a == null) return { book_pct: null, our_pct: null };
-  const b = rawImplied(g[keys[1]]);
-  const p = b != null ? a / (a + b) : a / 1.045;
-  return { book_pct: Math.round(p * 100), our_pct: Math.round(p * 100 + pp) };
+/** Pure: true when the pick's market publishes for its sport. */
+function published(flagsBySport, sport, market) {
+  if (!market) return false;
+  const flags = flagsBySport?.[sport];
+  if (!flags) return !CODE_SHADOW_SPORTS.has(sport);
+  return flags[market] === 1;
 }
 
-module.exports = async (req, res) => {
+/**
+ * Pure shaping: published headline picks (strongest first) and traps
+ * (most overpriced bait first), interleaved so a trap lands every few
+ * plays. Upcoming only. A row that cannot be labeled is dropped.
+ */
+function shapeTicker(pickRows, trapRows, flagsBySport, now = new Date()) {
+  const upcoming = r => new Date(r.game_date).getTime() > now.getTime();
+  const shape = (kind) => (r) => {
+    const l = labelFor(r);
+    if (!l) return null;
+    const edge = Number(r.edge_pp);
+    return {
+      kind,
+      sport: r.sport,
+      label: l.label,
+      matchup: l.matchup,
+      tier: r.tier,
+      pp: edge,
+      game_date: r.game_date,
+      ...bookAndOurPct(r),
+    };
+  };
+  const ok = r => upcoming(r) && published(flagsBySport, r.sport, marketOf(r.bet_type));
+  const picks = latestPerGame((pickRows || []).filter(r => HEADLINE_SESSION.test(String(r.session_id))))
+    .filter(r => ok(r) && Number(r.edge_pp) >= MIN_PP && !['Trap', 'Leg', 'Skip'].includes(r.tier))
+    .sort((a, b) => Number(b.edge_pp) - Number(a.edge_pp))
+    .map(shape('play')).filter(Boolean).slice(0, MAX_PICKS);
+  const traps = latestPerGame((trapRows || []).filter(r => TRAP_SESSION.test(String(r.session_id))))
+    .filter(r => ok(r) && Number(r.edge_pp) < 0)
+    .sort((a, b) => Number(a.edge_pp) - Number(b.edge_pp))
+    .map(shape('trap')).filter(Boolean).slice(0, MAX_TRAPS);
+  const items = [];
+  let t = 0;
+  picks.forEach((p, i) => {
+    items.push(p);
+    if (i % 2 === 1 && t < traps.length) items.push(traps[t++]);
+  });
+  while (t < traps.length) items.push(traps[t++]);
+  return { items, inSeason: [...new Set(items.map(i => i.sport))] };
+}
+
+async function publicTicker(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') { res.status(204).end(); return; }
@@ -71,44 +140,32 @@ module.exports = async (req, res) => {
   if (!supabase) { res.status(500).json({ error: 'Supabase not configured' }); return; }
 
   try {
-    const from = new Date(Date.now() - 6 * 3600 * 1000).toISOString();
-    const to = new Date(Date.now() + 36 * 3600 * 1000).toISOString();
-
-    const { data: games, error } = await supabase
-      .from('game_analysis')
-      .select('sport, home_team, away_team, game_date, spread, total, edges, moneyline_home, moneyline_away, spread_home_price, spread_away_price, over_price, under_price')
-      .gte('game_date', from)
-      .lte('game_date', to)
-      .order('game_date', { ascending: true })
-      .limit(120);
-
-    if (error) { res.status(500).json({ error: error.message }); return; }
-
-    const inSeason = [...new Set((games || []).map(g => g.sport).filter(Boolean))];
-
-    // One item per game: the strongest-magnitude side, positive or negative.
-    // Negative edges are the product's differentiator, so show them.
-    const items = [];
-    for (const g of games || []) {
-      if (!g.edges) continue;
-      let best = null;
-      for (const [side, val] of Object.entries(g.edges)) {
-        if (val == null) continue;
-        if (!best || Math.abs(val) > Math.abs(best.val)) best = { side, val };
-      }
-      if (!best) continue;
-      const label = sideLabel(best.side, g);
-      if (!label) continue;
-      const pp = Math.round(best.val * 1000) / 10;
-      items.push({ sport: g.sport, label, pp, tier: edgeTier(pp), ...sidePct(g, best.side, pp) });
-    }
-
-    // Strongest signals first, then cap the reel.
-    items.sort((a, b) => Math.abs(b.pp) - Math.abs(a.pp));
+    const now = new Date();
+    const horizon = new Date(now.getTime() + HORIZON_HOURS * 3600 * 1000).toISOString();
+    const cols = 'sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, implied_prob, tier, session_id';
+    const base = () => supabase
+      .from('ai_suggestions')
+      .select(cols)
+      .eq('actual_outcome', 'pending')
+      .is('voided_at', null)
+      .gt('game_date', now.toISOString())
+      .lt('game_date', horizon);
+    const [picksRes, trapsRes, flags] = await Promise.all([
+      base().like('session_id', 'auto_digest%').not('tier', 'in', '("Trap","Leg","Skip")').limit(300),
+      base().like('session_id', 'auto_digest_trap_%').limit(100),
+      publishFlagsAll(supabase),
+    ]);
+    const err = picksRes.error || trapsRes.error;
+    if (err) { res.status(500).json({ error: err.message }); return; }
 
     res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
-    res.status(200).json({ items: items.slice(0, 14), inSeason });
+    res.status(200).json(shapeTicker(picksRes.data, trapsRes.data, flags, now));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-};
+}
+
+module.exports = publicTicker;
+module.exports.shapeTicker = shapeTicker;
+module.exports.labelFor = labelFor;
+module.exports.nickname = nickname;
