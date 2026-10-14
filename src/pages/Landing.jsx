@@ -215,7 +215,7 @@ function Pricing({ onStartTrial }) {
         <div className="bg-ink-900 rounded-2xl border border-ink-700 p-6">
           <p className="text-ink-300">TrapHawk Pro</p>
           <p className="mt-1"><span className="text-4xl font-bold tabular-nums">{LAUNCH_PRICE}</span><span className="text-ink-400"> a month</span></p>
-          <p className="mt-1 text-sm text-signal-pos">Founding price, or {LAUNCH_ANNUAL} a year, kept as long as you stay subscribed. {STANDARD_PRICE} a month for new members after November 30.</p>
+          <p className="mt-1 text-sm text-signal-pos">Founding price, or {LAUNCH_ANNUAL} a year, kept as long as you stay subscribed. First 250 members only, then {STANDARD_PRICE} a month.</p>
           <ul className="mt-5 flex flex-col gap-2.5">
             {included.map(f => (
               <li key={f} className="flex gap-2.5 text-sm text-ink-200">

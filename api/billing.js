@@ -42,7 +42,6 @@ async function status(req, res) {
       paywall: paywallOn(),
       billingReady: !billing.keyProblem() && Boolean(offer.priceId),
       yearlyReady: !billing.keyProblem() && Boolean(yearly.priceId) && yearly.plan === offer.plan,
-      launchEnds: new Date(billing.launchEnds()).toISOString(),
       access: viewer.entitlement,
       launchMember: Boolean(viewer.row && viewer.row.launch_member),
       hasBilling: Boolean(viewer.row && viewer.row.stripe_customer_id),

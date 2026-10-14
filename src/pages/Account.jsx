@@ -202,11 +202,10 @@ export default function Account() {
                   {launchOffer && (
                     <p className="mt-1 text-sm text-signal-pos">
                       Founding price, yours for as long as you stay subscribed.
-                      {status.launchEnds ? ` Open until ${fmtDate(new Date(new Date(status.launchEnds).getTime() - 1).toISOString())}.` : ''}
                       {status.launchSeatsLeft != null && status.launchSeatsLeft <= 50 ? ` ${status.launchSeatsLeft} launch spots left.` : ''}
                     </p>
                   )}
-                  {launchOffer && <p className="mt-1 text-xs text-ink-500">Goes to {STANDARD_PRICE} a month for new members after launch.</p>}
+                  {launchOffer && <p className="mt-1 text-xs text-ink-500">Open to the first 250 members, then {STANDARD_PRICE} a month.</p>}
                 </div>
                 {status.billingReady ? (
                   <button disabled={busy} onClick={() => goTo('/api/billing/checkout', setBusy, setError, { interval: yearly ? 'year' : 'month' })} className="w-full px-6 py-4 rounded-xl bg-signal-pos text-ink-950 font-semibold hover:bg-signal-pos/90 active:scale-[0.98] disabled:opacity-60 transition">

@@ -33,18 +33,15 @@ describe('founding terms', () => {
     expect(billing.choosePrice({ seatsTaken: 249, now: before }, E).plan).toBe('launch');
     expect(billing.choosePrice({ seatsTaken: 250, now: before }, E).plan).toBe('standard');
   });
-  test('closes after November 30 Mountain time', () => {
-    expect(billing.choosePrice({ seatsTaken: 0, now: after }, E).plan).toBe('standard');
-  });
-  test('LAUNCH_ENDS overrides the date', () => {
-    expect(billing.choosePrice({ seatsTaken: 0, now: after }, { ...E, LAUNCH_ENDS: '2027-01-01T00:00:00Z' }).plan).toBe('launch');
+  test('no end date, seats are the only limit', () => {
+    expect(billing.choosePrice({ seatsTaken: 0, now: new Date('2027-06-01T00:00:00Z') }, E).plan).toBe('launch');
   });
   test('yearly launch price, and a launch member keeps it after the close', () => {
     expect(billing.choosePrice({ seatsTaken: 0, interval: 'year', now: before }, E)).toEqual({ priceId: 'price_launch_yr', plan: 'launch', interval: 'year' });
     expect(billing.choosePrice({ launchMember: true, seatsTaken: 999, interval: 'year', now: after }, E).priceId).toBe('price_launch_yr');
   });
-  test('no standard yearly price means no yearly offer after launch', () => {
-    expect(billing.choosePrice({ seatsTaken: 0, interval: 'year', now: after }, E).priceId).toBeNull();
+  test('no standard yearly price means no yearly offer once seats are gone', () => {
+    expect(billing.choosePrice({ seatsTaken: 250, interval: 'year' }, E).priceId).toBeNull();
   });
   test('an annual launch subscription is a launch seat', () => {
     const p = billing.subscriptionPatch({ id: 's', customer: 'c', status: 'active', items: { data: [{ price: { id: 'price_launch_yr' } }] } }, E);
