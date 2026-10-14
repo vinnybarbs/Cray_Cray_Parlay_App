@@ -10,12 +10,32 @@
  * queue makes the run a no-op that logs nothing. Responds 202 at once.
  * One run at a time: a window marked running in the last hour blocks a
  * new run, so overlapping fires never double spend credits.
+ *
+ * A window whose markets are all player props goes to the per event
+ * backfill (historical_prop_closes). After an NFL prop window, a season
+ * with no nflverse stat lines yet is synced once, so the
+ * historical_prop_results view can grade it.
  */
 
 const { supabase } = require('../../lib/middleware/supabaseAuth.js');
-const { backfillWindow } = require('../../lib/services/historical-odds.js');
+const { backfillWindow, backfillPropsWindow, isPropMarkets } = require('../../lib/services/historical-odds.js');
+const { runSync: syncNflverseSeason } = require('./sync-nflverse-player-stats.js');
 
 const MAX_RUN_MS = 10 * 60 * 1000;
+
+/** NFL season label for a window start date (seasons start in September). */
+function nflSeasonOf(windowStart) {
+  const [y, m] = String(windowStart).split('-').map(Number);
+  return m >= 8 ? y : y - 1;
+}
+
+async function ensureNflStats(season, synced) {
+  if (synced.has(season)) return;
+  synced.add(season);
+  const { count } = await supabase.from('nfl_player_game_stats')
+    .select('id', { count: 'exact', head: true }).eq('season', season);
+  if ((count || 0) === 0) await syncNflverseSeason(season);
+}
 
 async function run() {
   const started = Date.now();
@@ -31,6 +51,7 @@ async function run() {
   if (busy && busy.length) return null;
 
   const done = [];
+  const synced = new Set();
   while (Date.now() - started < MAX_RUN_MS) {
     const { data: next } = await supabase
       .from('historical_odds_jobs')
@@ -41,11 +62,14 @@ async function run() {
       .limit(1);
     const job = next && next[0];
     if (!job) break;
-    const key = { sport: job.sport, window_start: job.window_start };
+    const key = { sport: job.sport, window_start: job.window_start, markets: job.markets };
     await supabase.from('historical_odds_jobs')
       .update({ status: 'running', started_at: new Date().toISOString() }).match(key);
     try {
-      const r = await backfillWindow({ fetchFn: fetch, supabase, apiKey, ...job, windowStart: job.window_start, windowEnd: job.window_end });
+      const props = isPropMarkets(job.markets);
+      const fn = props ? backfillPropsWindow : backfillWindow;
+      const r = await fn({ fetchFn: fetch, supabase, apiKey, ...job, windowStart: job.window_start, windowEnd: job.window_end });
+      if (props && job.sport === 'americanfootball_nfl') await ensureNflStats(nflSeasonOf(job.window_start), synced);
       await supabase.from('historical_odds_jobs').update({
         status: 'done', events: r.events, kickoffs: r.kickoffs, games_with_close: r.gamesWithClose,
         rows_written: r.rowsWritten, credits_used: r.credits, done_at: new Date().toISOString(), error: null,
@@ -87,3 +111,4 @@ async function backfillHistoricalOdds(req, res) {
 
 module.exports = backfillHistoricalOdds;
 module.exports.run = run;
+module.exports.nflSeasonOf = nflSeasonOf;
