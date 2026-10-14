@@ -131,4 +131,60 @@ describe('historical odds helpers', () => {
     expect(written[0]).toMatchObject({ market: 'player_pass_tds', player_key: 'joe burrow', season: 2024, week: 2 });
     expect(r.credits).toBe(urls.length - 2 + 60);
   });
+
+  const ok = (body, last = '0') => ({ ok: true, status: 200, headers: { get: (k) => (k === 'x-requests-last' ? last : null) }, json: async () => body });
+  const ml = (price) => [{ key: 'draftkings', markets: [{ key: 'h2h', outcomes: [{ name: 'H', price }, { name: 'A', price: -price }] }] }];
+
+  test('closeForMissedEvent follows a start time that moved later', async () => {
+    const urls = [];
+    const fetchFn = async (url) => {
+      urls.push(url);
+      if (url.includes('date=2026-03-10T23:29:00Z')) return ok({ timestamp: 't1', data: { id: 'e', commence_time: '2026-03-11T00:00:00Z', home_team: 'H', away_team: 'A', bookmakers: ml(-120) } }, '30');
+      return ok({ timestamp: 't2', data: { id: 'e', commence_time: '2026-03-11T00:00:00Z', home_team: 'H', away_team: 'A', bookmakers: ml(-130) } }, '30');
+    };
+    const credits = { total: 0 };
+    const rows = await h.closeForMissedEvent(fetchFn, 'k', 'basketball_nba', 'h2h', { id: 'e', commence_time: '2026-03-10T23:30:00Z' }, credits);
+    expect(urls).toHaveLength(2);
+    expect(urls[1]).toContain('date=2026-03-10T23:59:00Z');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ external_game_id: 'e', commence_time: '2026-03-11T00:00:00Z' });
+    expect(rows[0].outcomes[0].price).toBe(-130);
+    expect(credits.total).toBe(60);
+  });
+
+  test('closeForMissedEvent asks ten minutes earlier when no book quoted the game', async () => {
+    const urls = [];
+    const fetchFn = async (url) => {
+      urls.push(url);
+      const bookmakers = url.includes('date=2026-03-10T23:20:00Z') ? ml(110) : [];
+      return ok({ timestamp: 't', data: { id: 'e', commence_time: '2026-03-10T23:30:00Z', home_team: 'H', away_team: 'A', bookmakers } });
+    };
+    const rows = await h.closeForMissedEvent(fetchFn, 'k', 'icehockey_nhl', 'h2h', { id: 'e', commence_time: '2026-03-10T23:30:00Z' }, { total: 0 });
+    expect(urls.map((u) => u.match(/date=([^&]+)/)[1])).toEqual(['2026-03-10T23:29:00Z', '2026-03-10T23:20:00Z']);
+    expect(rows).toHaveLength(1);
+  });
+
+  test('backfillWindow skips games already stored and recovers the one the kickoff snapshot missed', async () => {
+    const urls = [];
+    const fetchFn = async (url) => {
+      urls.push(url);
+      if (url.includes('/events?')) {
+        return ok({ data: [
+          { id: 'old', commence_time: '2025-01-03T00:00:00Z' },
+          { id: 'a', commence_time: '2025-01-04T00:00:00Z' }, { id: 'b', commence_time: '2025-01-04T00:00:00Z' },
+        ] }, '1');
+      }
+      if (url.includes('/events/b/odds')) return ok({ timestamp: 't', data: { id: 'b', commence_time: '2025-01-04T00:00:00Z', home_team: 'H', away_team: 'A', bookmakers: ml(-105) } }, '10');
+      return ok({ timestamp: 't', data: [{ id: 'a', commence_time: '2025-01-04T00:00:00Z', home_team: 'H', away_team: 'A', bookmakers: ml(-150) }] }, '10');
+    };
+    const written = [];
+    const chain = { eq: () => chain, gte: () => chain, lt: () => chain, range: async () => ({ data: [{ external_game_id: 'old' }], error: null }) };
+    const supabase = { from: () => ({ select: () => chain, upsert: async (rows) => { written.push(...rows); return { error: null }; } }) };
+    const r = await h.backfillWindow({ fetchFn, supabase, apiKey: 'k', sport: 'basketball_nba', markets: 'h2h', windowStart: '2025-01-01', windowEnd: '2025-01-08' });
+    const bulk = urls.filter((u) => u.includes('/odds?') && !u.includes('/events/'));
+    expect(bulk).toHaveLength(1);
+    expect(bulk[0]).toContain('commenceTimeFrom=2025-01-04T00:00:00Z');
+    expect(r).toMatchObject({ gamesWithClose: 2, recovered: 1 });
+    expect(written.map((w) => w.external_game_id).sort()).toEqual(['a', 'b']);
+  });
 });
