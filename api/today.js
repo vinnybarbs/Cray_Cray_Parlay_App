@@ -8,6 +8,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { attachShop } = require('../lib/services/line-shop.js');
+const { viewerSeesAll, gateToday } = require('../lib/services/paywall.js');
 
 const HORIZON_HOURS = 30;
 const MAX_PICKS = 5;
@@ -178,9 +179,11 @@ async function today(req, res) {
 
     // Line shopping on the upcoming picks (build_queue 105). Best effort.
     await attachShop(supabase, picksRes.data);
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     // A failed started query drops that list, never the picks.
-    res.json({ ...shapeToday(picksRes.data, trapsRes.data, recordRes.data, startedRes.error ? [] : startedRes.data), asOf: now.toISOString() });
+    const shaped = { ...shapeToday(picksRes.data, trapsRes.data, recordRes.data, startedRes.error ? [] : startedRes.data), asOf: now.toISOString() };
+    const access = await viewerSeesAll(req, res);
+    if (!access.viewer) res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+    res.json(access.all ? shaped : gateToday(shaped));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

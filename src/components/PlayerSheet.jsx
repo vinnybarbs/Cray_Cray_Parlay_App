@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { API_BASE_URL as API_BASE } from '../config'
+import { apiFetch } from '../lib/api'
 
 // Player sheet (owner 2026-10-13: "a clickable player with some stats and
 // summary"). Opens from a prop card: this season's game log, averages,
@@ -51,7 +52,7 @@ export default function PlayerSheet({ playerKey, name, team, onClose }) {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${API_BASE}/api/player?key=${encodeURIComponent(playerKey)}`)
+    apiFetch(`/api/player?key=${encodeURIComponent(playerKey)}`)
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
       .then(d => { if (!cancelled) setData(d) })
       .catch(e => { if (!cancelled) setError(e.message) })

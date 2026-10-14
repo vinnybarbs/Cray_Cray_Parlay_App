@@ -5,6 +5,7 @@ import BrandMark, { SignOutButton } from '../components/BrandMark'
 import PropCard, { fmtUnits } from '../components/PropCard'
 import { API_BASE_URL as API_BASE } from '../config'
 import { SkeletonList } from '../components/Skeleton'
+import { apiFetch } from '../lib/api'
 
 // Props (shadow), owner 2026-10-12. Every NFL player prop read at 4
 // points or more, the recent results and the shadow record by market.
@@ -22,7 +23,7 @@ export default function Props() {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${API_BASE}/api/props`)
+    apiFetch(`/api/props`)
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
       .then(d => { if (!cancelled) setData(d) })
       .catch(e => { if (!cancelled) setError(e.message) })

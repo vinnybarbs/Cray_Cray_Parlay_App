@@ -12,6 +12,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { teamAbbr } = require('../lib/services/nfl-inactives');
 const { SHOP_BOOKS, shopProp } = require('../lib/services/line-shop.js');
+const { viewerSeesAll, gateProps } = require('../lib/services/paywall.js');
 
 // Play and above, the same floor the props flip is judged at.
 const MIN_PP = 4;
@@ -273,8 +274,10 @@ async function props(req, res) {
     }
     shaped.upcoming = attachHistory(shaped.upcoming, statRows);
     shaped.live = attachHistory(shaped.live, statRows);
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
-    res.json({ ...shaped, asOf: now.toISOString() });
+    const access = await viewerSeesAll(req, res);
+    if (!access.viewer) res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+    const body = { ...shaped, asOf: now.toISOString() };
+    res.json(access.all ? body : gateProps(body));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -49,6 +49,17 @@ const TABS = [
       </>
     ),
   },
+  {
+    to: '/account',
+    label: 'Account',
+    icon: (
+      <>
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="10" r="3" />
+        <path d="M6.5 18.5c1.2-2.2 3.2-3.3 5.5-3.3s4.3 1.1 5.5 3.3" />
+      </>
+    ),
+  },
 ]
 
 // Routes that get the bar. Landing, admin and the generator keep their
@@ -71,7 +82,7 @@ export default function TabBar() {
         className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-ink-950/95 backdrop-blur border-t border-ink-800"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <ul className="grid grid-cols-4 max-w-xl mx-auto" style={{ height: BAR_HEIGHT }}>
+        <ul className="grid grid-cols-5 max-w-xl mx-auto" style={{ height: BAR_HEIGHT }}>
           {TABS.map(t => (
             <li key={t.to} className="flex">
               <NavLink
