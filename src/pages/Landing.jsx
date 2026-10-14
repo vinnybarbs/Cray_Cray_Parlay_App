@@ -7,6 +7,7 @@ import PropCard from '../components/PropCard'
 import LiveStrip from '../components/LiveStrip'
 import BrandMark from '../components/BrandMark'
 import { SkeletonCard } from '../components/Skeleton'
+import { LAUNCH_PRICE, LAUNCH_ANNUAL, STANDARD_PRICE } from './Account'
 
 // ─── Landing, the public front door ──────────────────────────────────────────
 // Rewritten 2026-10-12 (owner design review, "lead with the play, prove it
@@ -208,11 +209,13 @@ function Pricing({ onStartTrial }) {
       <div className="max-w-5xl mx-auto px-4 py-14 md:py-20 grid md:grid-cols-2 gap-8 items-center">
         <div>
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight">One plan. Try it free.</h2>
-          <p className="mt-3 text-ink-300">Pay nothing for 7 days, no card needed. Cancel anytime yourself.</p>
+          <p className="mt-3 text-ink-300">Pay nothing for 7 days, no card needed. Join at launch and your price never goes up while you stay subscribed. Cancel anytime yourself.</p>
+          <p className="mt-3 text-sm text-ink-400">The ledger, every Lean and every trap stay free forever.</p>
         </div>
         <div className="bg-ink-900 rounded-2xl border border-ink-700 p-6">
           <p className="text-ink-300">TrapHawk Pro</p>
-          <p className="mt-1"><span className="text-4xl font-bold tabular-nums">$19.99</span><span className="text-ink-400"> a month</span></p>
+          <p className="mt-1"><span className="text-4xl font-bold tabular-nums">{LAUNCH_PRICE}</span><span className="text-ink-400"> a month</span></p>
+          <p className="mt-1 text-sm text-signal-pos">Founding price, or {LAUNCH_ANNUAL} a year, kept as long as you stay subscribed. First 250 members only, then {STANDARD_PRICE} a month.</p>
           <ul className="mt-5 flex flex-col gap-2.5">
             {included.map(f => (
               <li key={f} className="flex gap-2.5 text-sm text-ink-200">

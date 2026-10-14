@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 import { edgeTier } from '../lib/tiers'
 import { fmtGameDateTime } from '../lib/gameTime'
-import { API_BASE_URL as API_BASE } from '../config'
 import { prefetchDigest } from './DailyDigest'
 import PropCard from '../components/PropCard'
 import LineShop from '../components/LineShop'
 import InstallButton from '../components/InstallButton'
 import { SkeletonList } from '../components/Skeleton'
+import LockedCard from '../components/Locked'
+import { apiFetch } from '../lib/api'
 
 // Today (build_queue 96, owner 2026-10-12): the one screen a first time
 // visitor or a home screen install opens on. The day's best plays in
@@ -111,7 +112,7 @@ export default function Today() {
   // failure never blocks the page.
   useEffect(() => {
     let cancelled = false
-    fetch(`${API_BASE}/api/props`)
+    apiFetch('/api/props')
       .then(r => (r.ok ? r.json() : null))
       .then(d => { if (!cancelled && d) setProps(d) })
       .catch(() => {})
@@ -120,7 +121,7 @@ export default function Today() {
 
   useEffect(() => {
     let cancelled = false
-    fetch(`${API_BASE}/api/today`)
+    apiFetch('/api/today')
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
       .then(d => { if (!cancelled) setData(d) })
       .catch(e => { if (!cancelled) setError(e.message) })
@@ -134,7 +135,7 @@ export default function Today() {
   const started = data?.started || []
   const startedProps = (props?.live || []).slice(0, 3)
   const r30 = data?.record?.last30
-  const plays = picks.filter(p => Number(p.edge_pp) >= 4).length
+  const plays = picks.filter(p => p.locked || Number(p.edge_pp) >= 4).length
   const shownProps = (props?.upcoming || []).slice(0, 3)
   const cardId = (kind, i) => `today-${kind}-${i}`
 
@@ -174,8 +175,9 @@ export default function Today() {
 
         {picks.length > 0 && (
           <section className="flex flex-col gap-3" aria-label="Today's picks">
-            {picks.map((p, i) => (
-              <PickRow key={`${p.home_team}|${p.away_team}|${i}`} id={cardId('pick', i)} p={p} onOpen={() => navigate('/digest')} />
+            {picks.map((p, i) => (p.locked
+              ? <LockedCard key={`${p.home_team}|${p.away_team}|${i}`} id={cardId('pick', i)} tier={p.tier} title={`${p.away_team} at ${p.home_team}`} sub={`${p.sport} · ${p.bet_type}`} when={p.game_date} />
+              : <PickRow key={`${p.home_team}|${p.away_team}|${i}`} id={cardId('pick', i)} p={p} onOpen={() => navigate('/digest')} />
             ))}
           </section>
         )}

@@ -12,6 +12,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { showable, describe } = require('./props');
 const { summarizeRedzone } = require('./cron/narrate-nfl-props');
+const { viewerSeesAll, gatePlayer } = require('../lib/services/paywall.js');
 
 const MAX_GAMES = 17;
 const MAX_READS = 25;
@@ -129,8 +130,10 @@ async function player(req, res) {
       shaped.player = name ? { name, team: null, position: null } : null;
     }
     if (!shaped.player) { res.status(404).json({ error: 'Player not found' }); return; }
-    res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
-    res.json({ ...shaped, asOf: new Date().toISOString() });
+    const access = await viewerSeesAll(req, res);
+    if (!access.viewer) res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
+    const body = { ...shaped, asOf: new Date().toISOString() };
+    res.json(access.all ? body : gatePlayer(body));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

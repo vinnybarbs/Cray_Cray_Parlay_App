@@ -4,6 +4,7 @@ const { getTennisContext } = require('../lib/services/tennis-data');
 const { getUfcContext } = require('../lib/services/ufc-data');
 const { publishFlagsAll } = require('../lib/services/publish-markets.js');
 const { attachShop } = require('../lib/services/line-shop.js');
+const { viewerSeesAll, gateDigest, PAID_PP } = require('../lib/services/paywall.js');
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -467,7 +468,8 @@ async function getDigest(req, res) {
       injuriesBySport[entry.team_name] = entry;
     }
 
-    res.json({
+    const access = await viewerSeesAll(req, res);
+    const body = {
       status: 'ok',
       timestamp: new Date().toISOString(),
       publishMarkets: publishMarkets || {},
@@ -480,7 +482,8 @@ async function getDigest(req, res) {
       firstGameTime: firstGameResult || null,
       onDeck: onDeckResult || {},
       golf: golfResult || null,
-    });
+    };
+    res.json(access.all ? body : gateDigest(body));
   } catch (err) {
     logger.error('Digest endpoint error', { error: err.message });
     res.status(500).json({ error: 'Internal server error', message: err.message });
@@ -519,6 +522,16 @@ async function deepResearch(req, res) {
     // grades, same as the tile.
     const startedAlready = gameAnalysisResult.game_date && new Date(gameAnalysisResult.game_date) <= new Date();
     await attachPublishedPicks(supabase, [gameAnalysisResult], { started: startedAlready });
+
+    // The paywall: an upcoming Play and above is Pro only, so the
+    // research modal answers locked before any of its reads run.
+    const pub = gameAnalysisResult.published_pick;
+    if (!startedAlready && pub && Number(pub.edge_pp) >= PAID_PP) {
+      const access = await viewerSeesAll(req, res);
+      if (!access.all) {
+        return res.json({ locked: true, game: { home_team: gameAnalysisResult.home_team, away_team: gameAnalysisResult.away_team, game_date: gameAnalysisResult.game_date, sport: gameAnalysisResult.sport, tier: pub.tier } });
+      }
+    }
 
     // Canonical fact sheet (same as /digest list view): structured matchup,
     // market, records, edge sections sourced from build_game_fact_sheet().

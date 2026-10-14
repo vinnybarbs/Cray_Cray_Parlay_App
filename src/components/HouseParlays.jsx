@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { API_BASE_URL as API_BASE } from '../config'
 import { fmtGameDateTime } from '../lib/gameTime'
+import { apiFetch } from '../lib/api'
+import { UnlockButton } from './Locked'
 
 // The machine-built parlays, one button away on the digest (owner spec
 // 2026-08-25: they lived only in the ledger and nobody could find them).
@@ -32,7 +34,7 @@ export default function HouseParlays() {
     setLoading(true)
     ;(async () => {
       try {
-        const res = await fetch(`${API_BASE}/api/house-parlays`)
+        const res = await apiFetch(`/api/house-parlays`)
         if (!res.ok) throw new Error(`Server error ${res.status}`)
         const json = await res.json()
         if (!cancelled) setData(json)
@@ -100,12 +102,18 @@ export default function HouseParlays() {
                     )}
                     <span className="ml-auto"><StatusChip status={p.status} /></span>
                   </div>
+                  {p.locked && (
+                    <div className="flex items-center justify-between gap-3 py-1">
+                      <span className="text-xs text-ink-400">Legs that have not started are for Pro members.</span>
+                      <UnlockButton />
+                    </div>
+                  )}
                   {(p.legs || []).map((leg, i) => (
                     <div key={i} className="flex flex-wrap items-center gap-x-2 gap-y-0.5 py-1 text-sm">
                       <span className="px-1.5 py-0.5 rounded-sharp tabular-nums text-[10px] bg-ink-850 shadow-hairline text-ink-300 flex-shrink-0">
-                        {leg.tier}
+                        {leg.locked ? 'Pro' : leg.tier}
                       </span>
-                      <span className="text-ink-200 min-w-0">{leg.pick}</span>
+                      <span className="text-ink-200 min-w-0">{leg.locked ? `${leg.away_team} at ${leg.home_team}` : leg.pick}</span>
                       <span className="tabular-nums text-[11px] text-ink-400 flex-shrink-0 ml-auto whitespace-nowrap">
                         {leg.sport}{leg.game_date ? ` · ${fmtGameDateTime(leg.game_date)}` : ''}
                       </span>

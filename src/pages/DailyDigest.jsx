@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import InstallButton from '../components/InstallButton'
-import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct, sidePct, legPct, bookOurPct, pctPair, rawImplied } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, lockOddsFor, finalPpFor, livePpFor, pickSideKey, breakEvenPct, sidePct, legPct, bookOurPct, pctPair, rawImplied, TIERS } from '../lib/tiers'
 import { setPublishFlags, isShadowSport, isShadowMarket } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -8,6 +8,8 @@ import YesterdayBoard from '../components/YesterdayBoard'
 import HouseParlays from '../components/HouseParlays'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
 import LineShop from '../components/LineShop'
+import { apiFetch } from '../lib/api'
+import LockedCard from '../components/Locked'
 
 // Shadow sports: the board shows the model's read, but nothing publishes
 // until go-live, so no tile may wear bet-tier language. The set lives in
@@ -199,7 +201,7 @@ function DeepResearchModal({ gameKey, game, onClose }) {
       setLoading(true)
       setError(null)
       try {
-        const res = await fetch(`${API_BASE}/api/deep-research?game_key=${encodeURIComponent(gameKey)}`)
+        const res = await apiFetch(`/api/deep-research?game_key=${encodeURIComponent(gameKey)}`)
         if (!res.ok) throw new Error(`Server error ${res.status}`)
         const json = await res.json()
         if (!cancelled) { setPublishFlags(json?.publishMarkets); setData(json) }
@@ -958,7 +960,22 @@ function LockedNote({ game }) {
   )
 }
 
-function GameCard({ game, gameKey, sport, onDeepResearch }) {
+// Where a locked game ranks: just inside its tier's band.
+function lockedPp(game) {
+  const t = TIERS.find(x => x.label === game?.published_pick?.tier)
+  return t ? t.min + 0.01 : 4.01
+}
+
+// The paywall's tile: the matchup and the tier, never the side.
+function GameCard(props) {
+  const { game } = props
+  if (game?.locked) {
+    return <LockedCard tier={game.published_pick?.tier} title={`${game.away_team} at ${game.home_team}`} sub={game.published_pick?.bet_type || 'Pick'} when={game.game_date} />
+  }
+  return <OpenGameCard {...props} />
+}
+
+function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
 
   // Signed edge in pp for the recommended side: the published claim when
@@ -1290,13 +1307,15 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
   // independent of the pick, since one game can carry both.
   // The final claim: the published edge_pp when the row exists, else the
   // raw read with the price rails applied (tiers.js finalPpFor).
-  const ppFor = (g) => finalPpFor(g)
+  // A locked game (the paywall) has no side or edge, only its tier, so
+  // it ranks at the bottom of its tier's band.
+  const ppFor = (g) => (g.locked ? lockedPp(g) : finalPpFor(g))
   // Best edge first, everywhere. Unsorted, the collapsed preview showed
   // the first three games by schedule and the section's headline chip
   // came from whichever game the API returned first (2026-08-12: a Lean
   // fronted a section that held a Sharp Take).
   const allPickGames = games
-    .filter(g => g.recommended_pick && (ppFor(g) ?? 0) >= 2)
+    .filter(g => (g.recommended_pick || g.locked) && (ppFor(g) ?? 0) >= 2)
     .sort((a, b) => (ppFor(b) ?? 0) - (ppFor(a) ?? 0))
   // Tier-narrowed view when a tier chip is active.
   const pickGames = (filter === 'All' || filter === 'Legs' || filter === 'Traps')
@@ -1365,7 +1384,10 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
                 {trapEntries.length > 0 && <span className="text-signal-neg"> · {trapEntries.length} trap{trapEntries.length !== 1 ? 's' : ''}</span>}
                 {bubbleGames.length > 0 && <span className="text-ink-500"> · {bubbleGames.length} on the bubble</span>}
                 {upcomingCount > 0 && <span className="text-ink-500"> · {upcomingCount} next 24h</span>}
-                {!expanded && topSignedPp != null && !SHADOW_DISPLAY.has(sport) && (
+                {!expanded && pickGames[0]?.locked && !SHADOW_DISPLAY.has(sport) && (
+                  <span className="ml-2 text-ink-500">· Top: <span className={`font-semibold ${topTier.color}`}>{pickGames[0].published_pick?.tier}, Pro</span></span>
+                )}
+                {!expanded && topSignedPp != null && !pickGames[0]?.locked && !SHADOW_DISPLAY.has(sport) && (
                   <span className="ml-2 text-ink-500">
                     · Top: <span className={`font-semibold ${topTier.color}`}>{topTier.label}, {pctPair(sidePct(pickGames[0], pickGames[0].recommended_side, topSignedPp)) ?? formatPp(topSignedPp)}</span>
                   </span>
@@ -1405,12 +1427,12 @@ function SportSection({ sport, games, injuries, isDefaultExpanded, onDeepResearc
               <div key={i} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-y-0.5 gap-x-3 text-sm">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className={`px-1.5 py-0.5 rounded-sharp text-[10px] font-semibold flex-shrink-0 tabular-nums ${tier.bg} ${tier.color}`}>
-                    {SHADOW_DISPLAY.has(sport) ? 'Shadow' : ((pctPair(sidePct(game, game.recommended_side, pp)) ?? formatPp(pp)) ?? '-')}
+                    {SHADOW_DISPLAY.has(sport) ? 'Shadow' : game.locked ? game.published_pick?.tier : ((pctPair(sidePct(game, game.recommended_side, pp)) ?? formatPp(pp)) ?? '-')}
                   </span>
                   <span className="text-ink-200 truncate">{game.away_team} at {game.home_team}</span>
                 </div>
                 <span className={` text-xs font-medium flex-shrink-0 truncate sm:max-w-[140px] tabular-nums pl-9 sm:pl-0 ${SHADOW_DISPLAY.has(sport) ? 'text-ink-500' : 'text-signal-pos'}`}>
-                  {SHADOW_DISPLAY.has(sport) ? 'read withheld' : (game.recommended_pick || '-')}
+                  {SHADOW_DISPLAY.has(sport) ? 'read withheld' : game.locked ? 'Pro' : (game.recommended_pick || '-')}
                 </span>
               </div>
             )
@@ -1794,7 +1816,7 @@ let digestInFlight = null
 // data that is already here.
 function loadDigest() {
   if (!digestInFlight) {
-    digestInFlight = fetch(`${API_BASE}/api/digest`)
+    digestInFlight = apiFetch(`/api/digest`)
       .then(res => {
         if (!res.ok) throw new Error(`Server error ${res.status}`)
         return res.json()
@@ -1887,7 +1909,7 @@ export default function DailyDigest({ onBack }) {
           else if (alt?.tier === 'Play') c.plays++
           else if (alt?.tier === 'Lean') c.leans++
         }
-        const pp = finalPpFor(g)
+        const pp = g.locked ? lockedPp(g) : finalPpFor(g)
         if (pp == null) continue
         // Four actionable tiers since the 2026-08-16 Strong Play restore:
         // Sharp Take 10+, Strong Play 7-10, Play 4-7, Lean 2-4. The count

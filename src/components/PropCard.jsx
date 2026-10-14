@@ -3,6 +3,7 @@ import { fmtGameDateTime } from '../lib/gameTime'
 import { teamColors } from '../lib/teamColors'
 import PlayerSheet from './PlayerSheet'
 import LineShop from './LineShop'
+import { LockIcon, UnlockButton } from './Locked'
 
 // One shadow prop read (owner 2026-10-12: show props as shadow so the
 // site can be envisioned before they publish). Always carries the SHADOW
@@ -231,7 +232,35 @@ function StartedChip({ p }) {
 
 const fmtClock = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 
+// A prop read for a visitor without Pro: the player and the market,
+// no side, line or why (the server removed them).
+function LockedProp({ p }) {
+  return (
+    <div className="bg-ink-900 rounded-2xl border border-ink-700 px-4 py-4 flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <Avatar name={p.player} team={p.team} />
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-ink-100 leading-tight truncate">{p.player}</div>
+          <div className="text-xs text-ink-400 truncate">
+            {p.awayAbbr && p.homeAbbr ? `${p.awayAbbr} at ${p.homeAbbr}` : `${p.away_team} at ${p.home_team}`} · {fmtGameDateTime(p.commence_time)}
+          </div>
+        </div>
+        <span className="text-xs text-ink-500 flex items-center gap-1 flex-shrink-0"><LockIcon className="w-3.5 h-3.5" /> Pro</span>
+      </div>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="text-sm text-ink-300">A {p.marketLabel} read, for Pro members.</span>
+        <UnlockButton />
+      </div>
+    </div>
+  )
+}
+
 export default function PropCard({ p, showOutcome = false }) {
+  if (p.locked) return <LockedProp p={p} />
+  return <OpenPropCard p={p} showOutcome={showOutcome} />
+}
+
+function OpenPropCard({ p, showOutcome }) {
   const [open, setOpen] = useState(false)
   const started = !!p.started
   const [playerOpen, setPlayerOpen] = useState(false)

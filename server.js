@@ -26,6 +26,11 @@ app.use(cors({
   credentials: true
 }));
 
+// Stripe webhook first: the signature is checked against the raw bytes,
+// so it must see the body before express.json parses it.
+const billingApi = require('./api/billing');
+app.post('/api/stripe/webhook', express.raw({ type: 'application/json', limit: '1mb' }), billingApi.webhook);
+
 app.use(express.json());
 
 // Apply general rate limiting to all routes
@@ -131,6 +136,10 @@ app.get('/api/board-history', boardHistory);
 
 // House parlays for the digest's parlay view: today's machine-built
 // parlays plus the running hit-rate record.
+app.get('/api/billing/status', billingApi.status);
+app.post('/api/billing/checkout', billingApi.checkout);
+app.post('/api/billing/portal', billingApi.portal);
+app.post('/api/billing/redeem', billingApi.redeem);
 const houseParlaysApi = require('./api/house-parlays');
 app.get('/api/house-parlays', houseParlaysApi);
 

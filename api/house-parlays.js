@@ -8,6 +8,7 @@
 const { supabase } = require('../lib/middleware/supabaseAuth.js');
 const { siteDay } = require('../shared/site-day.js');
 const { enrichParlayLegOutcomes } = require('../lib/services/parlay-leg-outcomes.js');
+const { viewerSeesAll, gateParlays } = require('../lib/services/paywall.js');
 
 module.exports = async function houseParlays(req, res) {
   try {
@@ -39,8 +40,9 @@ module.exports = async function houseParlays(req, res) {
       hitRate: settled > 0 ? Math.round((won / settled) * 1000) / 10 : null,
     };
 
+    const access = await viewerSeesAll(req, res);
     res.setHeader('Cache-Control', 'no-store');
-    res.status(200).json({ date: day, isToday: day === today, parlays, record });
+    res.status(200).json({ date: day, isToday: day === today, parlays: access.all ? parlays : gateParlays(parlays), record, ...(access.all ? {} : { gated: true }) });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
