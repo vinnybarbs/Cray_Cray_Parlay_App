@@ -5,7 +5,7 @@
 // number ever reaches this server.
 //
 //   GET  /api/billing/status    access, plan and whether launch seats remain
-//   POST /api/billing/checkout  { url } of a Stripe Checkout page
+//   POST /api/billing/checkout  { interval: month or year }, answers { url }
 //   POST /api/billing/portal    { url } of the Stripe customer portal
 //   POST /api/stripe/webhook    raw body, signature checked
 
@@ -33,11 +33,15 @@ async function status(req, res) {
     const viewer = await resolveViewer(req);
     const taken = await seatsTaken(supabase).catch(() => null);
     const cap = billing.launchSeats();
-    const offer = billing.choosePrice({ launchMember: Boolean(viewer.row && viewer.row.launch_member), seatsTaken: taken });
+    const launchMember = Boolean(viewer.row && viewer.row.launch_member);
+    const offer = billing.choosePrice({ launchMember, seatsTaken: taken });
+    const yearly = billing.choosePrice({ launchMember, seatsTaken: taken, interval: 'year' });
     res.json({
       signedIn: Boolean(viewer.user),
       paywall: paywallOn(),
       billingReady: !billing.keyProblem() && Boolean(offer.priceId),
+      yearlyReady: !billing.keyProblem() && Boolean(yearly.priceId) && yearly.plan === offer.plan,
+      launchEnds: new Date(billing.launchEnds()).toISOString(),
       access: viewer.entitlement,
       launchMember: Boolean(viewer.row && viewer.row.launch_member),
       hasBilling: Boolean(viewer.row && viewer.row.stripe_customer_id),
@@ -61,7 +65,8 @@ async function checkout(req, res) {
     if (row && billing.ENTITLED_STATUSES.has(row.status)) {
       return res.status(409).json({ error: 'You already have Pro', manage: true });
     }
-    const offer = billing.choosePrice({ launchMember: Boolean(row && row.launch_member), seatsTaken: await seatsTaken(supabase) });
+    const interval = req.body && req.body.interval === 'year' ? 'year' : 'month';
+    const offer = billing.choosePrice({ launchMember: Boolean(row && row.launch_member), seatsTaken: await seatsTaken(supabase), interval });
     if (!offer.priceId) return res.status(503).json({ error: 'Billing is not set up yet' });
 
     // One Stripe customer per user, kept on the row for the portal.
@@ -77,13 +82,13 @@ async function checkout(req, res) {
       customer,
       client_reference_id: viewer.user.id,
       line_items: [{ price: offer.priceId, quantity: 1 }],
-      subscription_data: { metadata: { user_id: viewer.user.id, plan: offer.plan } },
-      metadata: { user_id: viewer.user.id, plan: offer.plan },
+      subscription_data: { metadata: { user_id: viewer.user.id, plan: offer.plan, interval } },
+      metadata: { user_id: viewer.user.id, plan: offer.plan, interval },
       allow_promotion_codes: true,
       success_url: `${base}/#/account?checkout=done`,
       cancel_url: `${base}/#/account?checkout=cancelled`,
     });
-    res.json({ url: session.url, plan: offer.plan });
+    res.json({ url: session.url, plan: offer.plan, interval });
   } catch (err) {
     logger.error('Checkout failed', { error: err.message });
     res.status(500).json({ error: 'Checkout failed, try again' });

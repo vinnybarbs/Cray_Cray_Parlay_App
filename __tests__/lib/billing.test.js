@@ -6,22 +6,49 @@ const NOW = new Date('2026-10-20T12:00:00Z');
 
 describe('choosePrice', () => {
   test('launch price while seats remain', () => {
-    expect(billing.choosePrice({ launchMember: false, seatsTaken: 10 }, ENV)).toEqual({ priceId: 'price_launch', plan: 'launch' });
+    expect(billing.choosePrice({ launchMember: false, seatsTaken: 10, now: NOW }, ENV)).toEqual({ priceId: 'price_launch', plan: 'launch', interval: 'month' });
   });
   test('standard price once the launch seats are gone', () => {
-    expect(billing.choosePrice({ launchMember: false, seatsTaken: 100 }, ENV)).toEqual({ priceId: 'price_std', plan: 'standard' });
+    expect(billing.choosePrice({ launchMember: false, seatsTaken: 250, now: NOW }, ENV)).toEqual({ priceId: 'price_std', plan: 'standard', interval: 'month' });
   });
   test('standard price when the launch is closed', () => {
-    expect(billing.choosePrice({ launchMember: false, seatsTaken: 0 }, { ...ENV, LAUNCH_OPEN: 'off' }).plan).toBe('standard');
+    expect(billing.choosePrice({ launchMember: false, seatsTaken: 0, now: NOW }, { ...ENV, LAUNCH_OPEN: 'off' }).plan).toBe('standard');
   });
   test('a launch member gets the launch price back for life', () => {
     expect(billing.choosePrice({ launchMember: true, seatsTaken: 500 }, { ...ENV, LAUNCH_OPEN: 'off' }).plan).toBe('launch');
   });
   test('the cap is configurable', () => {
-    expect(billing.choosePrice({ seatsTaken: 5 }, { ...ENV, LAUNCH_SEATS: '5' }).plan).toBe('standard');
+    expect(billing.choosePrice({ seatsTaken: 5, now: NOW }, { ...ENV, LAUNCH_SEATS: '5' }).plan).toBe('standard');
   });
   test('no prices set means no offer', () => {
     expect(billing.choosePrice({ seatsTaken: 0 }, {}).priceId).toBeNull();
+  });
+});
+
+describe('founding terms', () => {
+  const E = { ...ENV, STRIPE_PRICE_LAUNCH_ANNUAL: 'price_launch_yr' };
+  const before = new Date('2026-11-30T20:00:00Z');
+  const after = new Date('2026-12-01T08:00:00Z');
+  test('defaults to 250 seats', () => {
+    expect(billing.choosePrice({ seatsTaken: 249, now: before }, E).plan).toBe('launch');
+    expect(billing.choosePrice({ seatsTaken: 250, now: before }, E).plan).toBe('standard');
+  });
+  test('closes after November 30 Mountain time', () => {
+    expect(billing.choosePrice({ seatsTaken: 0, now: after }, E).plan).toBe('standard');
+  });
+  test('LAUNCH_ENDS overrides the date', () => {
+    expect(billing.choosePrice({ seatsTaken: 0, now: after }, { ...E, LAUNCH_ENDS: '2027-01-01T00:00:00Z' }).plan).toBe('launch');
+  });
+  test('yearly launch price, and a launch member keeps it after the close', () => {
+    expect(billing.choosePrice({ seatsTaken: 0, interval: 'year', now: before }, E)).toEqual({ priceId: 'price_launch_yr', plan: 'launch', interval: 'year' });
+    expect(billing.choosePrice({ launchMember: true, seatsTaken: 999, interval: 'year', now: after }, E).priceId).toBe('price_launch_yr');
+  });
+  test('no standard yearly price means no yearly offer after launch', () => {
+    expect(billing.choosePrice({ seatsTaken: 0, interval: 'year', now: after }, E).priceId).toBeNull();
+  });
+  test('an annual launch subscription is a launch seat', () => {
+    const p = billing.subscriptionPatch({ id: 's', customer: 'c', status: 'active', items: { data: [{ price: { id: 'price_launch_yr' } }] } }, E);
+    expect(p).toMatchObject({ plan: 'launch', launch_member: true });
   });
 });
 

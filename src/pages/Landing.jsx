@@ -8,7 +8,7 @@ import LiveStrip from '../components/LiveStrip'
 import BrandMark from '../components/BrandMark'
 import { SkeletonCard } from '../components/Skeleton'
 import { formatPp } from '../lib/tiers'
-import { LAUNCH_PRICE, STANDARD_PRICE } from './Account'
+import { LAUNCH_PRICE, LAUNCH_ANNUAL, STANDARD_PRICE } from './Account'
 
 // ─── Landing, the public front door ──────────────────────────────────────────
 // Rewritten 2026-10-12 (owner design review, "lead with the play, prove it
@@ -224,7 +224,7 @@ function Pricing({ onStartTrial }) {
         <div className="bg-ink-900 rounded-2xl border border-ink-700 p-6">
           <p className="text-ink-300">TrapHawk Pro</p>
           <p className="mt-1"><span className="text-4xl font-bold tabular-nums">{LAUNCH_PRICE}</span><span className="text-ink-400"> a month</span></p>
-          <p className="mt-1 text-sm text-signal-pos">Launch price, locked in for life. {STANDARD_PRICE} for new members after launch.</p>
+          <p className="mt-1 text-sm text-signal-pos">Founding price, locked in for life, or {LAUNCH_ANNUAL} a year. {STANDARD_PRICE} a month for new members after November 30.</p>
           <ul className="mt-5 flex flex-col gap-2.5">
             {included.map(f => (
               <li key={f} className="flex gap-2.5 text-sm text-ink-200">

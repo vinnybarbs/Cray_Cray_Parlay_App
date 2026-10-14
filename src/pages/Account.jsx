@@ -9,7 +9,9 @@ import { apiFetch } from '../lib/api'
 // $9.99 a month and keep that price for life. Stripe hosts checkout and
 // the billing portal, so no card field lives on this page.
 export const LAUNCH_PRICE = '$9.99'
+export const LAUNCH_ANNUAL = '$89'
 export const STANDARD_PRICE = '$19.99'
+const STANDARD_ANNUAL = '$119.99'
 
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : null)
 
@@ -39,11 +41,13 @@ function useBillingStatus(isAuthenticated, poll) {
   return { status, error }
 }
 
-async function goTo(path, setBusy, setError) {
+async function goTo(path, setBusy, setError, body = null) {
   setBusy(true)
   setError(null)
   try {
-    const r = await apiFetch(path, { method: 'POST' })
+    const r = await apiFetch(path, body
+      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : { method: 'POST' })
     const d = await r.json().catch(() => ({}))
     if (!r.ok || !d.url) throw new Error(d.error || 'Something went wrong, try again')
     window.location.assign(d.url)
@@ -62,11 +66,14 @@ export default function Account() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [showAuth, setShowAuth] = useState(false)
+  const [period, setPeriod] = useState('month')
 
   const access = status?.access
   const subscribed = access?.reason === 'subscribed'
   const launchOffer = status?.offer === 'launch'
-  const price = launchOffer ? LAUNCH_PRICE : STANDARD_PRICE
+  const yearly = period === 'year' && status?.yearlyReady
+  const price = yearly ? (launchOffer ? LAUNCH_ANNUAL : STANDARD_ANNUAL) : (launchOffer ? LAUNCH_PRICE : STANDARD_PRICE)
+  const per = yearly ? 'a year' : 'a month'
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
@@ -107,7 +114,7 @@ export default function Account() {
             {subscribed && (
               <>
                 <p className="text-ink-200">
-                  You are on Pro{status.launchMember ? ` at the ${LAUNCH_PRICE} launch price, locked in for life` : ''}.
+                  You are on Pro{status.launchMember ? ` at the founding price, locked in for life` : ''}.
                 </p>
                 {access.until && (
                   <p className="text-sm text-ink-400">
@@ -129,19 +136,30 @@ export default function Account() {
               <>
                 {access?.reason === 'trial' && <p className="text-ink-200">Your free week runs until {fmtDate(access.until)}.</p>}
                 {access && !access.entitled && <p className="text-ink-200">Your free week is over. The ledger, every Lean and every trap stay free.</p>}
+                {status.yearlyReady && (
+                  <div className="grid grid-cols-2 gap-2" role="group" aria-label="Billing period">
+                    {[['month', 'Monthly'], ['year', 'Yearly']].map(([k, label]) => (
+                      <button key={k} onClick={() => setPeriod(k)} aria-pressed={period === k}
+                        className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${period === k ? 'border-signal-pos text-signal-pos' : 'border-ink-700 text-ink-300'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <div>
-                  <p><span className="text-4xl font-bold tabular-nums">{price}</span><span className="text-ink-400"> a month</span></p>
+                  <p><span className="text-4xl font-bold tabular-nums">{price}</span><span className="text-ink-400"> {per}</span></p>
                   {launchOffer && (
                     <p className="mt-1 text-sm text-signal-pos">
-                      Launch price, yours for as long as you stay.
+                      Founding price, yours for as long as you stay.
+                      {status.launchEnds ? ` Open until ${fmtDate(new Date(new Date(status.launchEnds).getTime() - 1).toISOString())}.` : ''}
                       {status.launchSeatsLeft != null && status.launchSeatsLeft <= 50 ? ` ${status.launchSeatsLeft} launch spots left.` : ''}
                     </p>
                   )}
-                  {launchOffer && <p className="mt-1 text-xs text-ink-500">Goes to {STANDARD_PRICE} for new members after launch.</p>}
+                  {launchOffer && <p className="mt-1 text-xs text-ink-500">Goes to {STANDARD_PRICE} a month for new members after launch.</p>}
                 </div>
                 {status.billingReady ? (
-                  <button disabled={busy} onClick={() => goTo('/api/billing/checkout', setBusy, setError)} className="w-full px-6 py-4 rounded-xl bg-signal-pos text-ink-950 font-semibold hover:bg-signal-pos/90 active:scale-[0.98] disabled:opacity-60 transition">
-                    {busy ? 'Opening checkout' : `Get Pro for ${price} a month`}
+                  <button disabled={busy} onClick={() => goTo('/api/billing/checkout', setBusy, setError, { interval: yearly ? 'year' : 'month' })} className="w-full px-6 py-4 rounded-xl bg-signal-pos text-ink-950 font-semibold hover:bg-signal-pos/90 active:scale-[0.98] disabled:opacity-60 transition">
+                    {busy ? 'Opening checkout' : `Get Pro for ${price} ${per}`}
                   </button>
                 ) : (
                   <p className="text-sm text-ink-400">Pro opens soon.</p>
