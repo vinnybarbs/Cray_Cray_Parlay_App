@@ -7,7 +7,6 @@ import PropCard from '../components/PropCard'
 import LiveStrip from '../components/LiveStrip'
 import BrandMark from '../components/BrandMark'
 import { SkeletonCard } from '../components/Skeleton'
-import { formatPp } from '../lib/tiers'
 
 // ─── Landing, the public front door ──────────────────────────────────────────
 // Rewritten 2026-10-12 (owner design review, "lead with the play, prove it
@@ -22,6 +21,7 @@ export default function Landing({ onStartTrial, onSignIn }) {
   const [stats, setStats] = useState(null)
   const [sharpTake, setSharpTake] = useState(null)
   const [ticker, setTicker] = useState(null)
+  const [tickerDone, setTickerDone] = useState(false)
   const [props, setProps] = useState(null)
 
   useEffect(() => {
@@ -31,30 +31,21 @@ export default function Landing({ onStartTrial, onSignIn }) {
       .then(j => { if (!cancelled && j) set(j) })
       .catch(() => { /* each section has its own empty state */ })
     get('/api/public-stats', j => { if (j.overall) setStats(j.overall); if (j.sharpTakeAllTime) setSharpTake(j.sharpTakeAllTime) })
-    get('/api/public-ticker', setTicker)
+    get('/api/public-ticker', setTicker).finally(() => { if (!cancelled) setTickerDone(true) })
     get('/api/props', setProps)
     return () => { cancelled = true }
   }, [])
 
   const scrollTo = (id) => () => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 
-  // The strip in plain words: a play with how far it beats the price, or
-  // the side not to bet. Strongest play first, then alternating.
-  const items = (ticker?.items || [])
-  const pos = items.filter(it => it.pp >= 0).sort((a, b) => b.pp - a.pp)
-  const neg = items.filter(it => it.pp < 0).sort((a, b) => a.pp - b.pp)
-  const strip = []
-  for (let i = 0; i < Math.max(pos.length, neg.length); i++) {
-    if (pos[i]) strip.push({ key: `p${i}`, label: `${pos[i].sport} ${pos[i].label}`, price: pos[i].book_pct != null ? `Book ${pos[i].book_pct}%, us ${pos[i].our_pct}%` : formatPp(pos[i].pp), targetId: 'free-look' })
-    if (neg[i]) strip.push({ key: `n${i}`, label: `Don't bet ${neg[i].sport} ${neg[i].label}`, tone: 'neg', targetId: 'free-look' })
-  }
+  // The ticker: published plays and the bait to stay off, already in
+  // order from the API. Every chip scrolls to the free look.
+  const strip = (ticker?.items || []).map((it, i) => ({ ...it, key: `${it.kind}-${i}` }))
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100 antialiased">
       <Nav onStartTrial={onStartTrial} onSignIn={onSignIn} />
-      <div className="max-w-xl md:max-w-5xl mx-auto px-4">
-        <LiveStrip items={strip} />
-      </div>
+      <LiveStrip items={strip} loading={!tickerDone} onSelect={scrollTo('free-look')} />
       <Hero onStartTrial={onStartTrial} onSignIn={onSignIn} onSeeFree={scrollTo('free-look')} />
       <FreeLook props={props} onStartTrial={onStartTrial} />
       <Proofs stats={stats} sharpTake={sharpTake} />
