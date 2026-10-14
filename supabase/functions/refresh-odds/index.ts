@@ -29,13 +29,17 @@ const SOCCER_SPORTS = ["soccer_epl", "soccer_usa_mls", ...EXTRA_SOCCER];
 // starting inside GAME_DAY_AHEAD_MS (or one that started inside
 // LIVE_BEHIND_MS) refreshes every run, every 20 minutes. Any other sport
 // refreshes only on the run at the top of every SLOW_EVERY_HOURS hour.
+// The fast cadence covers game day, the slow one games further out.
 // Soccer is shadow and never refreshes more than hourly. Hotness reads
 // the commence times already in odds_cache, so it costs no API call, and
 // a sport with nothing cached is cold (an off season key returns no
 // events, which is free, on its slow run).
 const GAME_DAY_AHEAD_MS = 18 * 3600 * 1000;
 const LIVE_BEHIND_MS = 4 * 3600 * 1000;
-const SLOW_EVERY_HOURS = 3;
+// Hourly since the owner's plan upgrade (2026-10-13: "people need to see
+// the same odds they will see in their bet apps"), so a line for a game
+// days out is never more than an hour old.
+const SLOW_EVERY_HOURS = 1;
 
 const TEAM_SPORTS = [
   "americanfootball_nfl",
