@@ -28,11 +28,14 @@ const { fromOddsCacheRows } = require('../../lib/services/edge-models/soccer-1x2
 const ss = require('../../lib/services/soccer-strengths.js');
 
 const CODES = ['EPL', 'MLS', 'UCL', 'UEL', 'LALIGA', 'SERIEA', 'BUNDESLIGA', 'LIGUE1'];
-const HISTORY_DAYS = 430;
+// Back to August 2024, two full European seasons, to line up with the
+// historical closing prices (historical_closing_lines) the replay scores.
+const HISTORY_DAYS = 820;
 const RECENT_DAYS = 5;
-// A competition below this many stored matches gets the deep walk.
-const MIN_HISTORY = { UCL: 120, UEL: 120 };
-const DEFAULT_MIN_HISTORY = 300;
+// A competition whose oldest stored match is younger than this many days
+// gets the deep walk (the summer break means the oldest match can sit
+// weeks inside the window).
+const DEEP_IF_OLDEST_WITHIN_DAYS = HISTORY_DAYS - 90;
 const PARALLEL_DAYS = 6;
 
 // Odds API slug to display sport, for the closing price replay.
@@ -71,8 +74,16 @@ async function ingestHistory({ deep }) {
       .from('soccer_match_history')
       .select('espn_event_id', { count: 'exact', head: true })
       .eq('competition', competition);
-    const need = MIN_HISTORY[code] || DEFAULT_MIN_HISTORY;
-    const days = deep || (count || 0) < need ? HISTORY_DAYS : RECENT_DAYS;
+    const { data: oldest } = await supabase
+      .from('soccer_match_history')
+      .select('match_date')
+      .eq('competition', competition)
+      .order('match_date', { ascending: true })
+      .limit(1);
+    const oldestDate = oldest && oldest[0] ? oldest[0].match_date : null;
+    const thin = !oldestDate
+      || (Date.now() - new Date(`${oldestDate}T00:00:00Z`).getTime()) / 86400000 < DEEP_IF_OLDEST_WITHIN_DAYS;
+    const days = deep || thin ? HISTORY_DAYS : RECENT_DAYS;
     let found = 0;
     let written = 0;
     for (let d = 0; d < days; d += PARALLEL_DAYS) {
@@ -124,12 +135,21 @@ function toMatch(r) {
  * a date within one day (ESPN dates are US Eastern days).
  */
 async function loadPriced(history, aliases) {
-  const closes = await pageAll(() => supabase
+  // Historical snapshots first, live captures after, so a game held in
+  // both keeps the live close (the later write per book wins below).
+  const historical = await pageAll(() => supabase
+    .from('historical_closing_lines')
+    .select('sport, external_game_id, commence_time, home_team, away_team, bookmaker, market_type, outcomes')
+    .in('sport', Object.keys(SLUG_TO_SPORT))
+    .eq('market_type', 'h2h')
+    .order('commence_time', { ascending: true }));
+  const live = await pageAll(() => supabase
     .from('closing_lines')
     .select('sport, external_game_id, commence_time, home_team, away_team, bookmaker, market_type, outcomes, captured_at')
     .in('sport', Object.keys(SLUG_TO_SPORT))
     .eq('market_type', 'h2h')
     .order('captured_at', { ascending: true }));
+  const closes = [...historical, ...live];
   // Latest capture per game and book.
   const games = new Map();
   for (const c of closes) {

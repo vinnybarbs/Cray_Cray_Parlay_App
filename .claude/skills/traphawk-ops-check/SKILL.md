@@ -141,6 +141,8 @@ closing_lines captures every 15 minutes, but the function writes ONLY for games 
 
 fit-soccer-strengths (daily 09:10 UTC) answers 202 at once and logs one cron_job_logs row per run (job_name fit-soccer-strengths) with per competition ingest counts, the priced and unmatched closing games, and per pool fit size and replay log loss. No row in 26 hours, a failed row, or a partial row (ESPN HTTP failures) is the finding. A fit that fails leaves the previous ratings in place and soccer reads stay market only, so it never moves a claim.
 
+backfill-historical-odds (every 15 minutes) works the historical_odds_jobs queue and logs a cron_job_logs row only when it processed a window (details.windows, credits, failed). A run with nothing pending writes nothing, by design. A failed window (status failed, error on the row) or a partial row is the finding. Credits are on each window row: `select sport, count(*) filter (where status = 'done') done, count(*) filter (where status = 'pending') pending, count(*) filter (where status = 'failed') failed, sum(credits_used) credits from historical_odds_jobs group by 1;`
+
 ## 8. Model sanity tripwires (directive 18)
 
 The sections above prove the machine ran. This one asks whether the reads make sense, because on 2026-09-12 every one of them was green while every NFL home team read 5pp above the market, MLB had published 117 home picks to 9 away in a week, and 123 of 124 NCAAF tiles showed 0-0 two weeks into the season. Directive 18's check_sql already runs this in section 0b; read the rows here and name the cause:
