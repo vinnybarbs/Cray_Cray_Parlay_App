@@ -452,6 +452,11 @@ app.post('/cron/discord-exec-brief', discordExecBrief);
 const { discordModelFeed, discordDialBoard } = require('./api/cron/discord-model-feed');
 app.post('/cron/discord-model-feed', discordModelFeed);
 app.post('/cron/discord-dial-board', discordDialBoard);
+// The one Discord read path: the owner's replies in #talk-to-claude on
+// the private HQ server land in owner_inbox for the exec assistant
+// (owner 2026-10-14).
+const discordInbox = require('./api/cron/discord-inbox');
+app.post('/cron/discord-inbox', discordInbox);
 
 // Per-player per-game NFL stat lines from nflverse: props settlement
 // truth and prop model history. Backfills a season on demand, keeps the

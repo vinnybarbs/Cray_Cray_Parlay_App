@@ -2,7 +2,8 @@ const {
   shouldAlertTierEntry, formatTierAlert, sendTierAlert, sendDiscordEmbeds, embedsFromLines, embedText, webhookFor,
 } = require('../../lib/services/discord-alerts');
 
-const ENV_KEYS = ['DISCORD_WEBHOOK_URL', 'DISCORD_WEBHOOK_RECEIPTS_URL', 'DISCORD_WEBHOOK_MODEL_URL'];
+const ENV_KEYS = ['DISCORD_WEBHOOK_URL', 'DISCORD_WEBHOOK_RECEIPTS_URL', 'DISCORD_WEBHOOK_MODEL_URL',
+  'DISCORD_WEBHOOK_EXEC_URL', 'DISCORD_WEBHOOK_DIALS_URL', 'DISCORD_WEBHOOK_DIRECTIVES_URL', 'DISCORD_WEBHOOK_OPS_URL'];
 function clearEnv() { for (const k of ENV_KEYS) delete process.env[k]; }
 
 describe('shouldAlertTierEntry', () => {
@@ -96,6 +97,31 @@ describe('webhookFor', () => {
     process.env.DISCORD_WEBHOOK_URL = 'https://discord.example/board';
     process.env.DISCORD_WEBHOOK_MODEL_URL = 'https://discord.example/model';
     expect(webhookFor('model')).toEqual({ url: 'https://discord.example/model', fallback: false });
+  });
+
+  test('with only the board set, every private channel still lands there (one channel setup)', () => {
+    clearEnv();
+    process.env.DISCORD_WEBHOOK_URL = 'https://discord.example/board';
+    for (const c of ['exec', 'dials', 'directives', 'ops']) {
+      expect(webhookFor(c)).toEqual({ url: 'https://discord.example/board', fallback: true });
+    }
+  });
+
+  test('a private channel falls back to the private model webhook, never the board', () => {
+    clearEnv();
+    process.env.DISCORD_WEBHOOK_URL = 'https://discord.example/board';
+    process.env.DISCORD_WEBHOOK_MODEL_URL = 'https://discord.example/hq';
+    expect(webhookFor('directives')).toEqual({ url: 'https://discord.example/hq', fallback: true });
+    expect(webhookFor('receipts')).toEqual({ url: 'https://discord.example/board', fallback: true });
+  });
+
+  test('once any private webhook is set, an unrouted private post is skipped, not sent to the public board', () => {
+    clearEnv();
+    process.env.DISCORD_WEBHOOK_URL = 'https://discord.example/board';
+    process.env.DISCORD_WEBHOOK_EXEC_URL = 'https://discord.example/exec';
+    expect(webhookFor('exec')).toEqual({ url: 'https://discord.example/exec', fallback: false });
+    expect(webhookFor('dials')).toEqual({ url: null, fallback: false });
+    expect(webhookFor('board')).toEqual({ url: 'https://discord.example/board', fallback: false });
   });
 });
 

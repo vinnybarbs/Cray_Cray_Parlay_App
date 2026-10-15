@@ -85,7 +85,7 @@ function formatExecBrief(row, dateLabel) {
     const lines = body.split(/\n+|(?<=\.)\s+(?=[A-Z0-9(])/).map(s => s.trim()).filter(Boolean);
     const title = c.name.charAt(0) + c.name.slice(1).toLowerCase();
     embeds.push(...embedsFromLines(title, lines.length ? lines : ['Nothing today.'], {
-      footer: i === cuts.length - 1 ? `Blackboard row ${row.id}. Answer the calls in chat and the exec assistant ships them.` : null,
+      footer: i === cuts.length - 1 ? `Blackboard row ${row.id}. Reply in #talk-to-claude or the Exec assistant thread and the exec assistant ships it.` : null,
     }));
   });
   if (!cuts.length) embeds[0].footer = { text: `Blackboard row ${row.id}.` };
@@ -122,14 +122,14 @@ async function runExecBrief() {
   });
   if (!row && isLastSlot() && !(await missingAlertSent())) {
     missingAlert = true;
-    result = await sendDiscordEmbeds(formatMissingBrief(dateLabelFor(Date.now())), 'board');
+    result = await sendDiscordEmbeds(formatMissingBrief(dateLabelFor(Date.now())), 'ops');
     if (!result.sent && !result.reason) result.reason = MISSING_REASON;
   } else if (!row) {
     result = { sent: false, reason: MISSING_REASON };
   } else if (await alreadyPosted(row.id)) {
     result = { sent: false, reason: 'already posted', skipped_duplicate: true };
   } else {
-    result = await sendDiscordEmbeds(formatExecBrief(row, dateLabelFor(row.created_at)), 'board');
+    result = await sendDiscordEmbeds(formatExecBrief(row, dateLabelFor(row.created_at)), 'exec');
   }
   await supabase.from('cron_job_logs').insert({
     job_name: 'discord-exec-brief',
@@ -137,7 +137,7 @@ async function runExecBrief() {
     details: JSON.stringify({
       report_id: row ? row.id : null,
       sent: result.sent,
-      channel: result.channel || 'board',
+      channel: result.channel || (missingAlert ? 'ops' : 'exec'),
       fallback: result.fallback || false,
       messages: result.messages || 0,
       reason: result.reason || (missingAlert ? MISSING_REASON : null),
