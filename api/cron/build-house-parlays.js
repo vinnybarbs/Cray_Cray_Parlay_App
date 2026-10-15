@@ -9,7 +9,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../../shared/logger');
-const { composeParlay } = require('../../lib/services/parlay-composer');
+const { composeValueParlay, PARLAY_DIAL_DEFAULTS } = require('../../lib/services/parlay-composer');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -154,6 +154,19 @@ async function buildHouseParlays(req, res) {
           : Number(b.edge_pp) - Number(a.edge_pp);
       });
 
+    // The value floors live on the dial board (owner 2026-10-15), with
+    // the composer's fallbacks only for a missing row.
+    const parlayDials = { ...PARLAY_DIAL_DEFAULTS };
+    const { data: dialRows } = await supabase
+      .from('sport_dials')
+      .select('dial, value')
+      .eq('sport', '__all__')
+      .in('dial', Object.keys(PARLAY_DIAL_DEFAULTS));
+    for (const d of dialRows || []) {
+      const v = Number(d.value);
+      if (Number.isFinite(v)) parlayDials[d.dial] = v;
+    }
+
     // Which sizes are already published today. Published parlays are append only.
     const { data: existingRows, error: existingError } = await supabase
       .from('house_parlays')
@@ -182,13 +195,20 @@ async function buildHouseParlays(req, res) {
         continue;
       }
 
-      // Heavy favorites only (owner spec 2026-08-26): every component is
-      // a Leg grade or a -186 and heavier favorite, and a board without
-      // enough of them builds nothing. See lib/services/parlay-composer.js.
-      const composed = composeParlay(legsPool, size);
-      if (!composed) {
-        sizeOutcomes[size] = `no_heavy_favorites (pool ${legsPool.length})`;
-        logger.info(`House parlay ${size}-leg for ${today}: not enough heavy favorites, no build`);
+      // Gimme plus value (owner 2026-10-15): the size minus one gimmes
+      // plus one Sharp Take, Strong Play or Play, published only at a
+      // positive claimed EV and a payout at or above the dial floor. A
+      // board without such a slip builds nothing. The heavy only rule
+      // (2026-08-26) went 59-59 for -6.09u at an average EV of -1.0
+      // percent. See lib/services/parlay-composer.js.
+      const composed = composeValueParlay(legsPool, size, {
+        combine: combineLegs,
+        minEvPct: parlayDials.parlay_min_ev_pct,
+        minDecimal: parlayDials.parlay_min_decimal,
+      });
+      if (!composed.rows) {
+        sizeOutcomes[size] = `${composed.reason} (pool ${legsPool.length})`;
+        logger.info(`House parlay ${size}-leg for ${today}: ${composed.reason}, no build`);
         continue;
       }
 
@@ -255,6 +275,7 @@ async function buildHouseParlays(req, res) {
       status: 'completed',
       details: JSON.stringify({
         built, skipped, sizes: sizeOutcomes,
+        dials: parlayDials,
         pool: legsPool.length,
         pick_candidates: (candidates || []).length,
         leg_candidates: (legRows || []).length,

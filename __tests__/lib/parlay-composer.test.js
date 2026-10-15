@@ -69,3 +69,55 @@ describe('composeParlay', () => {
     expect(composeParlay(pool.slice(0, 2), 3)).toBeNull();
   });
 });
+
+describe('composeValueParlay (owner 2026-10-15, gimme plus value)', () => {
+  const { composeValueParlay, isValuePick } = require('../../lib/services/parlay-composer');
+  const dec = (o) => (o > 0 ? 1 + o / 100 : 1 + 100 / Math.abs(o));
+  // Same math as the cron's combineLegs, enough for the floors.
+  const combine = (legs) => {
+    let d = 1, m = 1;
+    for (const l of legs) { d *= dec(parseInt(l.odds, 10)); m *= Number(l.model_prob); }
+    return { combinedDecimal: d, combinedOdds: d >= 2 ? Math.round((d - 1) * 100) : Math.round(-100 / (d - 1)), evPct: Math.round((m * d - 1) * 1000) / 10 };
+  };
+  const gimme = (id, odds, p) => ({ id, tier: 'Leg', odds, model_prob: p, implied_prob: p - 0.01, edge_pp: 0.5 });
+  const value = (id, tier, odds, p, edge) => ({ id, tier, odds, model_prob: p, implied_prob: p - edge / 100, edge_pp: edge });
+
+  test('a gimme plus a Strong Play at positive EV and at least -125 builds', () => {
+    const pool = [gimme('g1', '-500', 0.88), value('s1', 'Strong Play', '-140', 0.66, 8), value('p1', 'Play', '-150', 0.64, 5)];
+    const out = composeValueParlay(pool, 2, { combine, minEvPct: 0, minDecimal: 1.8 });
+    expect(out.rows.map(r => r.id)).toEqual(['g1', 's1']);
+    expect(out.composition).toBe('gimme_plus_value');
+    expect(out.combined.evPct).toBeGreaterThan(0);
+  });
+
+  test('two gimmes never make a slip without a value pick', () => {
+    const out = composeValueParlay([gimme('g1', '-500', 0.88), gimme('g2', '-400', 0.85)], 2, { combine });
+    expect(out.rows).toBeNull();
+    expect(out.reason).toBe('no_value_pick');
+  });
+
+  test('a Lean is not a value pick', () => {
+    expect(isValuePick(value('l1', 'Lean', '-120', 0.56, 2.5))).toBe(false);
+    expect(isValuePick(value('s1', 'Strong Play', '-120', 0.62, 8))).toBe(true);
+  });
+
+  test('a slip that pays under the floor does not build', () => {
+    const pool = [gimme('g1', '-2000', 0.97), value('s1', 'Strong Play', '-300', 0.83, 7.5)];
+    const out = composeValueParlay(pool, 2, { combine, minEvPct: 0, minDecimal: 1.8 });
+    expect(out.rows).toBeNull();
+    expect(out.reason).toMatch(/^pays_below_floor/);
+  });
+
+  test('negative claimed EV does not build', () => {
+    const pool = [gimme('g1', '-500', 0.80), value('p1', 'Play', '+120', 0.46, 0.5)];
+    const out = composeValueParlay(pool, 2, { combine, minEvPct: 0, minDecimal: 1.8 });
+    expect(out.rows).toBeNull();
+    expect(out.reason).toMatch(/^ev_below_floor/);
+  });
+
+  test('three legs are two gimmes plus one value pick', () => {
+    const pool = [gimme('g1', '-900', 0.93), gimme('g2', '-700', 0.91), value('s1', 'Sharp Take', '+110', 0.58, 10)];
+    const out = composeValueParlay(pool, 3, { combine, minEvPct: 0, minDecimal: 1.8 });
+    expect(out.rows.map(r => r.id)).toEqual(['g1', 'g2', 's1']);
+  });
+});
