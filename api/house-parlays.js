@@ -9,6 +9,7 @@ const { supabase } = require('../lib/middleware/supabaseAuth.js');
 const { siteDay } = require('../shared/site-day.js');
 const { enrichParlayLegOutcomes } = require('../lib/services/parlay-leg-outcomes.js');
 const { viewerSeesAll, gateParlays } = require('../lib/services/paywall.js');
+const { houseParlayRecord } = require('../lib/services/parlay-record.js');
 
 module.exports = async function houseParlays(req, res) {
   try {
@@ -24,21 +25,9 @@ module.exports = async function houseParlays(req, res) {
     const day = today;
     const parlays = await enrichParlayLegOutcomes(supabase, rows || []);
 
-    const { data: settledRows, error: recErr } = await supabase
-      .from('house_parlays')
-      .select('status')
-      .in('status', ['won', 'lost']);
-    if (recErr) throw recErr;
-    let won = 0, lost = 0;
-    for (const r of settledRows || []) {
-      if (r.status === 'won') won++; else lost++;
-    }
-    const settled = won + lost;
-    const record = {
-      won,
-      lost,
-      hitRate: settled > 0 ? Math.round((won / settled) * 1000) / 10 : null,
-    };
+    // The current rule's record, the earlier rule rides along as prior
+    // (owner 2026-10-15, lib/services/parlay-record.js).
+    const record = await houseParlayRecord(supabase);
 
     const access = await viewerSeesAll(req, res);
     res.setHeader('Cache-Control', 'no-store');

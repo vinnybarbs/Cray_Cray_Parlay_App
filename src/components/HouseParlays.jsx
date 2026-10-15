@@ -6,9 +6,10 @@ import { UnlockButton } from './Locked'
 
 // The machine-built parlays, one button away on the digest (owner spec
 // 2026-08-25: they lived only in the ledger and nobody could find them).
-// Composition is hit-first: one or two Legs plus the safest Play-or-better
-// anchor, and the running record line is where the 70 percent hit goal
-// gets judged in public.
+// Composition since 2026-10-15 (owner): gimme plus value, the safest
+// Legs or heavy favorites plus one Play or better, only at a positive
+// claimed EV and a -125 or better payout. The record line counts this
+// rule alone, the heavy only slips before it keep their own record.
 
 function StatusChip({ status }) {
   const map = {
@@ -73,7 +74,7 @@ export default function HouseParlays() {
             <span className="text-ink-200">House parlays · {dateLabel}</span>
             {rec && rec.hitRate != null && (
               <span className="ml-auto">
-                to date <span className="text-ink-200">{rec.won}-{rec.lost}</span>
+                since Oct 15 <span className="text-ink-200">{rec.won}-{rec.lost}</span>
                 {' '}<span className={rec.hitRate >= 70 ? 'text-signal-pos' : 'text-ink-300'}>{rec.hitRate}%</span>
                 {' '}· goal 70
               </span>
@@ -82,10 +83,10 @@ export default function HouseParlays() {
 
           {data.parlays.length === 0 ? (
             <p className="px-4 py-4 text-sm text-ink-300">
-              No open parlay today. The builder only ships tickets made of
-              heavy favorites, a Leg grade or -186 and heavier, and this board
-              does not have enough of them. No ticket beats a coin-flip
-              ticket. Settled parlays live on the House Ledger.
+              No open parlay today. The builder only ships a gimme plus a Play
+              or better when the ticket has positive value and pays -125 or
+              better, and this board does not have one. No ticket beats a
+              ticket that loses money. Settled parlays live on the House Ledger.
             </p>
           ) : (
             <div className="divide-y divide-ink-850">
@@ -135,9 +136,10 @@ export default function HouseParlays() {
           )}
 
           <p className="px-4 py-2.5 text-[11px] text-ink-500 bg-ink-950">
-            Heavy favorites only: every component is a Leg grade or a -186 and
-            heavier favorite. Parlays are a hit-rate product, not an edge
-            product, and the record line above is the scoreboard.
+            Gimme plus value: the safest Legs or -186 and heavier favorites
+            plus one Play or better, built only at positive value and a
+            -125 or better payout. Scored on its own since Oct 15, never mixed
+            into the pick record.
           </p>
         </div>
       )}

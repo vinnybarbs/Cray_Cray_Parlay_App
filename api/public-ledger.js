@@ -14,6 +14,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../shared/logger');
 const { enrichParlayLegOutcomes } = require('../lib/services/parlay-leg-outcomes.js');
+const { houseParlayRecord } = require('../lib/services/parlay-record.js');
 
 function getSupabase() {
   const url = process.env.SUPABASE_URL;
@@ -355,27 +356,10 @@ async function getPublicLedger(req, res) {
     }) || [];
 
     // The parlay record counts EVERY settled ticket, not just the 80 cards
-    // the page displays. The page used to derive the record from the
-    // displayed cards, which stays exact only until the table outgrows the
-    // display cap; this is the same full-table count /api/house-parlays
-    // serves the digest, so the two surfaces quote one record.
-    const parlayRecord = await safeQuery(async () => {
-      const { data, error } = await supabase
-        .from('house_parlays')
-        .select('status')
-        .in('status', ['won', 'lost']);
-      if (error) throw error;
-      let won = 0, lost = 0;
-      for (const r of data || []) {
-        if (r.status === 'won') won++; else lost++;
-      }
-      const settled = won + lost;
-      return {
-        won,
-        lost,
-        hitRate: settled > 0 ? Math.round((won / settled) * 1000) / 10 : null,
-      };
-    }) || null;
+    // the page displays, one record per composition rule (owner
+    // 2026-10-15). Same helper as /api/house-parlays, so the two surfaces
+    // quote one record.
+    const parlayRecord = await safeQuery(() => houseParlayRecord(supabase)) || null;
 
     res.json({
       status: 'ok',
