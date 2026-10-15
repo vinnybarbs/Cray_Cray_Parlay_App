@@ -38,6 +38,7 @@ const { getCalibrationMultiplier } = require('../../lib/services/calibration-mul
 const { practiceReportText, pricedInjuryText } = require('../../lib/services/nfl-inactives.js');
 const { nflWeekFor } = require('../../lib/services/prop-edge.js');
 const espnNews = require('../../lib/services/espn-news.js');
+const { checkNarration } = require('../../lib/services/narration-checker.js');
 
 // One provider per process; the Elo table load is cached inside it, so a
 // 40-match tennis slate costs one pair of table reads, not 40.
@@ -1169,6 +1170,9 @@ Key factors MUST include specific numbers/records. Do NOT include recommended_pi
           key_factors: parsed.key_factors,
           what_changed: parsed.what_changed || null,
           model_used: model,
+          // The matchup data the draft was written from, for the inline
+          // checker (build_queue 90). Never written to game_analysis.
+          narration_context: `${contextParts.join('\n')}\n${pickBlock}`,
           prompt_tokens: usage?.input_tokens,
           completion_tokens: usage?.output_tokens
         };
@@ -1378,6 +1382,10 @@ async function runPreAnalysis(sportSlugs) {
     let totalCompletionTokens = 0;
     // Tokens per narration model, for the by_model cost split.
     const byModel = {};
+    // Inline narration checker, shadow (build_queue 90): verdict counts
+    // and spend, kept apart from by_model so the narration split stays
+    // comparable to its history.
+    const checker = { calls: 0, pass: 0, fail: 0, error: 0, input: 0, output: 0, cost: 0 };
     const errors = [];
 
     const batch = gamesToAnalyze.slice(0, 50);
@@ -1864,6 +1872,35 @@ async function runPreAnalysis(sportSlugs) {
               m.output += result.completion_tokens || 0;
             }
 
+            // Inline checker in SHADOW (owner 2026-10-11, build_queue 90):
+            // log a verdict on every fresh narration, never block the
+            // write. Shadow narrations (no model call) are not checked.
+            if (result.narration_context) {
+              const check = await checkNarration({ client: getClaude(), context: result.narration_context, result });
+              checker.calls++;
+              checker[check.verdict]++;
+              checker.input += check.input_tokens;
+              checker.output += check.output_tokens;
+              checker.cost += check.cost_usd;
+              const { error: checkErr } = await supabase.from('narration_checks').insert({
+                game_key: game.game_key,
+                sport: sportDisplay,
+                game_date: game.game_date,
+                tier: narrationTier,
+                narration_model: result.model_used || null,
+                checker_model: check.model,
+                verdict: check.verdict,
+                issues: check.issues,
+                error: check.error,
+                analysis_snippet: result.analysis_snippet,
+                input_tokens: check.input_tokens,
+                output_tokens: check.output_tokens,
+                cost_usd: check.cost_usd,
+                blocked: false,
+              });
+              if (checkErr) console.warn(`  narration_checks insert failed for ${game.game_key}: ${checkErr.message}`);
+            }
+
             // Publication. Picks (>= +2pp) and traps (detector calls at
             // <= -2pp with real lure) publish INDEPENDENTLY: a game can
             // carry both a pick on one side and a trap on another, and
@@ -2303,7 +2340,8 @@ async function runPreAnalysis(sportSlugs) {
     // per MTok the ceiling has always been measured in, Haiku at its own
     // rate. by_model carries the split for the cost audit.
     for (const [m, v] of Object.entries(byModel)) v.cost = Number(estimateCost(m, v.input, v.output).toFixed(4));
-    const estimatedCost = Object.values(byModel).reduce((sum, v) => sum + v.cost, 0).toFixed(4);
+    checker.cost = Number(checker.cost.toFixed(4));
+    const estimatedCost = (Object.values(byModel).reduce((sum, v) => sum + v.cost, 0) + checker.cost).toFixed(4);
 
     // Log results to cron_job_logs for admin dashboard visibility
     try {
@@ -2326,6 +2364,7 @@ async function runPreAnalysis(sportSlugs) {
           duration_ms: duration,
           cost: estimatedCost,
           by_model: byModel,
+          checker,
         })
       });
     } catch (e) { /* don't block on logging */ }
