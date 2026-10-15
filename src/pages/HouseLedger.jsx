@@ -479,17 +479,27 @@ export default function HouseLedger() {
                       : data.parlays.filter(p => p.status === 'won' || p.status === 'lost').length
                     const won = rec ? rec.won
                       : data.parlays.filter(p => p.status === 'won').length
-                    if (settled === 0) return <span className="tabular-nums text-xs text-ink-400">{data.parlays.length} published</span>
+                    if (settled === 0) return (
+                      <span className="tabular-nums text-xs text-ink-400">
+                        {data.parlays.length} published · new rule since Oct 15, no settled ticket yet
+                        {rec?.prior && rec.prior.won + rec.prior.lost > 0 && (
+                          <> · earlier heavy only rule {rec.prior.won}-{rec.prior.lost}</>
+                        )}
+                      </span>
+                    )
                     return (
                       <span className=" text-xs text-ink-300 tabular-nums">
-                        Record: <span className="font-bold text-ink-100">{won}-{settled - won}</span> ({Math.round((won / settled) * 100)}%) · scored on its own, never mixed into the pick record
+                        Record since Oct 15: <span className="font-bold text-ink-100">{won}-{settled - won}</span> ({Math.round((won / settled) * 100)}%) · scored on its own, never mixed into the pick record
+                        {rec?.prior && rec.prior.won + rec.prior.lost > 0 && (
+                          <> · earlier heavy only rule {rec.prior.won}-{rec.prior.lost}</>
+                        )}
                       </span>
                     )
                   })()}
                   <span className="ml-auto text-ink-400 text-xs group-open:rotate-180 transition-transform">▼</span>
                 </summary>
                 <p className="text-sm text-ink-300 my-4 max-w-2xl">
-                  Parlays the machine assembles from heavy favorites only, a Leg grade or a -186 and heavier price, cross-game, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
+                  Parlays the machine assembles as a gimme plus value since Oct 15: the safest Legs or -186 and heavier favorites plus one Play or better, built only at positive value and a -125 or better payout, cross-game, published before the first pitch and settled here win or lose. A parlay is a bet on the combination: each leg already counts as an individual pick in the record above, so a parlay that misses does not double-punish the legs that hit.
                 </p>
                 <div className="grid md:grid-cols-2 gap-3">
                   {data.parlays.map(p => <ParlayCard key={p.id} parlay={p} />)}

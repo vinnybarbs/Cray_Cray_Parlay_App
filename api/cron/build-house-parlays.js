@@ -10,6 +10,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { logger } = require('../../shared/logger');
 const { composeValueParlay, PARLAY_DIAL_DEFAULTS } = require('../../lib/services/parlay-composer');
+const { CURRENT_RULE } = require('../../lib/services/parlay-record');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -247,6 +248,7 @@ async function buildHouseParlays(req, res) {
         model_win_prob: modelProb,
         fair_win_prob: fairProb,
         ev_pct: evPct,
+        rule: CURRENT_RULE,
         status: 'pending'
       };
 
