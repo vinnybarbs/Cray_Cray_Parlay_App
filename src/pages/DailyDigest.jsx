@@ -66,7 +66,7 @@ const ANALYSIS_SPORT_TO_CODE = {
   soccer_france_ligue_one: 'Ligue 1',
 }
 
-import { fmtGameDateTime, fmtGameDay, fmtFullDate as formatFullDate } from '../lib/gameTime'
+import { fmtGameDateTime, fmtGameDay, gameDayChip, fmtFullDate as formatFullDate } from '../lib/gameTime'
 
 function edgeBadgeClass(score) {
   if (score == null) return 'bg-ink-800 text-ink-300'
@@ -1003,16 +1003,15 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
             {game.in_progress && <StartedChip game={game} />}
             {game.game_date && !game.in_progress && (
               <div className=" text-[11px] text-ink-500 mt-0.5 tabular-nums flex items-center gap-1.5">
-                {/* The board is a rolling next-24h window, so an evening
-                    visit sees tonight's late games NEXT TO tomorrow's
-                    slate, and the owner bet them as one board
-                    (2026-09-04). A game beyond the current site day wears
-                    an unmissable chip. Site days are America/Denver,
-                    product law. */}
+                {/* An evening visit sees tonight's late games NEXT TO
+                    later slates, and the owner bet them as one board
+                    (2026-09-04). A game beyond today wears an unmissable
+                    chip that counts the real days ("Tomorrow", "In 3
+                    days") on the same calendar as the date beside it. */}
                 {(() => {
-                  const dayOf = (d) => new Date(d).toLocaleDateString('en-CA', { timeZone: 'America/Denver' })
-                  return dayOf(game.game_date) > dayOf(new Date()) ? (
-                    <span className="px-1.5 py-0.5 rounded-sharp bg-signal-pos-dim/40 text-signal-pos font-semibold text-xs">Tomorrow</span>
+                  const chip = gameDayChip(game.game_date)
+                  return chip ? (
+                    <span className="px-1.5 py-0.5 rounded-sharp bg-signal-pos-dim/40 text-signal-pos font-semibold text-xs">{chip}</span>
                   ) : null
                 })()}
                 <span>{fmtGameDateTime(game.game_date)}</span>
