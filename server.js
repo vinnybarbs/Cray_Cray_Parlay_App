@@ -601,6 +601,10 @@ app.get('/api/admin/dials', adminDials);
 // Daily Digest - public endpoint, no auth required
 const { getDigest, deepResearch } = require('./api/digest');
 app.get('/api/digest', getDigest);
+// The Board's live game tracker (owner 2026-10-16): score, clock and
+// where each started pick stands, from ESPN, polled every 30 seconds.
+const { getDigestLive } = require('./api/digest-live');
+app.get('/api/digest/live', getDigestLive);
 app.get('/api/deep-research', deepResearch);
 
 app.listen(PORT, () => {
