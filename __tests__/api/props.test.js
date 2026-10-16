@@ -57,6 +57,24 @@ describe('shapeProps', () => {
   });
 });
 
+// Owner 2026-10-16: a single 40 read cap across the slate left the Bears
+// game with one read. The cap is per game now.
+describe('per game cap', () => {
+  const { capPerGame } = require('../../api/props');
+  it('keeps every game on the board even when one game has the top edges', () => {
+    const big = Array.from({ length: 45 }, (_, i) => row({ v2_edge_pp: 20 + i, player_name: `R${i}`, home_team: 'Los Angeles Rams', away_team: 'Arizona Cardinals' }));
+    const bears = Array.from({ length: 10 }, (_, i) => row({ v2_edge_pp: 5 + i / 10, player_name: `B${i}`, home_team: 'Atlanta Falcons', away_team: 'Chicago Bears' }));
+    const out = shapeProps([...big, ...bears], [], []);
+    expect(out.upcoming.filter(p => p.away_team === 'Chicago Bears')).toHaveLength(10);
+    expect(out.upcoming.filter(p => p.home_team === 'Los Angeles Rams')).toHaveLength(30);
+    expect(out.upcoming[0].edgePp).toBe(64);
+  });
+  it('caps by game identity and keeps the given order', () => {
+    const rows = [row({ player_name: 'x' }), row({ player_name: 'y' }), row({ player_name: 'z', home_team: 'Other' })];
+    expect(capPerGame(rows, 1).map(r => r.player_name)).toEqual(['x', 'z']);
+  });
+});
+
 const { attachHistory, sideProbs } = require('../../api/props');
 
 describe('sideProbs', () => {
