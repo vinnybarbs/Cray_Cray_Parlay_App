@@ -17,7 +17,10 @@ const { liveProgress } = require('../lib/services/live-prop-stats.js');
 
 // Play and above, the same floor the props flip is judged at.
 const MIN_PP = 4;
-const MAX_UPCOMING = 40;
+// The cap is per game, not across the slate: a single 40 read cap left
+// the best edges from one or two games filling the whole page and other
+// games with one read or none (owner 2026-10-16, Bears at Falcons).
+const MAX_PER_GAME = 30;
 const RECENT_DAYS = 8;
 // Graded since the v2 read started (2026-09-14).
 const RECORD_SINCE = '2026-09-14';
@@ -177,18 +180,45 @@ function attachHistory(upcoming, statRows) {
   });
 }
 
+// One game's identity for the per game cap. Pure.
+const gameKey = (r) => `${r.commence_time}|${r.away_team}|${r.home_team}`;
+
+/**
+ * Keep at most `cap` rows per game, in the order given, so the list
+ * stays sorted by edge across the slate. Pure.
+ */
+function capPerGame(rows, cap = MAX_PER_GAME) {
+  const seen = new Map();
+  return rows.filter(r => {
+    const k = gameKey(r);
+    const n = seen.get(k) || 0;
+    seen.set(k, n + 1);
+    return n < cap;
+  });
+}
+
+// PostgREST returns at most 1000 rows per request, so read every page.
+// build(from, to) returns a ranged query.
+async function readAll(build, pageSize = 1000) {
+  const rows = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await build(from, from + pageSize - 1);
+    if (error) return { data: null, error };
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) return { data: rows, error: null };
+  }
+}
+
 /** Pure shaping of upcoming, recent and graded rows into the response. */
 function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
-  const upcoming = (upcomingRows || []).filter(showable)
-    .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
-    .slice(0, MAX_UPCOMING)
+  const upcoming = capPerGame((upcomingRows || []).filter(showable)
+    .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp)))
     .map(slim);
   // Reads whose game already kicked off, kept with their why so a bettor
   // can look back at what the read was (owner 2026-10-13). They are locked:
   // the line and price are the last ones before kickoff.
-  const live = (liveRows || []).filter(showable)
-    .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
-    .slice(0, MAX_UPCOMING)
+  const live = capPerGame((liveRows || []).filter(showable)
+    .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp)))
     .map(r => ({ ...slim(r), started: true }));
   const recent = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push'].includes(r.v2_outcome))
     .sort((a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
@@ -233,8 +263,8 @@ async function props(req, res) {
     const liveFrom = new Date(now.getTime() - STARTED_WINDOW_HOURS * 3600 * 1000).toISOString();
     // Order matters: the names below bind by position.
     const [upRes, liveRes, recentRes] = await Promise.all([
-      supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
-      supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gte('commence_time', liveFrom).lte('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(500),
+      readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).order('id', { ascending: true }).range(a, b)),
+      readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gte('commence_time', liveFrom).lte('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).order('id', { ascending: true }).range(a, b)),
       supabase.from('prop_reads').select(COLS).gte('commence_time', recentFrom).lt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(1000),
     ]);
     const graded = [];
@@ -255,22 +285,25 @@ async function props(req, res) {
     const keys = [...new Set([...shaped.upcoming, ...shaped.live].map(p => p.playerKey).filter(Boolean))];
     let statRows = [];
     if (keys.length > 0) {
-      const { data, error } = await supabase.from('nfl_player_game_stats')
+      const { data, error } = await readAll((a, b) => supabase.from('nfl_player_game_stats')
         .select('player_key, season, week, team, opponent, receptions, receiving_yards, rushing_yards, passing_yards, passing_tds, rushing_tds, receiving_tds')
         .in('player_key', keys)
-        .order('season', { ascending: false }).order('week', { ascending: false })
-        .limit(keys.length * 25);
+        .gte('season', now.getUTCFullYear() - 1)
+        .order('season', { ascending: false }).order('week', { ascending: false }).order('player_key', { ascending: true })
+        .range(a, b));
       if (!error) statRows = data || [];
     }
     // Line shopping at the read's own line (build_queue 105). Only the
     // upcoming board, and a failure only drops the chips.
     if (shaped.upcoming.length > 0) {
-      const { data, error } = await supabase.from('player_props')
+      const { data, error } = await readAll((a, b) => supabase.from('player_props')
         .select('player_key, market, line, over_price, under_price, yes_price, bookmaker, commence_time')
         .in('player_key', [...new Set(shaped.upcoming.map(p => p.playerKey).filter(Boolean))])
+        .in('market', [...new Set(shaped.upcoming.map(p => p.market))])
         .in('bookmaker', SHOP_BOOKS)
         .gt('commence_time', now.toISOString())
-        .limit(5000);
+        .order('id', { ascending: true })
+        .range(a, b));
       if (!error) shaped.upcoming = shaped.upcoming.map(p => ({ ...p, shop: shopProp(data, p) }));
     }
     shaped.upcoming = attachHistory(shaped.upcoming, statRows);
@@ -314,6 +347,7 @@ async function propsLive(req, res) {
 module.exports = props;
 module.exports.propsLive = propsLive;
 module.exports.shapeProps = shapeProps;
+module.exports.capPerGame = capPerGame;
 module.exports.showable = showable;
 module.exports.describe = describe;
 module.exports.attachHistory = attachHistory;
