@@ -1621,6 +1621,7 @@ function StartedSection({ games, onDeepResearch, liveCount = 0 }) {
   const visible = games.filter(g => !SHADOW_DISPLAY.has(g.sport))
   const hasRead = (g) => {
     if (g.published_pick?.pick) return true
+    if (Array.isArray(g.published_alts) && g.published_alts.length > 0) return true
     if (Array.isArray(g.trap_calls) && g.trap_calls.length > 0) return true
     const pp = finalPpFor(g)
     return pp != null && pp >= 2 && !!g.recommended_pick
@@ -1893,7 +1894,8 @@ export default function DailyDigest({ onBack }) {
   // with a read, in a sport ESPN covers, is on the board.
   const trackedStarted = useMemo(() => (data?.startedGames || []).filter(g =>
     g && TRACKED_SPORTS.has(g.sport) && !SHADOW_DISPLAY.has(g.sport)
-    && (g.published_pick?.pick || (Array.isArray(g.trap_calls) && g.trap_calls.length > 0))
+    && (g.published_pick?.pick || (Array.isArray(g.published_alts) && g.published_alts.length > 0)
+      || (Array.isArray(g.trap_calls) && g.trap_calls.length > 0))
   ), [data])
   const liveFeed = useLiveGames(trackedStarted.length > 0)
   const liveNow = useMemo(() => {
@@ -1904,6 +1906,14 @@ export default function DailyDigest({ onBack }) {
       if (!lg) continue
       const graded = g.published_pick?.outcome && g.published_pick.outcome !== 'pending'
       if (g.published_pick?.pick && !graded) items.push({ key: `game-${g.game_key}`, live: lg, sport: g.sport, standing: lg.pick, trap: false })
+      // A spotlight pick on a game with no headline gets its own chip, so
+      // an alt only game (the 2026-10-15 Seahawks spread) is on the rail.
+      if (!g.published_pick?.pick) {
+        for (const alt of (Array.isArray(g.published_alts) ? g.published_alts : [])) {
+          if (alt.outcome && alt.outcome !== 'pending') continue
+          items.push({ key: `game-${g.game_key}`, live: lg, sport: g.sport, standing: lg.alts?.[alt.pick] || null, trap: false })
+        }
+      }
       for (const t of (Array.isArray(g.trap_calls) ? g.trap_calls : [])) {
         items.push({ key: `game-${g.game_key}-trap-${t.side}`, live: lg, sport: g.sport, standing: lg.traps?.[t.side] || null, trap: true })
       }
