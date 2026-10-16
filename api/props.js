@@ -13,7 +13,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { teamAbbr } = require('../lib/services/nfl-inactives');
 const { SHOP_BOOKS, shopProp } = require('../lib/services/line-shop.js');
 const { viewerSeesAll, gateProps } = require('../lib/services/paywall.js');
-const { liveProgress } = require('../lib/services/live-prop-stats.js');
+const { liveProgress, keyFor } = require('../lib/services/live-prop-stats.js');
 
 // Play and above, the same floor the props flip is judged at.
 const MIN_PP = 4;
@@ -22,6 +22,10 @@ const MIN_PP = 4;
 // games with one read or none (owner 2026-10-16, Bears at Falcons).
 const MAX_PER_GAME = 30;
 const RECENT_DAYS = 8;
+// Recent results cap per game like the board, and across the week.
+const RECENT_MAX = 120;
+// The ESPN lookup for unofficial results never holds the page longer.
+const UNOFFICIAL_TIMEOUT_MS = 5000;
 // Graded since the v2 read started (2026-09-14).
 const RECORD_SINCE = '2026-09-14';
 const TD_MARKET = 'player_anytime_td';
@@ -210,7 +214,7 @@ async function readAll(build, pageSize = 1000) {
 }
 
 /** Pure shaping of upcoming, recent and graded rows into the response. */
-function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
+function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = [], unofficial = []) {
   const upcoming = capPerGame((upcomingRows || []).filter(showable)
     .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp)))
     .map(slim);
@@ -220,10 +224,12 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
   const live = capPerGame((liveRows || []).filter(showable)
     .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp)))
     .map(r => ({ ...slim(r), started: true }));
-  const recent = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push'].includes(r.v2_outcome))
-    .sort((a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
-    .slice(0, 30)
-    .map(slim);
+  // Official grades first, then a finished game's box score result where
+  // no official grade has landed yet (marked unofficial).
+  const official = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push'].includes(r.v2_outcome)).map(slim);
+  const recent = capPerGame([...official, ...(unofficial || [])]
+    .sort((a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.edgePp) - Number(a.edgePp)))
+    .slice(0, RECENT_MAX);
   const acc = new Map();
   const total = { won: 0, lost: 0, units: 0 };
   for (const r of (gradedRows || []).filter(showable)) {
@@ -243,6 +249,48 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
 
 // How long a started read stays up, same window as the game board.
 const STARTED_WINDOW_HOURS = 8;
+
+/**
+ * Finished reads with no official grade yet. Official prop grades come
+ * from the nflverse stat file, which lands Tuesdays, so a Thursday or
+ * Sunday game left the live list after 8 hours and showed nowhere for
+ * days (owner 2026-10-16: "Nothing goes to ledger so hard for me to
+ * know"). Pure.
+ */
+function awaitingGrade(recentRows, liveFrom) {
+  return (recentRows || []).filter(r => showable(r)
+    && !['won', 'lost', 'push', 'void'].includes(r.v2_outcome)
+    && new Date(r.commence_time).getTime() < new Date(liveFrom).getTime())
+    .map(slim);
+}
+
+/**
+ * Those reads with the final box score result from the live tracker,
+ * marked unofficial. Display only: nothing is written and the official
+ * grade replaces it when it lands. Reads with no final line are left
+ * out. Pure.
+ */
+function unofficialResults(reads, progress) {
+  const OUTCOME_FOR = { hit: 'won', miss: 'lost', push: 'push' };
+  const out = [];
+  for (const r of reads || []) {
+    const p = progress?.reads?.[keyFor(r)];
+    const outcome = p && p.final ? OUTCOME_FOR[p.status] : null;
+    if (!outcome) continue;
+    out.push({ ...r, outcome, actual: Number(p.current), unofficial: true });
+  }
+  return out;
+}
+
+async function withTimeout(promise, ms, fallback) {
+  let timer;
+  const timeout = new Promise(resolve => { timer = setTimeout(() => resolve(fallback), ms); });
+  try {
+    return await Promise.race([promise.catch(() => fallback), timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // The upcoming board also carries what the expanding explanation needs.
 const WHY_COLS = 'v2_mean, v2_factors, factors, narration, narration_detail, narration_side, narration_line';
@@ -278,8 +326,15 @@ async function props(req, res) {
     }
     const err = upRes.error || recentRes.error;
     if (err) { res.status(500).json({ error: err.message }); return; }
+    // Finished games still waiting on the official grade get the box
+    // score result. A slow or failed ESPN call only drops them.
+    const awaiting = awaitingGrade(recentRes.data, liveFrom);
+    const progress = awaiting.length
+      ? await withTimeout(liveProgress(awaiting), UNOFFICIAL_TIMEOUT_MS, { games: {}, reads: {} })
+      : { games: {}, reads: {} };
+    const unofficial = unofficialResults(awaiting, progress);
     // A failed live query drops the started list, never the board.
-    const shaped = shapeProps(upRes.data, recentRes.data, graded, liveRes.error ? [] : liveRes.data);
+    const shaped = shapeProps(upRes.data, recentRes.data, graded, liveRes.error ? [] : liveRes.data, unofficial);
     // Last games for the upcoming reads. A failure here only drops the
     // chart, never the board.
     const keys = [...new Set([...shaped.upcoming, ...shaped.live].map(p => p.playerKey).filter(Boolean))];
@@ -348,6 +403,8 @@ module.exports = props;
 module.exports.propsLive = propsLive;
 module.exports.shapeProps = shapeProps;
 module.exports.capPerGame = capPerGame;
+module.exports.awaitingGrade = awaitingGrade;
+module.exports.unofficialResults = unofficialResults;
 module.exports.showable = showable;
 module.exports.describe = describe;
 module.exports.attachHistory = attachHistory;
