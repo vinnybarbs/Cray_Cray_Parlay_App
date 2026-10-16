@@ -13,6 +13,7 @@ const { createClient } = require('@supabase/supabase-js');
 const { teamAbbr } = require('../lib/services/nfl-inactives');
 const { SHOP_BOOKS, shopProp } = require('../lib/services/line-shop.js');
 const { viewerSeesAll, gateProps } = require('../lib/services/paywall.js');
+const { liveProgress } = require('../lib/services/live-prop-stats.js');
 
 // Play and above, the same floor the props flip is judged at.
 const MIN_PP = 4;
@@ -283,7 +284,35 @@ async function props(req, res) {
   }
 }
 
+/**
+ * GET /api/props/live: the live tracker for started reads (owner
+ * 2026-10-16). The player's stat so far against the line and whether it
+ * already hit or missed, from the ESPN live box score. Polled by the
+ * props page while any read is started, so it stays light: one query,
+ * one cached ESPN summary per game. Started reads are never gated.
+ */
+async function propsLive(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const supabase = getSupabase();
+  if (!supabase) { res.status(500).json({ error: 'Supabase not configured' }); return; }
+  try {
+    const now = new Date();
+    const liveFrom = new Date(now.getTime() - STARTED_WINDOW_HOURS * 3600 * 1000).toISOString();
+    const { data, error } = await supabase.from('prop_reads').select(COLS)
+      .gte('commence_time', liveFrom).lte('commence_time', now.toISOString())
+      .gte('v2_edge_pp', MIN_PP).limit(500);
+    if (error) { res.status(500).json({ error: error.message }); return; }
+    const reads = (data || []).filter(showable).map(slim);
+    const live = reads.length ? await liveProgress(reads) : { games: {}, reads: {} };
+    res.setHeader('Cache-Control', 'public, max-age=20, s-maxage=20');
+    res.json({ ...live, asOf: now.toISOString() });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+
 module.exports = props;
+module.exports.propsLive = propsLive;
 module.exports.shapeProps = shapeProps;
 module.exports.showable = showable;
 module.exports.describe = describe;

@@ -4,6 +4,7 @@ import { teamColors } from '../lib/teamColors'
 import PlayerSheet from './PlayerSheet'
 import LineShop from './LineShop'
 import { LockIcon, UnlockButton } from './Locked'
+import useLiveProps, { liveReadKey, liveGameKey } from '../hooks/useLiveProps'
 
 // One shadow prop read (owner 2026-10-12: show props as shadow so the
 // site can be envisioned before they publish). Always carries the SHADOW
@@ -217,16 +218,84 @@ function Why({ p, onPlayer }) {
 
 // A started read keeps its card (owner 2026-10-13: "game in progress"
 // and "locked at", so a bettor can come back and see why). The chip says
-// where it stands, the line under the pick says what it locked at.
-function StartedChip({ p }) {
+// where it stands: the official grade once it lands, else the live
+// tracker's call (owner 2026-10-16: "show progress, and hit or miss").
+const LIVE_STATUS = {
+  hit: { label: 'Hit', cls: 'bg-signal-pos/15 text-signal-pos' },
+  miss: { label: 'Missed', cls: 'bg-signal-neg/15 text-signal-neg' },
+  push: { label: 'Push', cls: 'bg-ink-800 text-ink-300' },
+  no_stats: { label: 'No stats', cls: 'bg-ink-800 text-ink-300' },
+}
+
+function StartedChip({ p, live }) {
   const o = OUTCOME[p.outcome]
   if (o) return <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>Final, {o.label.toLowerCase()}{p.actual != null ? ` · ${p.actual}` : ''}</span>
+  const ls = live && LIVE_STATUS[live.status]
+  if (ls) {
+    return (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 ${ls.cls}`}>
+        {live.final && live.status !== 'hit' && live.status !== 'miss' ? `Final, ${ls.label.toLowerCase()}` : ls.label}
+      </span>
+    )
+  }
   const elapsedH = (Date.now() - new Date(p.commence_time).getTime()) / 3600e3
+  const inProgress = live ? !live.final : elapsedH <= 4
   return (
     <span className="px-2 py-0.5 rounded-full bg-ink-800 text-ink-200 text-xs font-semibold flex-shrink-0 flex items-center gap-1">
-      {elapsedH <= 4 && <span className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />}
-      {elapsedH <= 4 ? 'Game in progress' : 'Locked'}
+      {inProgress && <span className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />}
+      {inProgress ? (live ? 'Live' : 'Game in progress') : 'Locked'}
     </span>
+  )
+}
+
+// What the tracker says under the bar. n is how many more it takes to
+// clear the line: an over needs n more, an under is safe until n more.
+// Pure.
+function trackerText(p, live) {
+  const cur = Number(live.current) || 0
+  if (isTd(p)) return cur >= 1 ? `Scored${cur > 1 ? ` ${cur} TDs` : ''}` : (live.final ? 'No TD' : 'No TD yet')
+  const n = Math.max(0, Math.floor(Number(p.line)) + 1 - cur)
+  const unit = (k) => (k === 1 && p.marketLabel === 'receptions' ? 'reception' : k === 1 && /TDs$/.test(p.marketLabel) ? p.marketLabel.slice(0, -1) : p.marketLabel)
+  if (live.status === 'hit') return p.side === 'over' ? `Cleared ${p.line}` : `Stayed under ${p.line}`
+  if (live.status === 'miss') return p.side === 'over' ? `Finished short of ${p.line}` : `Went over ${p.line}`
+  if (live.status === 'push') return `Landed on ${p.line}`
+  if (live.status === 'no_stats') return 'No stats recorded, likely void'
+  return p.side === 'over' ? `Needs ${n} more ${unit(n)}` : `Safe unless ${n} more ${unit(n)}`
+}
+
+// The live tracker (owner 2026-10-16): the stat so far against the line,
+// "4 of 6.5 receptions", with the game score and clock.
+function LiveTracker({ p, live, game }) {
+  if (!live) return null
+  const td = isTd(p)
+  const cur = Number(live.current) || 0
+  const line = Number(p.line)
+  const top = td ? 1 : Math.max(line * 1.25, cur, 1)
+  const pct = (v) => `${Math.max(0, Math.min(100, (v / top) * 100))}%`
+  const fill = live.status === 'hit' ? 'bg-signal-pos'
+    : live.status === 'miss' ? 'bg-signal-neg'
+      : p.side === 'over' ? 'bg-signal-pos/70' : 'bg-ink-300'
+  const score = game && game.homeScore != null && game.awayScore != null
+    ? `${game.awayAbbr || p.awayAbbr} ${game.awayScore}, ${game.homeAbbr || p.homeAbbr} ${game.homeScore}`
+    : null
+  return (
+    <div className="flex flex-col gap-1.5 rounded-xl bg-ink-850 px-3 py-2.5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+        <span className="text-sm text-ink-200">
+          {td
+            ? <span className="font-semibold text-ink-100 tabular-nums">{cur} TD{cur === 1 ? '' : 's'}</span>
+            : <><span className="font-semibold text-ink-100 tabular-nums">{cur}</span> of <span className="tabular-nums">{p.line}</span> {p.marketLabel}</>}
+        </span>
+        {(score || game?.detail) && (
+          <span className="text-xs text-ink-400 tabular-nums whitespace-nowrap">{[score, game?.detail].filter(Boolean).join(' · ')}</span>
+        )}
+      </div>
+      <div className="relative h-2 rounded-full bg-ink-700 overflow-hidden" role="img" aria-label={`${trackerText(p, live)}, ${cur} so far`}>
+        <div className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ${fill}`} style={{ width: td ? (cur >= 1 ? '100%' : '0%') : pct(cur) }} />
+        {!td && <div className="absolute inset-y-0 w-0.5 bg-ink-100" style={{ left: `calc(${pct(line)} - 1px)` }} />}
+      </div>
+      <span className={`text-xs ${live.status === 'hit' ? 'text-signal-pos' : live.status === 'miss' ? 'text-signal-neg' : 'text-ink-400'}`}>{trackerText(p, live)}</span>
+    </div>
   )
 }
 
@@ -268,6 +337,11 @@ function OpenPropCard({ p, showOutcome }) {
   const openPlayer = p.playerKey ? (e) => { e?.stopPropagation?.(); setPlayerOpen(true) } : null
   const o = showOutcome ? OUTCOME[p.outcome] : null
   const hasEvidence = !showOutcome && p.ourProb != null && p.bookProb != null
+  // Only an ungraded started read polls the tracker. Once the official
+  // grade lands the card shows that instead.
+  const feed = useLiveProps(started && !OUTCOME[p.outcome])
+  const live = feed?.reads?.[liveReadKey(p)] || null
+  const liveGame = feed?.games?.[liveGameKey(p)] || null
   return (
     // The whole card opens the why (owner 2026-10-13: "I still can't click
     // anything on a prop to see research"). The labeled button stays for
@@ -287,7 +361,7 @@ function OpenPropCard({ p, showOutcome }) {
           </div>
         </div>
         {started
-          ? <StartedChip p={p} />
+          ? <StartedChip p={p} live={live} />
           : o
             ? <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{o.label}{p.actual != null ? ` · ${p.actual}` : ''}</span>
             : <ShadowBadge />}
@@ -302,6 +376,8 @@ function OpenPropCard({ p, showOutcome }) {
           <span className="text-xs text-ink-400 tabular-nums">Locked at {fmtClock(p.commence_time)}, {fmtOdds(p.price)}</span>
         )}
       </div>
+
+      {started && <LiveTracker p={p} live={live} game={liveGame} />}
 
       {!showOutcome && (() => {
         const evidence = hasEvidence

@@ -120,6 +120,7 @@ const today = require('./api/today');
 app.get('/api/today', today);
 const propsBoard = require('./api/props');
 app.get('/api/props', propsBoard);
+app.get('/api/props/live', propsBoard.propsLive);
 const playerSheet = require('./api/player');
 app.get('/api/player', playerSheet);
 
