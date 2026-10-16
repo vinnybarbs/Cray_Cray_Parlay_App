@@ -146,3 +146,48 @@ describe('slim fields for the card', () => {
     expect(td.underPrice).toBeNull();
   });
 });
+
+describe('unofficial results before the official grade', () => {
+  const { awaitingGrade, unofficialResults } = require('../../api/props');
+  const { keyFor } = require('../../lib/services/live-prop-stats');
+  const liveFrom = '2026-10-16T02:50:00.000Z';
+
+  it('picks finished, showable, ungraded reads only', () => {
+    const rows = [
+      row({ commence_time: '2026-10-16T00:15:00+00:00' }),
+      row({ commence_time: '2026-10-16T00:15:00+00:00', v2_outcome: 'won', player_name: 'Graded' }),
+      row({ commence_time: '2026-10-16T00:15:00+00:00', v2_outcome: 'void', player_name: 'Void' }),
+      row({ commence_time: '2026-10-16T03:00:00+00:00', player_name: 'Still live' }),
+      row({ commence_time: '2026-10-16T00:15:00+00:00', v2_edge_pp: 2, player_name: 'Thin' }),
+    ];
+    expect(awaitingGrade(rows, liveFrom).map(p => p.player)).toEqual(['Puka Nacua']);
+  });
+
+  it('marks final box score results unofficial and leaves the rest out', () => {
+    const reads = awaitingGrade([
+      row({ commence_time: '2026-10-16T00:15:00+00:00' }),
+      row({ commence_time: '2026-10-16T00:15:00+00:00', player_name: 'Miss' }),
+      row({ commence_time: '2026-10-16T00:15:00+00:00', player_name: 'No stats' }),
+      row({ commence_time: '2026-10-16T00:15:00+00:00', player_name: 'Unknown' }),
+    ], liveFrom);
+    const progress = { reads: {
+      [keyFor(reads[0])]: { current: 7, status: 'hit', final: true },
+      [keyFor(reads[1])]: { current: 3, status: 'miss', final: true },
+      [keyFor(reads[2])]: { current: 0, status: 'no_stats', final: true },
+    } };
+    const out = unofficialResults(reads, progress);
+    expect(out.map(p => [p.player, p.outcome, p.actual, p.unofficial])).toEqual([
+      ['Puka Nacua', 'won', 7, true],
+      ['Miss', 'lost', 3, true],
+    ]);
+  });
+
+  it('puts unofficial results in recent next to official grades, newest game first', () => {
+    const official = [row({ v2_outcome: 'won', actual_value: 7 })];
+    const unofficial = [{ ...shapeProps([row({ commence_time: '2099-01-01T00:00:00Z' })], [], []).upcoming[0],
+      commence_time: '2026-10-16T00:15:00+00:00', outcome: 'lost', actual: 2, unofficial: true }];
+    const out = shapeProps([], official, [], [], unofficial);
+    expect(out.recent.map(p => [p.outcome, !!p.unofficial])).toEqual([['lost', true], ['won', false]]);
+    expect(out.record.total).toEqual({ won: 0, lost: 0, units: 0 });
+  });
+});

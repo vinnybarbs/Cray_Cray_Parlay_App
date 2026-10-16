@@ -624,4 +624,16 @@ app.listen(PORT, () => {
   // served for 90 minutes with its start sync never written.
   recordServerStart().then(() => syncSkills({ source: 'server-start', retries: 3 })).catch(err =>
     logger.error('Server start bookkeeping failed', { error: err.message }));
+  // A deploy inside a data integrity sweep kills it (ops check 2026-10-16).
+  // Once a run on the old container has had time to finish, close any dead
+  // run with a failed row and resume it once. lib/services/sweep-recovery.js
+  const { recoverInterruptedSweeps, DEAD_AFTER_MS } = require('./lib/services/sweep-recovery');
+  setTimeout(() => {
+    const { supabase } = require('./lib/middleware/supabaseAuth.js');
+    const { runDataIntegritySweep } = require('./lib/services/data-integrity-agent');
+    recoverInterruptedSweeps(supabase, {
+      runSweep: (opts) => runDataIntegritySweep(supabase, opts),
+    }).then(r => { if (r.interrupted) logger.info('Sweep recovery', r); })
+      .catch(err => logger.error('Sweep recovery failed', { error: err.message }));
+  }, DEAD_AFTER_MS + 60 * 1000).unref();
 });

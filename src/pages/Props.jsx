@@ -75,7 +75,7 @@ function GameSection({ g, defaultOpen, showOutcome }) {
             {g.state === 'upcoming' ? fmtGameDateTime(g.commence_time) : `Started ${fmtClock(g.commence_time)}`}
             {' · '}{n} {n === 1 ? 'prop' : 'props'}
             {skips.length > 0 && <>{' · '}{skips.length} {skips.length === 1 ? 'skip' : 'skips'}</>}
-            {graded.length > 0 && <>{' · '}<span className="tabular-nums text-ink-200">{hits} of {graded.length} hit</span></>}
+            {graded.length > 0 && <>{' · '}<span className="tabular-nums text-ink-200">{hits} of {graded.length} hit</span>{graded.some(p => p.unofficial) ? ', unofficial' : ''}</>}
           </span>
         </span>
         <GameState g={g} />
@@ -201,8 +201,13 @@ export default function Props() {
 
         {data && tab === 'recent' && (
           recentGames.length === 0
-            ? <p className="text-sm text-ink-400">No graded props from the last week yet. Grades land the day after games.</p>
-            : recentGames.map((g, i) => <GameSection key={g.key} g={g} defaultOpen={i === 0} showOutcome />)
+            ? <p className="text-sm text-ink-400">No finished props from the last week yet.</p>
+            : <>
+                {recent.some(p => p.unofficial) && (
+                  <p className="text-xs text-ink-400">Unofficial results come from the box score and turn official when the game settles, usually within minutes of the final.</p>
+                )}
+                {recentGames.map((g, i) => <GameSection key={g.key} g={g} defaultOpen={i === 0} showOutcome />)}
+              </>
         )}
 
         {total && (total.won + total.lost) > 0 && (

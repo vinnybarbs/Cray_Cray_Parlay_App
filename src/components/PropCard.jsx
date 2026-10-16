@@ -414,7 +414,7 @@ function OpenPropCard({ p, showOutcome }) {
         {started
           ? <StartedChip p={p} live={live} />
           : o
-            ? <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{o.label}{p.actual != null ? ` · ${p.actual}` : ''}</span>
+            ? <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{o.label}{p.actual != null ? ` · ${p.actual}` : ''}{p.unofficial ? <span className="font-normal text-ink-400">, unofficial</span> : null}</span>
             : <ShadowBadge />}
       </div>
 
