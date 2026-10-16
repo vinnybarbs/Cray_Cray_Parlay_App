@@ -277,7 +277,12 @@ async function syncNflProps(req, res) {
   }
   if (req.query.mode === 'close') {
     res.status(202).json({ status: 'accepted', message: 'Prop close capture started' });
-    runClose().catch(err => console.error('Prop close capture error:', err.message));
+    // Every close capture tick also settles finished games from the
+    // ESPN box score, so a game is graded minutes after it ends.
+    runClose()
+      .catch(err => console.error('Prop close capture error:', err.message))
+      .then(() => require('./analyze-nfl-props.js').runBoxScoreGrade())
+      .catch(err => console.error('Prop box score grade error:', err.message));
     return;
   }
   const days = Math.min(MAX_DAYS, Math.max(1, parseInt(req.query.days, 10) || DEFAULT_DAYS));

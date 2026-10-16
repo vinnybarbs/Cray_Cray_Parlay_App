@@ -183,7 +183,7 @@ export default function Props() {
             ? <p className="text-sm text-ink-400">No finished props from the last week yet.</p>
             : <>
                 {recent.some(p => p.unofficial) && (
-                  <p className="text-xs text-ink-400">Unofficial results come from the box score. Official grades land Tuesday from the league stat file and replace them.</p>
+                  <p className="text-xs text-ink-400">Unofficial results come from the box score and turn official when the game settles, usually within minutes of the final.</p>
                 )}
                 {recentGames.map((g, i) => <GameSection key={g.key} g={g} defaultOpen={i === 0} showOutcome />)}
               </>
