@@ -40,6 +40,15 @@ const TABS = [
     ),
   },
   {
+    to: '/tracked',
+    label: 'Tracked',
+    icon: (
+      <>
+        <path d="M7 3h10a1 1 0 0 1 1 1v17l-6-4-6 4V4a1 1 0 0 1 1-1z" />
+      </>
+    ),
+  },
+  {
     to: '/ledger',
     label: 'Ledger',
     icon: (
@@ -82,7 +91,7 @@ export default function TabBar() {
         className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-ink-950/95 backdrop-blur border-t border-ink-800"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <ul className="grid grid-cols-5 max-w-xl mx-auto" style={{ height: BAR_HEIGHT }}>
+        <ul className="grid grid-cols-6 max-w-xl mx-auto" style={{ height: BAR_HEIGHT }}>
           {TABS.map(t => (
             <li key={t.to} className="flex">
               <NavLink
