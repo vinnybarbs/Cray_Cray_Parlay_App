@@ -5,13 +5,19 @@
  * and market, prices it off the player's own game log
  * (nfl_player_game_stats) through lib/services/prop-edge.js with every
  * weight from the NFL_props dial board, and stores one row per prop in
- * prop_reads. ?mode=grade settles past reads against the nflverse stat
- * lines once they land (Tuesdays). The weekly review judges the record;
+ * prop_reads. ?mode=boxscore settles a read from the ESPN final box
+ * score minutes after its game ends (owner 2026-10-16: "We can't go more
+ * than a few hours without settling after a big game"). ?mode=grade
+ * settles what is left against the nflverse stat lines once they land
+ * (Tuesdays) and checks every box score grade against them. Grades never
+ * re-flip: a disagreement is logged for the allow_regrade path, never
+ * written. The weekly review judges the record;
  * nothing here reaches ai_suggestions, the digest, or alerts.
  *
  * Endpoints:
  *   POST /cron/analyze-nfl-props?secret=...            (read, default)
- *   POST /cron/analyze-nfl-props?secret=...&mode=grade (settle)
+ *   POST /cron/analyze-nfl-props?secret=...&mode=grade (settle, nflverse)
+ *   POST /cron/analyze-nfl-props?secret=...&mode=boxscore (settle, ESPN final)
  *   POST /cron/analyze-nfl-props?secret=...&mode=narrate (prop narration only)
  */
 
@@ -23,6 +29,7 @@ const { edgeTier } = require('../../lib/services/pick-grader.js');
 const { teamAbbr, nameKey } = require('../../lib/services/nfl-inactives.js');
 const { getWeatherForGames } = require('../../lib/services/weather-data.js');
 const { narrateProps } = require('./narrate-nfl-props.js');
+const liveStats = require('../../lib/services/live-prop-stats.js');
 
 const SPORT = 'NFL';
 const ODDS_SPORT = 'americanfootball_nfl';
@@ -401,6 +408,107 @@ async function runNarrate() {
   }
 }
 
+// A game is checked for a final box score this long after kickoff, and
+// for this many days back (a game ESPN never calls final waits for the
+// nflverse file).
+const BOX_MIN_HOURS = 2.5;
+const BOX_LOOKBACK_DAYS = 4;
+
+/**
+ * The settlement for one read from a final box score line: the stat, the
+ * v1 outcome and the v2 outcome, or null when the player has no line
+ * (left pending, nflverse decides between a grade and a book void). Pure.
+ */
+function boxScoreGrade(read, players) {
+  const statFor = liveStats.STAT_FOR[read.market];
+  if (!statFor) return null;
+  const line = liveStats.findPlayer(players, read.player_name);
+  if (!line) return null;
+  const actual = statFor(line);
+  const outcome = propEdge.gradeRead(read.side, read.line, actual);
+  if (!outcome) return null;
+  const v2Outcome = read.v2_side ? propEdge.gradeRead(read.v2_side, read.line, actual) : null;
+  return { actual, outcome, v2Outcome };
+}
+
+/**
+ * Settle pending reads from the ESPN final box score. Runs with the close
+ * capture every 15 minutes on game days and before the daily nflverse
+ * pass, so a game settles minutes after it ends instead of on Tuesday.
+ */
+async function runBoxScoreGrade({ fetchFn = fetch } = {}) {
+  const started = Date.now();
+  const summary = { mode: 'boxscore', pending: 0, games: 0, games_final: 0, graded: 0, won: 0, lost: 0, push: 0, no_line: 0, errors: [] };
+  const now = Date.now();
+  const { data: pending, error } = await supabase
+    .from('prop_reads')
+    .select('id, market, player_key, player_name, line, side, v2_side, commence_time, home_team, away_team')
+    .eq('actual_outcome', 'pending')
+    .lt('commence_time', new Date(now - BOX_MIN_HOURS * 3600 * 1000).toISOString())
+    .gt('commence_time', new Date(now - BOX_LOOKBACK_DAYS * 24 * 3600 * 1000).toISOString())
+    .limit(5000);
+  if (error) throw error;
+  summary.pending = (pending || []).length;
+  const byGame = new Map();
+  for (const r of pending || []) {
+    const k = liveStats.gameKey(r);
+    if (!byGame.has(k)) byGame.set(k, []);
+    byGame.get(k).push(r);
+  }
+  summary.games = byGame.size;
+  for (const reads of byGame.values()) {
+    const box = await liveStats.boxScoreFor(reads[0], { fetchFn });
+    if (!box || !box.game.final) continue;
+    summary.games_final++;
+    const gradedAt = new Date().toISOString();
+    const updates = [];
+    for (const r of reads) {
+      const g = boxScoreGrade(r, box.players);
+      if (!g) { summary.no_line++; continue; }
+      updates.push({ id: r.id, g, cols: { actual_value: g.actual, actual_outcome: g.outcome, v2_outcome: g.v2Outcome, graded_at: gradedAt, updated_at: gradedAt } });
+    }
+    for (let i = 0; i < updates.length; i += 20) {
+      const results = await Promise.all(updates.slice(i, i + 20).map(u =>
+        // Only a row still pending: a row the nflverse pass graded in the
+        // meantime keeps its grade.
+        supabase.from('prop_reads').update(u.cols).eq('id', u.id).eq('actual_outcome', 'pending')));
+      results.forEach((res, j) => {
+        if (res.error) { summary.errors.push(res.error.message); return; }
+        summary.graded++;
+        summary[updates[i + j].g.outcome]++;
+      });
+    }
+  }
+  summary.duration_ms = Date.now() - started;
+  // Quiet runs (nothing pending past kickoff) do not log, so the every
+  // 15 minute cadence does not flood cron_job_logs.
+  if (summary.pending > 0 || summary.errors.length) {
+    await log(summary.errors.length ? 'partial' : 'completed', { ...summary, errors: summary.errors.slice(0, 5) }, 'grade-nfl-props-boxscore');
+  }
+  return summary;
+}
+
+/**
+ * Box score grades against the nflverse stat file, the settlement truth.
+ * Rows are graded reads with actual_value; stats maps
+ * player_key|season|week to the nflverse line. Returns the reads whose
+ * stat disagrees. Pure.
+ */
+function boxScoreMismatches(rows, stats) {
+  const out = [];
+  for (const r of rows || []) {
+    const line = stats.get(`${r.player_key}|${r.season}|${r.week}`);
+    if (!line || r.actual_value == null) continue;
+    const truth = r.market === propEdge.TD_MARKET
+      ? (Number(line.rushing_tds) || 0) + (Number(line.receiving_tds) || 0)
+      : Number(line[propEdge.STAT_COLUMN[r.market]]);
+    if (!Number.isFinite(truth) || truth === Number(r.actual_value)) continue;
+    out.push({ id: r.id, player_key: r.player_key, market: r.market, line: r.line, box: Number(r.actual_value), nflverse: truth,
+      outcome: r.actual_outcome, nflverse_outcome: propEdge.gradeRead(r.side, r.line, truth) });
+  }
+  return out;
+}
+
 async function runGrade() {
   const started = Date.now();
   const summary = { pending: 0, graded: 0, won: 0, lost: 0, push: 0, no_stat: 0, errors: [] };
@@ -463,6 +571,36 @@ async function runGrade() {
     summary[outcome]++;
     if (v2Outcome) summary.v2_graded++;
   }
+  // Check the last ten days of box score grades against the stat file.
+  // A disagreement is logged, never written: grades do not re-flip, a
+  // regrade goes through allow_regrade.
+  try {
+    const since = new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString();
+    const { data: done } = await supabase.from('prop_reads')
+      .select('id, player_key, season, week, market, line, side, actual_value, actual_outcome')
+      .in('actual_outcome', ['won', 'lost', 'push'])
+      .gte('graded_at', since)
+      .not('season', 'is', null)
+      .limit(5000);
+    const rows = done || [];
+    const checkStats = new Map();
+    const checkKeys = [...new Set(rows.map(r => r.player_key))];
+    const checkSeasons = [...new Set(rows.map(r => r.season))];
+    for (let i = 0; i < checkKeys.length; i += 100) {
+      const { data } = await supabase
+        .from('nfl_player_game_stats')
+        .select('player_key, season, week, passing_yards, passing_tds, rushing_yards, receiving_yards, receptions, rushing_tds, receiving_tds')
+        .in('player_key', checkKeys.slice(i, i + 100))
+        .in('season', checkSeasons);
+      for (const r of data || []) checkStats.set(`${r.player_key}|${r.season}|${r.week}`, r);
+    }
+    const mismatches = boxScoreMismatches(rows, checkStats);
+    summary.reconciled = rows.length;
+    summary.box_mismatches = mismatches.length;
+    summary.box_outcome_mismatches = mismatches.filter(m => m.nflverse_outcome && m.nflverse_outcome !== m.outcome).slice(0, 25);
+  } catch (err) {
+    summary.errors.push(`reconcile: ${err.message}`);
+  }
   summary.duration_ms = Date.now() - started;
   await log(summary.errors.length ? 'partial' : 'completed', summary, 'grade-nfl-props');
   return summary;
@@ -471,11 +609,14 @@ async function runGrade() {
 async function analyzeNflProps(req, res) {
   const cronSecret = req.headers['x-cron-secret'] || req.query.secret;
   if (cronSecret !== process.env.CRON_SECRET) return res.status(401).json({ error: 'Unauthorized' });
-  const mode = ['grade', 'narrate'].includes(req.query.mode) ? req.query.mode : 'read';
+  const mode = ['grade', 'narrate', 'boxscore'].includes(req.query.mode) ? req.query.mode : 'read';
   res.status(202).json({ status: 'accepted', message: `NFL props ${mode} started` });
   (async () => {
     try {
-      if (mode === 'grade') await runGrade();
+      // The daily grade settles from box scores first, so a game that
+      // ended after the last close capture run still settles by morning.
+      if (mode === 'grade') { await runBoxScoreGrade().catch(e => log('failed', { mode: 'boxscore', error: e.message }, 'grade-nfl-props-boxscore')); await runGrade(); }
+      else if (mode === 'boxscore') await runBoxScoreGrade();
       else if (mode === 'narrate') await runNarrate();
       else await runRead();
     } catch (err) {
@@ -488,5 +629,8 @@ async function analyzeNflProps(req, res) {
 module.exports = analyzeNflProps;
 module.exports.runRead = runRead;
 module.exports.runGrade = runGrade;
+module.exports.runBoxScoreGrade = runBoxScoreGrade;
+module.exports.boxScoreGrade = boxScoreGrade;
+module.exports.boxScoreMismatches = boxScoreMismatches;
 module.exports.runNarrate = runNarrate;
 module.exports.tdRow = tdRow;
