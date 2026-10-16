@@ -1,0 +1,31 @@
+import { groupByGame, gameState } from '../../src/lib/propGames'
+
+const now = new Date('2026-10-18T20:00:00Z').getTime()
+const read = (away, home, iso, extra = {}) => ({ away_team: away, home_team: home, awayAbbr: away, homeAbbr: home, commence_time: iso, text: `${away}-${home}`, ...extra })
+
+describe('groupByGame', () => {
+  test('in progress first, then upcoming by kickoff, then finished newest first', () => {
+    const props = [
+      read('BUF', 'LA', '2026-10-19T00:20:00Z'), // upcoming, later
+      read('KC', 'DEN', '2026-10-18T13:00:00Z'), // 7h ago, ungraded, final
+      read('NE', 'NYJ', '2026-10-18T17:00:00Z'), // 3h ago, live
+      read('SF', 'SEA', '2026-10-18T20:25:00Z'), // upcoming, sooner
+      read('DAL', 'PHI', '2026-10-18T17:05:00Z', { outcome: 'won' }), // started, all graded
+      read('NE', 'NYJ', '2026-10-18T17:00:00Z'),
+    ]
+    const games = groupByGame(props, now)
+    expect(games.map(g => `${g.away}-${g.state}`)).toEqual([
+      'NE-live', 'SF-upcoming', 'BUF-upcoming', 'DAL-final', 'KC-final',
+    ])
+    expect(games[0].props).toHaveLength(2)
+  })
+
+  test('a started game with one ungraded read is still in progress', () => {
+    const list = [read('A', 'B', '2026-10-18T18:00:00Z', { outcome: 'won' }), read('A', 'B', '2026-10-18T18:00:00Z')]
+    expect(gameState(list, now)).toBe('live')
+  })
+
+  test('empty input gives no games', () => {
+    expect(groupByGame(undefined, now)).toEqual([])
+  })
+})
