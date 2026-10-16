@@ -7,6 +7,7 @@ import { LockIcon, UnlockButton } from './Locked'
 import useLiveProps, { liveReadKey, liveGameKey } from '../hooks/useLiveProps'
 import TrackButton from './TrackButton'
 import { propItem } from '../lib/trackedKeys'
+import { skipReason } from '../lib/propSkip'
 
 // One shadow prop read (owner 2026-10-12: show props as shadow so the
 // site can be envisioned before they publish). Always carries the SHADOW
@@ -322,6 +323,48 @@ function LockedProp({ p }) {
         <span className="text-sm text-ink-300">A {p.marketLabel} read, for Pro members.</span>
         <UnlockButton />
       </div>
+    </div>
+  )
+}
+
+// The headline of a skip: the market at the book's line, no side lit.
+function skipLine(p) {
+  if (isTd(p)) return 'To score a TD'
+  return `${p.line} ${p.marketLabel}`
+}
+
+// Every other read for the game (owner 2026-10-16: "show all props even
+// skips reasoning", so a bettor can research here and not jump apps).
+// Compact by default, tap for the numbers, the chart and the player.
+export function SkipCard({ p }) {
+  const [open, setOpen] = useState(false)
+  const [playerOpen, setPlayerOpen] = useState(false)
+  const td = isTd(p)
+  const chartP = td ? { ...p, side: 'over' } : p
+  return (
+    <div className="bg-ink-900/60 rounded-xl border border-ink-800 px-3 py-2.5 flex flex-col gap-2">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 text-left">
+        <span className="min-w-0 flex-1 flex flex-col">
+          <span className="text-sm font-semibold text-ink-200 truncate">{p.player}</span>
+          <span className="text-xs text-ink-400 truncate first-letter:uppercase">
+            {skipLine(p)}
+            {!td && (p.overPrice != null || p.underPrice != null) && (
+              <span className="tabular-nums"> · O {fmtOdds(p.overPrice) || '-'} / U {fmtOdds(p.underPrice) || '-'}</span>
+            )}
+            {td && p.overPrice != null && <span className="tabular-nums"> · {fmtOdds(p.overPrice)}</span>}
+          </span>
+        </span>
+        <span className="text-[11px] font-medium text-ink-500 border border-ink-700 rounded-full px-2 py-0.5 flex-shrink-0">Skip</span>
+        <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-ink-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      {open && (
+        <div className="flex flex-col gap-3 pt-1">
+          <p className="text-sm text-ink-300">{skipReason(p)}</p>
+          <Why p={{ ...p, why: p.why ? { ...p.why, narration: null, detail: null } : null }} onPlayer={p.playerKey ? () => setPlayerOpen(true) : null} />
+          <HistoryChart p={chartP} />
+        </div>
+      )}
+      {playerOpen && <PlayerSheet playerKey={p.playerKey} name={p.player} team={p.team} onClose={() => setPlayerOpen(false)} />}
     </div>
   )
 }

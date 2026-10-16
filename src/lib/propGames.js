@@ -18,7 +18,9 @@ export function gameKey(p) {
 export function gameState(props, now = Date.now()) {
   const kick = new Date(props[0].commence_time).getTime()
   if (!(kick <= now)) return 'upcoming'
-  if (props.every(isGraded)) return 'final'
+  // Skips are never graded, so only the reads decide a finished game.
+  const reads = props.filter(p => !p.skip)
+  if (reads.length > 0 && reads.every(isGraded)) return 'final'
   return (now - kick) / 3600e3 <= IN_PROGRESS_HOURS ? 'live' : 'final'
 }
 

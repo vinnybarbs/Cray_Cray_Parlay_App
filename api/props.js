@@ -4,7 +4,10 @@
 // and nothing touches mv_public_record. Public and read only, the same
 // anon pattern as /api/today.
 //
-// Response: { upcoming: [...], live: [...], recent: [...], record: { byMarket: [...], total }, asOf }
+// Response: { upcoming: [...], live: [...], skips: [...], recent: [...], record: { byMarket: [...], total }, asOf }
+// skips holds every other read for the same games, under 4 points or an
+// anytime TD we price below the book, with the numbers behind it, so a
+// bettor can research the whole game here (owner 2026-10-16).
 // live holds reads whose game started in the last 8 hours, with their why.
 // Each upcoming read also carries ourProb and bookProb for its side and
 // history, the player's last games against the line (UI plan item 6).
@@ -20,7 +23,7 @@ const MIN_PP = 4;
 // The cap is per game, not across the slate: a single 40 read cap left
 // the best edges from one or two games filling the whole page and other
 // games with one read or none (owner 2026-10-16, Bears at Falcons).
-const MAX_PER_GAME = 30;
+const MAX_PER_GAME = 60;
 const RECENT_DAYS = 8;
 // Graded since the v2 read started (2026-09-14).
 const RECORD_SINCE = '2026-09-14';
@@ -51,6 +54,12 @@ function showable(r) {
   if (!(Number(r.v2_edge_pp) >= MIN_PP)) return false;
   if (r.market === TD_MARKET && r.v2_side !== 'over') return false;
   return Boolean(MARKET_LABEL[r.market]);
+}
+
+/** A read we have but would not bet: shown as a Skip with its numbers. Pure. */
+function skippable(r) {
+  if (!r || !r.v2_side || r.v2_edge_pp == null || !MARKET_LABEL[r.market]) return false;
+  return !showable(r);
 }
 
 /** The plain words for a read: "Puka Nacua over 5.5 receptions". Pure. */
@@ -168,11 +177,13 @@ function attachHistory(upcoming, statRows) {
   }
   return upcoming.map(p => {
     const stat = STAT_FOR[p.market];
+    // An anytime TD chart always counts games he scored, whatever the read's side.
+    const side = p.market === TD_MARKET ? 'over' : p.side;
     const games = (byPlayer.get(p.playerKey) || []).slice(-HISTORY_GAMES);
     if (!stat || p.line == null || games.length === 0) return { ...p, history: null };
     const rows = games.map(g => {
       const value = Number(stat(g)) || 0;
-      const hit = p.side === 'over' ? value > p.line : value < p.line;
+      const hit = side === 'over' ? value > p.line : value < p.line;
       return { season: g.season, week: g.week, opponent: g.opponent || null, value, hit };
     });
     const last = games[games.length - 1];
@@ -209,6 +220,21 @@ async function readAll(build, pageSize = 1000) {
   }
 }
 
+/** A skip: the read's fields a research row needs, nothing to bet. Pure. */
+function slimSkip(r) {
+  const s = slim(r);
+  delete s.books;
+  delete s.outcome;
+  delete s.actual;
+  return { ...s, price: null, skip: true };
+}
+
+/** A skip's chart, trimmed to the values and hits to keep the payload light. Pure. */
+function leanHistory(p) {
+  if (!p.history) return p;
+  return { ...p, history: { games: p.history.games.map(g => ({ value: g.value, hit: g.hit })), hits: p.history.hits } };
+}
+
 /** Pure shaping of upcoming, recent and graded rows into the response. */
 function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
   const upcoming = capPerGame((upcomingRows || []).filter(showable)
@@ -220,6 +246,12 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
   const live = capPerGame((liveRows || []).filter(showable)
     .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp)))
     .map(r => ({ ...slim(r), started: true }));
+  // Skips carry no price shopping and no tracking, only the read and
+  // its numbers.
+  const skips = [
+    ...(upcomingRows || []).filter(skippable).map(r => ({ ...slimSkip(r) })),
+    ...(liveRows || []).filter(skippable).map(r => ({ ...slimSkip(r), started: true })),
+  ].sort((a, b) => b.edgePp - a.edgePp);
   const recent = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push'].includes(r.v2_outcome))
     .sort((a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.v2_edge_pp) - Number(a.v2_edge_pp))
     .slice(0, 30)
@@ -238,7 +270,7 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = []) {
   const byMarket = [...acc.values()]
     .map(m => ({ ...m, units: round(m.units) }))
     .sort((a, b) => b.units - a.units);
-  return { upcoming, live, recent, record: { byMarket, total: { ...total, units: round(total.units) }, since: RECORD_SINCE, minPp: MIN_PP } };
+  return { upcoming, live, skips, recent, record: { byMarket, total: { ...total, units: round(total.units) }, since: RECORD_SINCE, minPp: MIN_PP } };
 }
 
 // How long a started read stays up, same window as the game board.
@@ -263,8 +295,8 @@ async function props(req, res) {
     const liveFrom = new Date(now.getTime() - STARTED_WINDOW_HOURS * 3600 * 1000).toISOString();
     // Order matters: the names below bind by position.
     const [upRes, liveRes, recentRes] = await Promise.all([
-      readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).order('id', { ascending: true }).range(a, b)),
-      readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gte('commence_time', liveFrom).lte('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).order('id', { ascending: true }).range(a, b)),
+      readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).order('id', { ascending: true }).range(a, b)),
+      readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gte('commence_time', liveFrom).lte('commence_time', now.toISOString()).order('id', { ascending: true }).range(a, b)),
       supabase.from('prop_reads').select(COLS).gte('commence_time', recentFrom).lt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(1000),
     ]);
     const graded = [];
@@ -282,7 +314,7 @@ async function props(req, res) {
     const shaped = shapeProps(upRes.data, recentRes.data, graded, liveRes.error ? [] : liveRes.data);
     // Last games for the upcoming reads. A failure here only drops the
     // chart, never the board.
-    const keys = [...new Set([...shaped.upcoming, ...shaped.live].map(p => p.playerKey).filter(Boolean))];
+    const keys = [...new Set([...shaped.upcoming, ...shaped.live, ...shaped.skips].map(p => p.playerKey).filter(Boolean))];
     let statRows = [];
     if (keys.length > 0) {
       const { data, error } = await readAll((a, b) => supabase.from('nfl_player_game_stats')
@@ -308,6 +340,7 @@ async function props(req, res) {
     }
     shaped.upcoming = attachHistory(shaped.upcoming, statRows);
     shaped.live = attachHistory(shaped.live, statRows);
+    shaped.skips = attachHistory(shaped.skips, statRows).map(leanHistory);
     const access = await viewerSeesAll(req, res);
     if (!access.viewer) res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
     const body = { ...shaped, asOf: now.toISOString() };
@@ -349,6 +382,7 @@ module.exports.propsLive = propsLive;
 module.exports.shapeProps = shapeProps;
 module.exports.capPerGame = capPerGame;
 module.exports.showable = showable;
+module.exports.skippable = skippable;
 module.exports.describe = describe;
 module.exports.attachHistory = attachHistory;
 module.exports.sideProbs = sideProbs;
