@@ -5,6 +5,8 @@ import PlayerSheet from './PlayerSheet'
 import LineShop from './LineShop'
 import { LockIcon, UnlockButton } from './Locked'
 import useLiveProps, { liveReadKey, liveGameKey } from '../hooks/useLiveProps'
+import TrackButton from './TrackButton'
+import { propItem } from '../lib/trackedKeys'
 
 // One shadow prop read (owner 2026-10-12: show props as shadow so the
 // site can be envisioned before they publish). Always carries the SHADOW
@@ -372,9 +374,14 @@ function OpenPropCard({ p, showOutcome }) {
           <span className="text-lg font-semibold text-ink-100 leading-snug min-w-0 first-letter:uppercase">{p.player ? pickLine(p) : p.text}</span>
           <span className=" text-base tabular-nums text-ink-200 flex-shrink-0">{fmtOdds(p.price)}</span>
         </div>
-        {started && (
-          <span className="text-xs text-ink-400 tabular-nums">Locked at {fmtClock(p.commence_time)}, {fmtOdds(p.price)}</span>
-        )}
+        <div className="flex items-center justify-between gap-3">
+          {started
+            ? <span className="text-xs text-ink-400 tabular-nums">Locked at {fmtClock(p.commence_time)}, {fmtOdds(p.price)}</span>
+            : <span />}
+          {/* Track bet (owner 2026-10-16): one tap puts the read on the
+              Tracked tab. Gone once the official grade is in. */}
+          {!OUTCOME[p.outcome] && <TrackButton item={propItem(p)} />}
+        </div>
       </div>
 
       {started && <LiveTracker p={p} live={live} game={liveGame} />}

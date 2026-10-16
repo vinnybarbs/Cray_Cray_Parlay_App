@@ -12,6 +12,8 @@ import { apiFetch } from '../lib/api'
 import LockedCard from '../components/Locked'
 import useLiveGames from '../hooks/useLiveGames'
 import { LiveScoreboard, StandingLine, LiveNowRail } from '../components/LiveScoreboard'
+import TrackButton from '../components/TrackButton'
+import { gameItem } from '../lib/trackedKeys'
 
 // Shadow sports: the board shows the model's read, but nothing publishes
 // until go-live, so no tile may wear bet-tier language. The set lives in
@@ -1095,6 +1097,13 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
               <TierPathNote published={game.published_pick} />
               {game.in_progress ? <LockedNote game={game} /> : <LiveReadNote game={game} />}
               {live && !graded && <StandingLine standing={live.pick} />}
+              {/* Track bet (owner 2026-10-16): the published pick only, a
+                  live read that has not cleared the gate is not a bet. */}
+              {publishedText && !graded && (
+                <div className="flex justify-end mt-2">
+                  <TrackButton item={gameItem(game, gameKey, game.published_pick, sidePct(game, game.recommended_side, signedPp))} />
+                </div>
+              )}
             </div>
           )
           if (game.recommended_pick && isLegGame) {
@@ -1152,6 +1161,11 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
             {!game.in_progress && <LineShop shop={alt.shop} bookPct={bookOurPct(Number(alt.edge_pp), alt.odds, null, alt.implied_prob)?.book ?? null} />}
             <TierPathNote published={alt} />
             {live && !(alt.outcome && alt.outcome !== 'pending') && <StandingLine standing={live.alts?.[alt.pick]} />}
+            {!(alt.outcome && alt.outcome !== 'pending') && (
+              <div className="flex justify-end mt-2">
+                <TrackButton item={gameItem(game, gameKey, alt, bookOurPct(Number(alt.edge_pp), alt.odds, null, alt.implied_prob))} />
+              </div>
+            )}
           </div>
         ))}
 

@@ -10,6 +10,7 @@ import DialsDashboard from './pages/DialsDashboard'
 import HouseLedger from './pages/HouseLedger'
 import Today from './pages/Today'
 import Props from './pages/Props'
+import Tracked from './pages/Tracked'
 import Account from './pages/Account'
 import TabBar from './components/TabBar'
 
@@ -101,6 +102,7 @@ function AppRoutes() {
       <Route path="/" element={<Home />} />
       <Route path="/today" element={<Today />} />
       <Route path="/props" element={<Props />} />
+      <Route path="/tracked" element={<Tracked />} />
       <Route path="/account" element={<Account />} />
       <Route path="/digest" element={<DigestRoute />} />
       <Route path="/generator" element={<GeneratorPage />} />
@@ -114,7 +116,7 @@ function AppRoutes() {
       <Route path="/admin/dials" element={<DialsDashboard />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
-    {/* Bottom tabs on phones for Today, Props, Board and Ledger. Renders
+    {/* Bottom tabs on phones for Today, Props, Board, Tracked and Ledger. Renders
         nothing on every other route. */}
     <TabBar />
     </>

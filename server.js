@@ -605,6 +605,10 @@ app.get('/api/digest', getDigest);
 // where each started pick stands, from ESPN, polled every 30 seconds.
 const { getDigestLive } = require('./api/digest-live');
 app.get('/api/digest/live', getDigestLive);
+
+// The Tracked tab's grades for the bets a user follows (owner 2026-10-16).
+const { getTrackedOutcomes } = require('./api/tracked-outcomes');
+app.post('/api/tracked/outcomes', getTrackedOutcomes);
 app.get('/api/deep-research', deepResearch);
 
 app.listen(PORT, () => {
