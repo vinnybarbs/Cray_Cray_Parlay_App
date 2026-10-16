@@ -10,6 +10,8 @@ import BrandMark, { SignOutButton } from '../components/BrandMark'
 import LineShop from '../components/LineShop'
 import { apiFetch } from '../lib/api'
 import LockedCard from '../components/Locked'
+import useLiveGames from '../hooks/useLiveGames'
+import { LiveScoreboard, StandingLine, LiveNowRail } from '../components/LiveScoreboard'
 
 // Shadow sports: the board shows the model's read, but nothing publishes
 // until go-live, so no tile may wear bet-tier language. The set lives in
@@ -67,6 +69,13 @@ const ANALYSIS_SPORT_TO_CODE = {
 }
 
 import { fmtGameDateTime, fmtGameDay, gameDayChip, fmtFullDate as formatFullDate } from '../lib/gameTime'
+
+// The game tracker feed (owner 2026-10-16), one poll for the page, read
+// by every started card through this context by game_key.
+const LiveGamesContext = React.createContext(null)
+const useLiveGame = (gameKey) => React.useContext(LiveGamesContext)?.games?.[gameKey] || null
+// Sports the tracker covers. Mirrors ESPN_PATHS in lib/services/live-game-scores.js.
+const TRACKED_SPORTS = new Set(['NFL', 'NCAAF', 'NBA', 'NCAAB', 'MLB', 'NHL'])
 
 function edgeBadgeClass(score) {
   if (score == null) return 'bg-ink-800 text-ink-300'
@@ -977,6 +986,11 @@ function GameCard(props) {
 
 function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
   const [expanded, setExpanded] = useState(false)
+  // The tracker's read of this game while it is on: score, clock and
+  // where the pick stands. The official grade, once it lands, wins.
+  const liveGame = useLiveGame(gameKey)
+  const live = game.in_progress ? liveGame : null
+  const graded = game.published_pick?.outcome && game.published_pick.outcome !== 'pending'
 
   // Signed edge in pp for the recommended side: the published claim when
   // the pick row exists (it carries the price rails and the exposure guard
@@ -985,7 +999,7 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
   const signedPp = finalPpFor(game)
 
   return (
-    <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden flex flex-col">
+    <div id={`game-${gameKey}`} className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden flex flex-col scroll-mt-24">
       <div className="p-4 flex-1">
         {/* Matchup header */}
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -1000,7 +1014,7 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
                 {game.home_record && <span>{game.home_record}</span>}
               </div>
             )}
-            {game.in_progress && <StartedChip game={game} />}
+            {game.in_progress && (!live || graded) && <StartedChip game={game} />}
             {game.game_date && !game.in_progress && (
               <div className=" text-[11px] text-ink-500 mt-0.5 tabular-nums flex items-center gap-1.5">
                 {/* An evening visit sees tonight's late games NEXT TO
@@ -1031,6 +1045,8 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
             )
           })()}
         </div>
+
+        {live && <div className="mb-3"><LiveScoreboard live={live} sport={sport} /></div>}
 
         {/* Recommended read. A trap read (negative edge) must never render
             in pick-green: the text names the side NOT to bet. The 0-2pp
@@ -1078,6 +1094,7 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
               })()}
               <TierPathNote published={game.published_pick} />
               {game.in_progress ? <LockedNote game={game} /> : <LiveReadNote game={game} />}
+              {live && !graded && <StandingLine standing={live.pick} />}
             </div>
           )
           if (game.recommended_pick && isLegGame) {
@@ -1134,6 +1151,7 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
             )}
             {!game.in_progress && <LineShop shop={alt.shop} bookPct={bookOurPct(Number(alt.edge_pp), alt.odds, null, alt.implied_prob)?.book ?? null} />}
             <TierPathNote published={alt} />
+            {live && !(alt.outcome && alt.outcome !== 'pending') && <StandingLine standing={live.alts?.[alt.pick]} />}
           </div>
         ))}
 
@@ -1206,11 +1224,16 @@ function OpenGameCard({ game, gameKey, sport, onDeepResearch }) {
 function TrapCard({ game, trap, gameKey, onDeepResearch }) {
   const side = trap.side
   const baitText = sidePickText(game, side)
+  // The tracker reads a trap the other way round: the bait side losing
+  // is the call coming good.
+  const liveGame = useLiveGame(gameKey)
+  const live = game.in_progress ? liveGame : null
+  const baitStanding = live?.traps?.[side] || null
   const edgePp = trap.edge_pp != null ? Number(trap.edge_pp) : edgePpForSide(game.edges, side)
   const signals = Array.isArray(trap.signals) ? trap.signals : []
 
   return (
-    <div className="bg-ink-900 rounded-sharp overflow-hidden flex flex-col border border-signal-neg/40 shadow-hairline">
+    <div id={`game-${gameKey}-trap-${side}`} className="bg-ink-900 rounded-sharp overflow-hidden flex flex-col border border-signal-neg/40 shadow-hairline scroll-mt-24">
       <div className="flex items-center justify-between px-3 py-1.5 bg-signal-neg-dim/30 border-b border-signal-neg/30">
         <span className="text-xs text-signal-neg font-semibold">🪤 Trap</span>
         <span className="text-xs text-signal-neg tabular-nums font-semibold">{edgePp != null ? (pctPair(sidePct(game, side, edgePp)) ?? formatPp(edgePp)) : ''}</span>
@@ -1220,11 +1243,14 @@ function TrapCard({ game, trap, gameKey, onDeepResearch }) {
           {game.away_team} <span className="text-ink-500">at</span> {game.home_team}
         </div>
         {game.game_date && (game.in_progress
-          ? <div className="mb-3"><StartedChip game={{ ...game, published_pick: null }} /></div>
+          ? (live
+              ? <div className="mb-3"><LiveScoreboard live={live} sport={game.sport} /></div>
+              : <div className="mb-3"><StartedChip game={{ ...game, published_pick: null }} /></div>)
           : <div className=" text-[11px] text-ink-500 mb-3 tabular-nums">{fmtGameDateTime(game.game_date)}</div>)}
         <div className="bg-signal-neg-dim/20 rounded-sharp px-3 py-2 mb-3 border border-signal-neg/30">
           <div className="text-xs text-signal-neg mb-0.5">The bait · don't bet it</div>
           <div className="text-signal-neg font-medium text-sm tabular-nums">{baitText || side}</div>
+          <StandingLine standing={baitStanding} trap />
         </div>
         {signals.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -1589,7 +1615,7 @@ function fmtGolfPrice(price) {
 // The games that already kicked off, newest first. Tiles with a read
 // (a pick, a leg or a trap) show by default, the rest sit behind a tap so
 // a slate of no-edge games does not bury tonight's plays.
-function StartedSection({ games, onDeepResearch }) {
+function StartedSection({ games, onDeepResearch, liveCount = 0 }) {
   const [showAll, setShowAll] = useState(false)
   if (!Array.isArray(games) || games.length === 0) return null
   const visible = games.filter(g => !SHADOW_DISPLAY.has(g.sport))
@@ -1606,9 +1632,12 @@ function StartedSection({ games, onDeepResearch }) {
   return (
     <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
       <div className="bg-ink-850 px-6 py-4 border-b border-ink-700">
-        <h2 className="text-base font-semibold text-ink-100">Started</h2>
+        <h2 className="text-base font-semibold text-ink-100 flex items-center gap-2">
+          {liveCount > 0 && <span className="w-2 h-2 rounded-full bg-signal-pos animate-pulse" aria-hidden="true" />}
+          {liveCount > 0 ? 'In progress' : 'Started'}
+        </h2>
         <p className="text-[11px] text-ink-400 tabular-nums">
-          {withRead.length} with a read{rest.length > 0 ? `, ${rest.length} more` : ''}. Locked when each game started, kept here so you can see why.
+          {withRead.length} with a read{rest.length > 0 ? `, ${rest.length} more` : ''}. Locked when each game started{liveCount > 0 ? ', scores from ESPN, refreshed every 30 seconds while you watch' : ', kept here so you can see why'}.
         </p>
       </div>
       <div className="p-4 sm:p-6">
@@ -1860,6 +1889,34 @@ export default function DailyDigest({ onBack }) {
     fetchDigest()
   }, [fetchDigest])
 
+  // The game tracker (owner 2026-10-16). Polls only while a started game
+  // with a read, in a sport ESPN covers, is on the board.
+  const trackedStarted = useMemo(() => (data?.startedGames || []).filter(g =>
+    g && TRACKED_SPORTS.has(g.sport) && !SHADOW_DISPLAY.has(g.sport)
+    && (g.published_pick?.pick || (Array.isArray(g.trap_calls) && g.trap_calls.length > 0))
+  ), [data])
+  const liveFeed = useLiveGames(trackedStarted.length > 0)
+  const liveNow = useMemo(() => {
+    const games = liveFeed?.games || {}
+    const items = []
+    for (const g of trackedStarted) {
+      const lg = games[g.game_key]
+      if (!lg) continue
+      const graded = g.published_pick?.outcome && g.published_pick.outcome !== 'pending'
+      if (g.published_pick?.pick && !graded) items.push({ key: `game-${g.game_key}`, live: lg, sport: g.sport, standing: lg.pick, trap: false })
+      for (const t of (Array.isArray(g.trap_calls) ? g.trap_calls : [])) {
+        items.push({ key: `game-${g.game_key}-trap-${t.side}`, live: lg, sport: g.sport, standing: lg.traps?.[t.side] || null, trap: true })
+      }
+    }
+    // Games still on first, finals after.
+    return items.sort((a, b) => Number(!!a.live.final) - Number(!!b.live.final))
+  }, [liveFeed, trackedStarted])
+  const liveCount = liveNow.filter(i => !i.live.final).length
+  const jumpTo = useCallback((id) => {
+    const el = document.getElementById(id)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
   // Sections rank by their STRONGEST pick, not by volume. Count ordering
   // put a 56-match tennis wall above the day's only Sharp Take (owner,
   // 2026-08-18: "board sort is still buggy"). Volume breaks ties.
@@ -1965,6 +2022,7 @@ export default function DailyDigest({ onBack }) {
   }, [])
 
   return (
+    <LiveGamesContext.Provider value={liveFeed}>
     <div className="min-h-screen bg-ink-950 text-white font-sans">
       {/* Top nav bar. The digest is the authenticated home, so there is no
           "Back". Other surfaces are forward navigation. */}
@@ -2095,6 +2153,13 @@ export default function DailyDigest({ onBack }) {
             {/* House parlays left, yesterday's board right (owner order
                 2026-08-25). Expanded panels take the full row via w-full
                 so the flex wrap drops them under the button strip. */}
+            {/* The game tracker (owner 2026-10-16): while one of our reads
+                is on, the rail and the in progress section lead the board. */}
+            {liveNow.length > 0 && <LiveNowRail items={liveNow} onJump={jumpTo} />}
+            {liveCount > 0 && boardFilter === 'All' && (
+              <StartedSection games={data.startedGames} onDeepResearch={handleOpenDeepResearch} liveCount={liveCount} />
+            )}
+
             {sportSections.length > 0 && (
               <div className="-mt-2 flex flex-wrap items-start gap-x-3">
                 <HouseParlays />
@@ -2166,7 +2231,7 @@ export default function DailyDigest({ onBack }) {
               </>
             )}
 
-            {boardFilter === 'All' && (
+            {boardFilter === 'All' && liveCount === 0 && (
               <StartedSection games={data.startedGames} onDeepResearch={handleOpenDeepResearch} />
             )}
 
@@ -2217,6 +2282,7 @@ export default function DailyDigest({ onBack }) {
       {/* Sticky locked-picks bar, visible whenever the user has staged ≥ 1 pick.
           Pinned to viewport bottom; the parent container reserves pb-32 to avoid overlap. */}
     </div>
+    </LiveGamesContext.Provider>
   )
 }
 
