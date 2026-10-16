@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
-import PropCard, { fmtUnits } from '../components/PropCard'
+import PropCard, { fmtUnits, SkipCard } from '../components/PropCard'
 import { API_BASE_URL as API_BASE } from '../config'
 import { SkeletonList } from '../components/Skeleton'
 import { apiFetch } from '../lib/api'
@@ -12,6 +12,8 @@ import { fmtGameDateTime } from '../lib/gameTime'
 
 // Props (shadow), owner 2026-10-12. Every NFL player prop read at 4
 // points or more, the recent results and the shadow record by market.
+// Under each game, every other read we have shows as a Skip with its
+// numbers (owner 2026-10-16), so the whole game can be researched here.
 // Props are not picks yet: they publish only when the shadow record and
 // the closing line clear the bar (build_queue 65), and nothing here
 // counts toward the official record.
@@ -50,8 +52,11 @@ function GameState({ g }) {
 // matchup, kickoff or state, and how many reads are inside.
 function GameSection({ g, defaultOpen, showOutcome }) {
   const [open, setOpen] = useState(defaultOpen)
-  const n = g.props.length
-  const graded = showOutcome ? g.props.filter(p => p.outcome === 'won' || p.outcome === 'lost') : []
+  const [skipsOpen, setSkipsOpen] = useState(false)
+  const reads = g.props.filter(p => !p.skip)
+  const skips = g.props.filter(p => p.skip)
+  const n = reads.length
+  const graded = showOutcome ? reads.filter(p => p.outcome === 'won' || p.outcome === 'lost') : []
   const hits = graded.filter(p => p.outcome === 'won').length
   return (
     <section className="flex flex-col gap-2" aria-label={`${g.away} at ${g.home}`}>
@@ -69,6 +74,7 @@ function GameSection({ g, defaultOpen, showOutcome }) {
           <span className="text-xs text-ink-400">
             {g.state === 'upcoming' ? fmtGameDateTime(g.commence_time) : `Started ${fmtClock(g.commence_time)}`}
             {' · '}{n} {n === 1 ? 'prop' : 'props'}
+            {skips.length > 0 && <>{' · '}{skips.length} {skips.length === 1 ? 'skip' : 'skips'}</>}
             {graded.length > 0 && <>{' · '}<span className="tabular-nums text-ink-200">{hits} of {graded.length} hit</span>{graded.some(p => p.unofficial) ? ', unofficial' : ''}</>}
           </span>
         </span>
@@ -77,7 +83,20 @@ function GameSection({ g, defaultOpen, showOutcome }) {
           <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
         </svg>
       </button>
-      {open && g.props.map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} showOutcome={showOutcome} />)}
+      {open && reads.map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} showOutcome={showOutcome} />)}
+      {open && skips.length > 0 && (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setSkipsOpen(v => !v)}
+            aria-expanded={skipsOpen}
+            className="self-start px-3 py-1.5 rounded-full bg-ink-900 border border-ink-700 text-xs font-semibold text-ink-300 hover:text-ink-100"
+          >
+            {skipsOpen ? 'Hide skips' : `Show ${skips.length} more ${skips.length === 1 ? 'prop' : 'props'} we'd skip`}
+          </button>
+          {skipsOpen && skips.map((p, i) => <SkipCard key={`skip|${p.text}|${i}`} p={p} />)}
+        </div>
+      )}
     </section>
   )
 }
@@ -102,22 +121,24 @@ export default function Props() {
   const allUpcoming = data?.upcoming || []
   const allRecent = data?.recent || []
   const allLive = data?.live || []
+  const allSkips = data?.skips || []
   // Chips for the markets on the board right now, in board order.
   const markets = []
-  for (const p of [...allUpcoming, ...allLive, ...allRecent]) {
+  for (const p of [...allUpcoming, ...allLive, ...allSkips, ...allRecent]) {
     if (!markets.some(m => m.key === p.market)) markets.push({ key: p.market, label: p.marketLabel })
   }
   const pick = (list) => (market === 'all' ? list : list.filter(p => p.market === market))
   const upcoming = pick(allUpcoming)
   const recent = pick(allRecent)
   const live = pick(allLive)
+  const skips = pick(allSkips)
   const rec = data?.record
   const total = rec?.total
 
   // Started and upcoming reads in one list, a section per game: in
   // progress on top, then upcoming by kickoff, then finished (owner
   // 2026-10-16). Live games and the next game start open.
-  const games = groupByGame([...live, ...upcoming])
+  const games = groupByGame([...live, ...upcoming, ...skips])
   const firstUpcoming = games.find(g => g.state === 'upcoming')
   const openByDefault = (g) => g.state === 'live' || g === firstUpcoming
   const recentGames = groupByGame(recent)
@@ -174,7 +195,7 @@ export default function Props() {
 
         {data && tab === 'upcoming' && (
           games.length === 0
-            ? <p className="text-sm text-ink-400">No prop reads with us 4% or more above the book for the next games yet. Reads refresh twice a day.</p>
+            ? <p className="text-sm text-ink-400">No prop reads for the next games yet. Reads refresh twice a day.</p>
             : games.map(g => <GameSection key={g.key} g={g} defaultOpen={openByDefault(g)} />)
         )}
 

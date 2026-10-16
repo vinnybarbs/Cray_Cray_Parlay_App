@@ -66,7 +66,7 @@ describe('per game cap', () => {
     const bears = Array.from({ length: 10 }, (_, i) => row({ v2_edge_pp: 5 + i / 10, player_name: `B${i}`, home_team: 'Atlanta Falcons', away_team: 'Chicago Bears' }));
     const out = shapeProps([...big, ...bears], [], []);
     expect(out.upcoming.filter(p => p.away_team === 'Chicago Bears')).toHaveLength(10);
-    expect(out.upcoming.filter(p => p.home_team === 'Los Angeles Rams')).toHaveLength(30);
+    expect(out.upcoming.filter(p => p.home_team === 'Los Angeles Rams')).toHaveLength(45);
     expect(out.upcoming[0].edgePp).toBe(64);
   });
   it('caps by game identity and keeps the given order', () => {
@@ -75,7 +75,38 @@ describe('per game cap', () => {
   });
 });
 
+// Owner 2026-10-16: every read shows under its game, the ones we would
+// not bet as Skips with their numbers.
+describe('skips', () => {
+  const { skippable } = require('../../api/props');
+  it('splits reads into props and skips', () => {
+    const up = [
+      row({ v2_edge_pp: 6, player_name: 'Play' }),
+      row({ v2_edge_pp: 1.2, player_name: 'Close', narration: 'x', narration_side: 'over', narration_line: 5.5 }),
+      row({ market: 'player_anytime_td', v2_side: 'under', v2_edge_pp: 7, player_name: 'NoTd' }),
+      row({ market: 'player_kicking_points', v2_edge_pp: 2, player_name: 'Unlabeled' }),
+    ];
+    const live = [row({ v2_edge_pp: 2, player_name: 'Started' })];
+    const out = shapeProps(up, [], [], live);
+    expect(out.upcoming.map(p => p.player)).toEqual(['Play']);
+    expect(out.skips.map(p => p.player)).toEqual(['NoTd', 'Started', 'Close']);
+    const close = out.skips.find(p => p.player === 'Close');
+    expect(close).toMatchObject({ skip: true, price: -115, line: 5.5, side: 'over' });
+    expect(close.books).toBeUndefined();
+    expect(out.skips.find(p => p.player === 'Started').started).toBe(true);
+    expect(skippable(row({ v2_side: null }))).toBe(false);
+  });
+});
+
 const { attachHistory, sideProbs } = require('../../api/props');
+
+describe('anytime TD history', () => {
+  it('counts games he scored even on a no lean', () => {
+    const stats = [{ player_key: 'k', season: 2026, week: 1, rushing_tds: 1 }, { player_key: 'k', season: 2026, week: 2, rushing_tds: 0 }];
+    const [p] = attachHistory([{ playerKey: 'k', market: 'player_anytime_td', side: 'under', line: 0.5 }], stats);
+    expect(p.history.hits).toBe(1);
+  });
+});
 
 describe('sideProbs', () => {
   it('turns stored over probabilities into the read side', () => {
