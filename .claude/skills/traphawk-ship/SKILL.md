@@ -65,7 +65,7 @@ Do not declare a change live until you have production evidence. The standard lo
 
 ## LLM call sites
 
-All Claude usage goes through `lib/services/claude.js` (MODELS map, WRITING_STYLE injection via `complete()`). New model calls: prefer `complete()`, and if you must use raw `messages.create`, import and include WRITING_STYLE in the system prompt. Narration cost logs into cron_job_logs at standard Sonnet rates. Any new recurring call site must log enough to be auditable (tokens or cost in cron_job_logs or agent_intel), because the monthly cost audit reconciles DB records against the Anthropic console.
+All Claude usage goes through `lib/services/claude.js` (MODELS map, WRITING_STYLE injection via `complete()`), except the data integrity sweep, which builds its own Anthropic client with its model ids in lib/services/data-integrity-agent.js 40 to 41 and imports only WRITING_STYLE. New model calls: prefer `complete()`, and if you must use raw `messages.create`, import and include WRITING_STYLE in the system prompt. Narration cost logs into cron_job_logs at standard Sonnet rates. Any new recurring call site must log enough to be auditable (tokens or cost in cron_job_logs or agent_intel), because the monthly cost audit reconciles DB records against the Anthropic console.
 
 ## Base changes re-audit every factor (directive 19)
 
