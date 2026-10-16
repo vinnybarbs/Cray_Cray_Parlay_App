@@ -220,13 +220,13 @@ async function readAll(build, pageSize = 1000) {
   }
 }
 
-/** A skip: the read's fields a research row needs, nothing to bet. Pure. */
+/** A skip: the read's fields a research row needs, and its lean's price for tracking. Pure. */
 function slimSkip(r) {
   const s = slim(r);
   delete s.books;
   delete s.outcome;
   delete s.actual;
-  return { ...s, price: null, skip: true };
+  return { ...s, skip: true };
 }
 
 /** A skip's chart, trimmed to the values and hits to keep the payload light. Pure. */

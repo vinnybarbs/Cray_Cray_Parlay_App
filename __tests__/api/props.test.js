@@ -91,7 +91,7 @@ describe('skips', () => {
     expect(out.upcoming.map(p => p.player)).toEqual(['Play']);
     expect(out.skips.map(p => p.player)).toEqual(['NoTd', 'Started', 'Close']);
     const close = out.skips.find(p => p.player === 'Close');
-    expect(close).toMatchObject({ skip: true, price: null, line: 5.5, side: 'over' });
+    expect(close).toMatchObject({ skip: true, price: -115, line: 5.5, side: 'over' });
     expect(close.books).toBeUndefined();
     expect(out.skips.find(p => p.player === 'Started').started).toBe(true);
     expect(skippable(row({ v2_side: null }))).toBe(false);

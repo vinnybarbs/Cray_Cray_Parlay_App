@@ -336,6 +336,7 @@ function skipLine(p) {
 // Every other read for the game (owner 2026-10-16: "show all props even
 // skips reasoning", so a bettor can research here and not jump apps).
 // Compact by default, tap for the numbers, the chart and the player.
+// Track bet follows the lean, graded like any read.
 export function SkipCard({ p }) {
   const [open, setOpen] = useState(false)
   const [playerOpen, setPlayerOpen] = useState(false)
@@ -343,7 +344,8 @@ export function SkipCard({ p }) {
   const chartP = td ? { ...p, side: 'over' } : p
   return (
     <div className="bg-ink-900/60 rounded-xl border border-ink-800 px-3 py-2.5 flex flex-col gap-2">
-      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="w-full flex items-center gap-3 text-left">
+      <div className="flex items-center gap-2">
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="min-w-0 flex-1 flex items-center gap-3 text-left">
         <span className="min-w-0 flex-1 flex flex-col">
           <span className="text-sm font-semibold text-ink-200 truncate">{p.player}</span>
           <span className="text-xs text-ink-400 truncate first-letter:uppercase">
@@ -357,6 +359,10 @@ export function SkipCard({ p }) {
         <span className="text-[11px] font-medium text-ink-500 border border-ink-700 rounded-full px-2 py-0.5 flex-shrink-0">Skip</span>
         <svg viewBox="0 0 24 24" className={`w-3.5 h-3.5 text-ink-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
       </button>
+      {/* Track bet on skips too (owner 2026-10-16): the bettor may play the
+          lean anyway. Not on an anytime TD no, books sell no no. */}
+      {(!td || p.side === 'over') && <TrackButton item={propItem(p)} />}
+      </div>
       {open && (
         <div className="flex flex-col gap-3 pt-1">
           <p className="text-sm text-ink-300">{skipReason(p)}</p>
