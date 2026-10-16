@@ -6,12 +6,81 @@ import PropCard, { fmtUnits } from '../components/PropCard'
 import { API_BASE_URL as API_BASE } from '../config'
 import { SkeletonList } from '../components/Skeleton'
 import { apiFetch } from '../lib/api'
+import { groupByGame } from '../lib/propGames'
+import { teamColors } from '../lib/teamColors'
+import { fmtGameDateTime } from '../lib/gameTime'
 
 // Props (shadow), owner 2026-10-12. Every NFL player prop read at 4
 // points or more, the recent results and the shadow record by market.
 // Props are not picks yet: they publish only when the shadow record and
 // the closing line clear the bar (build_queue 65), and nothing here
 // counts toward the official record.
+
+// A team-color circle with the team code, the same no-logo look as the
+// prop card avatar (owner 2026-10-12).
+function TeamDot({ abbr }) {
+  const c = teamColors(abbr)
+  return (
+    <span
+      className={`w-8 h-8 rounded-full flex items-center justify-center ${String(abbr || '').length > 2 ? 'text-[9px]' : 'text-[10px]'} font-bold flex-shrink-0 ${c ? 'border-2' : 'bg-ink-750 border border-ink-600 text-ink-200'}`}
+      style={c ? { backgroundColor: c.bg, borderColor: c.accent, color: c.fg } : undefined}
+      aria-hidden="true"
+    >
+      {abbr ? String(abbr).slice(0, 3) : ''}
+    </span>
+  )
+}
+
+const fmtClock = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+
+function GameState({ g }) {
+  if (g.state === 'live') {
+    return (
+      <span className="px-2 py-0.5 rounded-full bg-ink-800 text-ink-200 text-xs font-semibold flex items-center gap-1 flex-shrink-0">
+        <span className="w-1.5 h-1.5 rounded-full bg-signal-pos animate-pulse" />
+        In progress
+      </span>
+    )
+  }
+  if (g.state === 'final') return <span className="text-xs text-ink-400 flex-shrink-0">Final</span>
+  return null
+}
+
+// One game, collapsible (owner 2026-10-16). The header carries the
+// matchup, kickoff or state, and how many reads are inside.
+function GameSection({ g, defaultOpen, showOutcome }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const n = g.props.length
+  const graded = showOutcome ? g.props.filter(p => p.outcome === 'won' || p.outcome === 'lost') : []
+  const hits = graded.filter(p => p.outcome === 'won').length
+  return (
+    <section className="flex flex-col gap-2" aria-label={`${g.away} at ${g.home}`}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className={`w-full bg-ink-900 rounded-2xl border px-4 py-3 flex items-center gap-3 text-left transition-colors ${g.state === 'live' ? 'border-signal-pos/50' : 'border-ink-700'}`}
+      >
+        <span className="flex -space-x-2">
+          <TeamDot abbr={g.awayAbbr} />
+          <TeamDot abbr={g.homeAbbr} />
+        </span>
+        <span className="flex-1 min-w-0 flex flex-col">
+          <span className="text-sm font-semibold text-ink-100 truncate">{g.away} at {g.home}</span>
+          <span className="text-xs text-ink-400">
+            {g.state === 'upcoming' ? fmtGameDateTime(g.commence_time) : `Started ${fmtClock(g.commence_time)}`}
+            {' · '}{n} {n === 1 ? 'prop' : 'props'}
+            {graded.length > 0 && <>{' · '}<span className="tabular-nums text-ink-200">{hits} of {graded.length} hit</span></>}
+          </span>
+        </span>
+        <GameState g={g} />
+        <svg className={`w-4 h-4 text-ink-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </button>
+      {open && g.props.map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} showOutcome={showOutcome} />)}
+    </section>
+  )
+}
 
 export default function Props() {
   const navigate = useNavigate()
@@ -45,14 +114,13 @@ export default function Props() {
   const rec = data?.record
   const total = rec?.total
 
-  // Group upcoming reads by game so a slate reads like a card per game.
-  const games = []
-  const byGame = new Map()
-  for (const p of upcoming) {
-    const k = `${p.away_team}|${p.home_team}|${p.commence_time}`
-    if (!byGame.has(k)) { byGame.set(k, []); games.push(k) }
-    byGame.get(k).push(p)
-  }
+  // Started and upcoming reads in one list, a section per game: in
+  // progress on top, then upcoming by kickoff, then finished (owner
+  // 2026-10-16). Live games and the next game start open.
+  const games = groupByGame([...live, ...upcoming])
+  const firstUpcoming = games.find(g => g.state === 'upcoming')
+  const openByDefault = (g) => g.state === 'live' || g === firstUpcoming
+  const recentGames = groupByGame(recent)
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
@@ -93,7 +161,7 @@ export default function Props() {
         )}
 
         <div className="flex gap-4 border-b border-ink-800" role="tablist">
-          {[['upcoming', `Upcoming (${upcoming.length})`], ['recent', 'Recent results']].map(([k, label]) => (
+          {[['upcoming', `Games (${games.length})`], ['recent', 'Recent results']].map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
               className={`px-3 py-1.5 text-sm border-b-2 transition-colors ${tab === k ? 'border-signal-pos text-ink-100 font-semibold' : 'border-transparent text-ink-400'}`}>
               {label}
@@ -105,28 +173,15 @@ export default function Props() {
         {!data && !error && <SkeletonList count={4} label="Loading props" />}
 
         {data && tab === 'upcoming' && (
-          upcoming.length === 0
+          games.length === 0
             ? <p className="text-sm text-ink-400">No prop reads with us 4% or more above the book for the next games yet. Reads refresh twice a day.</p>
-            : games.map(k => (
-              <section key={k} className="flex flex-col gap-2">
-                {byGame.get(k).map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} />)}
-              </section>
-            ))
-        )}
-
-        {/* Reads whose game already started stay up, locked, with their
-            why (owner 2026-10-13). */}
-        {data && tab === 'upcoming' && live.length > 0 && (
-          <section className="flex flex-col gap-2" aria-label="Started">
-            <h2 className="text-sm font-semibold text-ink-300 mt-2">Started</h2>
-            {live.map((p, i) => <PropCard key={`live|${p.text}|${i}`} p={p} />)}
-          </section>
+            : games.map(g => <GameSection key={g.key} g={g} defaultOpen={openByDefault(g)} />)
         )}
 
         {data && tab === 'recent' && (
-          recent.length === 0
+          recentGames.length === 0
             ? <p className="text-sm text-ink-400">No graded props from the last week yet. Grades land the day after games.</p>
-            : <section className="flex flex-col gap-2">{recent.map((p, i) => <PropCard key={`${p.text}|${i}`} p={p} showOutcome />)}</section>
+            : recentGames.map((g, i) => <GameSection key={g.key} g={g} defaultOpen={i === 0} showOutcome />)
         )}
 
         {total && (total.won + total.lost) > 0 && (
