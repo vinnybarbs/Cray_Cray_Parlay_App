@@ -1,5 +1,6 @@
 const {
   approvedRecordSource,
+  soccerOrderMixup,
   webSearchTool,
   RECORD_SOURCES,
   BANNED_SOURCES,
@@ -52,5 +53,23 @@ describe('webSearchTool', () => {
     expect(tool.blocked_domains).toContain('wikipedia.org');
     expect(tool.allowed_domains).toBeUndefined();
     expect(tool.max_uses).toBe(6);
+  });
+});
+
+// 2026-10-16: four soccer mismatches were the same record with draws and
+// losses read in the other order.
+describe('soccerOrderMixup', () => {
+  test('flags the draw and loss slots swapped with the same wins', () => {
+    expect(soccerOrderMixup('3-2-1', '3-1-2')).toBe(true);
+    expect(soccerOrderMixup('2-2-4', '2-4-2')).toBe(true);
+    expect(soccerOrderMixup('1-2-3', '1 - 3 - 2')).toBe(true);
+  });
+
+  test('keeps real conflicts', () => {
+    expect(soccerOrderMixup('3-2-1', '4-1-1')).toBe(false);
+    expect(soccerOrderMixup('3-2-1', '2-1-3')).toBe(false);
+    expect(soccerOrderMixup('2-2-2', '2-2-2')).toBe(false);
+    expect(soccerOrderMixup('3-2', '3-2-1')).toBe(false);
+    expect(soccerOrderMixup(null, '3-1-2')).toBe(false);
   });
 });
