@@ -19,8 +19,12 @@ export function gameState(props, now = Date.now()) {
   const kick = new Date(props[0].commence_time).getTime()
   if (!(kick <= now)) return 'upcoming'
   // Skips are never graded, so only the reads decide a finished game.
+  // One graded read is enough: grades come from the final box score,
+  // so nothing grades while the game is on. Waiting for every read left
+  // a game "In progress" for hours when a player never recorded a stat
+  // (owner 2026-10-18, Browns at 2:20 PM: "still saying in progress").
   const reads = props.filter(p => !p.skip)
-  if (reads.length > 0 && reads.every(isGraded)) return 'final'
+  if (reads.some(isGraded)) return 'final'
   return (now - kick) / 3600e3 <= IN_PROGRESS_HOURS ? 'live' : 'final'
 }
 
