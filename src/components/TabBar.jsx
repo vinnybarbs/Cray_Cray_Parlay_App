@@ -3,8 +3,10 @@ import { NavLink, useLocation } from 'react-router-dom'
 
 // Bottom tab bar (UI plan item 2, owner 2026-10-12). Every leading picks
 // app puts its main screens one thumb tap away at the bottom. It shows on
-// phones and small tablets, where the home screen app lives, and stays
-// out of the way on desktop where the page headers carry navigation.
+// phones and tablets (below the lg breakpoint, 1024px, so iPad portrait
+// keeps it). Desktop and iPad landscape get TopNav in the page header
+// instead. Owner 2026-10-18: the bar used to stop at md (768px), which
+// left iPad and desktop with no way around the app.
 
 const TABS = [
   {
@@ -71,6 +73,31 @@ const TABS = [
   },
 ]
 
+// Desktop links: the six tabs plus the Pick builder, which has no tab of
+// its own (its parlay slip sits where the bar would be).
+const TOP_LINKS = [...TABS.slice(0, 3), { to: '/generator', label: 'Pick builder' }, ...TABS.slice(3)]
+
+// Inline nav for page headers at lg and up, where the bottom bar is
+// hidden. Every app page renders it in its sticky header so desktop and
+// iPad landscape always have the same six places one click away.
+export function TopNav({ className = '' }) {
+  return (
+    <nav aria-label="Main" className={`hidden lg:flex items-center gap-0.5 ${className}`}>
+      {TOP_LINKS.map(t => (
+        <NavLink
+          key={t.to}
+          to={t.to}
+          className={({ isActive }) =>
+            `px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors focus:outline-none focus-visible:text-signal-pos ${isActive ? 'text-signal-pos bg-ink-900' : 'text-ink-300 hover:text-white hover:bg-ink-900/60'}`
+          }
+        >
+          {t.label}
+        </NavLink>
+      ))}
+    </nav>
+  )
+}
+
 // Routes that get the bar. Landing, admin and the generator keep their
 // own layouts.
 export const TAB_ROUTES = new Set(TABS.map(t => t.to))
@@ -85,10 +112,10 @@ export default function TabBar() {
 
   return (
     <>
-      <div aria-hidden="true" className="md:hidden bg-ink-950" style={{ height: `calc(${BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` }} />
+      <div aria-hidden="true" className="lg:hidden bg-ink-950" style={{ height: `calc(${BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` }} />
       <nav
         aria-label="Main"
-        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-ink-950/95 backdrop-blur border-t border-ink-800"
+        className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-ink-950/95 backdrop-blur border-t border-ink-800"
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
         <ul className="grid grid-cols-6 max-w-xl mx-auto" style={{ height: BAR_HEIGHT }}>
