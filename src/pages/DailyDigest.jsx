@@ -7,6 +7,7 @@ import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
 import HouseParlays from '../components/HouseParlays'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
+import { TopNav } from '../components/TabBar'
 import LineShop from '../components/LineShop'
 import { apiFetch } from '../lib/api'
 import LockedCard from '../components/Locked'
@@ -2042,15 +2043,10 @@ export default function DailyDigest({ onBack }) {
             mobile audit: the whole digest rendered 591px wide on a 390px
             screen, the "congested" report). Same fix for the Refresh label:
             icon only on phones. */}
-        <button
-          onClick={() => { window.location.hash = '#/ledger' }}
-          className="ml-auto hidden md:inline-block px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
-        >
-          Ledger
-        </button>
+        <TopNav className="ml-auto mr-1" />
         <button
           onClick={onBack}
-          className="max-md:ml-auto hidden sm:inline-block whitespace-nowrap px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="max-lg:ml-auto hidden sm:inline-block lg:hidden whitespace-nowrap px-2 sm:px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           Pick builder
         </button>

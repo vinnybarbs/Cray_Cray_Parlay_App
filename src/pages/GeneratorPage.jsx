@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import BrandMark from '../components/BrandMark'
+import { TopNav } from '../components/TabBar'
 import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS, sidePct, finalPpFor, SIDE_PRICES, lockOddsFor } from '../lib/tiers'
 import PctStack from '../components/PctStack'
 import { isShadowSport } from '../lib/publish-flags'
@@ -369,8 +370,9 @@ export default function GeneratorPage() {
         <span className="text-sm font-semibold text-ink-200 hidden sm:inline">Pick builder</span>
         <span className="hidden sm:inline text-xs text-ink-500">Every graded pick, add legs to build a parlay</span>
         <div className="ml-auto flex items-center gap-2">
-          <button onClick={() => navigate('/digest')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Digest</button>
-          <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
+          <TopNav className="mr-1" />
+          <button onClick={() => navigate('/digest')} className="lg:hidden px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Digest</button>
+          <button onClick={() => navigate('/ledger')} className="hidden sm:block lg:hidden px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
           <button onClick={signOut} className="px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Sign out</button>
         </div>
       </div>

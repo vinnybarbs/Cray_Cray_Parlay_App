@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
+import { TopNav } from '../components/TabBar'
 import { edgeTier, tierRange, TIERS, bookOurPct, pctPair, formatPp } from '../lib/tiers'
 
 import { API_BASE_URL as API_BASE } from '../config'
@@ -206,9 +207,10 @@ export default function HouseLedger() {
         <BrandMark />
         <span className="text-sm font-semibold text-ink-200 hidden sm:inline">The House Ledger</span>
         <span className="hidden sm:inline text-xs text-ink-500">Append only, losers included</span>
+        <TopNav className="ml-auto mr-1" />
         <button
           onClick={() => navigate('/today')}
-          className="ml-auto px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
+          className="max-lg:ml-auto lg:hidden px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95"
         >
           Today
         </button>

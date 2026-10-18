@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
+import { TopNav } from '../components/TabBar'
 import { edgeTier } from '../lib/tiers'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { prefetchDigest } from './DailyDigest'
@@ -142,11 +143,11 @@ export default function Today() {
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <header className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur border-b border-ink-800" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
-        <div className="max-w-xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="max-w-xl lg:max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <BrandMark />
           <div className="flex items-center gap-1">
+            <TopNav className="mr-2" />
             <InstallButton />
-            <button onClick={() => navigate('/ledger')} className="hidden md:inline-block px-3 py-1.5 text-xs text-ink-400 hover:text-white transition-colors">Ledger</button>
             <SignOutButton />
           </div>
         </div>
