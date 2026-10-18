@@ -6,7 +6,7 @@ import PropCard, { fmtUnits, SkipCard } from '../components/PropCard'
 import { API_BASE_URL as API_BASE } from '../config'
 import { SkeletonList } from '../components/Skeleton'
 import { apiFetch } from '../lib/api'
-import { groupByGame, sortProps, SORTS } from '../lib/propGames'
+import { groupByGame, sortProps } from '../lib/propGames'
 import { teamColors } from '../lib/teamColors'
 import { fmtGameDateTime } from '../lib/gameTime'
 
@@ -50,11 +50,11 @@ function GameState({ g }) {
 
 // One game, collapsible (owner 2026-10-16). The header carries the
 // matchup, kickoff or state, and how many reads are inside.
-function GameSection({ g, defaultOpen, showOutcome, sortBy }) {
+function GameSection({ g, defaultOpen, showOutcome }) {
   const [open, setOpen] = useState(defaultOpen)
   const [skipsOpen, setSkipsOpen] = useState(false)
-  const reads = sortProps(g.props.filter(p => !p.skip), sortBy)
-  const skips = sortProps(g.props.filter(p => p.skip), sortBy)
+  const reads = sortProps(g.props.filter(p => !p.skip))
+  const skips = sortProps(g.props.filter(p => p.skip))
   const n = reads.length
   const graded = showOutcome ? reads.filter(p => p.outcome === 'won' || p.outcome === 'lost') : []
   const hits = graded.filter(p => p.outcome === 'won').length
@@ -108,8 +108,6 @@ export default function Props() {
   const [tab, setTab] = useState('upcoming')
   // Market filter chips (owner mockup 2026-10-12). 'all' or a market key.
   const [market, setMarket] = useState('all')
-  // Order under each game (owner 2026-10-18), biggest edge by default.
-  const [sortBy, setSortBy] = useState('edge')
 
   useEffect(() => {
     let cancelled = false
@@ -192,29 +190,13 @@ export default function Props() {
           ))}
         </div>
 
-        {data && tab === 'upcoming' && games.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-ink-400" role="group" aria-label="Sort props">
-            <span>Sort</span>
-            {SORTS.map(o => (
-              <button
-                key={o.key}
-                onClick={() => setSortBy(o.key)}
-                aria-pressed={sortBy === o.key}
-                className={`px-3 py-1 rounded-full border font-semibold transition-colors ${sortBy === o.key ? 'bg-ink-800 text-ink-100 border-ink-600' : 'bg-ink-900 text-ink-400 border-ink-700'}`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-        )}
-
         {error && <p className="text-sm text-ink-400">Props did not load. Try again in a minute.</p>}
         {!data && !error && <SkeletonList count={4} label="Loading props" />}
 
         {data && tab === 'upcoming' && (
           games.length === 0
             ? <p className="text-sm text-ink-400">No prop reads for the next games yet. Reads refresh twice a day.</p>
-            : games.map(g => <GameSection key={g.key} g={g} defaultOpen={openByDefault(g)} sortBy={sortBy} />)
+            : games.map(g => <GameSection key={g.key} g={g} defaultOpen={openByDefault(g)} />)
         )}
 
         {data && tab === 'recent' && (
