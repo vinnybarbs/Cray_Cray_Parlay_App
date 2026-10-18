@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
@@ -21,6 +21,11 @@ import { findByMatchup, liveNowItems } from '../lib/liveNow'
 // Props are not picks yet: they publish only when the shadow record and
 // the closing line clear the bar (build_queue 65), and nothing here
 // counts toward the official record.
+
+// How often the board refetches while a game on it is on, so grades
+// show without a reload. The server caches the signed in response for
+// 20 seconds, so this costs two queries a minute per open page.
+const REFRESH_MS = 30 * 1000
 
 // A team-color circle with the team code, the same no-logo look as the
 // prop card avatar (owner 2026-10-12).
@@ -113,14 +118,26 @@ export default function Props() {
   // Market filter chips (owner mockup 2026-10-12). 'all' or a market key.
   const [market, setMarket] = useState('all')
 
-  useEffect(() => {
+  // One loader for the first paint and every refresh. A refresh keeps the
+  // page up on a failed fetch: the last good board stays.
+  const load = useCallback((initial = false) => {
     let cancelled = false
     apiFetch(`/api/props`)
       .then(r => (r.ok ? r.json() : Promise.reject(new Error(`status ${r.status}`))))
       .then(d => { if (!cancelled) setData(d) })
-      .catch(e => { if (!cancelled) setError(e.message) })
+      .catch(e => { if (!cancelled && initial) setError(e.message) })
     return () => { cancelled = true }
   }, [])
+  useEffect(() => load(true), [load])
+
+  // The home screen app comes back days later with the board it left
+  // on. Reload when the page is visible again (owner 2026-10-18: the
+  // Browns props were graded but Recent results still showed none).
+  useEffect(() => {
+    const onVisible = () => { if (!document.hidden) load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
 
   const allUpcoming = data?.upcoming || []
   const allRecent = data?.recent || []
@@ -151,7 +168,18 @@ export default function Props() {
   // on this slate that are on, no reads in it. Polls only while one is.
   // Every game on the slate, whatever market chip is on.
   const slate = useMemo(() => groupByGame([...allLive, ...allUpcoming, ...allSkips]), [data]) // eslint-disable-line react-hooks/exhaustive-deps
-  const liveFeed = useLiveGames(slate.some(g => g.state === 'live'))
+  const anyLive = slate.some(g => g.state === 'live')
+  const liveFeed = useLiveGames(anyLive)
+
+  // While a game on the slate is on, the official grades land up to 15
+  // minutes after the final whistle, so refetch the board every 30 seconds
+  // until every read in it is graded. A game stops counting as live once
+  // it is, so the polling ends on its own.
+  useEffect(() => {
+    if (!anyLive) return undefined
+    const id = setInterval(() => { if (!document.hidden) load() }, REFRESH_MS)
+    return () => clearInterval(id)
+  }, [anyLive, load])
   const { liveNow, sectionFor } = useMemo(() => {
     const keys = []
     const map = {}
