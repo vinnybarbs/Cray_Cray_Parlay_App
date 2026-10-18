@@ -6,7 +6,9 @@ import { teamColors } from '../lib/teamColors'
 //   LiveScoreboard   the score block on a started card, in place of the
 //                    "Game in progress" chip
 //   StandingLine     where the pick stands, in plain words, with a pill
-//   LiveNowRail      one chip per started play under the Board header
+//   LiveNowRail      one chip per started game, score and clock only, on
+//                    the Board, Props and Tracked (owner 2026-10-18: "should
+//                    not have our bets in it")
 // Team-color initials circles, no logos. Amber when our side is good,
 // crimson when it is not, grey when nothing is decided. A trap is read
 // the other way round: the bait side losing is the good news.
@@ -105,51 +107,65 @@ export function LiveScoreboard({ live, sport }) {
 }
 
 /**
- * One chip per started play under the Board header. items:
- *   [{ key, live, sport, standing, trap }]
- * onJump(key) scrolls the page to that card.
+ * The Live now strip: one chip per started game, the score and the clock,
+ * nothing about our reads (owner 2026-10-18). items:
+ *   [{ key, live, sport }]   (src/lib/liveNow.js liveNowItems)
+ * onJump(key), when given, scrolls the page to that game.
  */
 export function LiveNowRail({ items, onJump }) {
   if (!items || items.length === 0) return null
   const playing = items.filter(i => !i.live.final).length
+  const finals = items.length - playing
+  const summary = [
+    playing > 0 ? `${playing} in progress` : null,
+    finals > 0 ? `${finals} final` : null,
+  ].filter(Boolean).join(', ')
   return (
     <section aria-label="Live now" className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3">
       <div className="flex items-center gap-2 text-xs font-semibold text-ink-200 mb-2">
         <span className="relative flex w-2 h-2" aria-hidden="true">
-          <span className="absolute inline-flex h-full w-full rounded-full bg-signal-pos opacity-60 motion-safe:animate-ping" />
-          <span className="relative inline-flex w-2 h-2 rounded-full bg-signal-pos" />
+          {playing > 0 && <span className="absolute inline-flex h-full w-full rounded-full bg-signal-pos opacity-60 motion-safe:animate-ping" />}
+          <span className={`relative inline-flex w-2 h-2 rounded-full ${playing > 0 ? 'bg-signal-pos' : 'bg-ink-500'}`} />
         </span>
         Live now
-        <span className="font-normal text-ink-400">· {playing} of our {items.length === 1 ? 'read' : 'reads'} in progress</span>
+        <span className="font-normal text-ink-400">· {summary}</span>
       </div>
       <ul className="flex gap-2 overflow-x-auto -mx-4 px-4 pb-1 [scrollbar-width:none]">
         {items.map(it => {
           const { live } = it
           const hs = live.home.score ?? 0, as = live.away.score ?? 0
+          const body = (
+            <>
+              <span className="flex flex-col gap-1">
+                <span className={`flex items-center gap-1.5 text-xs ${as >= hs ? 'text-ink-100' : 'text-ink-300'}`}>
+                  <TeamDot size="sm" name={live.away.name} abbr={live.away.abbr} sport={it.sport} />
+                  <span className="max-w-[6.5rem] truncate">{live.away.abbr || live.away.name}</span>
+                  {live.away.possession && <span className="w-1.5 h-1.5 rounded-full bg-signal-pos flex-shrink-0" aria-label="has the ball" />}
+                  <span className="ml-auto pl-2 tabular-nums font-bold">{live.away.score ?? ''}</span>
+                </span>
+                <span className={`flex items-center gap-1.5 text-xs ${hs >= as ? 'text-ink-100' : 'text-ink-300'}`}>
+                  <TeamDot size="sm" name={live.home.name} abbr={live.home.abbr} sport={it.sport} />
+                  <span className="max-w-[6.5rem] truncate">{live.home.abbr || live.home.name}</span>
+                  {live.home.possession && <span className="w-1.5 h-1.5 rounded-full bg-signal-pos flex-shrink-0" aria-label="has the ball" />}
+                  <span className="ml-auto pl-2 tabular-nums font-bold">{live.home.score ?? ''}</span>
+                </span>
+              </span>
+              <span className="flex flex-col items-start justify-center gap-0.5 border-l border-ink-700 pl-2.5 self-stretch">
+                {live.final ? (
+                  <span className="text-[11px] font-semibold text-ink-300">Final</span>
+                ) : (
+                  <span className="tabular-nums text-[11px] font-semibold text-ink-100 whitespace-nowrap">{live.detail || 'Live'}</span>
+                )}
+                {!live.final && live.downDistance && <span className="tabular-nums text-[10px] text-ink-400 whitespace-nowrap">{live.downDistance}</span>}
+              </span>
+            </>
+          )
+          const cls = 'flex items-center gap-2.5 rounded-xl bg-ink-850 shadow-hairline px-2.5 py-2 text-left'
           return (
             <li key={it.key} className="flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => onJump && onJump(it.key)}
-                className="flex items-center gap-2.5 rounded-xl bg-ink-850 shadow-hairline hover:shadow-hairline-bright px-2.5 py-2 text-left"
-              >
-                <span className="flex flex-col gap-1">
-                  <span className={`flex items-center gap-1.5 text-xs ${as >= hs ? 'text-ink-100' : 'text-ink-300'}`}>
-                    <TeamDot size="sm" name={live.away.name} abbr={live.away.abbr} sport={it.sport} />
-                    <span className="max-w-[6.5rem] truncate">{live.away.abbr || live.away.name}</span>
-                    <span className="ml-auto pl-2 tabular-nums font-bold">{live.away.score ?? ''}</span>
-                  </span>
-                  <span className={`flex items-center gap-1.5 text-xs ${hs >= as ? 'text-ink-100' : 'text-ink-300'}`}>
-                    <TeamDot size="sm" name={live.home.name} abbr={live.home.abbr} sport={it.sport} />
-                    <span className="max-w-[6.5rem] truncate">{live.home.abbr || live.home.name}</span>
-                    <span className="ml-auto pl-2 tabular-nums font-bold">{live.home.score ?? ''}</span>
-                  </span>
-                </span>
-                <span className="flex flex-col items-start gap-1 border-l border-ink-700 pl-2.5">
-                  <span className="tabular-nums text-[11px] text-ink-300 whitespace-nowrap">{live.final ? 'Final' : (live.detail || 'Live')}</span>
-                  <StandingPill standing={it.standing} trap={it.trap} />
-                </span>
-              </button>
+              {onJump
+                ? <button type="button" onClick={() => onJump(it.key)} className={`${cls} hover:shadow-hairline-bright`}>{body}</button>
+                : <div className={cls}>{body}</div>}
             </li>
           )
         })}

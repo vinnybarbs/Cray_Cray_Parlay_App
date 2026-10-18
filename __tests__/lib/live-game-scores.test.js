@@ -178,16 +178,19 @@ describe('liveGames', () => {
     { game_key: 'nfl-4', sport: 'NFL', home_team: 'Denver Broncos', away_team: 'Seattle Seahawks', game_date: '2026-10-16T00:15:00Z', published_pick: null, published_alts: [{ pick: 'Seattle Seahawks -3', bet_type: 'Spread' }], trap_calls: [] },
     { game_key: 'ufc-1', sport: 'UFC', home_team: 'A', away_team: 'B', game_date: '2026-10-16T00:15:00Z', published_pick: { pick: 'A ML -150', bet_type: 'Moneyline' } },
   ];
-  const payload = { events: [event(PHI_NYG), event({ id: '402', home: 'Dallas Cowboys', away: 'Washington Commanders', hs: 20, as: 20, state: 'pre', period: 0, clock: '0:00' }), event({ id: '403', home: 'Denver Broncos', away: 'Seattle Seahawks', hs: 14, as: 3, period: 4, clock: '7:16', detail: '7:16 - 4th' })] };
+  const payload = { events: [event(PHI_NYG), event({ id: '402', home: 'Dallas Cowboys', away: 'Washington Commanders', hs: 20, as: 20, state: 'pre', period: 0, clock: '0:00' }), event({ id: '403', home: 'Denver Broncos', away: 'Seattle Seahawks', hs: 14, as: 3, period: 4, clock: '7:16', detail: '7:16 - 4th' }), event({ id: '404', home: 'Miami Dolphins', away: 'Buffalo Bills', hs: 7, as: 10, period: 2, clock: '1:02', detail: '1:02 - 2nd' })] };
   const fetchFn = jest.fn(async (url) => ({ ok: true, json: async () => payload }));
 
-  test('one scoreboard fetch per sport day, rows with a headline, spotlight or trap read, pregame games left out', async () => {
+  test('one scoreboard fetch per sport day, every started game scored read or not, pregame games left out', async () => {
     const out = await liveGames(rows, { fetchFn, now: Date.parse('2026-10-16T01:00:00Z') });
     // NFL on the site day and the next day: two urls, one fetch each.
     expect(fetchFn).toHaveBeenCalledTimes(2);
     expect(fetchFn.mock.calls.every(([u]) => u.includes('/football/nfl/scoreboard?dates='))).toBe(true);
     // nfl-4 has a spotlight pick only and is still tracked (2026-10-15 Seahawks at Broncos).
-    expect(Object.keys(out.games).sort()).toEqual(['nfl-1', 'nfl-4']);
+    // nfl-3 has no read and still gets its score for the Live now strip (owner 2026-10-18).
+    expect(Object.keys(out.games).sort()).toEqual(['nfl-1', 'nfl-3', 'nfl-4']);
+    expect(out.games['nfl-3']).toMatchObject({ sport: 'NFL', home_team: 'Miami Dolphins', away_team: 'Buffalo Bills', pick: null, alts: {}, traps: {} });
+    expect(out.games['nfl-3'].away.score).toBe(10);
     expect(out.games['nfl-4'].pick).toBeNull();
     expect(out.games['nfl-4'].alts['Seattle Seahawks -3']).toMatchObject({ status: 'behind', label: 'Not covering, 14 short' });
     const g = out.games['nfl-1'];

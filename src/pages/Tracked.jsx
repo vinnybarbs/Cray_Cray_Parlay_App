@@ -4,12 +4,13 @@ import BrandMark, { SignOutButton } from '../components/BrandMark'
 import InstallButton from '../components/InstallButton'
 import PropCard, { fmtOdds } from '../components/PropCard'
 import TrackButton from '../components/TrackButton'
-import { LiveScoreboard, StandingLine, TeamDot } from '../components/LiveScoreboard'
+import { LiveScoreboard, LiveNowRail, StandingLine, TeamDot } from '../components/LiveScoreboard'
 import useLiveGames from '../hooks/useLiveGames'
 import useLiveProps, { liveReadKey, liveGameKey } from '../hooks/useLiveProps'
 import { useTracked } from '../lib/trackedStore'
 import { splitUnits, groupTracked, itemTime, itemSection, parlayStatus } from '../lib/trackedKeys'
 import { fmtGameDateTime } from '../lib/gameTime'
+import { findByMatchup, liveNowItems } from '../lib/liveNow'
 import { apiFetch } from '../lib/api'
 
 // The Tracked tab (owner 2026-10-16): every play and prop the user
@@ -216,7 +217,10 @@ export default function Tracked() {
   const { items } = useTracked()
   const outcomes = useOutcomes(items)
 
-  const gameFeed = useLiveGames(items.some(it => it.kind === 'game'))
+  // Game cards and the Live now strip both read the game feed, so it runs
+  // while any tracked bet has kicked off.
+  const anyStarted = items.some(it => (itemTime(it) || Infinity) <= Date.now())
+  const gameFeed = useLiveGames(anyStarted)
   const propFeed = useLiveProps(items.some(it => it.kind === 'prop'))
 
   const gradeFor = (it) => (it.kind === 'game' ? outcomes.games[it.key] : outcomes.props[it.key]) || null
@@ -228,6 +232,12 @@ export default function Tracked() {
     const read = it.kind === 'prop' ? propFeed?.reads?.[liveReadKey(it)] : null
     return { outcome: gradeFor(it)?.outcome, final: !!(live?.final || read?.final) }
   }
+
+  // The Live now strip (owner 2026-10-18): score and clock for every game
+  // a tracked bet is on, one chip per game, no reads in it.
+  const liveNow = liveNowItems(gameFeed?.games, items.map(it => (it.kind === 'game'
+    ? it.game_key
+    : findByMatchup(gameFeed?.games, { home_team: it.home_team, away_team: it.away_team, at: it.commence_time })?.[0])))
 
   const sections = splitUnits(items, stateFor)
   const render = (section) => (u) => {
@@ -266,6 +276,8 @@ export default function Tracked() {
             </div>
           </div>
         )}
+
+        <LiveNowRail items={liveNow} />
 
         <Section title="In progress" count={sections.live.length}>{sections.live.map(render('live'))}</Section>
         <Section title="Upcoming" count={sections.upcoming.length}>{sections.upcoming.map(render('upcoming'))}</Section>
