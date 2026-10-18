@@ -125,3 +125,88 @@ export function splitTracked(items, stateFor = () => ({}), now = Date.now()) {
   out.finished.sort((a, b) => (itemTime(b) || 0) - (itemTime(a) || 0))
   return out
 }
+
+// ─── Parlays tracked together (owner 2026-10-18) ────────────────────────────
+// "Track together" saves each leg as its own item with a shared parlay
+// stamp, so a leg keeps its own live tracker and grade. Leg keys carry
+// the parlay id, so the same pick can be tracked alone and inside any
+// number of parlays without one overwriting another. Nothing is locked:
+// it is a watch list, like every tracked bet.
+
+/** Key for one leg of a tracked parlay. */
+export function parlayLegKey(parlayId, legKey) {
+  return `parlay:${parlayId}|${legKey}`
+}
+
+/**
+ * The tracked items for a parlay. `legs` are plain tracked items (from
+ * gameItem or propItem), `meta` is what the parlay header shows: combined
+ * odds and the book and our chance as percents.
+ */
+export function parlayItems(parlayId, legs, meta = {}) {
+  const parlay = {
+    id: parlayId,
+    size: legs.length,
+    odds: meta.odds ?? null,
+    book_pct: meta.book_pct ?? null,
+    our_pct: meta.our_pct ?? null,
+  }
+  return legs.map((leg, i) => ({ ...leg, key: parlayLegKey(parlayId, leg.key), parlay: { ...parlay, leg: i } }))
+}
+
+/**
+ * The list as display units: a single bet, or a parlay with its legs in
+ * the order they were picked.
+ */
+export function groupTracked(items) {
+  const units = []
+  const parlays = new Map()
+  for (const it of items || []) {
+    const id = it?.parlay?.id
+    if (!id) { units.push({ type: 'single', key: it.key, item: it }); continue }
+    let u = parlays.get(id)
+    if (!u) {
+      u = { type: 'parlay', key: `parlay:${id}`, id, meta: it.parlay, legs: [] }
+      parlays.set(id, u)
+      units.push(u)
+    }
+    u.legs.push(it)
+  }
+  for (const u of parlays.values()) u.legs.sort((a, b) => (a.parlay.leg ?? 0) - (b.parlay.leg ?? 0))
+  return units
+}
+
+/**
+ * Where a parlay stands from its legs' outcomes: lost on the first lost
+ * leg, won once every leg is in with at least one win (pushes drop out),
+ * otherwise open with how many legs have hit.
+ */
+export function parlayStatus(outcomes) {
+  const list = outcomes || []
+  if (list.some(o => o === 'lost')) return { state: 'lost', won: list.filter(o => o === 'won').length }
+  const won = list.filter(o => o === 'won').length
+  if (list.length > 0 && list.every(o => GRADED.has(o))) return { state: won > 0 ? 'won' : 'push', won }
+  return { state: 'open', won }
+}
+
+/**
+ * Split display units into the page sections. A parlay sits where its
+ * most active leg is: in progress if any leg is, then upcoming, then
+ * finished once every leg is done.
+ */
+export function splitUnits(items, stateFor = () => ({}), now = Date.now()) {
+  const out = { live: [], upcoming: [], finished: [] }
+  const time = (u) => (u.type === 'single' ? itemTime(u.item) : Math.min(...u.legs.map(l => itemTime(l) ?? Infinity)))
+  const last = (u) => (u.type === 'single' ? itemTime(u.item) : Math.max(...u.legs.map(l => itemTime(l) ?? 0)))
+  for (const u of groupTracked(items)) {
+    const secs = u.type === 'single'
+      ? [itemSection(u.item, stateFor(u.item), now)]
+      : u.legs.map(l => itemSection(l, stateFor(l), now))
+    const s = secs.includes('live') ? 'live' : secs.includes('upcoming') ? 'upcoming' : 'finished'
+    out[s].push(u)
+  }
+  out.upcoming.sort((a, b) => (time(a) || 0) - (time(b) || 0))
+  out.live.sort((a, b) => (time(a) || 0) - (time(b) || 0))
+  out.finished.sort((a, b) => (last(b) || 0) - (last(a) || 0))
+  return out
+}

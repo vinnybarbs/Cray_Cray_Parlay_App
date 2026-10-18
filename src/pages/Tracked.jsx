@@ -8,7 +8,7 @@ import { LiveScoreboard, LiveNowRail, StandingLine, TeamDot } from '../component
 import useLiveGames from '../hooks/useLiveGames'
 import useLiveProps, { liveReadKey, liveGameKey } from '../hooks/useLiveProps'
 import { useTracked } from '../lib/trackedStore'
-import { splitTracked, itemTime } from '../lib/trackedKeys'
+import { splitUnits, groupTracked, itemTime, itemSection, parlayStatus } from '../lib/trackedKeys'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { findByMatchup, liveNowItems } from '../lib/liveNow'
 import { apiFetch } from '../lib/api'
@@ -55,11 +55,20 @@ function useOutcomes(items) {
   return out
 }
 
-function TrackedGameCard({ item, live, grade, section }) {
-  // The feed keys a spotlight pick by its text and the headline by `pick`.
-  const standing = live ? (live.alts?.[item.pick] || live.pick || null) : null
-  const graded = GRADED.has(grade?.outcome) ? grade.outcome
+// The feed keys a spotlight pick by its text and the headline by `pick`.
+const standingFor = (item, live) => (live ? (live.alts?.[item.pick] || live.pick || null) : null)
+
+// The official grade, or the live feed's call once the game is final.
+function gradedOf(item, live, grade) {
+  if (item.kind === 'prop') return GRADED.has(grade?.outcome) ? grade.outcome : null
+  const standing = standingFor(item, live)
+  return GRADED.has(grade?.outcome) ? grade.outcome
     : (live?.final && GRADED.has(standing?.status) ? standing.status : null)
+}
+
+function TrackedGameCard({ item, live, grade, section, inParlay = false }) {
+  const standing = standingFor(item, live)
+  const graded = gradedOf(item, live, grade)
   const o = graded ? OUTCOME_TEXT[graded] : null
   const odds = item.odds != null && Number.isFinite(parseInt(item.odds, 10)) ? parseInt(item.odds, 10) : null
   return (
@@ -97,9 +106,11 @@ function TrackedGameCard({ item, live, grade, section }) {
         )}
       </div>
 
-      <div className="flex justify-end">
-        <TrackButton item={item} />
-      </div>
+      {!inParlay && (
+        <div className="flex justify-end">
+          <TrackButton item={item} />
+        </div>
+      )}
     </div>
   )
 }
@@ -112,6 +123,80 @@ function TrackedPropCard({ item, grade, section }) {
     actual: grade?.actual ?? null,
   }
   return <PropCard p={p} showOutcome={section !== 'upcoming'} />
+}
+
+const PARLAY_STATE = {
+  won: { label: 'Parlay won', cls: 'bg-signal-pos/15 text-signal-pos' },
+  lost: { label: 'Parlay lost', cls: 'bg-signal-neg/15 text-signal-neg' },
+  push: { label: 'Push', cls: 'bg-ink-800 text-ink-300' },
+}
+
+const LEG_DOT = {
+  won: 'bg-signal-pos border-signal-pos',
+  lost: 'bg-signal-neg border-signal-neg',
+  push: 'bg-ink-500 border-ink-500',
+}
+
+// A parlay tracked together (owner 2026-10-18): the legs stay full cards
+// with their own live trackers, joined by a line down the left with a dot
+// per leg that fills in as each one settles.
+function TrackedParlay({ unit, liveFor, gradeFor, stateFor }) {
+  const { untrackMany } = useTracked()
+  const meta = unit.meta || {}
+  const outcomes = unit.legs.map(l => gradedOf(l, liveFor(l), gradeFor(l)))
+  const status = parlayStatus(outcomes)
+  const done = PARLAY_STATE[status.state]
+  const settled = outcomes.filter(Boolean).length
+  const pct = (v) => (v == null ? null : v < 10 ? `${v}%` : `${Math.round(v)}%`)
+  return (
+    <div className="bg-ink-900 rounded-sharp shadow-hairline p-4 flex flex-col gap-3">
+      <div className="flex items-center gap-3">
+        <span className="w-8 h-8 rounded-full bg-signal-pos/15 text-signal-pos flex items-center justify-center flex-shrink-0" aria-hidden="true">
+          <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1" />
+            <path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1" />
+          </svg>
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-ink-100 leading-tight tabular-nums">
+            {unit.legs.length} leg parlay{meta.odds != null && <span className="ml-2 text-signal-pos">{fmtOdds(meta.odds)}</span>}
+          </div>
+          <div className="text-xs text-ink-400 tabular-nums truncate">
+            {meta.book_pct != null && meta.our_pct != null ? `Book says ${pct(meta.book_pct)}, we say ${pct(meta.our_pct)}` : 'Tracked together'}
+            {!done && settled > 0 && ` · ${status.won} of ${unit.legs.length} hit`}
+          </div>
+        </div>
+        {done && <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold flex-shrink-0 ${done.cls}`}>{done.label}</span>}
+      </div>
+
+      <div className="relative flex flex-col gap-3 pl-6">
+        <div className="absolute left-[9px] top-6 bottom-6 w-0.5 rounded-full bg-signal-pos/30" aria-hidden="true" />
+        {unit.legs.map((l, i) => {
+          const section = itemSection(l, stateFor(l))
+          return (
+            <div key={l.key} className="relative">
+              <span className={`absolute -left-6 top-5 w-5 h-5 rounded-full border-2 bg-ink-950 flex items-center justify-center text-[10px] font-bold tabular-nums ${outcomes[i] ? `${LEG_DOT[outcomes[i]]} text-ink-950` : 'border-signal-pos/60 text-signal-pos'}`} aria-hidden="true">
+                {i + 1}
+              </span>
+              {l.kind === 'game'
+                ? <TrackedGameCard item={l} live={liveFor(l)} grade={gradeFor(l)} section={section} inParlay />
+                : <TrackedPropCard item={l} grade={gradeFor(l)} section={section} />}
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => untrackMany(unit.legs.map(l => l.key))}
+          className="px-2 py-1 rounded-full text-[11px] font-semibold bg-ink-800 text-ink-300 hover:text-ink-100 active:bg-ink-700"
+        >
+          Untrack parlay
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function Section({ title, count, children }) {
@@ -154,12 +239,14 @@ export default function Tracked() {
     ? it.game_key
     : findByMatchup(gameFeed?.games, { home_team: it.home_team, away_team: it.away_team, at: it.commence_time })?.[0])))
 
-  const sections = splitTracked(items, stateFor)
-  const render = (section) => (it) => (
-    it.kind === 'game'
+  const sections = splitUnits(items, stateFor)
+  const render = (section) => (u) => {
+    if (u.type === 'parlay') return <TrackedParlay key={u.key} unit={u} liveFor={liveFor} gradeFor={gradeFor} stateFor={stateFor} />
+    const it = u.item
+    return it.kind === 'game'
       ? <TrackedGameCard key={it.key} item={it} live={liveFor(it)} grade={gradeFor(it)} section={section} />
       : <TrackedPropCard key={it.key} item={it} grade={gradeFor(it)} section={section} />
-  )
+  }
 
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
@@ -177,7 +264,7 @@ export default function Tracked() {
       <main className="max-w-xl mx-auto px-4 pt-6 pb-16 flex flex-col gap-6">
         <div className="flex items-baseline justify-between gap-3">
           <h1 className="text-lg font-semibold text-ink-100">Tracked</h1>
-          <span className="text-[11px] text-ink-500 tabular-nums">{items.length} bet{items.length !== 1 ? 's' : ''}</span>
+          <span className="text-[11px] text-ink-500 tabular-nums">{(n => `${n} bet${n !== 1 ? 's' : ''}`)(groupTracked(items).length)}</span>
         </div>
 
         {items.length === 0 && (
