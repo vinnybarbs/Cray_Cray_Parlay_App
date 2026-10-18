@@ -31,19 +31,15 @@ describe('groupByGame', () => {
 })
 
 describe('sortProps', () => {
-  const p = (text, ourProb, bookProb, extra = {}) => ({ text, ourProb, bookProb, ...extra })
-  const list = [p('a', 60, 55), p('b', 52, 40), p('c', 70, 64), p('d', null, null, { edgePp: 1 })]
+  const p = (text, ourProb, bookProb) => ({ text, ourProb, bookProb })
+  const list = [p('a', 60, 55), p('b', 52, 40), p('c', 70, 64), p('d', null, null)]
 
-  test('biggest edge first by default, our % minus book %', () => {
-    expect(sortProps(list).map(x => x.text)).toEqual(['b', 'c', 'a', 'd'])
-  })
-
-  test('our % sorts most likely first, missing numbers last', () => {
-    expect(sortProps(list, 'ours').map(x => x.text)).toEqual(['c', 'a', 'b', 'd'])
+  test('our % highest first, missing numbers last', () => {
+    expect(sortProps(list).map(x => x.text)).toEqual(['c', 'a', 'b', 'd'])
   })
 
   test('does not reorder the input', () => {
-    sortProps(list, 'ours')
+    sortProps(list)
     expect(list.map(x => x.text)).toEqual(['a', 'b', 'c', 'd'])
   })
 })

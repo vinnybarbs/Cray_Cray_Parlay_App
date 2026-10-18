@@ -57,25 +57,10 @@ export function groupByGame(props, now = Date.now()) {
     a.key.localeCompare(b.key))
 }
 
-// How reads sort under each game (owner 2026-10-18: "descend by %").
-// 'edge' is our % minus the book's, biggest first, the default because
-// the gap is what makes a prop worth betting. 'ours' is our own %,
-// most likely first. Reads with no number go last. Pure.
-export const SORTS = [
-  { key: 'edge', label: 'Biggest edge' },
-  { key: 'ours', label: 'Our %' },
-]
-
-const sortValue = {
-  edge: (p) => (p.ourProb != null && p.bookProb != null ? p.ourProb - p.bookProb : p.edgePp),
-  ours: (p) => p.ourProb,
-}
-
-export function sortProps(props, by = 'edge') {
-  const val = sortValue[by] || sortValue.edge
-  const num = (p) => {
-    const v = val(p)
-    return v == null || !Number.isFinite(Number(v)) ? -Infinity : Number(v)
-  }
+// Reads under each game sort by our own %, most likely to hit first
+// (owner 2026-10-18: "it should end up being the most likely to hit
+// list to lowest %"). Reads with no number go last. Pure.
+export function sortProps(props) {
+  const num = (p) => (p.ourProb == null || !Number.isFinite(Number(p.ourProb)) ? -Infinity : Number(p.ourProb))
   return [...(props || [])].sort((a, b) => num(b) - num(a))
 }
