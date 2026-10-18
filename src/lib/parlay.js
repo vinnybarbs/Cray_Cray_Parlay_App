@@ -1,11 +1,13 @@
 import { bookProb, finalPpFor, SIDE_PRICES } from './tiers'
+import { propItemKey } from './trackedKeys'
 
 // The Pick builder's parlay math (owner 2026-10-18: "click multiple to
 // calculate parlay odds/payout", nothing locked). Pure, so the server
 // tests cover it. A parlay's book chance is the product of each leg's
 // no-vig chance and ours is the product of each leg's model chance, the
 // same Book says / we say pair every card uses. Legs are treated as
-// independent, which is why one game can only give one leg.
+// independent, so legs from one game (a side and a prop, or two props)
+// get a note that the math is rough, never a block.
 
 export const MAX_LEGS = 10
 
@@ -37,14 +39,55 @@ export function legFromGame(game, sport = null) {
   const pp = finalPpFor(game)
   const ours = book != null && pp != null ? Math.min(0.99, Math.max(0.01, book + pp / 100)) : null
   return {
+    kind: 'game',
     id: `${game.game_key || `${game.home_team}|${game.away_team}`}`,
     sport: sport || game.sport || null,
+    matchup: matchupOf(game.away_team, game.home_team),
     pick: pub.pick,
     odds,
     book,
     ours,
     game,
   }
+}
+
+const matchupOf = (away, home) => `${String(away || '').toLowerCase()}@${String(home || '').toLowerCase()}`
+
+/**
+ * A prop read (a play or a skip's lean) as a parlay leg, or null when it
+ * cannot be one: locked, started, graded, no price, or an anytime TD no,
+ * which books do not sell.
+ */
+export function legFromProp(p) {
+  if (!p || p.locked || p.started) return null
+  if (p.outcome && p.outcome !== 'pending') return null
+  if (p.market === 'player_anytime_td' && p.side !== 'over') return null
+  const odds = parseInt(p.price, 10)
+  if (decimalOdds(odds) == null) return null
+  // The props feed sends ourProb and bookProb as percents (61.5).
+  const num = (x) => (x != null && Number.isFinite(Number(x)) ? Number(x) / 100 : null)
+  return {
+    kind: 'prop',
+    id: propItemKey(p),
+    sport: 'NFL',
+    matchup: matchupOf(p.away_team, p.home_team),
+    pick: p.text || `${p.player} ${p.side} ${p.line}`,
+    odds,
+    book: num(p.bookProb),
+    ours: num(p.ourProb),
+    prop: p,
+  }
+}
+
+/** True when two or more legs come from the same game. */
+export function sharesGame(legs) {
+  const seen = new Set()
+  for (const l of legs || []) {
+    if (!l?.matchup) continue
+    if (seen.has(l.matchup)) return true
+    seen.add(l.matchup)
+  }
+  return false
 }
 
 /**

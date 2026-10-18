@@ -115,14 +115,14 @@ function TrackedGameCard({ item, live, grade, section, inParlay = false }) {
   )
 }
 
-function TrackedPropCard({ item, grade, section }) {
+function TrackedPropCard({ item, grade, section, inParlay = false }) {
   const p = {
     ...item,
     started: section !== 'upcoming',
     outcome: grade?.outcome && GRADED.has(grade.outcome) ? grade.outcome : null,
     actual: grade?.actual ?? null,
   }
-  return <PropCard p={p} showOutcome={section !== 'upcoming'} />
+  return <PropCard p={p} showOutcome={section !== 'upcoming'} hideTrack={inParlay} />
 }
 
 const PARLAY_STATE = {
@@ -180,7 +180,7 @@ function TrackedParlay({ unit, liveFor, gradeFor, stateFor }) {
               </span>
               {l.kind === 'game'
                 ? <TrackedGameCard item={l} live={liveFor(l)} grade={gradeFor(l)} section={section} inParlay />
-                : <TrackedPropCard item={l} grade={gradeFor(l)} section={section} />}
+                : <TrackedPropCard item={l} grade={gradeFor(l)} section={section} inParlay />}
             </div>
           )
         })}

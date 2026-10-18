@@ -8,8 +8,9 @@ import { isShadowSport } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
-import { legFromGame, parlayMath, fmtChance, MAX_LEGS } from '../lib/parlay'
-import { gameItem, parlayItems } from '../lib/trackedKeys'
+import { legFromGame, legFromProp, sharesGame, parlayMath, fmtChance, MAX_LEGS } from '../lib/parlay'
+import { gameItem, propItem, parlayItems } from '../lib/trackedKeys'
+import { apiFetch } from '../lib/api'
 import { useTracked } from '../lib/trackedStore'
 
 // The Pick builder, "give me picks for the sports I choose", a filtered
@@ -31,6 +32,10 @@ const MIN_TIER_OPTIONS = [
 ]
 
 import { fmtGameDateTime } from '../lib/gameTime'
+
+// The sport chip for prop reads, and how many show before "Show all".
+const PROPS_CHIP = 'NFL props'
+const PROPS_PREVIEW = 15
 
 function formatOdds(odds) {
   if (odds == null) return null
@@ -138,6 +143,47 @@ function PickRow({ row, isOpen, onToggle, leg, added, onAdd, full }) {
   )
 }
 
+// One prop read as a row: tier, our % over the book's, the read, and Add.
+function PropRow({ p, leg, added, onAdd, full }) {
+  const tier = edgeTier(p.edgePp)
+  // The props feed sends these as percents.
+  const ours = p.ourProb != null ? Math.round(p.ourProb) : null
+  const book = p.bookProb != null ? Math.round(p.bookProb) : null
+  return (
+    <div className={`flex items-center gap-3 pl-4 pr-2 py-3 border-t border-ink-800 ${added ? 'bg-signal-pos/5' : ''}`}>
+      <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-xs font-bold ${tier.color} ${tier.bg}`}>{tier.label}</span>
+      <span className="flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums text-signal-pos leading-tight">
+        {ours != null && book != null
+          ? <><span className="block">{ours}%</span><span className="block text-[11px] font-normal text-ink-500">book {book}%</span></>
+          : formatPp(p.edgePp)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-semibold text-ink-100 truncate first-letter:uppercase">
+          {p.text}
+          {p.price != null && <span className="ml-2 tabular-nums text-xs text-ink-300">{formatOdds(p.price)}</span>}
+        </div>
+        <div className="text-xs text-ink-400 truncate">
+          NFL prop · {p.awayAbbr && p.homeAbbr ? `${p.awayAbbr} at ${p.homeAbbr}` : `${p.away_team} at ${p.home_team}`}
+          {p.commence_time && <> · {fmtGameDateTime(p.commence_time)}</>}
+        </div>
+      </div>
+      <div className="flex-shrink-0 w-16 flex items-center justify-center">
+        {leg && (
+          <button
+            type="button"
+            aria-pressed={added}
+            disabled={!added && full}
+            onClick={() => onAdd(leg)}
+            className={`w-full py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-pos disabled:opacity-40 ${added ? 'bg-signal-pos text-ink-950' : 'bg-ink-800 text-ink-200 hover:text-ink-100 active:bg-ink-700'}`}
+          >
+            {added ? 'Added' : '+ Add'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // A trap tile is its own thing, not a pick tile in red. It leads with the
 // bait (why the side looks good to a casual bettor) and closes with the
 // math (how overpriced it actually is). That contrast IS the product.
@@ -190,7 +236,9 @@ function ParlaySlip({ legs, onRemove, onClear, onTracked }) {
 
   const trackTogether = async () => {
     const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-    const items = parlayItems(id, legs.map(l => gameItem(l.game, l.game.game_key || l.id, l.game.published_pick, sidePct(l.game, l.game.recommended_side, finalPpFor(l.game)))), {
+    const items = parlayItems(id, legs.map(l => (l.kind === 'prop'
+      ? propItem(l.prop)
+      : gameItem(l.game, l.game.game_key || l.id, l.game.published_pick, sidePct(l.game, l.game.recommended_side, finalPpFor(l.game))))), {
       odds: m.odds,
       book_pct: m.bookPct != null ? Math.round(m.bookPct * 10) / 10 : null,
       our_pct: m.ourPct != null ? Math.round(m.ourPct * 10) / 10 : null,
@@ -243,6 +291,7 @@ function ParlaySlip({ legs, onRemove, onClear, onTracked }) {
               <div className="text-xs text-ink-400 tabular-nums leading-relaxed">
                 {book && ours && <div>Book says {book}, we say {ours}.</div>}
                 <div>The payout breaks even at {fmtChance(m.breakEvenPct)}.{ours && <> {m.ourPct >= m.breakEvenPct ? 'Our number clears it.' : 'Our number falls short of it.'}</>}</div>
+                {sharesGame(legs) && <div className="text-ink-500">Some legs are from the same game. They tend to move together, so treat these chances as rough.</div>}
               </div>
             )}
 
@@ -280,6 +329,25 @@ export default function GeneratorPage() {
     setJustTracked(false)
     setLegs(prev => prev.some(l => l.id === leg.id) ? prev.filter(l => l.id !== leg.id) : prev.length >= MAX_LEGS ? prev : [...prev, leg])
   }
+
+  // NFL prop reads: the plays and the skips' leans, all addable as legs.
+  const [props, setProps] = useState([])
+  const [showAllProps, setShowAllProps] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await apiFetch('/api/props')
+        if (!r.ok) return
+        const json = await r.json()
+        const list = [...(json.upcoming || []), ...(json.skips || [])]
+          .filter(p => !p.started && !p.locked && p.edgePp != null)
+          .sort((a, b) => b.edgePp - a.edgePp)
+        if (!cancelled) setProps(list)
+      } catch { /* the board still works without props */ }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   // Filters
   const [selectedSports, setSelectedSports] = useState([]) // empty = all
@@ -345,13 +413,19 @@ export default function GeneratorPage() {
     return rows.sort((a, b) => (b.trap.lure_score - a.trap.lure_score) || (a.trap.edge_pp - b.trap.edge_pp))
   }, [data])
 
-  const sports = useMemo(() => [...new Set(allRows.map(r => r.sport))], [allRows])
+  const sports = useMemo(() => [...new Set(allRows.map(r => r.sport)), ...(props.length > 0 ? [PROPS_CHIP] : [])], [allRows, props])
 
   const minPp = MIN_TIER_OPTIONS.find(o => o.key === minTier)?.min ?? -Infinity
   const rows = allRows.filter(r =>
     (selectedSports.length === 0 || selectedSports.includes(r.sport)) &&
     (minTier === 'all' || (r.pp != null && r.pp >= minPp))
   )
+
+  const propRows = props.filter(p =>
+    (selectedSports.length === 0 || selectedSports.includes(PROPS_CHIP)) &&
+    (minTier === 'all' || p.edgePp >= minPp)
+  )
+  const shownProps = showAllProps ? propRows : propRows.slice(0, PROPS_PREVIEW)
 
   const toggleSport = (s) => {
     setSelectedSports(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
@@ -421,6 +495,14 @@ export default function GeneratorPage() {
           </p>
         </div>
 
+        {/* How it works, one line (owner 2026-10-18). */}
+        <div className="bg-ink-900 rounded-sharp shadow-hairline px-4 py-3 flex items-start gap-3">
+          <span className="w-7 h-7 rounded-full bg-signal-pos/15 text-signal-pos flex items-center justify-center flex-shrink-0 text-sm font-bold" aria-hidden="true">+</span>
+          <p className="text-xs text-ink-300 leading-relaxed">
+            <span className="font-semibold text-ink-100">Build a parlay.</span> Tap <span className="font-semibold text-ink-100">+ Add</span> on any picks or props below to tie them together. The slip at the bottom shows the combined odds, what your stake pays, and our chance against the book's. Tap <span className="font-semibold text-ink-100">Track together</span> to follow them as one bet.
+          </p>
+        </div>
+
         {/* Loading. Real skeleton, no theater */}
         {loading && (
           <div className="space-y-2">
@@ -441,7 +523,7 @@ export default function GeneratorPage() {
         {/* Dark slate. No games on the board at all. Distinct from "your
             filter cleared everything" below: this is the calendar, not the
             filters, and it should never read as an outage. */}
-        {!loading && !error && allRows.length === 0 && trapRows.length === 0 && (
+        {!loading && !error && allRows.length === 0 && trapRows.length === 0 && props.length === 0 && (
           <div className="bg-ink-900 rounded-sharp shadow-hairline p-6 md:p-8">
             <div className="text-xs text-ink-400 mb-3">
               Slate status
@@ -500,6 +582,34 @@ export default function GeneratorPage() {
                   />
                 )
               })
+            )}
+          </div>
+        )}
+
+        {/* NFL props, plays first then skips, each a possible leg. */}
+        {!loading && !error && propRows.length > 0 && (
+          <div className="bg-ink-900 rounded-sharp shadow-hairline overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-2.5 bg-ink-950 text-xs text-ink-500">
+              <span className="text-ink-300">NFL props</span>
+              <span className="ml-auto flex-shrink-0">{shownProps.length} of {propRows.length}</span>
+            </div>
+            {shownProps.map(p => {
+              const leg = legFromProp(p)
+              return (
+                <PropRow
+                  key={`${p.playerKey}|${p.market}|${p.side}|${p.line}|${p.commence_time}`}
+                  p={p}
+                  leg={leg}
+                  added={!!leg && legIds.has(leg.id)}
+                  full={legs.length >= MAX_LEGS}
+                  onAdd={toggleLeg}
+                />
+              )
+            })}
+            {propRows.length > shownProps.length && (
+              <button onClick={() => setShowAllProps(true)} className="w-full px-4 py-3 border-t border-ink-800 text-xs font-semibold text-signal-pos hover:bg-ink-850/40">
+                Show all {propRows.length} props
+              </button>
             )}
           </div>
         )}
