@@ -12,6 +12,7 @@ import { apiFetch } from '../lib/api'
 import LockedCard from '../components/Locked'
 import useLiveGames from '../hooks/useLiveGames'
 import { LiveScoreboard, StandingLine, LiveNowRail } from '../components/LiveScoreboard'
+import { liveNowItems } from '../lib/liveNow'
 import TrackButton from '../components/TrackButton'
 import { gameItem } from '../lib/trackedKeys'
 
@@ -1905,39 +1906,22 @@ export default function DailyDigest({ onBack }) {
   }, [fetchDigest])
 
   // The game tracker (owner 2026-10-16). Polls only while a started game
-  // with a read, in a sport ESPN covers, is on the board.
+  // in a sport ESPN covers is on the board. The Live now strip is every
+  // such game, score and clock only, no reads (owner 2026-10-18).
   const trackedStarted = useMemo(() => (data?.startedGames || []).filter(g =>
     g && TRACKED_SPORTS.has(g.sport) && !SHADOW_DISPLAY.has(g.sport)
-    && (g.published_pick?.pick || (Array.isArray(g.published_alts) && g.published_alts.length > 0)
-      || (Array.isArray(g.trap_calls) && g.trap_calls.length > 0))
   ), [data])
   const liveFeed = useLiveGames(trackedStarted.length > 0)
-  const liveNow = useMemo(() => {
-    const games = liveFeed?.games || {}
-    const items = []
-    for (const g of trackedStarted) {
-      const lg = games[g.game_key]
-      if (!lg) continue
-      const graded = g.published_pick?.outcome && g.published_pick.outcome !== 'pending'
-      if (g.published_pick?.pick && !graded) items.push({ key: `game-${g.game_key}`, live: lg, sport: g.sport, standing: lg.pick, trap: false })
-      // A spotlight pick on a game with no headline gets its own chip, so
-      // an alt only game (the 2026-10-15 Seahawks spread) is on the rail.
-      if (!g.published_pick?.pick) {
-        for (const alt of (Array.isArray(g.published_alts) ? g.published_alts : [])) {
-          if (alt.outcome && alt.outcome !== 'pending') continue
-          items.push({ key: `game-${g.game_key}`, live: lg, sport: g.sport, standing: lg.alts?.[alt.pick] || null, trap: false })
-        }
-      }
-      for (const t of (Array.isArray(g.trap_calls) ? g.trap_calls : [])) {
-        items.push({ key: `game-${g.game_key}-trap-${t.side}`, live: lg, sport: g.sport, standing: lg.traps?.[t.side] || null, trap: true })
-      }
-    }
-    // Games still on first, finals after.
-    return items.sort((a, b) => Number(!!a.live.final) - Number(!!b.live.final))
-  }, [liveFeed, trackedStarted])
+  const liveNow = useMemo(
+    () => liveNowItems(liveFeed?.games, trackedStarted.map(g => g.game_key)),
+    [liveFeed, trackedStarted],
+  )
   const liveCount = liveNow.filter(i => !i.live.final).length
-  const jumpTo = useCallback((id) => {
-    const el = document.getElementById(id)
+  // A strip chip jumps to the game's card, or its trap card when the
+  // game only carries a trap.
+  const jumpTo = useCallback((key) => {
+    const el = document.getElementById(`game-${key}`)
+      || document.querySelector(`[id^="${CSS.escape(`game-${key}-trap-`)}"]`)
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [])
 
@@ -2177,8 +2161,8 @@ export default function DailyDigest({ onBack }) {
             {/* House parlays left, yesterday's board right (owner order
                 2026-08-25). Expanded panels take the full row via w-full
                 so the flex wrap drops them under the button strip. */}
-            {/* The game tracker (owner 2026-10-16): while one of our reads
-                is on, the rail and the in progress section lead the board. */}
+            {/* The game tracker (owner 2026-10-16): while a game is on, the
+                Live now strip and the in progress section lead the board. */}
             {liveNow.length > 0 && <LiveNowRail items={liveNow} onJump={jumpTo} />}
             {liveCount > 0 && boardFilter === 'All' && (
               <StartedSection games={data.startedGames} onDeepResearch={handleOpenDeepResearch} liveCount={liveCount} />

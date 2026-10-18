@@ -1,6 +1,8 @@
-// GET /api/digest/live: the Board's game tracker (owner 2026-10-16).
-// Score, clock and where each published pick or trap stands, for games
-// that started in the last 8 hours. Polled by the Board every 30 seconds
+// GET /api/digest/live: the game tracker (owner 2026-10-16).
+// Score and clock for every game that started in the last 8 hours, read
+// or not (owner 2026-10-18), plus where each published pick or trap
+// stands for the cards that carry one. The Board, Props and Tracked
+// pages all read it. Polled by the Board every 30 seconds
 // while a started card is on screen. One cached ESPN scoreboard per
 // sport per 30 seconds however many visitors poll. Started picks are
 // never gated, the pick was public at lock.
