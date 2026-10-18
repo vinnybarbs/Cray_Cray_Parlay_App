@@ -2,19 +2,25 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import BrandMark from '../components/BrandMark'
-import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS } from '../lib/tiers'
+import { edgeTier, formatPp, edgePpForSide, pickIdFor, TIERS, sidePct, finalPpFor, SIDE_PRICES, lockOddsFor } from '../lib/tiers'
 import PctStack from '../components/PctStack'
 import { isShadowSport } from '../lib/publish-flags'
 
 import { API_BASE_URL as API_BASE } from '../config'
 import YesterdayBoard from '../components/YesterdayBoard'
+import { legFromGame, parlayMath, fmtChance, MAX_LEGS } from '../lib/parlay'
+import { gameItem, parlayItems } from '../lib/trackedKeys'
+import { useTracked } from '../lib/trackedStore'
 
-// The Board, "give me picks for the sports I choose", rebuilt as a filtered
+// The Pick builder, "give me picks for the sports I choose", a filtered
 // view of the same graded edge-tier data the digest serves (audit 40 §3).
 // One grading language (signed pp + six tiers), real odds on every row, no
-// second pick generator, no fake loading theater. Picks are information, and
-// the machine builds the parlays (see The House Ledger), so there is no
-// lock/queue/betslip apparatus here.
+// second pick generator, no fake loading theater. Since 2026-10-18 (owner:
+// "click multiple to calculate parlay odds/payout", "I don't want to lock
+// it") any published pick can be added to a parlay slip that shows the
+// combined odds, the payout and the Book says / we say pair, and Track
+// together puts the legs on the Tracked tab linked as one parlay. Still no
+// lock or queue: the slip is a calculator and a watch list, not a wager.
 
 const MIN_TIER_OPTIONS = [
   { key: 'all',    label: 'All picks',  min: -Infinity },
@@ -61,7 +67,7 @@ function edgeStory(game) {
   return story
 }
 
-function PickRow({ row, isOpen, onToggle }) {
+function PickRow({ row, isOpen, onToggle, leg, added, onAdd, full }) {
   // pp null = no published pick. If the game still has edge data, surface
   // the story (best side's tier, trap callouts) instead of a blank preview.
   // Truly no-data games (soccer, UFC) stay honest previews.
@@ -76,12 +82,13 @@ function PickRow({ row, isOpen, onToggle }) {
   const odds = formatOdds(row.odds)
   return (
     <div>
-    <button onClick={onToggle} className={`w-full text-left flex items-center gap-3 px-4 py-3 border-t border-ink-800 transition-colors ${isOpen ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}>
+    <div className={`flex items-stretch border-t border-ink-800 transition-colors ${added ? 'bg-signal-pos/5' : ''}`}>
+    <button onClick={onToggle} className={`min-w-0 flex-1 text-left flex items-center gap-3 pl-4 pr-2 py-3 transition-colors ${isOpen ? 'bg-ink-850/70' : 'hover:bg-ink-850/40'}`}>
       <span className={`flex-shrink-0 w-24 text-center px-2 py-1 rounded-sharp text-xs font-bold ${isPreview ? 'text-ink-300 bg-ink-850 shadow-hairline' :`${tier.color} ${tier.bg}`}`}>
         {isPreview ? 'Preview' : tier.label}
       </span>
       <span className={`flex-shrink-0 w-16 text-right text-sm font-bold tabular-nums ${isPreview ? 'text-ink-600' : effPp >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>
-        {isPreview ? '-' : <PctStack edgePp={effPp} odds={row.odds} impliedProb={row.implied_prob} />}
+        {isPreview ? '-' : <PctStack edgePp={effPp} odds={row.odds} otherOdds={row.otherOdds} impliedProb={row.implied_prob} />}
       </span>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-semibold text-ink-100 truncate">
@@ -94,10 +101,25 @@ function PickRow({ row, isOpen, onToggle }) {
           {row.game.game_date && <> · {fmtGameDateTime(row.game.game_date)}</>}
         </div>
       </div>
-      <span className={`flex-shrink-0 px-3 py-1.5 text-xs ${isPreview ? 'text-ink-500' : tier.color}`}>
+      <span className={`hidden sm:inline flex-shrink-0 px-3 py-1.5 text-xs ${isPreview ? 'text-ink-500' : tier.color}`}>
         {isPreview ? 'no bet graded' : tier.subtitle}
       </span>
     </button>
+    {/* Add to parlay. Only a published pick with a price can be a leg. */}
+    <div className="flex-shrink-0 w-16 flex items-center justify-center pr-2">
+      {leg && (
+        <button
+          type="button"
+          aria-pressed={added}
+          disabled={!added && full}
+          onClick={() => onAdd(leg)}
+          className={`w-full py-1.5 rounded-full text-[11px] font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-signal-pos disabled:opacity-40 ${added ? 'bg-signal-pos text-ink-950' : 'bg-ink-800 text-ink-200 hover:text-ink-100 active:bg-ink-700'}`}
+        >
+          {added ? 'Added' : '+ Add'}
+        </button>
+      )}
+    </div>
+    </div>
     {isOpen && (
       <div className="px-4 pb-3 pt-1 bg-ink-850/40 border-t border-ink-800/50">
         {row.game.analysis_snippet
@@ -151,6 +173,97 @@ function TrapRow({ row }) {
   )
 }
 
+const fmtMoney = (n) => `$${Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+// The parlay slip. Pinned to the bottom once a leg is added, collapsed to
+// one line on a phone until tapped. A calculator and a watch list only:
+// Track together sends the legs to the Tracked tab, linked as one parlay.
+function ParlaySlip({ legs, onRemove, onClear, onTracked }) {
+  const { trackMany } = useTracked()
+  const [stake, setStake] = useState('10')
+  const [open, setOpen] = useState(true)
+  const m = parlayMath(legs, stake)
+  if (!m) return null
+  const odds = formatOdds(m.odds)
+  const book = fmtChance(m.bookPct)
+  const ours = fmtChance(m.ourPct)
+
+  const trackTogether = async () => {
+    const id = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+    const items = parlayItems(id, legs.map(l => gameItem(l.game, l.game.game_key || l.id, l.game.published_pick, sidePct(l.game, l.game.recommended_side, finalPpFor(l.game)))), {
+      odds: m.odds,
+      book_pct: m.bookPct != null ? Math.round(m.bookPct * 10) / 10 : null,
+      our_pct: m.ourPct != null ? Math.round(m.ourPct * 10) / 10 : null,
+    })
+    await trackMany(items)
+    onTracked()
+  }
+
+  return (
+    <div className="fixed bottom-0 inset-x-0 z-40 bg-ink-950/95 backdrop-blur border-t border-ink-700" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="max-w-3xl mx-auto px-4 py-3 flex flex-col gap-3">
+        <button type="button" onClick={() => setOpen(o => !o)} className="flex items-center gap-3 text-left focus:outline-none" aria-expanded={open}>
+          <span className="text-sm font-semibold text-ink-100">{m.legs === 1 ? '1 leg' : `${m.legs} leg parlay`}</span>
+          {odds && <span className="text-sm font-bold tabular-nums text-signal-pos">{odds}</span>}
+          <span className="ml-auto text-xs text-ink-300 tabular-nums">{fmtMoney(Number(stake) > 0 ? Number(stake) : 0)} pays {fmtMoney(m.payout)}</span>
+          <span className={`text-ink-500 text-xs transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden="true">▾</span>
+        </button>
+
+        {open && (
+          <>
+            <ul className="flex flex-col gap-1 max-h-40 overflow-y-auto">
+              {legs.map(l => (
+                <li key={l.id} className="flex items-center gap-2 text-xs">
+                  <span className="min-w-0 flex-1 truncate text-ink-200">{l.pick} <span className="text-ink-500">· {l.sport}</span></span>
+                  <span className="tabular-nums text-ink-300 flex-shrink-0">{formatOdds(l.odds)}</span>
+                  <button type="button" onClick={() => onRemove(l)} className="flex-shrink-0 w-6 h-6 rounded-full text-ink-500 hover:text-ink-100 hover:bg-ink-800" aria-label={`Remove ${l.pick}`}>×</button>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex items-center gap-3 text-xs">
+              <label className="flex items-center gap-1.5 text-ink-400">
+                Stake
+                <span className="flex items-center bg-ink-900 shadow-hairline rounded-sharp px-2 py-1">
+                  <span className="text-ink-500">$</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    value={stake}
+                    onChange={(e) => setStake(e.target.value)}
+                    className="w-16 bg-transparent text-ink-100 tabular-nums focus:outline-none"
+                  />
+                </span>
+              </label>
+              <span className="ml-auto text-ink-300 tabular-nums">Profit {fmtMoney(m.profit)}</span>
+            </div>
+
+            {m.legs >= 2 && (
+              <div className="text-xs text-ink-400 tabular-nums leading-relaxed">
+                {book && ours && <div>Book says {book}, we say {ours}.</div>}
+                <div>The payout breaks even at {fmtChance(m.breakEvenPct)}.{ours && <> {m.ourPct >= m.breakEvenPct ? 'Our number clears it.' : 'Our number falls short of it.'}</>}</div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={onClear} className="px-3 py-2 text-xs text-ink-400 hover:text-ink-100">Clear</button>
+              <button
+                type="button"
+                disabled={m.legs < 2}
+                onClick={trackTogether}
+                className="ml-auto px-4 py-2 rounded-full text-xs font-semibold bg-signal-pos text-ink-950 transition-all active:scale-[0.98] disabled:opacity-40"
+              >
+                {m.legs < 2 ? 'Add another leg' : 'Track together'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function GeneratorPage() {
   const { isAuthenticated, signOut } = useAuth()
   const navigate = useNavigate()
@@ -159,6 +272,14 @@ export default function GeneratorPage() {
   const [error, setError] = useState(null)
 
   const [openRow, setOpenRow] = useState(null)
+  // Parlay slip legs, in the order they were added.
+  const [legs, setLegs] = useState([])
+  const [justTracked, setJustTracked] = useState(false)
+  const legIds = useMemo(() => new Set(legs.map(l => l.id)), [legs])
+  const toggleLeg = (leg) => {
+    setJustTracked(false)
+    setLegs(prev => prev.some(l => l.id === leg.id) ? prev.filter(l => l.id !== leg.id) : prev.length >= MAX_LEGS ? prev : [...prev, leg])
+  }
 
   // Filters
   const [selectedSports, setSelectedSports] = useState([]) // empty = all
@@ -199,7 +320,11 @@ export default function GeneratorPage() {
       for (const g of games) {
         const pp = edgePpForSide(g.edges, g.recommended_side)
         if (pp != null && pp <= -2) continue
-        rows.push({ sport, game: g, pp })
+        // The side's own price and the other side's, so the edge column
+        // reads as our % over the book's % instead of a bare point gap.
+        // A best side story row has no priced side of its own.
+        const keys = pp != null ? SIDE_PRICES[g.recommended_side] : null
+        rows.push({ sport, game: g, pp, odds: keys ? (g.published_pick?.odds ?? lockOddsFor(g)) : null, otherOdds: keys ? g[keys[1]] : null })
       }
     }
     return rows.sort((a, b) => (b.pp ?? -999) - (a.pp ?? -999))
@@ -241,8 +366,8 @@ export default function GeneratorPage() {
       {/* Top bar */}
       <div className="sticky top-0 z-30 bg-ink-950/95 border-b border-ink-800 backdrop-blur px-4 py-3 flex items-center gap-3">
         <BrandMark />
-        <span className="text-sm font-semibold text-ink-200 hidden sm:inline">The Board</span>
-        <span className="hidden sm:inline text-xs text-ink-500">Every graded pick, filter it your way</span>
+        <span className="text-sm font-semibold text-ink-200 hidden sm:inline">Pick builder</span>
+        <span className="hidden sm:inline text-xs text-ink-500">Every graded pick, add legs to build a parlay</span>
         <div className="ml-auto flex items-center gap-2">
           <button onClick={() => navigate('/digest')} className="px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Digest</button>
           <button onClick={() => navigate('/ledger')} className="hidden sm:block px-3 py-1.5 text-xs font-semibold bg-ink-900 hover:bg-ink-800 text-ink-200 rounded-sharp border border-ink-700 transition-colors active:scale-95">Ledger</button>
@@ -250,7 +375,14 @@ export default function GeneratorPage() {
         </div>
       </div>
 
-      <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
+      <div className={`max-w-3xl mx-auto px-4 py-6 space-y-4 ${legs.length > 0 ? 'pb-72' : ''}`}>
+
+        {justTracked && (
+          <div className="bg-signal-pos/10 rounded-sharp shadow-hairline px-4 py-3 flex items-center gap-3 text-sm">
+            <span className="text-ink-100">Parlay tracked. Each leg runs live on its own and they stay linked.</span>
+            <button onClick={() => navigate('/tracked')} className="ml-auto flex-shrink-0 text-signal-pos font-semibold hover:underline">Open Tracked</button>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="bg-ink-900 rounded-sharp shadow-hairline p-4 space-y-3">
@@ -354,12 +486,17 @@ export default function GeneratorPage() {
             ) : (
               rows.map(row => {
                 const id = pickIdFor(row.game)
+                const leg = legFromGame(row.game, row.sport)
                 return (
                   <PickRow
                     key={id}
                     row={row}
                     isOpen={openRow === id}
                     onToggle={() => setOpenRow(openRow === id ? null : id)}
+                    leg={leg}
+                    added={!!leg && legIds.has(leg.id)}
+                    full={legs.length >= MAX_LEGS}
+                    onAdd={toggleLeg}
                   />
                 )
               })
@@ -391,6 +528,15 @@ export default function GeneratorPage() {
           </p>
         )}
       </div>
+
+      {legs.length > 0 && (
+        <ParlaySlip
+          legs={legs}
+          onRemove={toggleLeg}
+          onClear={() => setLegs([])}
+          onTracked={() => { setLegs([]); setJustTracked(true); window.scrollTo({ top: 0, behavior: 'smooth' }) }}
+        />
+      )}
 
     </div>
   )

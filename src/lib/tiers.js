@@ -230,7 +230,7 @@ export function bookOurPct(signedPp, odds, otherOdds, impliedProb) {
   return { book: Math.round(p * 100), ours: Math.round(p * 100 + Number(signedPp)) }
 }
 
-const SIDE_PRICES = {
+export const SIDE_PRICES = {
   home_ml: ['moneyline_home', 'moneyline_away'],
   away_ml: ['moneyline_away', 'moneyline_home'],
   home_spread: ['spread_home_price', 'spread_away_price'],

@@ -2273,7 +2273,7 @@ export default function DailyDigest({ onBack }) {
                 onClick={onBack}
                 className="w-full sm:w-auto px-6 py-3 bg-ink-850 shadow-hairline hover:bg-ink-800 hover:shadow-hairline-bright rounded-sharp font-medium text-sm text-ink-200 transition-all active:scale-[0.98]"
               >
-                Pick builder, filter every pick
+                Pick builder, build a parlay from every pick
               </button>
             </div>
 

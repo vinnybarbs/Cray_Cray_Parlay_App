@@ -91,6 +91,27 @@ export async function untrack(key) {
   }
 }
 
+/** Track several items at once, the legs of a parlay tracked together. */
+export async function trackMany(list) {
+  const now = new Date().toISOString()
+  const fresh = (list || []).filter(it => it?.key && !isTracked(it.key)).map(it => ({ ...it, tracked_at: now }))
+  if (fresh.length === 0) return
+  set(mergeTracked(items, fresh))
+  if (userId) {
+    try { await supabase.from('tracked_bets').upsert(fresh.map(it => rowFor(userId, it)), { onConflict: 'user_id,item_key' }) } catch { /* local copy stands */ }
+  }
+}
+
+/** Untrack several items at once, a whole parlay. */
+export async function untrackMany(keys) {
+  const drop = new Set((keys || []).filter(isTracked))
+  if (drop.size === 0) return
+  set(items.filter(it => !drop.has(it.key)))
+  if (userId) {
+    try { await supabase.from('tracked_bets').delete().eq('user_id', userId).in('item_key', [...drop]) } catch { /* local copy stands */ }
+  }
+}
+
 export function toggle(item) {
   return isTracked(item.key) ? untrack(item.key) : track(item)
 }
@@ -107,5 +128,5 @@ export function useTracked() {
   const { user } = useAuth()
   const list = useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
   useEffect(() => { setUser(user?.id || null) }, [user?.id])
-  return { items: list, isTracked: (key) => list.some(it => it.key === key), track, untrack, toggle, synced }
+  return { items: list, isTracked: (key) => list.some(it => it.key === key), track, untrack, toggle, trackMany, untrackMany, synced }
 }
