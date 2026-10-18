@@ -97,7 +97,7 @@ function GameSection({ g, defaultOpen, showOutcome }) {
           >
             {skipsOpen ? 'Hide skips' : `Show ${skips.length} more ${skips.length === 1 ? 'prop' : 'props'} we'd skip`}
           </button>
-          {skipsOpen && skips.map((p, i) => <SkipCard key={`skip|${p.text}|${i}`} p={p} />)}
+          {skipsOpen && skips.map((p, i) => <SkipCard key={`skip|${p.text}|${i}`} p={p} showOutcome={showOutcome} />)}
         </div>
       )}
     </section>
