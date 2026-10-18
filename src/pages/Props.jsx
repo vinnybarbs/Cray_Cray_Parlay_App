@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import InstallButton from '../components/InstallButton'
 import { useNavigate } from 'react-router-dom'
 import BrandMark, { SignOutButton } from '../components/BrandMark'
@@ -9,6 +9,9 @@ import { apiFetch } from '../lib/api'
 import { groupByGame, sortProps } from '../lib/propGames'
 import { teamColors } from '../lib/teamColors'
 import { fmtGameDateTime } from '../lib/gameTime'
+import { LiveNowRail } from '../components/LiveScoreboard'
+import useLiveGames from '../hooks/useLiveGames'
+import { findByMatchup, liveNowItems } from '../lib/liveNow'
 
 // Props (shadow), owner 2026-10-12. Every NFL player prop read at 4
 // points or more, the recent results and the shadow record by market.
@@ -59,7 +62,7 @@ function GameSection({ g, defaultOpen, showOutcome }) {
   const graded = showOutcome ? reads.filter(p => p.outcome === 'won' || p.outcome === 'lost') : []
   const hits = graded.filter(p => p.outcome === 'won').length
   return (
-    <section className="flex flex-col gap-2" aria-label={`${g.away} at ${g.home}`}>
+    <section id={`props-game-${g.key}`} className="flex flex-col gap-2 scroll-mt-20" aria-label={`${g.away} at ${g.home}`}>
       <button
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
@@ -143,6 +146,29 @@ export default function Props() {
   const openByDefault = (g) => g.state === 'live' || g === firstUpcoming
   const recentGames = groupByGame(recent)
 
+  // The Live now strip (owner 2026-10-18): score and clock for the games
+  // on this slate that are on, no reads in it. Polls only while one is.
+  // Every game on the slate, whatever market chip is on.
+  const slate = useMemo(() => groupByGame([...allLive, ...allUpcoming, ...allSkips]), [data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const liveFeed = useLiveGames(slate.some(g => g.state === 'live'))
+  const { liveNow, sectionFor } = useMemo(() => {
+    const keys = []
+    const map = {}
+    for (const g of slate) {
+      if (g.state !== 'live') continue
+      const p = g.props[0]
+      const hit = findByMatchup(liveFeed?.games, { home_team: p.home_team, away_team: p.away_team, at: g.commence_time })
+      if (!hit) continue
+      keys.push(hit[0])
+      map[hit[0]] = g.key
+    }
+    return { liveNow: liveNowItems(liveFeed?.games, keys), sectionFor: map }
+  }, [slate, liveFeed])
+  const jumpTo = (feedKey) => {
+    const el = document.getElementById(`props-game-${sectionFor[feedKey]}`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div className="min-h-screen bg-ink-950 text-ink-100">
       <header className="sticky top-0 z-20 bg-ink-950/95 backdrop-blur border-b border-ink-800" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
@@ -189,6 +215,8 @@ export default function Props() {
             </button>
           ))}
         </div>
+
+        {data && tab === 'upcoming' && liveNow.length > 0 && <LiveNowRail items={liveNow} onJump={jumpTo} />}
 
         {error && <p className="text-sm text-ink-400">Props did not load. Try again in a minute.</p>}
         {!data && !error && <SkeletonList count={4} label="Loading props" />}
