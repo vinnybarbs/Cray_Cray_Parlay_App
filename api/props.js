@@ -258,7 +258,7 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = [], unoffic
   ].sort((a, b) => b.edgePp - a.edgePp);
   // Official grades first, then a finished game's box score result where
   // no official grade has landed yet (marked unofficial).
-  const official = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push'].includes(r.v2_outcome)).map(slim);
+  const official = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push', 'void'].includes(r.v2_outcome)).map(slim);
   const recent = capPerGame([...official, ...(unofficial || [])]
     .sort((a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.edgePp) - Number(a.edgePp)))
     .slice(0, RECENT_MAX);

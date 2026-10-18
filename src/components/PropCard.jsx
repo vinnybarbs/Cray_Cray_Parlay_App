@@ -43,6 +43,7 @@ const OUTCOME = {
   won: { label: 'Hit', cls: 'text-signal-pos' },
   lost: { label: 'Missed', cls: 'text-signal-neg' },
   push: { label: 'Push', cls: 'text-ink-400' },
+  void: { label: 'Void, did not play', cls: 'text-ink-400' },
 }
 
 const isTd = (p) => p.market === 'player_anytime_td'
@@ -228,11 +229,12 @@ const LIVE_STATUS = {
   miss: { label: 'Missed', cls: 'bg-signal-neg/15 text-signal-neg' },
   push: { label: 'Push', cls: 'bg-ink-800 text-ink-300' },
   no_stats: { label: 'No stats', cls: 'bg-ink-800 text-ink-300' },
+  inactive: { label: 'Inactive', cls: 'bg-ink-800 text-ink-300' },
 }
 
 function StartedChip({ p, live }) {
   const o = OUTCOME[p.outcome]
-  if (o) return <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>Final, {o.label.toLowerCase()}{p.actual != null ? ` · ${p.actual}` : ''}</span>
+  if (o) return <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{p.outcome === 'void' ? o.label : `Final, ${o.label.toLowerCase()}`}{p.actual != null ? ` · ${p.actual}` : ''}</span>
   const ls = live && LIVE_STATUS[live.status]
   if (ls) {
     return (
@@ -262,6 +264,7 @@ function trackerText(p, live) {
   if (live.status === 'hit') return p.side === 'over' ? `Cleared ${p.line}` : `Stayed under ${p.line}`
   if (live.status === 'miss') return p.side === 'over' ? `Finished short of ${p.line}` : `Went over ${p.line}`
   if (live.status === 'push') return `Landed on ${p.line}`
+  if (live.status === 'inactive') return 'Did not play, the book voids this'
   if (live.status === 'no_stats') return 'No stats recorded, likely void'
   return p.side === 'over' ? `Needs ${n} more ${unit(n)}` : `Safe unless ${n} more ${unit(n)}`
 }
