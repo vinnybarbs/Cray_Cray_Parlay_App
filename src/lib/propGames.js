@@ -28,7 +28,8 @@ const RANK = { live: 0, upcoming: 1, final: 2 }
 
 // Groups reads into games and orders them: live by kickoff, upcoming by
 // kickoff, finished newest first. Inside a game, reads keep the order
-// they came in (the server sorts by edge, biggest first).
+// they came in (the server sorts by edge, biggest first). sortProps
+// reorders them on the page.
 export function groupByGame(props, now = Date.now()) {
   const byKey = new Map()
   for (const p of props || []) {
@@ -54,4 +55,27 @@ export function groupByGame(props, now = Date.now()) {
     RANK[a.state] - RANK[b.state] ||
     (a.state === 'final' ? t(b) - t(a) : t(a) - t(b)) ||
     a.key.localeCompare(b.key))
+}
+
+// How reads sort under each game (owner 2026-10-18: "descend by %").
+// 'edge' is our % minus the book's, biggest first, the default because
+// the gap is what makes a prop worth betting. 'ours' is our own %,
+// most likely first. Reads with no number go last. Pure.
+export const SORTS = [
+  { key: 'edge', label: 'Biggest edge' },
+  { key: 'ours', label: 'Our %' },
+]
+
+const sortValue = {
+  edge: (p) => (p.ourProb != null && p.bookProb != null ? p.ourProb - p.bookProb : p.edgePp),
+  ours: (p) => p.ourProb,
+}
+
+export function sortProps(props, by = 'edge') {
+  const val = sortValue[by] || sortValue.edge
+  const num = (p) => {
+    const v = val(p)
+    return v == null || !Number.isFinite(Number(v)) ? -Infinity : Number(v)
+  }
+  return [...(props || [])].sort((a, b) => num(b) - num(a))
 }

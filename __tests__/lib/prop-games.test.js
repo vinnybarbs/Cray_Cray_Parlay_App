@@ -1,4 +1,4 @@
-import { groupByGame, gameState } from '../../src/lib/propGames'
+import { groupByGame, gameState, sortProps } from '../../src/lib/propGames'
 
 const now = new Date('2026-10-18T20:00:00Z').getTime()
 const read = (away, home, iso, extra = {}) => ({ away_team: away, home_team: home, awayAbbr: away, homeAbbr: home, commence_time: iso, text: `${away}-${home}`, ...extra })
@@ -27,5 +27,23 @@ describe('groupByGame', () => {
 
   test('empty input gives no games', () => {
     expect(groupByGame(undefined, now)).toEqual([])
+  })
+})
+
+describe('sortProps', () => {
+  const p = (text, ourProb, bookProb, extra = {}) => ({ text, ourProb, bookProb, ...extra })
+  const list = [p('a', 60, 55), p('b', 52, 40), p('c', 70, 64), p('d', null, null, { edgePp: 1 })]
+
+  test('biggest edge first by default, our % minus book %', () => {
+    expect(sortProps(list).map(x => x.text)).toEqual(['b', 'c', 'a', 'd'])
+  })
+
+  test('our % sorts most likely first, missing numbers last', () => {
+    expect(sortProps(list, 'ours').map(x => x.text)).toEqual(['c', 'a', 'b', 'd'])
+  })
+
+  test('does not reorder the input', () => {
+    sortProps(list, 'ours')
+    expect(list.map(x => x.text)).toEqual(['a', 'b', 'c', 'd'])
   })
 })
