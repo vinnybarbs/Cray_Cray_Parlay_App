@@ -20,8 +20,16 @@ describe('groupByGame', () => {
     expect(games[0].props).toHaveLength(2)
   })
 
-  test('a started game with one ungraded read is still in progress', () => {
+  test('one graded read means the game is over, whatever the rest say', () => {
+    // Grades come from the final box score, so a player with no stat
+    // line (inactive, or never touched the ball) must not hold the game
+    // "In progress" for hours (owner 2026-10-18, Browns).
     const list = [read('A', 'B', '2026-10-18T18:00:00Z', { outcome: 'won' }), read('A', 'B', '2026-10-18T18:00:00Z')]
+    expect(gameState(list, now)).toBe('final')
+  })
+
+  test('a started game with no graded read is in progress for four hours', () => {
+    const list = [read('A', 'B', '2026-10-18T18:00:00Z'), read('A', 'B', '2026-10-18T18:00:00Z')]
     expect(gameState(list, now)).toBe('live')
   })
 

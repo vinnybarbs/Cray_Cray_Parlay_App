@@ -67,6 +67,11 @@ function GameSection({ g, defaultOpen, showOutcome }) {
   const n = reads.length
   const graded = showOutcome ? reads.filter(p => p.outcome === 'won' || p.outcome === 'lost') : []
   const hits = graded.filter(p => p.outcome === 'won').length
+  // Pushes and props still waiting on a grade are named too, so the
+  // hit count adds up to the props count (owner 2026-10-18: "it says
+  // 14/17 but I know there were 20").
+  const pushes = showOutcome ? reads.filter(p => p.outcome === 'push').length : 0
+  const waiting = showOutcome && g.state === 'final' ? n - graded.length - pushes : 0
   return (
     <section id={`props-game-${g.key}`} className="flex flex-col gap-2 scroll-mt-20" aria-label={`${g.away} at ${g.home}`}>
       <button
@@ -85,6 +90,8 @@ function GameSection({ g, defaultOpen, showOutcome }) {
             {' · '}{n} {n === 1 ? 'prop' : 'props'}
             {skips.length > 0 && <>{' · '}{skips.length} {skips.length === 1 ? 'skip' : 'skips'}</>}
             {graded.length > 0 && <>{' · '}<span className="tabular-nums text-ink-200">{hits} of {graded.length} hit</span>{graded.some(p => p.unofficial) ? ', unofficial' : ''}</>}
+            {pushes > 0 && <>{', '}{pushes} push</>}
+            {waiting > 0 && <>{', '}{waiting} waiting</>}
           </span>
         </span>
         <GameState g={g} />
@@ -159,17 +166,31 @@ export default function Props() {
   // Started and upcoming reads in one list, a section per game: in
   // progress on top, then upcoming by kickoff, then finished (owner
   // 2026-10-16). Live games and the next game start open.
-  const games = groupByGame([...live, ...upcoming, ...skips])
-  const firstUpcoming = games.find(g => g.state === 'upcoming')
-  const openByDefault = (g) => g.state === 'live' || g === firstUpcoming
-  const recentGames = groupByGame(recent)
-
   // The Live now strip (owner 2026-10-18): score and clock for the games
   // on this slate that are on, no reads in it. Polls only while one is.
   // Every game on the slate, whatever market chip is on.
-  const slate = useMemo(() => groupByGame([...allLive, ...allUpcoming, ...allSkips]), [data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const grouped = useMemo(() => groupByGame([...allLive, ...allUpcoming, ...allSkips]), [data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const liveFeed = useLiveGames(grouped.some(g => g.state === 'live'))
+
+  // ESPN knows a game is over before our grades land, so a game the feed
+  // marks final is final here too, whatever its reads say (owner
+  // 2026-10-18: Browns showed "In progress" 20 minutes after the end).
+  const withFeedState = useCallback((list) => list.map(g => {
+    if (g.state !== 'live') return g
+    const p = g.props[0]
+    const hit = findByMatchup(liveFeed?.games, { home_team: p.home_team, away_team: p.away_team, at: g.commence_time })
+    return hit && hit[1].final ? { ...g, state: 'final' } : g
+  }), [liveFeed])
+  const slate = useMemo(() => withFeedState(grouped), [grouped, withFeedState])
   const anyLive = slate.some(g => g.state === 'live')
-  const liveFeed = useLiveGames(anyLive)
+
+  // Started and upcoming reads in one list, a section per game: in
+  // progress on top, then upcoming by kickoff, then finished (owner
+  // 2026-10-16). Live games and the next game start open.
+  const games = withFeedState(groupByGame([...live, ...upcoming, ...skips]))
+  const firstUpcoming = games.find(g => g.state === 'upcoming')
+  const openByDefault = (g) => g.state === 'live' || g === firstUpcoming
+  const recentGames = groupByGame(recent)
 
   // While a game on the slate is on, the official grades land up to 15
   // minutes after the final whistle, so refetch the board every 30 seconds
