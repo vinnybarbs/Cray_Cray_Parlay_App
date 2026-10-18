@@ -98,6 +98,25 @@ describe('progressFor', () => {
     expect(progressFor(r, live.game, live.players)).toMatchObject({ current: 0, status: 'live' });
     expect(progressFor(r, final.game, final.players).status).toBe('no_stats');
   });
+
+  it('a player ESPN lists Out with no line is inactive at the final, not no_stats', () => {
+    const payload = {
+      ...summary({ state: 'post', completed: true, detail: 'Final' }),
+      injuries: [{ team: { displayName: 'Los Angeles Rams' }, injuries: [
+        { athlete: { displayName: 'Cooper Kupp', position: { abbreviation: 'WR' } }, status: 'Out' },
+        { athlete: { displayName: 'Tutu Atwell', position: { abbreviation: 'WR' } }, status: 'Questionable' },
+      ] }],
+    };
+    const parsed = parseSummary(payload);
+    expect(parsed.inactives.has('cooper kupp')).toBe(true);
+    expect(parsed.inactives.has('tutu atwell')).toBe(false);
+    expect(progressFor(read({ player: 'Cooper Kupp' }), parsed.game, parsed.players, parsed.inactives)).toMatchObject({ current: 0, status: 'inactive', final: true });
+    // Questionable with no line is still only no_stats.
+    expect(progressFor(read({ player: 'Tutu Atwell' }), parsed.game, parsed.players, parsed.inactives).status).toBe('no_stats');
+    // While the game is on, an Out player is simply at zero, like any other.
+    const liveParsed = parseSummary({ ...summary(), injuries: payload.injuries });
+    expect(progressFor(read({ player: 'Cooper Kupp' }), liveParsed.game, liveParsed.players, liveParsed.inactives).status).toBe('live');
+  });
 });
 
 describe('liveProgress', () => {

@@ -438,7 +438,7 @@ function boxScoreGrade(read, players) {
  */
 async function runBoxScoreGrade({ fetchFn = fetch } = {}) {
   const started = Date.now();
-  const summary = { mode: 'boxscore', pending: 0, games: 0, games_final: 0, graded: 0, won: 0, lost: 0, push: 0, no_line: 0, errors: [] };
+  const summary = { mode: 'boxscore', pending: 0, games: 0, games_final: 0, graded: 0, won: 0, lost: 0, push: 0, voided: 0, no_line: 0, errors: [] };
   const now = Date.now();
   const { data: pending, error } = await supabase
     .from('prop_reads')
@@ -464,7 +464,16 @@ async function runBoxScoreGrade({ fetchFn = fetch } = {}) {
     const updates = [];
     for (const r of reads) {
       const g = boxScoreGrade(r, box.players);
-      if (!g) { summary.no_line++; continue; }
+      if (!g) {
+        // No stat line and ESPN lists the player Out: the book voids the
+        // prop, so settle it as void now instead of leaving it waiting
+        // for Tuesday (owner 2026-10-18, Judkins). A missing line on a
+        // player not listed Out stays pending for the nflverse pass.
+        if (liveStats.isInactive(box.inactives, r.player_name)) {
+          updates.push({ id: r.id, g: { outcome: 'void' }, cols: { actual_value: null, actual_outcome: 'void', v2_outcome: r.v2_side ? 'void' : null, graded_at: gradedAt, updated_at: gradedAt } });
+        } else summary.no_line++;
+        continue;
+      }
       updates.push({ id: r.id, g, cols: { actual_value: g.actual, actual_outcome: g.outcome, v2_outcome: g.v2Outcome, graded_at: gradedAt, updated_at: gradedAt } });
     }
     for (let i = 0; i < updates.length; i += 20) {
@@ -474,8 +483,8 @@ async function runBoxScoreGrade({ fetchFn = fetch } = {}) {
         supabase.from('prop_reads').update(u.cols).eq('id', u.id).eq('actual_outcome', 'pending')));
       results.forEach((res, j) => {
         if (res.error) { summary.errors.push(res.error.message); return; }
-        summary.graded++;
-        summary[updates[i + j].g.outcome]++;
+        const o = updates[i + j].g.outcome;
+        if (o === 'void') summary.voided++; else { summary.graded++; summary[o]++; }
       });
     }
   }

@@ -71,7 +71,8 @@ function GameSection({ g, defaultOpen, showOutcome }) {
   // hit count adds up to the props count (owner 2026-10-18: "it says
   // 14/17 but I know there were 20").
   const pushes = showOutcome ? reads.filter(p => p.outcome === 'push').length : 0
-  const waiting = showOutcome && g.state === 'final' ? n - graded.length - pushes : 0
+  const voids = showOutcome ? reads.filter(p => p.outcome === 'void').length : 0
+  const waiting = showOutcome && g.state === 'final' ? n - graded.length - pushes - voids : 0
   return (
     <section id={`props-game-${g.key}`} className="flex flex-col gap-2 scroll-mt-20" aria-label={`${g.away} at ${g.home}`}>
       <button
@@ -91,6 +92,7 @@ function GameSection({ g, defaultOpen, showOutcome }) {
             {skips.length > 0 && <>{' · '}{skips.length} {skips.length === 1 ? 'skip' : 'skips'}</>}
             {graded.length > 0 && <>{' · '}<span className="tabular-nums text-ink-200">{hits} of {graded.length} hit</span>{graded.some(p => p.unofficial) ? ', unofficial' : ''}</>}
             {pushes > 0 && <>{', '}{pushes} push</>}
+            {voids > 0 && <>{', '}{voids} void</>}
             {waiting > 0 && <>{', '}{waiting} waiting</>}
           </span>
         </span>
