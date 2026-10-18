@@ -3,7 +3,7 @@
  * Fetches current standings for all sports from ESPN public API
  * Populates standings table (via teams foreign key) for accurate W-L records
  *
- * Schedule: Every 6 hours
+ * Schedule: every 2 hours at minute 30 (cron sync-standings)
  * Endpoint: POST /cron/sync-standings
  */
 
@@ -43,11 +43,21 @@ function currentSeason(sport) {
   return new Date().getFullYear();
 }
 
-/** "12-4" or "12-4-1" to { wins, losses, ties }; anything else is null. */
-function parseOverallRecord(v) {
+/**
+ * "12-4" or "12-4-1" to { wins, losses, ties }, anything else is null.
+ * ESPN's soccer summary reads wins, draws, losses ("3-2-4" is 3 wins, 2
+ * draws, 4 losses), so with soccer set the middle number is the draws.
+ * Read as W-L-T it swapped every club's draws and losses (2026-10-18:
+ * Columbus Crew stored 15 draws and 5 losses for 5 draws and 15 losses).
+ */
+function parseOverallRecord(v, { soccer = false } = {}) {
   if (v == null) return null;
   const m = String(v).trim().match(/^(\d+)-(\d+)(?:-(\d+))?$/);
   if (!m) return null;
+  if (soccer) {
+    if (m[3] == null) return null;
+    return { wins: Number(m[1]), losses: Number(m[3]), ties: Number(m[2]) };
+  }
   return { wins: Number(m[1]), losses: Number(m[2]), ties: m[3] != null ? Number(m[3]) : null };
 }
 
@@ -109,7 +119,7 @@ async function fetchESPNStandings(sport, config, seasonOverride = null) {
       // and the season record under an "overall" summary (2026-09-12: 123
       // of 124 FBS teams stored 0-0 two weeks into the season). When a
       // summary of the form W-L or W-L-T is present it is the record.
-      const overall = parseOverallRecord(stats.overall ?? stats.total ?? stats.Overall);
+      const overall = parseOverallRecord(stats.overall ?? stats.total ?? stats.Overall, { soccer: SOCCER_STORED.has(config.stored || sport) });
       teams.push({
         espn_id: team.id,
         name: team.displayName,

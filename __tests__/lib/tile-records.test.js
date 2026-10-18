@@ -104,6 +104,14 @@ describe('standings parser: the overall summary beats the conference columns', (
     expect(parseOverallRecord(undefined)).toBeNull();
     expect(parseOverallRecord(0.5)).toBeNull();
   });
+
+  test('parseOverallRecord reads the soccer summary as wins, draws, losses', () => {
+    // ESPN La Liga 2026-10-18: Osasuna overall 3-2-4 with wins 3, ties 2, losses 4.
+    expect(parseOverallRecord('3-2-4', { soccer: true })).toEqual({ wins: 3, losses: 4, ties: 2 });
+    expect(parseOverallRecord('9-5-15', { soccer: true })).toEqual({ wins: 9, losses: 15, ties: 5 });
+    expect(parseOverallRecord('2-0', { soccer: true })).toBeNull();
+    expect(parseOverallRecord('3-2-4')).toEqual({ wins: 3, losses: 2, ties: 4 });
+  });
 });
 
 describe('tile records: the scoreboard source starts at the regular season floor', () => {
