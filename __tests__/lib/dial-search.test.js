@@ -46,8 +46,15 @@ describe('searchVariants', () => {
   });
   test('dials the replay cannot see are never searched', () => {
     const names = Object.keys(byName).join(' ');
-    for (const d of ['injury_weight', 'pitcher_anchor_damp', 'seed_weight', 'leg_prob_floor', 'min_gate_pp', 'publish_ml']) {
+    for (const d of ['injury_depth_unknown_weight', 'pitcher_anchor_damp', 'seed_weight', 'leg_prob_floor', 'min_gate_pp', 'publish_ml']) {
       expect(names).not.toContain(d);
+    }
+  });
+  test('injury_weight is searched for NFL only, a 25 percent step', () => {
+    expect(byName.injury_weight_dn.dials).toEqual({ injury_weight: 0.75 });
+    expect(byName.injury_weight_up.dials).toEqual({ injury_weight: 1.25 });
+    for (const sport of ['MLB', 'NHL', 'NCAAF', 'NBA']) {
+      expect(ds.searchVariants(sport, ds.boardFor(sport, [])).some(v => v.name.startsWith('injury_'))).toBe(false);
     }
   });
   test('MLB skips the rest dials', () => {
