@@ -24,6 +24,21 @@ describe('gameFromAnalysis', () => {
   });
 });
 
+describe('stored injury impact (NFL, build_queue 118)', () => {
+  test('reads the selected column or the factor object', () => {
+    expect(rf.storedInjuryImpact({ stored_injury_impact: '-0.042' })).toBe(-0.042);
+    expect(rf.storedInjuryImpact({ edge_factors: { injuryImpact: 0.03 } })).toBe(0.03);
+    expect(rf.storedInjuryImpact({ edge_factors: {} })).toBeNull();
+    expect(rf.storedInjuryImpact(null)).toBeNull();
+  });
+  test('NFL games carry it, zero when missing, other sports never', () => {
+    const nfl = { ...row, sport: 'NFL', home_team: 'Chicago Bears', away_team: 'Detroit Lions' };
+    expect(rf.gameFromAnalysis({ ...nfl, stored_injury_impact: '-0.05' }).stored_injury).toBe(-0.05);
+    expect(rf.gameFromAnalysis(nfl).stored_injury).toBe(0);
+    expect(rf.gameFromAnalysis({ ...row, stored_injury_impact: '-0.05' }).stored_injury).toBeNull();
+  });
+});
+
 describe('gradeSide and units', () => {
   const g = rf.gameFromAnalysis(row);
   test('moneyline, spread, total', () => {
