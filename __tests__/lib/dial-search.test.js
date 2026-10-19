@@ -44,9 +44,19 @@ describe('searchVariants', () => {
     expect(byName.home_margin_shift_dn.dials).toEqual({ home_margin_shift: -0.25 });
     expect(byName.home_margin_shift_up.dials).toEqual({ home_margin_shift: 0.25 });
   });
+  test('NFL searches injury_weight one 25 percent step each way (build_queue 118)', () => {
+    expect(byName.injury_weight_dn.dials).toEqual({ injury_weight: 0.75 });
+    expect(byName.injury_weight_up.dials).toEqual({ injury_weight: 1.25 });
+  });
+  test('injury_weight is NFL only', () => {
+    for (const sport of ['MLB', 'NHL', 'NCAAF']) {
+      const vs2 = ds.searchVariants(sport, ds.boardFor(sport, []));
+      expect(vs2.some(v => v.name.startsWith('injury_weight'))).toBe(false);
+    }
+  });
   test('dials the replay cannot see are never searched', () => {
     const names = Object.keys(byName).join(' ');
-    for (const d of ['injury_weight', 'pitcher_anchor_damp', 'seed_weight', 'leg_prob_floor', 'min_gate_pp', 'publish_ml']) {
+    for (const d of ['injury_depth_unknown_weight', 'pitcher_anchor_damp', 'seed_weight', 'leg_prob_floor', 'min_gate_pp', 'publish_ml']) {
       expect(names).not.toContain(d);
     }
   });

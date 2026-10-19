@@ -24,6 +24,17 @@ describe('gameFromAnalysis', () => {
   });
 });
 
+describe('storedInjuryImpact (build_queue 118)', () => {
+  const nfl = rf.gameFromAnalysis({ ...row, sport: 'NFL', home_team: 'Chicago Bears', away_team: 'Detroit Lions', injury_impact: -0.021 });
+  test('the home team carries the stored home minus away impact, the away team zero', () => {
+    expect(rf.storedInjuryImpact(nfl, 'Chicago Bears')).toBe(-0.021);
+    expect(rf.storedInjuryImpact(nfl, 'Detroit Lions')).toBe(0);
+  });
+  test('no stored impact reads zero, never the live feed', () => {
+    expect(rf.storedInjuryImpact(rf.gameFromAnalysis(row), 'Boston Red Sox')).toBe(0);
+  });
+});
+
 describe('gradeSide and units', () => {
   const g = rf.gameFromAnalysis(row);
   test('moneyline, spread, total', () => {
