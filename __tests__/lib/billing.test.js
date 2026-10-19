@@ -195,6 +195,14 @@ describe('paywall gates', () => {
     expect(out.live[0].side).toBe('over');
   });
 
+  test('longshots not yet started are locked, started ones stay open', () => {
+    const ls = (o) => ({ player: 'L', marketLabel: 'anytime TD', market: 'player_anytime_td', side: 'over', line: 0.5, price: 700, edgePp: 8, ...o });
+    const out = paywall.gateProps({ upcoming: [], longshots: [ls(), ls({ started: true, player: 'S' })] });
+    expect(out.longshots[0]).toMatchObject({ locked: true, player: 'L' });
+    expect(out.longshots[0]).not.toHaveProperty('price');
+    expect(out.longshots[1]).toMatchObject({ started: true, price: 700 });
+  });
+
   test('board tile for a Play loses its side fields, a Lean keeps them', () => {
     const play = { home_team: 'H', away_team: 'A', recommended_pick: 'H -3', edges: {}, calc_home_prob: 0.6, analysis_snippet: 'x', spread: -3, published_pick: { pick: 'H -3', odds: -110, edge_pp: 6, tier: 'Play', bet_type: 'Spread' }, published_alts: [{ pick: 'Over', edge_pp: 5, tier: 'Play', bet_type: 'Total' }, { pick: 'H ML', edge_pp: 2, tier: 'Lean' }] };
     const lean = { home_team: 'H2', recommended_pick: 'H2 ML', published_pick: { pick: 'H2 ML', edge_pp: 3, tier: 'Lean' } };

@@ -39,6 +39,17 @@ export function ShadowBadge() {
   )
 }
 
+// A Longshot (owner 2026-10-18): an anytime TD yes we price above the
+// book, published with its why but never a Play. The badge says so, so
+// a plus money card never reads as a pick.
+export function LongshotBadge() {
+  return (
+    <span className="text-[11px] font-medium text-amber-300/90 border border-amber-300/40 rounded-full px-2.5 py-0.5 flex-shrink-0">
+      Longshot
+    </span>
+  )
+}
+
 const OUTCOME = {
   won: { label: 'Hit', cls: 'text-signal-pos' },
   lost: { label: 'Missed', cls: 'text-signal-neg' },
@@ -418,7 +429,7 @@ function OpenPropCard({ p, showOutcome }) {
           ? <StartedChip p={p} live={live} />
           : o
             ? <span className={`text-xs font-semibold flex-shrink-0 ${o.cls}`}>{o.label}{p.actual != null ? ` · ${p.actual}` : ''}{p.unofficial ? <span className="font-normal text-ink-400">, unofficial</span> : null}</span>
-            : <ShadowBadge />}
+            : p.longshot ? <LongshotBadge /> : <ShadowBadge />}
       </div>
 
       <div className="flex flex-col gap-0.5">
