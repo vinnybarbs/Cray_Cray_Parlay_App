@@ -1,6 +1,7 @@
 const {
   approvedRecordSource,
   soccerOrderMixup,
+  recordsUnverified,
   webSearchTool,
   RECORD_SOURCES,
   BANNED_SOURCES,
@@ -71,5 +72,19 @@ describe('soccerOrderMixup', () => {
     expect(soccerOrderMixup('2-2-2', '2-2-2')).toBe(false);
     expect(soccerOrderMixup('3-2', '3-2-1')).toBe(false);
     expect(soccerOrderMixup(null, '3-1-2')).toBe(false);
+  });
+});
+
+// Ops check 2026-10-20: three sweeps handed the verifier teams, it checked
+// none, and every run logged success.
+describe('recordsUnverified', () => {
+  test('teams sent and none checked is a gap', () => {
+    expect(recordsUnverified(16, 0)).toBe(true);
+    expect(recordsUnverified(16, null)).toBe(true);
+  });
+
+  test('a check that saw any record, or had no teams to check, is not', () => {
+    expect(recordsUnverified(16, 6)).toBe(false);
+    expect(recordsUnverified(0, 0)).toBe(false);
   });
 });
