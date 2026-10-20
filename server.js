@@ -450,6 +450,9 @@ app.post('/cron/discord-receipts', discordReceipts);
 // channel (owner 2026-10-09).
 const discordExecBrief = require('./api/cron/discord-exec-brief');
 app.post('/cron/discord-exec-brief', discordExecBrief);
+// Every directive change, before and after, to the model channel (directive 29).
+const discordDirectiveChanges = require('./api/cron/discord-directive-changes');
+app.post('/cron/discord-directive-changes', discordDirectiveChanges);
 const { discordModelFeed, discordDialBoard } = require('./api/cron/discord-model-feed');
 app.post('/cron/discord-model-feed', discordModelFeed);
 app.post('/cron/discord-dial-board', discordDialBoard);
@@ -622,8 +625,15 @@ app.listen(PORT, () => {
   // tell which build is serving from cron_job_logs alone; the skills
   // table sync alone proved a false witness on 2026-09-10 when a build
   // served for 90 minutes with its start sync never written.
-  recordServerStart().then(() => syncSkills({ source: 'server-start', retries: 3 })).catch(err =>
-    logger.error('Server start bookkeeping failed', { error: err.message }));
+  // Then the downstream sync's inventory (directive 29): the deployed
+  // repo files and routes, and the drift findings against the briefs,
+  // skills and directives that were just synced.
+  recordServerStart().then(() => syncSkills({ source: 'server-start', retries: 3 }))
+    .then(() => {
+      const { supabase } = require('./lib/middleware/supabaseAuth.js');
+      return require('./lib/services/system-inventory').recordCodeInventory(supabase, { app });
+    })
+    .catch(err => logger.error('Server start bookkeeping failed', { error: err.message }));
   // A deploy inside a data integrity sweep kills it (ops check 2026-10-16).
   // Once a run on the old container has had time to finish, close any dead
   // run with a failed row and resume it once. lib/services/sweep-recovery.js

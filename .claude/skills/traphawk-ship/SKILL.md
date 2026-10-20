@@ -37,9 +37,10 @@ Every change moves every surface that sees it, BEFORE merge, and the PR body car
 | A table, view or function | traphawk-data-model; every skill query that reads it; the tripwire or readiness function that should see it; the migration file in supabase/migrations AND applied to production |
 | A cron job or routine | cron.job (secret stays there, never in the repo); traphawk-ops-check silent witnesses; the migration file |
 | Anything user facing | the digest API payload, the DailyDigest render, the shadow and publish flags, the Edge Anatomy note |
+| A directive | edit it through a migration or downstream_update_directive() so directive_history logs it and Discord shows it. Never a bare UPDATE without app.change_reason |
 | Anything at all | agent_reports row; the build_queue item opened or closed |
 
-The mechanical half runs without you: `select * from public.doc_drift_findings()` reports an undocumented dial, a dead enforcement function or a broken directive check every morning (directive 22), and `__tests__/lib/drift.test.js` fails the build when a server constant and its client or SQL mirror disagree (shadow list, season floors, tier ladder, rail defaults) or a dial default is named in no skill.
+Whatever you miss, the downstream sync (directive 29, agents/downstream-sync.md, run by the exec assistant every morning) catches from system_inventory and the merged PRs and corrects in briefs, skills and directives the next day, but the row above is still yours before merge. The mechanical half runs without you: `select * from public.doc_drift_findings()` reports an undocumented dial, a dead enforcement function or a broken directive check every morning (directive 22), and `__tests__/lib/drift.test.js` fails the build when a server constant and its client or SQL mirror disagree (shadow list, season floors, tier ladder, rail defaults) or a dial default is named in no skill.
 
 ## Branch and PR flow
 

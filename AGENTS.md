@@ -58,7 +58,12 @@ reads them before acting and writes them after:
 
 - `directives`: the standing owner decisions with enforcement and a
   `check_sql` the daily ops check runs. Never silently contradict one.
-  Propose an amendment instead.
+  Propose an amendment instead. Every edit is logged before and after
+  in `directive_history` and posted to Discord. The downstream sync
+  (directive 29, agents/downstream-sync.md, run by the exec assistant
+  each morning) keeps enforcement, check_sql and the facts in step
+  with downstream changes on its own, and never loosens, expires or
+  adds one.
 - `sport_dials` plus `model_weight_changes`: every tunable weight, per
   sport and market. A weight moves here with an evidence row, never as
   a constant edit. Moves follow the three test counterfactual and the
@@ -72,7 +77,9 @@ reads them before acting and writes them after:
 Also: `rule_gates`, `rule_gate_log` and `rule_gate_scorecard` (the
 lookback's selection rules, shadow until promoted, judged per verdict
 against the ledger), `bucket_targets` (the per tier floors), `skills`
-(the synced skill text), `mv_public_record` (the only source of any public record
+(the synced skill text), `system_inventory` and `downstream_drift_log`
+(what exists downstream and where a doc no longer matches it, directive
+29), `mv_public_record` (the only source of any public record
 number), `pick_clv_all` and `closing_lines` (closing line value),
 `shadow_reads_graded` and `shadow_market_readiness()` (the shadow
 ledger every muted market is judged on).

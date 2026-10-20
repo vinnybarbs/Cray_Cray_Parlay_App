@@ -54,6 +54,30 @@ A routine whose brief row is missing, or whose Supabase tools are
 absent, stops and says so loudly instead of guessing. That line is in
 every prompt and every brief.
 
+## The downstream sync (directive 29)
+
+Owner 2026-10-20: "have an automated daily check and be literally
+updating the agents directive directives if something downstream
+changes". agents/downstream-sync.md is not a routine of its own. The
+exec assistant runs it as step 3 every morning, in its checkout, so its
+fixes ride the day's pull request. The mechanical half runs without
+any session: refresh-system-inventory (pg_cron, 13:30 UTC daily, SQL
+only) and every server start record what exists in system_inventory
+(cron jobs, tables, functions, dials, repo files, routes) and keep
+downstream_drift_log current with every place a brief, a skill or a
+directive no longer matches. The sync reads that log, the merged pull
+requests and the production changes since its last run, fixes the
+briefs and skills by pull request and edits the directives in place
+through downstream_update_directive(). Every directive edit lands in
+directive_history with its before and after, the hourly
+discord-directive-changes job posts it to the Discord model channel
+with its undo call, and revert_directive_change(id) undoes it. The sync
+never loosens, expires or adds a directive. Directive 29's check_sql
+flags any finding left open 36 hours.
+
+The deploy sync also removes a skills row whose repo file is gone, so
+a deleted brief can never be loaded again.
+
 ## The schedule
 
 | Routine | Trigger id | Brief | Cron | Local (MDT) | Model | Writes |
@@ -123,8 +147,9 @@ the run history).
 
 - Facts about the stack (model names, tiers, file paths, table and
   column names, cron names and times, dial names, trigger ids, feature
-  claims) may be corrected by anyone, the exec assistant's fact sweep
-  included, with the evidence in the pull request.
+  claims) may be corrected by anyone, the downstream sync included,
+  with the evidence in the pull request. The sync does it every morning
+  without asking (directive 29).
 - Mission, schedule, deliverable format, writing rules and safety rules
   change only by a deliberate commit from the owner. A routine that
   finds one of those wrong says so in its report and leaves it alone.

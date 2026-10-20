@@ -48,7 +48,7 @@ describe('readSkills', () => {
     for (const expected of [
       'agents/README.md', 'agents/daily-ops-check.md', 'agents/exec-assistant.md',
       'agents/weekly-calibration-review.md', 'agents/monthly-cost-audit.md',
-      'agents/football-desk.md', 'agents/desks/football.md',
+      'agents/football-desk.md', 'agents/desks/football.md', 'agents/downstream-sync.md',
     ]) {
       expect(names).toContain(expected);
     }
