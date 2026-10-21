@@ -19,6 +19,24 @@ function unitProfit(oddsStr, outcome) {
   return price > 0 ? price / 100 : 100 / Math.abs(price);
 }
 
+// A void is not a push (build_queue 117: the postponed 18401 and 18402
+// read as pushes), so it gets its own count.
+function summarizeBoard(picks) {
+  const summary = { total: picks.length, won: 0, lost: 0, push: 0, void: 0, pending: 0, units: 0 };
+  for (const p of picks) {
+    if (p.actual_outcome === 'won') summary.won++;
+    else if (p.actual_outcome === 'lost') summary.lost++;
+    else if (p.actual_outcome === 'push') summary.push++;
+    else if (p.actual_outcome === 'void') summary.void++;
+    else summary.pending++;
+    summary.units += unitProfit(p.odds, p.actual_outcome);
+  }
+  summary.units = Math.round(summary.units * 100) / 100;
+  const settled = summary.won + summary.lost;
+  summary.winRate = settled > 0 ? Math.round((summary.won / settled) * 1000) / 10 : null;
+  return summary;
+}
+
 module.exports = async function boardHistory(req, res) {
   try {
     // Default: the most recent digest day that actually published picks
@@ -47,7 +65,7 @@ module.exports = async function boardHistory(req, res) {
     // belong on the same day's board and in its record.
     const { data, error } = await supabase
       .from('ai_suggestions')
-      .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, tier_history, actual_outcome, reasoning, created_at')
+      .select('sport, home_team, away_team, game_date, bet_type, pick, odds, edge_pp, tier, tier_history, actual_outcome, voided_reason, reasoning, created_at')
       .in('session_id', [
         `auto_digest_${date}`,
         `auto_digest_alt_spread_${date}`,
@@ -66,17 +84,7 @@ module.exports = async function boardHistory(req, res) {
     const picks = nonSoccer.filter(p => p.tier !== 'Trap' && p.tier !== 'Skip');
     const traps = nonSoccer.filter(p => p.tier === 'Trap');
 
-    const summary = { total: picks.length, won: 0, lost: 0, push: 0, pending: 0, units: 0 };
-    for (const p of picks) {
-      if (p.actual_outcome === 'won') summary.won++;
-      else if (p.actual_outcome === 'lost') summary.lost++;
-      else if (p.actual_outcome === 'push' || p.actual_outcome === 'void') summary.push++;
-      else summary.pending++;
-      summary.units += unitProfit(p.odds, p.actual_outcome);
-    }
-    summary.units = Math.round(summary.units * 100) / 100;
-    const settled = summary.won + summary.lost;
-    summary.winRate = settled > 0 ? Math.round((summary.won / settled) * 1000) / 10 : null;
+    const summary = summarizeBoard(picks);
 
     res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({ date, summary, picks, traps });
@@ -84,3 +92,5 @@ module.exports = async function boardHistory(req, res) {
     res.status(500).json({ error: err.message });
   }
 };
+
+module.exports.summarizeBoard = summarizeBoard;

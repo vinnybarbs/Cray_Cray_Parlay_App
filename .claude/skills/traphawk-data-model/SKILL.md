@@ -70,6 +70,8 @@ GRANT SELECT ON public.mv_public_record TO anon, authenticated, service_role;
 
 Skipping this silently zeroes every public stat on the site.
 
+Since 2026-10-21 (PR 277, migration 20261021103000_rls_lockdown) every public table has RLS on. anon and authenticated hold no grants except SELECT on mv_public_record and the owner scoped user tables (tracked_bets, profiles, parlays, parlay_legs, subscriptions), views are security_invoker, ai_suggestions has no public read policy, and a new table starts closed to anon. The server and the crons use the service role and are unaffected. A table the browser reads directly needs an explicit grant plus RLS policies in its own migration.
+
 ## Other tables you will need
 
 - `system_inventory` (since 2026-10-20, directive 29): kind (cron_job, table, function, dial from the database, file and route from the server at every start), name, detail jsonb (a cron's schedule and active flag, a table's columns hash), first_seen, last_seen, changed_at, removed_at. Written by `record_inventory_kind`, `record_code_inventory(kind, names)` (server, lib/services/system-inventory.js) and `refresh_system_inventory()` (cron refresh-system-inventory 13:30 UTC). `downstream_drift_findings()` returns (drift, subject, detail) for removed_still_named, added_undocumented, changed_recheck, dead_path, orphan_skill_row and directive_without_check, and `downstream_drift_log` keeps each with first_seen, resolved_at and acknowledged_at plus acknowledged_note.
