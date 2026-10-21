@@ -2,6 +2,8 @@ const {
   approvedRecordSource,
   soccerOrderMixup,
   recordsUnverified,
+  checkableRecord,
+  recordCheckGames,
   webSearchTool,
   RECORD_SOURCES,
   BANNED_SOURCES,
@@ -86,5 +88,61 @@ describe('recordsUnverified', () => {
   test('a check that saw any record, or had no teams to check, is not', () => {
     expect(recordsUnverified(16, 6)).toBe(false);
     expect(recordsUnverified(0, 0)).toBe(false);
+  });
+});
+
+// Build_queue 119: 16 teams over six leagues ran the verifier out of
+// searches, and null or preseason 0-0 records burned the rest.
+describe('checkableRecord', () => {
+  test('a record with any game played is checkable', () => {
+    expect(checkableRecord('3-2')).toBe(true);
+    expect(checkableRecord('0-1')).toBe(true);
+    expect(checkableRecord('2-1-0')).toBe(true);
+  });
+
+  test('null, empty, 0-0 and junk are not', () => {
+    expect(checkableRecord(null)).toBe(false);
+    expect(checkableRecord('')).toBe(false);
+    expect(checkableRecord('0-0')).toBe(false);
+    expect(checkableRecord('0-0-0')).toBe(false);
+    expect(checkableRecord('form 3 of 5')).toBe(false);
+  });
+});
+
+describe('recordCheckGames', () => {
+  const g = (sport, n, home = '2-1', away = '1-2') => ({
+    sport, home_team: `${sport} home ${n}`, away_team: `${sport} away ${n}`, home_record: home, away_record: away,
+  });
+
+  test('skips and names games with a record a page cannot confirm', () => {
+    const { games, skipped } = recordCheckGames([g('NBA', 1, '0-0', '0-0'), g('La Liga', 1, null, '3-1-2'), g('NHL', 1)]);
+    expect(games.map((x) => x.sport)).toEqual(['NHL']);
+    expect(skipped).toEqual([
+      'NBA home 1: stored 0-0, nothing to check',
+      'NBA away 1: stored 0-0, nothing to check',
+      'La Liga home 1: no stored record',
+    ]);
+  });
+
+  test('sends at most 8 games from at most 4 leagues, biggest leagues first', () => {
+    const board = [
+      ...[1, 2, 3].map((n) => g('NHL', n)),
+      ...[1, 2].map((n) => g('NCAAF', n)),
+      g('MLS', 1), g('EPL', 1), g('Ligue 1', 1), g('Champions League', 1),
+    ];
+    const { games } = recordCheckGames(board, 0);
+    const leagues = [...new Set(games.map((x) => x.sport))];
+    expect(games.length).toBeLessThanOrEqual(8);
+    expect(leagues.length).toBeLessThanOrEqual(4);
+    expect(leagues.slice(0, 2)).toEqual(['NHL', 'NCAAF']);
+    expect(games.filter((x) => x.sport === 'NHL')).toHaveLength(3);
+  });
+
+  test('the seed rotates which league leads', () => {
+    const board = [g('NHL', 1), g('NCAAF', 1), g('MLS', 1), g('EPL', 1), g('Ligue 1', 1)];
+    const a = recordCheckGames(board, 0).games.map((x) => x.sport);
+    const b = recordCheckGames(board, 4).games.map((x) => x.sport);
+    expect(a).not.toEqual(b);
+    expect(b).toHaveLength(4);
   });
 });

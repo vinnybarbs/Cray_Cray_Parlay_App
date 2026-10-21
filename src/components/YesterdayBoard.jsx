@@ -9,15 +9,24 @@ import { fmtGameDateTime } from '../lib/gameTime'
 // machine published yesterday and how every pick actually settled. Same
 // receipts posture as the House Ledger, scoped to one day.
 
-function OutcomeChip({ outcome }) {
+// "Postponed" from a stored voided_reason, cut to its first clause so the
+// chip stays short. The full reason shows when the row opens.
+export function voidLabel(reason) {
+  const head = String(reason || '').split(/[:(,]/)[0].trim()
+  if (!head) return 'Void'
+  const short = head.length > 24 ? `${head.slice(0, 24).trim()}...` : head
+  return `Void, ${short.toLowerCase()}`
+}
+
+function OutcomeChip({ outcome, voidedReason }) {
   const map = {
     won:  { label: 'Won',  cls: 'bg-signal-pos-dim/40 text-signal-pos' },
     lost: { label: 'Lost', cls: 'bg-signal-neg-dim/40 text-signal-neg' },
     push: { label: 'Push', cls: 'bg-ink-850 text-ink-300' },
-    void: { label: 'Void', cls: 'bg-ink-850 text-ink-400' },
+    void: { label: voidLabel(voidedReason), cls: 'bg-ink-850 text-ink-400' },
   }
   const m = map[outcome] || { label: 'Open', cls: 'bg-ink-850 text-ink-200' }
-  return <span className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
+  return <span title={outcome === 'void' && voidedReason ? voidedReason : undefined} className={`px-2 py-0.5 rounded-sharp tabular-nums text-[10px] font-bold tracking-wider flex-shrink-0 ${m.cls}`}>{m.label}</span>
 }
 
 export default function YesterdayBoard({ alwaysOpen = false }) {
@@ -81,7 +90,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
             <span className="text-ink-200">{dateLabel}</span>
             {s && s.total > 0 && (
               <>
-                <span>{s.won}-{s.lost}{s.push > 0 ? `-${s.push}` : ''}</span>
+                <span>{s.won}-{s.lost}{s.push > 0 ? `-${s.push}` : ''}{s.void > 0 ? ` · ${s.void} void` : ''}</span>
                 {s.winRate != null && <span className={s.winRate >= 55 ? 'text-signal-pos' : s.winRate < 50 ? 'text-signal-neg' : ''}>{s.winRate}%</span>}
                 <span title="Profit measured in units, staking 1 unit per pick at the published odds" className={`tabular-nums cursor-help ${s.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{s.units >= 0 ? '+' : ''}{s.units.toFixed(2)}u at 1u a pick</span>
               </>
@@ -96,7 +105,7 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
               {data.traps.map((p, i) => {
                 const fade = p.actual_outcome === 'lost' ? { label: 'Trap held', cls: 'bg-signal-pos-dim/40 text-signal-pos' }
                   : p.actual_outcome === 'won' ? { label: 'Bait came in', cls: 'bg-signal-neg-dim/40 text-signal-neg' }
-                  : { label: p.actual_outcome === 'push' || p.actual_outcome === 'void' ? 'Push' : 'Open', cls: 'bg-ink-850 text-ink-300' }
+                  : { label: p.actual_outcome === 'push' ? 'Push' : p.actual_outcome === 'void' ? voidLabel(p.voided_reason) : 'Open', cls: 'bg-ink-850 text-ink-300' }
                 return (
                   <div key={`trap-${i}`} className="flex items-center gap-3 px-4 py-2.5 border-t border-ink-800">
                     <span className="flex-shrink-0 w-20 text-center px-1.5 py-0.5 rounded-sharp text-xs font-bold text-signal-neg bg-signal-neg-dim/30">
@@ -141,13 +150,16 @@ export default function YesterdayBoard({ alwaysOpen = false }) {
                       </div>
                       <div className="text-xs text-ink-500 truncate">{p.sport} · {p.away_team} at {p.home_team}</div>
                     </div>
-                    <OutcomeChip outcome={p.actual_outcome} />
+                    <OutcomeChip outcome={p.actual_outcome} voidedReason={p.voided_reason} />
                   </button>
                   {isOpen && (
                     <div className="px-4 pb-3 pt-1 bg-ink-850/40 border-t border-ink-800/50">
                       {p.reasoning
                         ? <p className="text-xs text-ink-200 leading-relaxed max-w-2xl">{p.reasoning}</p>
                         : <p className="text-xs text-ink-500">No written analysis was stored with this pick.</p>}
+                      {p.actual_outcome === 'void' && p.voided_reason && (
+                        <p className="mt-2 text-xs text-ink-400">Voided: {p.voided_reason.replace(/\.\s*$/, '')}. A void stakes nothing and stays out of the record.</p>
+                      )}
                       <p className="mt-2 text-xs text-ink-500">
                         {tier.label}{tier.subtitle && tier.subtitle.toLowerCase() !== tier.label.toLowerCase() ? ` · ${tier.subtitle}` : ''} · published {fmtPublished(p.created_at)}, before the game started
                       </p>
