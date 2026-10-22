@@ -142,8 +142,63 @@ describe('slim fields for the card', () => {
   it('carries both prices and short team codes', () => {
     const [p] = shapeProps([row({ consensus_over_price: 111, consensus_under_price: -146 })], [], []).upcoming;
     expect(p).toMatchObject({ overPrice: 111, underPrice: -146, awayAbbr: 'LA', homeAbbr: 'BUF' });
-    const [td] = shapeProps([row({ market: 'player_anytime_td', consensus_over_price: 662, consensus_under_price: null })], [], []).upcoming;
+    const [td] = shapeProps([row({ market: 'player_anytime_td', consensus_over_price: 662, consensus_under_price: null })], [], []).longshots;
     expect(td.underPrice).toBeNull();
+    expect(td.longshot).toBe(true);
+    expect(p.longshot).toBe(false);
+  });
+});
+
+// Owner 2026-10-18: "the crazy longshot props can have % and research
+// and be published but don't have to be a play". Anytime TD yes reads
+// are Longshots: their own lists and their own record line, never in the
+// Plays, the Recent results or the shadow record.
+describe('longshots', () => {
+  const { isLongshot, playable } = require('../../api/props');
+  const td = (o) => row({ market: 'player_anytime_td', line: 0.5, consensus_over_price: 700, consensus_under_price: null, v2_edge_pp: 8, ...o });
+
+  it('tells a Longshot from a Play from a Skip', () => {
+    expect(isLongshot(td())).toBe(true);
+    expect(playable(td())).toBe(false);
+    expect(isLongshot(td({ v2_edge_pp: 2 }))).toBe(false);
+    expect(isLongshot(td({ v2_side: 'under' }))).toBe(false);
+    expect(isLongshot(row())).toBe(false);
+    expect(playable(row())).toBe(true);
+  });
+
+  it('keeps TD reads out of upcoming, live and recent, in their own lists', () => {
+    const up = [td({ player_name: 'Up TD' }), row({ player_name: 'Up play' })];
+    const live = [td({ player_name: 'Live TD' }), row({ player_name: 'Live play' })];
+    const recent = [td({ player_name: 'Done TD', v2_outcome: 'won', actual_value: 1 }), row({ player_name: 'Done play', v2_outcome: 'lost', actual_value: 2 })];
+    const out = shapeProps(up, recent, [], live);
+    expect(out.upcoming.map(p => p.player)).toEqual(['Up play']);
+    expect(out.live.map(p => p.player)).toEqual(['Live play']);
+    expect(out.recent.map(p => p.player)).toEqual(['Done play']);
+    expect(out.longshots.map(p => [p.player, !!p.started])).toEqual([['Up TD', false], ['Live TD', true]]);
+    expect(out.longshotResults.map(p => [p.player, p.outcome, p.actual])).toEqual([['Done TD', 'won', 1]]);
+    expect(out.skips).toEqual([]);
+  });
+
+  it('records longshots on their own line, out of the total and by market', () => {
+    const graded = [
+      td({ v2_outcome: 'won' }),
+      td({ v2_outcome: 'lost', consensus_over_price: 900 }),
+      td({ v2_outcome: 'lost', consensus_over_price: 800 }),
+      row({ v2_outcome: 'won', consensus_over_price: 120 }),
+      row({ v2_outcome: 'lost' }),
+    ];
+    const out = shapeProps([], [], graded);
+    expect(out.record.total).toEqual({ won: 1, lost: 1, units: 0.2 });
+    expect(out.record.byMarket.map(m => m.market)).toEqual(['player_receptions']);
+    expect(out.record.longshots).toEqual({ won: 1, lost: 2, units: 5, avgPrice: 800, since: '2026-10-12' });
+  });
+
+  it('sends an unofficial TD result to the longshot results', () => {
+    const unofficial = [{ ...shapeProps([td({ commence_time: '2099-01-01T00:00:00Z' })], [], []).longshots[0],
+      commence_time: '2026-10-16T00:15:00+00:00', outcome: 'won', actual: 1, unofficial: true }];
+    const out = shapeProps([], [], [], [], unofficial);
+    expect(out.recent).toEqual([]);
+    expect(out.longshotResults.map(p => [p.outcome, !!p.unofficial])).toEqual([['won', true]]);
   });
 });
 
@@ -160,7 +215,7 @@ describe('unofficial results before the official grade', () => {
       row({ commence_time: '2026-10-16T03:00:00+00:00', player_name: 'Still live' }),
       row({ commence_time: '2026-10-16T00:15:00+00:00', v2_edge_pp: 2, player_name: 'Thin' }),
     ];
-    expect(awaitingGrade(rows, liveFrom).map(p => p.player)).toEqual(['Puka Nacua']);
+    expect(awaitingGrade(rows, liveFrom).map(p => [p.player, !!p.skip])).toEqual([['Puka Nacua', false], ['Thin', true]]);
   });
 
   it('marks final box score results unofficial and leaves the rest out', () => {
@@ -179,7 +234,40 @@ describe('unofficial results before the official grade', () => {
     expect(out.map(p => [p.player, p.outcome, p.actual, p.unofficial])).toEqual([
       ['Puka Nacua', 'won', 7, true],
       ['Miss', 'lost', 3, true],
+      ['No stats', 'no_stats', 0, true],
     ]);
+  });
+
+  // Owner 2026-10-18: a game that just ended shows in Recent results
+  // right away, skips included, not 8 hours after kickoff.
+  it('takes a game that just ended, skips and all, into recent', () => {
+    const now = '2026-10-18T17:05:00Z';
+    const kick = '2026-10-18T13:30:00Z';
+    const reads = awaitingGrade([
+      row({ commence_time: kick }),
+      row({ commence_time: kick, v2_edge_pp: 1.5, player_name: 'Lean' }),
+    ], now);
+    const progress = { reads: {
+      [keyFor(reads[0])]: { current: 7, status: 'hit', final: true },
+      [keyFor(reads[1])]: { current: 2, status: 'miss', final: true },
+    } };
+    const official = [row({ commence_time: kick, v2_outcome: 'won', actual_value: 4, player_name: 'Graded' }),
+      row({ commence_time: kick, v2_outcome: 'lost', v2_edge_pp: 2, actual_value: 1, player_name: 'Graded skip' })];
+    const out = shapeProps([], official, [], [], unofficialResults(reads, progress));
+    expect(out.recent.map(p => [p.player, p.outcome, !!p.skip, !!p.unofficial])).toEqual([
+      ['Graded', 'won', false, false],
+      ['Puka Nacua', 'won', false, true],
+      ['Graded skip', 'lost', true, false],
+      ['Lean', 'lost', true, true],
+    ]);
+  });
+
+  it('keeps a full week of games in recent, capped per game only', () => {
+    const rows = [];
+    for (let g = 0; g < 14; g++) {
+      for (let i = 0; i < 20; i++) rows.push(row({ commence_time: `2026-10-${String(10 + (g % 7)).padStart(2, '0')}T1${g % 10}:00:00Z`, home_team: `Home ${g}`, v2_outcome: 'won', player_name: `P${i}` }));
+    }
+    expect(shapeProps([], rows, []).recent).toHaveLength(280);
   });
 
   it('puts unofficial results in recent next to official grades, newest game first', () => {
