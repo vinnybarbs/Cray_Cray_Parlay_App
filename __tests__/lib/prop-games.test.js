@@ -51,3 +51,15 @@ describe('sortProps', () => {
     expect(list.map(x => x.text)).toEqual(['a', 'b', 'c', 'd'])
   })
 })
+
+// Owner 2026-10-18: a finished game in Recent results reads Final even
+// when a player never recorded a stat.
+describe('gameState with no stats reads', () => {
+  test('a game whose reads are graded or no stats is final', () => {
+    const list = [
+      read('HOU', 'JAX', '2026-10-18T18:30:00Z', { outcome: 'won' }),
+      read('HOU', 'JAX', '2026-10-18T18:30:00Z', { outcome: 'no_stats' }),
+    ]
+    expect(gameState(list, now)).toBe('final')
+  })
+})

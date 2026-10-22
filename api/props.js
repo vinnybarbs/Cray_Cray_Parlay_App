@@ -4,7 +4,11 @@
 // and nothing touches mv_public_record. Public and read only, the same
 // anon pattern as /api/today.
 //
-// Response: { upcoming: [...], live: [...], skips: [...], recent: [...], record: { byMarket: [...], total }, asOf }
+// Response: { upcoming: [...], live: [...], skips: [...], recent: [...],
+//   longshots: [...], longshotResults: [...], record: { byMarket: [...], total, longshots }, asOf }
+// longshots holds the anytime TD yes reads (upcoming and started) and
+// longshotResults their settled ones, apart from the Plays (owner
+// 2026-10-18): judged on units, never on the hit rate.
 // skips holds every other read for the same games, under 4 points or an
 // anytime TD we price below the book, with the numbers behind it, so a
 // bettor can research the whole game here (owner 2026-10-16).
@@ -25,13 +29,13 @@ const MIN_PP = 4;
 // games with one read or none (owner 2026-10-16, Bears at Falcons).
 const MAX_PER_GAME = 60;
 const RECENT_DAYS = 8;
-// Recent results cap per game like the board, and across the week.
-const RECENT_MAX = 120;
 // The ESPN lookup for unofficial results never holds the page longer.
 const UNOFFICIAL_TIMEOUT_MS = 5000;
 // Graded since the v2 read started (2026-09-14).
 const RECORD_SINCE = '2026-09-14';
 const TD_MARKET = 'player_anytime_td';
+// The anytime TD read went live on 2026-10-12 (PR 217).
+const LONGSHOTS_SINCE = '2026-10-12';
 
 const MARKET_LABEL = {
   player_receptions: 'receptions',
@@ -58,6 +62,23 @@ function showable(r) {
   if (!(Number(r.v2_edge_pp) >= MIN_PP)) return false;
   if (r.market === TD_MARKET && r.v2_side !== 'over') return false;
   return Boolean(MARKET_LABEL[r.market]);
+}
+
+/**
+ * A Longshot: an anytime TD yes we price above the book (owner
+ * 2026-10-18: "the crazy longshot props can have % and research and be
+ * published but don't have to be a play"). Published with the why, in
+ * its own bucket, never a Play: these pay plus money, so one in several
+ * scoring is a winning week, and a hit rate would read as failure. They
+ * stay out of the Plays, the Recent results and the shadow record. Pure.
+ */
+function isLongshot(r) {
+  return showable(r) && r.market === TD_MARKET;
+}
+
+/** A Play: a showable read that is not a Longshot. Pure. */
+function playable(r) {
+  return showable(r) && r.market !== TD_MARKET;
 }
 
 /** A read we have but would not bet: shown as a Skip with its numbers. Pure. */
@@ -126,6 +147,7 @@ function slim(r) {
     side: r.v2_side,
     line: r.line != null ? Number(r.line) : null,
     text: describe(r),
+    longshot: r.market === TD_MARKET,
     edgePp: Number(r.v2_edge_pp),
     price: priceFor(r),
     books: r.books,
@@ -233,6 +255,18 @@ function slimSkip(r) {
   return { ...s, skip: true };
 }
 
+/**
+ * A finished skip for Recent results: the skip's fields plus how it
+ * came out, so every prop shown under a game before kickoff is still
+ * there after the final (owner 2026-10-18). Pure.
+ */
+function slimRecentSkip(r) {
+  const s = slim(r);
+  delete s.books;
+  delete s.why;
+  return { ...s, skip: true };
+}
+
 /** A skip's chart, trimmed to the values and hits to keep the payload light. Pure. */
 function leanHistory(p) {
   if (!p.history) return p;
@@ -241,15 +275,19 @@ function leanHistory(p) {
 
 /** Pure shaping of upcoming, recent and graded rows into the response. */
 function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = [], unofficial = []) {
-  const upcoming = capPerGame((upcomingRows || []).filter(showable)
-    .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp)))
-    .map(slim);
+  const byEdge = (a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp);
+  const upcoming = capPerGame((upcomingRows || []).filter(playable).sort(byEdge)).map(slim);
   // Reads whose game already kicked off, kept with their why so a bettor
   // can look back at what the read was (owner 2026-10-13). They are locked:
   // the line and price are the last ones before kickoff.
-  const live = capPerGame((liveRows || []).filter(showable)
-    .sort((a, b) => Number(b.v2_edge_pp) - Number(a.v2_edge_pp)))
-    .map(r => ({ ...slim(r), started: true }));
+  const live = capPerGame((liveRows || []).filter(playable).sort(byEdge)).map(r => ({ ...slim(r), started: true }));
+  // Longshots (owner 2026-10-18): the anytime TD yes reads, upcoming and
+  // started in one list, their results in another, so neither mixes
+  // with the Plays or the hit rate.
+  const longshots = [
+    ...capPerGame((upcomingRows || []).filter(isLongshot).sort(byEdge)).map(slim),
+    ...capPerGame((liveRows || []).filter(isLongshot).sort(byEdge)).map(r => ({ ...slim(r), started: true })),
+  ];
   // Skips carry no price shopping, only the read, its numbers and a
   // Track bet on the lean.
   const skips = [
@@ -257,18 +295,39 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = [], unoffic
     ...(liveRows || []).filter(skippable).map(r => ({ ...slimSkip(r), started: true })),
   ].sort((a, b) => b.edgePp - a.edgePp);
   // Official grades first, then a finished game's box score result where
-  // no official grade has landed yet (marked unofficial).
-  const official = (recentRows || []).filter(r => showable(r) && ['won', 'lost', 'push', 'void'].includes(r.v2_outcome)).map(slim);
-  const recent = capPerGame([...official, ...(unofficial || [])]
-    .sort((a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.edgePp) - Number(a.edgePp)))
-    .slice(0, RECENT_MAX);
+  // no official grade has landed yet (marked unofficial). Skips come
+  // along under their game, the same as on the board (owner 2026-10-18:
+  // every prop stays visible after the game ends). The window is the
+  // last RECENT_DAYS, capped per game only: a cap across the week cut
+  // whole games out of a full Sunday. Longshot reads settle into their
+  // own list.
+  const graded = (r) => ['won', 'lost', 'push', 'void'].includes(r.v2_outcome);
+  const newestFirst = (a, b) => String(b.commence_time).localeCompare(String(a.commence_time)) || Number(b.edgePp) - Number(a.edgePp);
+  const officialReads = (recentRows || []).filter(r => showable(r) && graded(r)).map(slim);
+  const officialSkips = (recentRows || []).filter(r => skippable(r) && graded(r)).map(slimRecentSkip);
+  const finishedReads = [...officialReads, ...(unofficial || []).filter(p => !p.skip)];
+  const recent = [
+    ...capPerGame(finishedReads.filter(p => !p.longshot).sort(newestFirst)),
+    ...capPerGame([...officialSkips, ...(unofficial || []).filter(p => p.skip)].sort(newestFirst)),
+  ];
+  const longshotResults = capPerGame(finishedReads.filter(p => p.longshot).sort(newestFirst));
   const acc = new Map();
   const total = { won: 0, lost: 0, units: 0 };
+  // Longshots keep their own line: wins, losses, units, and the average
+  // price, which says how many of them need to score to break even.
+  const ls = { won: 0, lost: 0, units: 0, priceSum: 0, priced: 0 };
   for (const r of (gradedRows || []).filter(showable)) {
     if (!['won', 'lost'].includes(r.v2_outcome)) continue;
+    const u = unitsFor(r);
+    if (isLongshot(r)) {
+      if (r.v2_outcome === 'won') ls.won++; else ls.lost++;
+      ls.units += u;
+      const p = priceFor(r);
+      if (p != null) { ls.priceSum += p; ls.priced++; }
+      continue;
+    }
     if (!acc.has(r.market)) acc.set(r.market, { market: r.market, label: MARKET_LABEL[r.market], won: 0, lost: 0, units: 0 });
     const m = acc.get(r.market);
-    const u = unitsFor(r);
     if (r.v2_outcome === 'won') { m.won++; total.won++; } else { m.lost++; total.lost++; }
     m.units += u; total.units += u;
   }
@@ -276,34 +335,45 @@ function shapeProps(upcomingRows, recentRows, gradedRows, liveRows = [], unoffic
   const byMarket = [...acc.values()]
     .map(m => ({ ...m, units: round(m.units) }))
     .sort((a, b) => b.units - a.units);
-  return { upcoming, live, skips, recent, record: { byMarket, total: { ...total, units: round(total.units) }, since: RECORD_SINCE, minPp: MIN_PP } };
+  const record = {
+    byMarket,
+    total: { ...total, units: round(total.units) },
+    longshots: { won: ls.won, lost: ls.lost, units: round(ls.units), avgPrice: ls.priced ? Math.round(ls.priceSum / ls.priced) : null, since: LONGSHOTS_SINCE },
+    since: RECORD_SINCE,
+    minPp: MIN_PP,
+  };
+  return { upcoming, live, skips, recent, longshots, longshotResults, record };
 }
 
 // How long a started read stays up, same window as the game board.
 const STARTED_WINDOW_HOURS = 8;
 
 /**
- * Finished reads with no official grade yet. Official prop grades come
- * from the nflverse stat file, which lands Tuesdays, so a Thursday or
- * Sunday game left the live list after 8 hours and showed nowhere for
- * days (owner 2026-10-16: "Nothing goes to ledger so hard for me to
- * know"). Pure.
+ * Started reads and skips with no official grade yet. The box score
+ * grader settles a game on its next tick after the final, and players
+ * with no box line wait for the Tuesday stat file, so a finished game
+ * used to show nowhere in Recent results until 8 hours after kickoff
+ * (owner 2026-10-18: "All odds after game end aren't in recent
+ * results"). unofficialResults keeps only the ones ESPN calls final.
+ * Pure.
  */
-function awaitingGrade(recentRows, liveFrom) {
-  return (recentRows || []).filter(r => showable(r)
+function awaitingGrade(recentRows, startedBefore) {
+  const cutoff = new Date(startedBefore).getTime();
+  return (recentRows || []).filter(r => (showable(r) || skippable(r))
     && !['won', 'lost', 'push', 'void'].includes(r.v2_outcome)
-    && new Date(r.commence_time).getTime() < new Date(liveFrom).getTime())
-    .map(slim);
+    && new Date(r.commence_time).getTime() < cutoff)
+    .map(r => (showable(r) ? slim(r) : slimRecentSkip(r)));
 }
 
 /**
  * Those reads with the final box score result from the live tracker,
  * marked unofficial. Display only: nothing is written and the official
- * grade replaces it when it lands. Reads with no final line are left
- * out. Pure.
+ * grade replaces it when it lands. A player with no box line shows as
+ * no_stats (likely void). Reads whose game is not final are left out.
+ * Pure.
  */
 function unofficialResults(reads, progress) {
-  const OUTCOME_FOR = { hit: 'won', miss: 'lost', push: 'push' };
+  const OUTCOME_FOR = { hit: 'won', miss: 'lost', push: 'push', no_stats: 'no_stats' };
   const out = [];
   for (const r of reads || []) {
     const p = progress?.reads?.[keyFor(r)];
@@ -345,7 +415,8 @@ async function props(req, res) {
     const [upRes, liveRes, recentRes] = await Promise.all([
       readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gt('commence_time', now.toISOString()).order('id', { ascending: true }).range(a, b)),
       readAll((a, b) => supabase.from('prop_reads').select(`${COLS}, ${WHY_COLS}`).gte('commence_time', liveFrom).lte('commence_time', now.toISOString()).order('id', { ascending: true }).range(a, b)),
-      supabase.from('prop_reads').select(COLS).gte('commence_time', recentFrom).lt('commence_time', now.toISOString()).gte('v2_edge_pp', MIN_PP).limit(1000),
+      // Reads and skips, every page: a full Sunday alone is near 1000 rows.
+      readAll((a, b) => supabase.from('prop_reads').select(COLS).gte('commence_time', recentFrom).lt('commence_time', now.toISOString()).not('v2_edge_pp', 'is', null).order('id', { ascending: true }).range(a, b)),
     ]);
     const graded = [];
     for (let from = 0; ; from += 1000) {
@@ -360,7 +431,7 @@ async function props(req, res) {
     if (err) { res.status(500).json({ error: err.message }); return; }
     // Finished games still waiting on the official grade get the box
     // score result. A slow or failed ESPN call only drops them.
-    const awaiting = awaitingGrade(recentRes.data, liveFrom);
+    const awaiting = awaitingGrade(recentRes.data, now);
     const progress = awaiting.length
       ? await withTimeout(liveProgress(awaiting), UNOFFICIAL_TIMEOUT_MS, { games: {}, reads: {} })
       : { games: {}, reads: {} };
@@ -369,7 +440,7 @@ async function props(req, res) {
     const shaped = shapeProps(upRes.data, recentRes.data, graded, liveRes.error ? [] : liveRes.data, unofficial);
     // Last games for the upcoming reads. A failure here only drops the
     // chart, never the board.
-    const keys = [...new Set([...shaped.upcoming, ...shaped.live, ...shaped.skips].map(p => p.playerKey).filter(Boolean))];
+    const keys = [...new Set([...shaped.upcoming, ...shaped.live, ...shaped.longshots, ...shaped.skips].map(p => p.playerKey).filter(Boolean))];
     let statRows = [];
     if (keys.length > 0) {
       const { data, error } = await readAll((a, b) => supabase.from('nfl_player_game_stats')
@@ -382,19 +453,24 @@ async function props(req, res) {
     }
     // Line shopping at the read's own line (build_queue 105). Only the
     // upcoming board, and a failure only drops the chips.
-    if (shaped.upcoming.length > 0) {
+    const shoppable = [...shaped.upcoming, ...shaped.longshots.filter(p => !p.started)];
+    if (shoppable.length > 0) {
       const { data, error } = await readAll((a, b) => supabase.from('player_props')
         .select('player_key, market, line, over_price, under_price, yes_price, bookmaker, commence_time')
-        .in('player_key', [...new Set(shaped.upcoming.map(p => p.playerKey).filter(Boolean))])
-        .in('market', [...new Set(shaped.upcoming.map(p => p.market))])
+        .in('player_key', [...new Set(shoppable.map(p => p.playerKey).filter(Boolean))])
+        .in('market', [...new Set(shoppable.map(p => p.market))])
         .in('bookmaker', SHOP_BOOKS)
         .gt('commence_time', now.toISOString())
         .order('id', { ascending: true })
         .range(a, b));
-      if (!error) shaped.upcoming = shaped.upcoming.map(p => ({ ...p, shop: shopProp(data, p) }));
+      if (!error) {
+        shaped.upcoming = shaped.upcoming.map(p => ({ ...p, shop: shopProp(data, p) }));
+        shaped.longshots = shaped.longshots.map(p => (p.started ? p : { ...p, shop: shopProp(data, p) }));
+      }
     }
     shaped.upcoming = attachHistory(shaped.upcoming, statRows);
     shaped.live = attachHistory(shaped.live, statRows);
+    shaped.longshots = attachHistory(shaped.longshots, statRows);
     shaped.skips = attachHistory(shaped.skips, statRows).map(leanHistory);
     const access = await viewerSeesAll(req, res);
     if (!access.viewer) res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300');
@@ -439,6 +515,8 @@ module.exports.capPerGame = capPerGame;
 module.exports.awaitingGrade = awaitingGrade;
 module.exports.unofficialResults = unofficialResults;
 module.exports.showable = showable;
+module.exports.isLongshot = isLongshot;
+module.exports.playable = playable;
 module.exports.skippable = skippable;
 module.exports.describe = describe;
 module.exports.attachHistory = attachHistory;

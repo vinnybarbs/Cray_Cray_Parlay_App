@@ -7,8 +7,10 @@
 // same window the card's "Game in progress" chip uses.
 export const IN_PROGRESS_HOURS = 4
 
-const GRADED = ['won', 'lost', 'push']
-const isGraded = (p) => GRADED.includes(p.outcome)
+// A read is settled once it is graded, or the final box score shows the
+// player never recorded a stat (no_stats, likely void).
+const SETTLED = ['won', 'lost', 'push', 'void', 'no_stats']
+const isSettled = (p) => SETTLED.includes(p.outcome)
 
 export function gameKey(p) {
   return `${p.away_team}|${p.home_team}|${p.commence_time}`
@@ -24,7 +26,7 @@ export function gameState(props, now = Date.now()) {
   // a game "In progress" for hours when a player never recorded a stat
   // (owner 2026-10-18, Browns at 2:20 PM: "still saying in progress").
   const reads = props.filter(p => !p.skip)
-  if (reads.some(isGraded)) return 'final'
+  if (reads.some(isSettled)) return 'final'
   return (now - kick) / 3600e3 <= IN_PROGRESS_HOURS ? 'live' : 'final'
 }
 

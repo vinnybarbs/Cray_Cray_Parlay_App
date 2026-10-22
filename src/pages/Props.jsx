@@ -8,6 +8,7 @@ import { API_BASE_URL as API_BASE } from '../config'
 import { SkeletonList } from '../components/Skeleton'
 import { apiFetch } from '../lib/api'
 import { groupByGame, sortProps } from '../lib/propGames'
+import { breakEvenHits, oneIn, sumUnits } from '../lib/longshots'
 import { teamColors } from '../lib/teamColors'
 import { fmtGameDateTime } from '../lib/gameTime'
 import { LiveNowRail } from '../components/LiveScoreboard'
@@ -59,12 +60,15 @@ function GameState({ g }) {
 
 // One game, collapsible (owner 2026-10-16). The header carries the
 // matchup, kickoff or state, and how many reads are inside.
-function GameSection({ g, defaultOpen, showOutcome }) {
+// showUnits (Longshots) adds the units line to a finished game's header,
+// since there the units are the result, not the hit count.
+function GameSection({ g, defaultOpen, showOutcome, showUnits = false }) {
   const [open, setOpen] = useState(defaultOpen)
   const [skipsOpen, setSkipsOpen] = useState(false)
   const reads = sortProps(g.props.filter(p => !p.skip))
   const skips = sortProps(g.props.filter(p => p.skip))
   const n = reads.length
+  const units = showUnits && showOutcome ? sumUnits(reads) : null
   const graded = showOutcome ? reads.filter(p => p.outcome === 'won' || p.outcome === 'lost') : []
   const hits = graded.filter(p => p.outcome === 'won').length
   // Pushes and props still waiting on a grade are named too, so the
@@ -94,6 +98,7 @@ function GameSection({ g, defaultOpen, showOutcome }) {
             {pushes > 0 && <>{', '}{pushes} push</>}
             {voids > 0 && <>{', '}{voids} void</>}
             {waiting > 0 && <>{', '}{waiting} waiting</>}
+            {units != null && graded.length > 0 && <>{' · '}<span className={`tabular-nums ${units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(units)}</span></>}
           </span>
         </span>
         <GameState g={g} />
@@ -112,7 +117,7 @@ function GameSection({ g, defaultOpen, showOutcome }) {
           >
             {skipsOpen ? 'Hide skips' : `Show ${skips.length} more ${skips.length === 1 ? 'prop' : 'props'} we'd skip`}
           </button>
-          {skipsOpen && skips.map((p, i) => <SkipCard key={`skip|${p.text}|${i}`} p={p} />)}
+          {skipsOpen && skips.map((p, i) => <SkipCard key={`skip|${p.text}|${i}`} p={p} showOutcome={showOutcome} />)}
         </div>
       )}
     </section>
@@ -152,6 +157,11 @@ export default function Props() {
   const allRecent = data?.recent || []
   const allLive = data?.live || []
   const allSkips = data?.skips || []
+  // Longshots (owner 2026-10-18): the anytime TD yes reads, their own
+  // tab, never in the Games count, the Recent results or the record.
+  const longshots = data?.longshots || []
+  const longshotResults = data?.longshotResults || []
+  const openLongshots = longshots.filter(p => !['won', 'lost', 'push', 'void'].includes(p.outcome))
   // Chips for the markets on the board right now, in board order.
   const markets = []
   for (const p of [...allUpcoming, ...allLive, ...allSkips, ...allRecent]) {
@@ -171,7 +181,7 @@ export default function Props() {
   // The Live now strip (owner 2026-10-18): score and clock for the games
   // on this slate that are on, no reads in it. Polls only while one is.
   // Every game on the slate, whatever market chip is on.
-  const grouped = useMemo(() => groupByGame([...allLive, ...allUpcoming, ...allSkips]), [data]) // eslint-disable-line react-hooks/exhaustive-deps
+  const grouped = useMemo(() => groupByGame([...allLive, ...allUpcoming, ...longshots, ...allSkips]), [data]) // eslint-disable-line react-hooks/exhaustive-deps
   const liveFeed = useLiveGames(grouped.some(g => g.state === 'live'))
 
   // ESPN knows a game is over before our grades land, so a game the feed
@@ -193,6 +203,11 @@ export default function Props() {
   const firstUpcoming = games.find(g => g.state === 'upcoming')
   const openByDefault = (g) => g.state === 'live' || g === firstUpcoming
   const recentGames = groupByGame(recent)
+  const longshotGames = withFeedState(groupByGame(longshots))
+  const longshotResultGames = groupByGame(longshotResults)
+  const breakEven = breakEvenHits(openLongshots)
+  const lsRec = rec?.longshots
+  const lsOneIn = lsRec ? oneIn(lsRec.avgPrice) : null
 
   // While a game on the slate is on, the official grades land up to 15
   // minutes after the final whistle, so refetch the board every 30 seconds
@@ -260,7 +275,7 @@ export default function Props() {
         )}
 
         <div className="flex gap-4 border-b border-ink-800" role="tablist">
-          {[['upcoming', `Games (${games.length})`], ['recent', 'Recent results']].map(([k, label]) => (
+          {[['upcoming', `Games (${games.length})`], ['longshots', `Longshots (${openLongshots.length})`], ['recent', 'Recent results']].map(([k, label]) => (
             <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
               className={`px-3 py-1.5 text-sm border-b-2 transition-colors ${tab === k ? 'border-signal-pos text-ink-100 font-semibold' : 'border-transparent text-ink-400'}`}>
               {label}
@@ -277,6 +292,37 @@ export default function Props() {
           games.length === 0
             ? <p className="text-sm text-ink-400">No prop reads for the next games yet. Reads refresh twice a day.</p>
             : games.map(g => <GameSection key={g.key} g={g} defaultOpen={openByDefault(g)} />)
+        )}
+
+        {data && tab === 'longshots' && (
+          <>
+            <section className="bg-ink-900 rounded-2xl border border-ink-700 px-4 py-3 flex flex-col gap-2">
+              <p className="text-sm text-ink-200">
+                Anytime TD scorers we price well above the book. These pay plus money, so we judge them on units, not on how many hit.
+              </p>
+              {openLongshots.length > 0 && breakEven > 0 && (
+                <p className="text-sm text-ink-300">
+                  <span className="font-semibold text-ink-100 tabular-nums">{openLongshots.length}</span> flagged this week. Break even if <span className="font-semibold text-ink-100 tabular-nums">{breakEven}</span> {breakEven === 1 ? 'scores' : 'score'}.
+                </p>
+              )}
+              {lsRec && (lsRec.won + lsRec.lost) > 0 && (
+                <p className="text-xs text-ink-400">
+                  Since Oct 12: <span className="tabular-nums text-ink-200">{lsRec.won}-{lsRec.lost}</span>, <span className={`tabular-nums ${lsRec.units >= 0 ? 'text-signal-pos' : 'text-signal-neg'}`}>{fmtUnits(lsRec.units)}</span> at 1 unit each
+                  {lsRec.avgPrice != null && <>, average price {lsRec.avgPrice > 0 ? '+' : ''}{lsRec.avgPrice}</>}
+                  {lsOneIn != null && lsOneIn > 1 && <>, so one in {lsOneIn} needs to score</>}. Too few to judge yet, we call it at about 80.
+                </p>
+              )}
+            </section>
+            {longshotGames.length === 0
+              ? <p className="text-sm text-ink-400">No longshots for the next games yet. Reads refresh twice a day.</p>
+              : longshotGames.map(g => <GameSection key={`ls|${g.key}`} g={g} defaultOpen={g.state !== 'final'} />)}
+            {longshotResultGames.length > 0 && (
+              <>
+                <h2 className="text-lg font-semibold text-ink-100 pt-2">Results</h2>
+                {longshotResultGames.map((g, i) => <GameSection key={`lsr|${g.key}`} g={g} defaultOpen={i === 0} showOutcome showUnits />)}
+              </>
+            )}
+          </>
         )}
 
         {data && tab === 'recent' && (
@@ -309,7 +355,7 @@ export default function Props() {
                 ))}
               </tbody>
             </table>
-            <p className="text-xs text-ink-500 mt-2">Graded since Sep 14 at the consensus price, 1 unit each. Rushing and receiving yards changed method on Oct 12 and anytime TD started Oct 12.</p>
+            <p className="text-xs text-ink-500 mt-2">Graded since Sep 14 at the consensus price, 1 unit each. Rushing and receiving yards changed method on Oct 12. Anytime TD scorers are Longshots, kept on their own tab and out of this record.</p>
           </details>
         )}
 
