@@ -378,12 +378,13 @@ export function SkipCard({ p }) {
   )
 }
 
-export default function PropCard({ p, showOutcome = false }) {
+// hideTrack: a leg inside a tracked parlay, which is untracked as a whole.
+export default function PropCard({ p, showOutcome = false, hideTrack = false }) {
   if (p.locked) return <LockedProp p={p} />
-  return <OpenPropCard p={p} showOutcome={showOutcome} />
+  return <OpenPropCard p={p} showOutcome={showOutcome} hideTrack={hideTrack} />
 }
 
-function OpenPropCard({ p, showOutcome }) {
+function OpenPropCard({ p, showOutcome, hideTrack }) {
   const [open, setOpen] = useState(false)
   const started = !!p.started
   const [playerOpen, setPlayerOpen] = useState(false)
@@ -432,7 +433,7 @@ function OpenPropCard({ p, showOutcome }) {
             : <span />}
           {/* Track bet (owner 2026-10-16): one tap puts the read on the
               Tracked tab. Gone once the official grade is in. */}
-          {!OUTCOME[p.outcome] && <TrackButton item={propItem(p)} />}
+          {!OUTCOME[p.outcome] && !hideTrack && <TrackButton item={propItem(p)} />}
         </div>
       </div>
 

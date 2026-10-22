@@ -1,4 +1,4 @@
-const { decimalOdds, americanOdds, legFromGame, parlayMath, fmtChance } = require('../../src/lib/parlay');
+const { decimalOdds, americanOdds, legFromGame, legFromProp, sharesGame, parlayMath, fmtChance } = require('../../src/lib/parlay');
 const { parlayItems, parlayLegKey, groupTracked, parlayStatus, splitUnits, gameItem } = require('../../src/lib/trackedKeys');
 
 const NOW = Date.parse('2026-10-18T18:00:00Z');
@@ -99,5 +99,36 @@ describe('parlays on the Tracked tab', () => {
     const s = splitUnits([...parlay, legs[0]], () => ({}), NOW);
     expect(s.live.map(u => u.type)).toEqual(['parlay']);
     expect(s.upcoming.map(u => u.type)).toEqual(['single']);
+  });
+});
+
+describe('prop legs', () => {
+  const prop = (over = {}) => ({
+    player: 'DJ Moore', playerKey: 'dj moore', market: 'player_receptions', side: 'over', line: 4.5,
+    price: -120, ourProb: 60, bookProb: 53, edgePp: 7, text: 'DJ Moore over 4.5 receptions',
+    commence_time: hoursFromNow(3), home_team: 'Lions', away_team: 'Bears', ...over,
+  });
+
+  it('takes a priced read that has not started, keyed like Track bet', () => {
+    const leg = legFromProp(prop());
+    expect(leg).toMatchObject({ kind: 'prop', odds: -120, book: 0.53, ours: 0.6, pick: 'DJ Moore over 4.5 receptions' });
+    expect(leg.id).toMatch(/^prop:dj moore\|player_receptions\|over\|4.5\|/);
+  });
+
+  it('refuses started, locked, unpriced reads and an anytime TD no', () => {
+    expect(legFromProp(prop({ started: true }))).toBeNull();
+    expect(legFromProp(prop({ locked: true }))).toBeNull();
+    expect(legFromProp(prop({ price: null }))).toBeNull();
+    expect(legFromProp(prop({ market: 'player_anytime_td', side: 'under' }))).toBeNull();
+    expect(legFromProp(prop({ market: 'player_anytime_td', side: 'over', price: 150 }))).not.toBeNull();
+  });
+
+  it('mixes with Board legs and flags legs from one game', () => {
+    const side = legFromGame(game());
+    const p = legFromProp(prop());
+    const m = parlayMath([side, p], 10);
+    expect(m.bookPct).toBeCloseTo(50 * 53 / 100, 5);
+    expect(sharesGame([side, p])).toBe(true);
+    expect(sharesGame([side, legFromProp(prop({ home_team: 'Packers', away_team: 'Vikings' }))])).toBe(false);
   });
 });
